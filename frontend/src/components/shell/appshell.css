@@ -1,0 +1,21 @@
+/*
+ * Shell, after pellet-frontend's app.css: a DEFINITE height, not a minimum, so nothing that
+ * measures itself can push the page down; content that does not fit scrolls inside main.
+ * The sidebar adds a row axis the pellet shell did not have.
+ */
+.appshell { display: flex; height: 100vh; height: 100dvh; }
+.app-col { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.app-main {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 14px 16px 22px; max-width: 1860px; width: 100%; margin: 0 auto;
+}
+
+.app-msg {
+  margin: 60px auto; max-width: 520px; text-align: center;
+  color: var(--muted); font-size: 12px; line-height: 1.7;
+}
+
+@media (max-width: 760px) {
+  .appshell { flex-direction: column; }
+  .app-main { padding: 12px 12px 20px; }
+}

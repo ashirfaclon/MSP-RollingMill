@@ -1,0 +1,220 @@
+/* ==========================================================================
+   Rolling mill · Visualization — layout only. Colour, radius and shadow come
+   from theme.css tokens; the card anatomy follows pellet-frontend's .cpp-card.
+   ========================================================================== */
+
+.rm-viz { display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+
+/* Series tone: a category colour any child can read as --tone. */
+.rm-tone--prod  { --tone: var(--s-prod); }
+.rm-tone--order { --tone: var(--s-order); }
+.rm-tone--free  { --tone: var(--s-free); }
+.rm-text--order { color: var(--s-order); }
+
+/* Label convention: muted, small, uppercase, heavy — the value is the brightest thing. */
+.rm-k {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+/* ------------------------------- KPI strip -------------------------------- */
+
+.rm-strip {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* label · value · note · meter, repeating per row of cards; spare height goes to the meter row. */
+  grid-auto-rows: auto auto auto minmax(4px, 1fr);
+  column-gap: 10px; row-gap: 10px;
+}
+
+/*
+ * Each card spans four rows of the strip and adopts them as a subgrid, so label, value,
+ * note and meter sit on the same lines across all seven — a label that wraps to two lines
+ * pushes its whole row down rather than knocking one value out of line.
+ */
+.rm-card {
+  display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 6px; align-content: start;
+  min-width: 0;
+  min-height: clamp(112px, 13vh, 150px);
+  padding: 12px 13px 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)), var(--panel);
+  border: 1px solid var(--border); border-top: 2px solid var(--border-hi);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+:root[data-theme="light"] .rm-card { background: var(--panel); }
+
+.rm-card-label {
+  display: flex; align-items: flex-start; gap: 7px; min-width: 0;
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.8px; line-height: 12px; text-transform: uppercase;
+  color: var(--muted-2); text-wrap: balance;
+}
+.rm-card-label::before {
+  content: ""; flex: none; width: 3px; height: 12px; border-radius: 2px; background: var(--tone);
+}
+.rm-card-value {
+  font-size: 30px; font-weight: 800; line-height: 1.05; letter-spacing: -0.6px;
+  white-space: nowrap; margin-top: 2px;
+}
+.rm-card-unit { font-size: 11px; font-weight: 700; color: var(--muted); margin-left: 5px; letter-spacing: 0; }
+.rm-card-note {
+  font-size: 10px; font-weight: 600; color: var(--muted-2);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rm-meter {
+  display: block; align-self: end; height: 4px; border-radius: 3px;
+  background: var(--panel-3); overflow: hidden;
+}
+.rm-meter > i { display: block; height: 100%; border-radius: 3px; background: var(--tone); }
+
+/* ------------------------------- Panels ----------------------------------- */
+
+.rm-row { flex: 1 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rm-panel { display: flex; flex-direction: column; min-width: 0; }
+.rm-body { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
+
+/* ------------------------------- Mill mimic ------------------------------- */
+
+.rm-mimic {
+  list-style: none; margin: 0; padding: 2px 0;
+  display: grid; align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+}
+.rm-mimic-arrow { color: var(--muted-3); display: grid; place-items: center; }
+
+.rm-zone {
+  --zone: var(--s-prod);
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  padding: 9px 12px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft); border-top: 2px solid var(--zone);
+  border-radius: var(--radius-sm);
+}
+.rm-zone--ok   { --zone: var(--ok); }
+.rm-zone--risk { --zone: var(--risk); }
+.rm-zone--na   { --zone: var(--na); }
+.rm-zone-title {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rm-zone-body { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rm-zone-value { font-size: 19px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
+.rm-zone-state { text-transform: uppercase; letter-spacing: 0.6px; }
+.rm-zone-glyph { color: var(--zone); flex: none; }
+.rm-zone-foot {
+  align-self: flex-end;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.7px; text-transform: uppercase; color: var(--muted-3);
+}
+
+/* --------------------------- Production by shift -------------------------- */
+
+.rm-shifts { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding-top: 4px; }
+.rm-shift, .rm-shift-target-label {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) 80px; align-items: center; gap: 14px;
+}
+.rm-shift-target-label { margin-bottom: -8px; }
+.rm-shift-target-label > span {
+  grid-column: 2; position: relative; left: var(--target); transform: translateX(-50%);
+  justify-self: start; white-space: nowrap;
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--gold);
+}
+.rm-shift-name {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.7px; text-transform: uppercase; color: var(--muted-2);
+}
+.rm-shift-track {
+  position: relative; display: block; height: 20px; border-radius: 4px; background: var(--panel-3);
+}
+.rm-shift-fill {
+  position: absolute; inset: 0 auto 0 0; border-radius: 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--s-prod) 88%, #ffffff), var(--s-prod));
+}
+/* Each track draws its own slice of the target line; the slices overlap the row gap so
+   the three read as one dashed rule down the plot. */
+.rm-shift-target {
+  position: absolute; left: var(--target); top: -9px; bottom: -9px; width: 0;
+  border-left: 1.5px dashed var(--gold);
+}
+.rm-shift-val { font-size: 11.5px; font-weight: 800; text-align: right; }
+
+/* Footer readouts shared by the shift panel. */
+.rm-foot {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding-top: 10px; border-top: 1px solid var(--border-soft);
+}
+.rm-foot-item { display: inline-flex; align-items: baseline; gap: 14px; }
+.rm-foot-v { font-size: 17px; font-weight: 800; }
+
+/* ---------------------------- Order allocation ---------------------------- */
+
+.rm-alloc { justify-content: space-around; }
+.rm-alloc-block { display: flex; flex-direction: column; gap: 8px; }
+.rm-alloc-block + .rm-alloc-block { padding-top: 12px; border-top: 1px solid var(--border-soft); }
+.rm-alloc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.rm-alloc-total { font-size: 17px; font-weight: 800; }
+
+.rm-stack { display: flex; gap: 2px; width: 100%; border-radius: 5px; overflow: hidden; }
+.rm-stack--lg { height: 22px; }
+.rm-stack--sm { height: 12px; background: var(--panel-3); border-radius: 4px; }
+.rm-stack-seg { display: block; height: 100%; background: var(--tone); }
+
+.rm-legend { display: flex; align-items: center; gap: 8px 22px; flex-wrap: wrap; font-size: 10.5px; }
+.rm-legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.rm-legend-label { color: var(--text-2); font-weight: 600; }
+.rm-legend-item b { color: var(--tone); font-weight: 800; }
+.rm-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); flex: none; }
+.rm-legend-end { margin-left: auto; display: inline-flex; align-items: baseline; gap: 6px; }
+.rm-legend-end b { font-size: 11.5px; font-weight: 800; }
+.rm-legend--head { gap: 14px; }
+
+/* --------------------------- Material balance ----------------------------- */
+
+.rm-balance {
+  flex: 1; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+  align-content: center;
+}
+.rm-balance > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rm-balance dd { margin: 0; }
+.rm-stat { font-size: 19px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
+
+.rm-ops {
+  margin: 0; padding-top: 10px; border-top: 1px solid var(--border-soft);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px 18px; flex-wrap: wrap;
+}
+.rm-ops > div { display: inline-flex; align-items: baseline; gap: 6px; }
+.rm-ops dt { font-size: 10px; font-weight: 700; color: var(--muted-2); }
+.rm-ops dd { margin: 0; font-size: 11.5px; font-weight: 800; color: var(--text); }
+.rm-ops-yield dt { font-size: 9.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--s-order); }
+.rm-ops-yield dd { color: var(--s-order); }
+
+/* ---------------------------- Stock by size ------------------------------- */
+
+.rm-sizes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-around; gap: 12px; flex: 1; }
+.rm-size { display: grid; grid-template-columns: 52px minmax(0, 1fr) 64px; align-items: center; gap: 14px; }
+.rm-size-name { font-size: 10.5px; font-weight: 700; color: var(--muted); }
+.rm-size-val { font-size: 11.5px; font-weight: 800; text-align: right; }
+
+/* ------------------------------ Breakpoints ------------------------------- */
+
+/* Seven cards on a narrow desktop: step the headline down so value + unit stay on a line. */
+@media (max-width: 1500px) {
+  .rm-card-value { font-size: 25px; letter-spacing: -0.4px; }
+}
+
+@media (max-width: 1180px) {
+  .rm-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .rm-row { grid-template-columns: minmax(0, 1fr); }
+  .rm-mimic { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); row-gap: 10px; }
+  .rm-mimic-arrow:nth-child(6) { display: none; }
+}
+
+@media (max-width: 760px) {
+  .rm-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rm-card-value { font-size: 22px; }
+  .rm-mimic { grid-template-columns: minmax(0, 1fr); }
+  .rm-mimic-arrow { transform: rotate(90deg); height: 14px; }
+  .rm-mimic-arrow:nth-child(6) { display: grid; }
+  .rm-balance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rm-shift, .rm-shift-target-label { grid-template-columns: 52px minmax(0, 1fr) 64px; gap: 10px; }
+  .rm-legend-end { margin-left: 0; }
+  .panel-head { flex-wrap: wrap; row-gap: 4px; }
+  .panel-head .panel-sub { order: 3; flex-basis: 100%; }
+}

@@ -1,0 +1,521 @@
+/* ============================================================================
+   MSP control-room design system — ported from pellet-frontend (see
+   DESIGN_HANDOVER.md). Tokens and primitives shared by every rolling-mill
+   screen; the look (deep navy field, luminous panels, status-coloured accents)
+   lives here so the screens themselves stay layout-only.
+   ========================================================================== */
+
+:root {
+  /* Field */
+  --bg-0: #04101f;
+  --bg-1: #071a2e;
+  --panel: #0a1e35;
+  --panel-2: #0d2742;
+  --panel-3: #123253;
+  --panel-hi: #16405f;
+
+  /* Lines */
+  --border: #1b3f63;
+  --border-soft: #143352;
+  --border-hi: #24557f;
+
+  /* Type */
+  --text: #eaf3fd;
+  --text-2: #a8c2dc;
+  --text-3: #7f9cba;
+  --muted: #8fabc8;
+  --muted-2: #6b88a6;
+  --muted-3: #55738f;
+
+  /* Status */
+  --ok: #2fe07a;
+  --ok-dim: rgba(47, 224, 122, 0.13);
+  --warn: #f7b731;
+  --warn-dim: rgba(247, 183, 49, 0.14);
+  --risk: #ff5252;
+  --risk-dim: rgba(255, 82, 82, 0.14);
+  --info: #38bdf8;
+  --info-dim: rgba(56, 189, 248, 0.13);
+  --na: #7b95b0;
+  --na-dim: rgba(123, 149, 176, 0.14);
+  --demo: #b78bfa;
+  --demo-dim: rgba(183, 139, 250, 0.15);
+
+  /* Accents */
+  --accent: #4da3ff;
+  --accent-2: #22d3ee;
+  --gold: #ffc84a;
+  --violet: #a78bfa;
+
+  /* Series palette (charts) */
+  --s-actual: #2fe07a;
+  --s-expected: #4da3ff;
+  --s-pred: #ffc84a;
+  --s-alt: #22d3ee;
+
+  /* Rolling-mill series: finished output, order-linked tonnage, free (unallocated)
+     tonnage. Categories, not verdicts — they never stand in for ok/warn/risk. */
+  --s-prod: #4da3ff;
+  --s-order: #34d3b4;
+  --s-free: #f5b54a;
+
+  --radius: 10px;
+  --radius-sm: 7px;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.34);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { margin: 0; height: 100%; }
+
+body {
+  background:
+    radial-gradient(1100px 620px at 14% -8%, #0c2b4b 0%, transparent 62%),
+    radial-gradient(900px 560px at 92% 0%, #0a2540 0%, transparent 58%),
+    var(--bg-0);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-inter), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 12.5px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num { font-variant-numeric: tabular-nums; letter-spacing: -0.2px; }
+
+/* ------------------------------- Panels --------------------------------- */
+
+.panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0)) , var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.panel-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.panel-title {
+  font-size: 12.5px; font-weight: 700; color: var(--text);
+  letter-spacing: 0.2px; display: flex; align-items: center; gap: 8px;
+}
+.panel-title .idx {
+  display: inline-grid; place-items: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--info-dim); color: var(--info);
+  font-size: 10.5px; font-weight: 800;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+.panel-sub { font-size: 10.5px; color: var(--muted-2); font-weight: 500; }
+.panel-head .spacer { flex: 1; }
+.panel-body { padding: 11px 13px 13px; }
+.panel-body.tight { padding: 6px 8px 8px; }
+
+.section-label {
+  font-size: 11px; font-weight: 800; letter-spacing: 1.4px;
+  text-transform: uppercase; color: var(--muted-2);
+  margin: 4px 2px 2px;
+}
+
+/* -------------------------------- Chips --------------------------------- */
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.2px;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.chip--ok   { color: var(--ok);   background: var(--ok-dim);   border-color: rgba(47, 224, 122, 0.32); }
+.chip--warn { color: var(--warn); background: var(--warn-dim); border-color: rgba(247, 183, 49, 0.34); }
+.chip--risk { color: var(--risk); background: var(--risk-dim); border-color: rgba(255, 82, 82, 0.34); }
+.chip--info { color: var(--info); background: var(--info-dim); border-color: rgba(56, 189, 248, 0.32); }
+.chip--na   { color: var(--na);   background: var(--na-dim);   border-color: rgba(123, 149, 176, 0.3); }
+
+/* Honesty badge */
+.dbadge {
+  display: inline-flex; align-items: center;
+  padding: 1px 6px; border-radius: 4px;
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.dbadge--live       { color: var(--ok);   background: var(--ok-dim);   border-color: rgba(47, 224, 122, 0.3); }
+.dbadge--calc       { color: var(--info); background: var(--info-dim); border-color: rgba(56, 189, 248, 0.3); }
+/* Measured, but not the whole of it: amber, between Calc's confidence and Check's alarm. */
+.dbadge--partial    { color: var(--warn); background: var(--warn-dim); border-color: rgba(247, 183, 49, 0.35); }
+.dbadge--unreliable { color: var(--risk); background: var(--risk-dim); border-color: rgba(255, 82, 82, 0.3); }
+.dbadge--na         { color: var(--na);   background: var(--na-dim);   border-color: rgba(123, 149, 176, 0.28); }
+.dbadge--demo       { color: var(--demo); background: var(--demo-dim); border-color: rgba(183, 139, 250, 0.35); }
+
+/* Priority pills */
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 5px;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.4px;
+}
+.pill--critical { color: #ffdada; background: rgba(255, 82, 82, 0.2);  border: 1px solid rgba(255, 82, 82, 0.45); }
+.pill--warning  { color: #ffeec2; background: rgba(247, 183, 49, 0.16); border: 1px solid rgba(247, 183, 49, 0.4); }
+.pill--data     { color: #cfe9ff; background: rgba(56, 189, 248, 0.14); border: 1px solid rgba(56, 189, 248, 0.36); }
+.pill--idle,
+.pill--na       { color: var(--na); background: rgba(123, 149, 176, 0.1); border: 1px solid rgba(123, 149, 176, 0.28); }
+.pill--p1 { color: #ffd9d9; background: rgba(255, 82, 82, 0.2);   border: 1px solid rgba(255, 82, 82, 0.45); }
+.pill--p2 { color: #ffe9bf; background: rgba(247, 183, 49, 0.16); border: 1px solid rgba(247, 183, 49, 0.4); }
+.pill--p3 { color: #c8f7dc; background: rgba(47, 224, 122, 0.14); border: 1px solid rgba(47, 224, 122, 0.36); }
+/* A recovered alert: green, because the condition is resolved — but the softest green on
+   the page, since the row is history and must not compete with a live alert for attention. */
+.pill--cleared { color: #a9e9c4; background: rgba(47, 224, 122, 0.10); border: 1px solid rgba(47, 224, 122, 0.30); }
+
+/* Trend arrows */
+.trend { font-weight: 700; white-space: nowrap; }
+.trend--up   { color: var(--risk); }
+.trend--down { color: var(--info); }
+.trend--flat { color: var(--muted); }
+.trend--good { color: var(--ok); }
+
+/* -------------------------------- Tables -------------------------------- */
+
+table.grid { border-collapse: collapse; width: 100%; }
+table.grid th {
+  text-align: left; font-size: 9.5px; font-weight: 800;
+  letter-spacing: 0.7px; text-transform: uppercase;
+  color: var(--muted-2); background: var(--panel-2);
+  padding: 7px 9px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 1;
+}
+table.grid th:first-child { border-top-left-radius: var(--radius-sm); }
+table.grid th:last-child  { border-top-right-radius: var(--radius-sm); }
+table.grid td {
+  padding: 7px 9px; border-bottom: 1px solid var(--border-soft);
+  color: var(--text-2); vertical-align: middle; font-size: 11.5px;
+}
+table.grid tbody tr:last-child td { border-bottom: none; }
+table.grid tbody tr.clickable:hover td { background: rgba(77, 163, 255, 0.07); }
+/* Row label in a data table. Muted like every card label, so the VALUE stays the
+   brightest thing in the row — see the convention block in supervisor.css. Kept at
+   weight 700 because a table label is the same size as its value and would otherwise
+   be hard to scan. */
+table.grid td b, table.grid td strong { color: var(--muted); font-weight: 700; }
+/* Numbers align in a column. Deliberately NO colour here: `table.grid td.num` would
+   out-specify .v-ok / .v-risk / .v-na and silently override the value hierarchy that
+   valueClass() sets. Colour on a value comes from those classes and nowhere else. */
+table.grid td.num { font-variant-numeric: tabular-nums; }
+tr.idle td { opacity: 0.55; }
+
+/* Header variants that mirror the prototype's coloured table heads */
+table.grid.head-risk th { background: rgba(255, 82, 82, 0.14); color: #ffc9c9; }
+table.grid.head-info th { background: rgba(56, 189, 248, 0.1); color: #bfe6ff; }
+
+/* ------------------------------ Interaction ----------------------------- */
+
+.clickable { cursor: pointer; }
+.clickable:hover { background: rgba(77, 163, 255, 0.06); }
+
+.na-text { color: var(--muted-3); font-style: normal; }
+
+.scroll-y { overflow-y: auto; }
+.scroll-y::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-y::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; }
+.scroll-y::-webkit-scrollbar-track { background: transparent; }
+
+h1, h2, h3, p { margin: 0; }
+button { font-family: inherit; }
+
+/* Chart empty state */
+.chart-empty {
+  display: grid; place-items: center; text-align: center;
+  color: var(--muted-3); font-size: 11px; line-height: 1.5;
+  border: 1px dashed var(--border); border-radius: var(--radius-sm);
+  background: repeating-linear-gradient(
+    -45deg, rgba(255, 255, 255, 0.014) 0 8px, transparent 8px 16px
+  );
+  padding: 8px;
+}
+
+/* Stat block used beside charts (prototype's right-hand readouts) */
+.statbox {
+  border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  background: var(--panel-2); padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.statbox .label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted-2); font-weight: 700; }
+.statbox .value { font-size: 19px; font-weight: 800; line-height: 1.1; }
+.statbox .value .u { font-size: 10.5px; font-weight: 700; color: var(--muted); margin-left: 4px; }
+
+.v-ok { color: var(--ok); } .v-warn { color: var(--warn); }
+.v-risk { color: var(--risk); } .v-info { color: var(--info); }
+.v-na { color: var(--muted-3); } .v-gold { color: var(--gold); }
+/* A value with no status tone: primary text colour, so the number carries the emphasis. */
+.v-val { color: var(--text); }
+
+/* Inside a table these must be restated. `table.grid td` sets --text-2 at specificity
+   0-0-1-2, which out-ranks a bare .v-* class (0-0-1-0) — so every value in a table was
+   silently rendering in the dim cell colour instead of its own. */
+table.grid td.v-ok   { color: var(--ok); }
+table.grid td.v-warn { color: var(--warn); }
+table.grid td.v-risk { color: var(--risk); }
+table.grid td.v-info { color: var(--info); }
+table.grid td.v-na   { color: var(--muted-3); }
+table.grid td.v-val  { color: var(--text); }
+table.grid td.v-gold { color: var(--gold); }
+
+/* ============================ LIGHT THEME =================================
+   Same token names, daylight values. Everything downstream — panels, chips,
+   tables, charts — reads tokens, so the whole dashboard flips with this block.
+   ========================================================================= */
+
+:root[data-theme="light"] {
+  /*
+   * Pure-white cards on a near-white page were the glare: almost no luminance step between
+   * the two, so the eye got maximum brightness and minimum separation at the same time.
+   * The ground drops and the card lifts to a soft off-white, which reads as paper rather
+   * than as a lit screen, and the borders carry the card edge instead of brightness.
+   */
+  --bg-0: #dfe6f0;
+  --bg-1: #eaf0f8;
+  --panel: #fbfcfe;
+  --panel-2: #f1f5fb;
+  --panel-3: #e4ecf6;
+  --panel-hi: #d6e3f2;
+
+  /*
+   * Firmer than before. In daylight the card edge is what separates a card from the page,
+   * since the luminance step between them is small by design — a 1.41:1 edge disappeared
+   * at 1 px, and `border-soft` at 1.21:1 made in-card row separators invisible.
+   */
+  --border: #bacbde;
+  --border-soft: #d0dcea;
+  --border-hi: #9db3cd;
+
+  --text: #0f2440;
+  --text-2: #365b82;
+  --text-3: #5f7591;
+  /*
+   * Darkened for daylight. The dashboard's smallest labels are 9-9.5 px, and the previous
+   * muted-3 sat at 2.55:1 on a card — legible on a dark field where the same hue is a
+   * light-on-dark tint, but not on paper. All three now clear 4.5:1 while keeping their
+   * relative order, so the hierarchy still reads.
+   */
+  --muted: #4d6684;
+  --muted-2: #5c7490;
+  --muted-3: #5c7189;
+
+  --ok: #14803c;
+  --ok-dim: rgba(20, 128, 60, 0.11);
+  --warn: #9a6a00;
+  --warn-dim: rgba(154, 106, 0, 0.12);
+  --risk: #c62828;
+  --risk-dim: rgba(198, 40, 40, 0.1);
+  --info: #0b6fb8;
+  --info-dim: rgba(11, 111, 184, 0.1);
+  --na: #5e7288;
+  --na-dim: rgba(94, 114, 136, 0.12);
+  --demo: #6d28d9;
+  --demo-dim: rgba(109, 40, 217, 0.11);
+
+  --accent: #1d6fd9;
+  --accent-2: #0e7490;
+  --gold: #a86b00;
+  --violet: #6d28d9;
+
+  --s-actual: #14803c;
+  --s-expected: #1d6fd9;
+  --s-pred: #b8790a;
+  --s-alt: #0e7490;
+
+  --s-prod: #1d6fd9;
+  --s-order: #0b7a66;
+  --s-free: #a15f00;
+
+  --shadow: 0 1px 2px rgba(16, 42, 74, 0.05), 0 6px 18px rgba(16, 42, 74, 0.07);
+}
+
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(1100px 620px at 14% -8%, #f3f7fc 0%, transparent 62%),
+    radial-gradient(900px 560px at 92% 0%, #dde7f5 0%, transparent 58%),
+    var(--bg-0);
+}
+
+/* Surfaces that were luminous-on-dark need a flat treatment in daylight. */
+:root[data-theme="light"] .panel {
+  background: var(--panel);
+}
+:root[data-theme="light"] .sv-tile,
+:root[data-theme="light"] .mg-top {
+  background: var(--panel);
+}
+:root[data-theme="light"] .topbar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(244, 248, 253, 0.95));
+}
+:root[data-theme="light"] .tb-mark {
+  background: linear-gradient(140deg, #1d6fd9, #14539f);
+  border-color: rgba(29, 111, 217, 0.4);
+  color: #ffffff;
+}
+:root[data-theme="light"] .tb-pick option { background: #ffffff; }
+:root[data-theme="light"] .kd-drawer {
+  background: linear-gradient(180deg, #ffffff 0%, #f6f9fd 100%);
+}
+:root[data-theme="light"] .kd-overlay { background: rgba(16, 34, 58, 0.34); }
+:root[data-theme="light"] .kd-formula {
+  background: #f4f7fc; color: #1c3a5e;
+}
+:root[data-theme="light"] .ah-hbar-txt { color: #ffffff; }
+:root[data-theme="light"] .chart-empty {
+  background: repeating-linear-gradient(
+    -45deg, rgba(16, 42, 74, 0.03) 0 8px, transparent 8px 16px
+  );
+}
+:root[data-theme="light"] .clickable:hover,
+:root[data-theme="light"] table.grid tbody tr.clickable:hover td {
+  background: rgba(29, 111, 217, 0.06);
+}
+
+/* ------------------------- the ⓘ formula affordance ---------------------- */
+
+.infodot {
+  display: inline-grid; place-items: center; flex: none;
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 1px solid var(--border-hi); background: transparent;
+  color: var(--muted-2); cursor: pointer;
+  font-size: 9.5px; font-weight: 800; font-style: italic;
+  font-family: Georgia, "Times New Roman", serif; line-height: 1; padding: 0;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.infodot:hover {
+  color: var(--accent); border-color: var(--accent);
+  background: var(--info-dim);
+}
+.infodot:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Sits quietly until the card is hovered, then becomes obvious. */
+.panel-head .infodot, .sv-tile .infodot, .mg-top .infodot, .ah-health .infodot { opacity: 0.55; }
+.panel:hover .panel-head .infodot,
+.sv-tile:hover .infodot, .mg-top:hover .infodot, .ah-health:hover .infodot { opacity: 1; }
+
+/* Pills and banners were built for luminous text on a dark field; in daylight
+   they need dark text on a tint, or they wash out to invisible. */
+:root[data-theme="light"] .pill--critical { color: #8e1414; background: rgba(198, 40, 40, 0.12); border-color: rgba(198, 40, 40, 0.4); }
+:root[data-theme="light"] .pill--warning  { color: #7a4a00; background: rgba(154, 106, 0, 0.13); border-color: rgba(154, 106, 0, 0.4); }
+:root[data-theme="light"] .pill--cleared  { color: #14803c; background: rgba(20, 128, 60, 0.10); border-color: rgba(20, 128, 60, 0.34); }
+:root[data-theme="light"] .pill--data     { color: #0a4f80; background: rgba(11, 111, 184, 0.11); border-color: rgba(11, 111, 184, 0.38); }
+:root[data-theme="light"] .pill--p1       { color: #8e1414; background: rgba(198, 40, 40, 0.12); border-color: rgba(198, 40, 40, 0.4); }
+:root[data-theme="light"] .pill--p2       { color: #7a4a00; background: rgba(154, 106, 0, 0.13); border-color: rgba(154, 106, 0, 0.4); }
+:root[data-theme="light"] .pill--p3       { color: #106732; background: rgba(20, 128, 60, 0.12); border-color: rgba(20, 128, 60, 0.38); }
+:root[data-theme="light"] .pill--idle,
+:root[data-theme="light"] .pill--na       { color: #5b7089; background: rgba(107, 127, 150, 0.12); border-color: rgba(107, 127, 150, 0.32); }
+
+:root[data-theme="light"] table.grid.head-risk th { background: rgba(198, 40, 40, 0.09); color: #8e1414; }
+:root[data-theme="light"] table.grid.head-info th { background: rgba(11, 111, 184, 0.08); color: #0a4f80; }
+
+:root[data-theme="light"] .demo-banner {
+  color: #4a1d96;
+  background: linear-gradient(90deg, rgba(109, 40, 217, 0.14), rgba(109, 40, 217, 0.04));
+  border-bottom-color: rgba(109, 40, 217, 0.3);
+}
+:root[data-theme="light"] .demo-banner button {
+  background: rgba(109, 40, 217, 0.1); border-color: rgba(109, 40, 217, 0.4); color: #4a1d96;
+}
+:root[data-theme="light"] .demo-banner button:hover { background: rgba(109, 40, 217, 0.18); }
+
+/*
+ * Controls added for the alert log, field pickers and maintenance workflow were authored
+ * against a dark surface: white-on-transparent fills vanish on paper, and the two form
+ * inputs fell back to a dark translucent ground because `--bg` is not a token here.
+ */
+:root[data-theme="light"] .sv-field-pick option { background: #ffffff; }
+:root[data-theme="light"] .sv-field-pick { background: var(--panel-2); }
+:root[data-theme="light"] .ma-btn { background: var(--panel-2); }
+:root[data-theme="light"] .ma-btn:hover:not(:disabled) { background: var(--panel-3); }
+:root[data-theme="light"] .ma-input,
+:root[data-theme="light"] .mg-notes { background: #ffffff; color: var(--text); }
+:root[data-theme="light"] .mg-alert { background: var(--panel-2); }
+:root[data-theme="light"] .mg-l17-card { background: var(--panel-2); }
+:root[data-theme="light"] .sv-alert-scroll table.grid thead th { background: var(--panel); }
+/* The log's scrollbar was a dark-mode thumb on a light track. */
+:root[data-theme="light"] .sv-alert-scroll::-webkit-scrollbar-thumb { background: var(--border-hi); }
+
+/*
+ * Surfaces and separators that were authored as translucent white over a dark field. On
+ * paper white-over-white is nothing at all, so each needs a real tint or a real line.
+ */
+:root[data-theme="light"] .ma-btn:hover:not(:disabled) { background: var(--panel-3); }
+:root[data-theme="light"] .kd-drawer { box-shadow: -16px 0 40px rgba(16, 42, 74, 0.16); }
+
+/*
+ * Elevation was tuned for a dark field, where a heavy black shadow reads as depth. On
+ * paper the same shadow is a grey smudge, so the cards lift with a light, tight shadow and
+ * let their borders do the separating. The state glow stays — it is information — but at
+ * an opacity that does not bloom against white.
+ */
+
+
+:root[data-theme="light"] .mg-top-ico { background: rgba(16, 42, 74, 0.04); }
+:root[data-theme="light"] .ah-ready {
+  background: linear-gradient(145deg, rgba(11, 111, 184, 0.07), rgba(255, 255, 255, 0.6)), var(--panel);
+}
+
+/* ---------------------------- chart tooltips ----------------------------
+ * Every chart renders its tooltip with `outside: true` — into document.body
+ * rather than inside its own SVG — so a chart in a panel, a drawer or a table
+ * cell is not clipped by that container's `overflow`.
+ *
+ * Highcharts gives that detached container `z-index: 3`. Every overlay in this
+ * app sits far above it: the KPI drawer is 41, the expanded mimic 240, the
+ * sensor menu 9000. So the tooltip WAS being built and positioned correctly on
+ * hover and then painted underneath the panel the reader was hovering over —
+ * the crosshair and the highlighted point showed, the box did not.
+ *
+ * One rule, above the highest of them, because a tooltip is transient and
+ * pointer-transparent: it can never trap a click or hide anything for longer
+ * than the cursor rests on a point.
+ * ---------------------------------------------------------------------- */
+.highcharts-tooltip-container { z-index: 9100 !important; }
+
+/* ------------------------------- skeletons --------------------------------
+ * The third state, beside a reading and an NA.
+ *
+ * "NA" is a claim — we looked and there is no source. During the first fetch
+ * the truth is that nobody has looked yet, and a card saying NA in the meantime
+ * tells the reader something false for as long as the request takes. These bars
+ * say "not yet" and cannot be mistaken for either a value or an absence.
+ *
+ * One keyframe for the whole app, so every screen breathes at the same rate.
+ * ------------------------------------------------------------------------ */
+
+@keyframes skel-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.95; }
+}
+
+.skel {
+  display: inline-block;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    var(--border) 0%,
+    var(--border-hi) 50%,
+    var(--border) 100%
+  );
+  animation: skel-pulse 1.5s ease-in-out infinite;
+  /* Nothing inside is readable, and a screen reader should be told so rather
+     than announcing an empty element. */
+  color: transparent;
+  user-select: none;
+}
+
+/* The shapes a skeleton stands in for. Widths are deliberately uneven — a
+   column of identical bars reads as a rendering fault, not as loading. */
+.skel--num    { width: 4.5ch; height: 1em; vertical-align: -0.12em; }
+.skel--num-lg { width: 3.2ch; height: 1.5em; vertical-align: -0.2em; }
+.skel--text   { width: 11ch;  height: 0.85em; vertical-align: -0.05em; }
+.skel--cell   { width: 3.5ch; height: 0.85em; vertical-align: -0.05em; }
+
+/* A chart or sparkline: the box keeps its height so nothing below it moves. */
+.skel--block { display: block; width: 100%; border-radius: var(--radius-sm, 6px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; opacity: 0.7; }
+}

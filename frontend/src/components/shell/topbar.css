@@ -1,0 +1,63 @@
+/* Top bar. Brand block, segment and picker chrome ported from pellet-frontend's
+   topbar.css; the tab strip lives in the sidebar here. Every colour is a token. */
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 10px 16px;
+  background: linear-gradient(180deg, rgba(10, 32, 56, 0.97), rgba(7, 24, 43, 0.94));
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+.tb-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.tb-brand-text { min-width: 0; }
+.tb-mark {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; flex: none;
+  background: linear-gradient(140deg, #1e6fd9, #12406f);
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  font-size: 11px; font-weight: 900; letter-spacing: 0.5px; color: #eaf3fd;
+}
+/* The mill code is the screen's identity — wider than the MSP monogram, same plate. */
+.tb-mark--mill { width: auto; min-width: 46px; height: 36px; padding: 0 10px; font-size: 13.5px; letter-spacing: 0.8px; }
+
+.tb-title {
+  font-size: 16px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--text); line-height: 1.2; white-space: nowrap;
+}
+.tb-title-sep { color: var(--muted-3); font-weight: 600; margin: 0 2px; }
+.tb-sub { font-size: 11px; color: var(--muted-2); font-weight: 600; margin-top: 2px; }
+
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.tb-seg {
+  display: flex; padding: 2px; gap: 2px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+}
+.tb-seg-btn {
+  display: grid; place-items: center;
+  border: none; background: transparent; color: var(--muted-2);
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.3px;
+  padding: 4px 9px; border-radius: 6px; cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.tb-seg-btn:hover { color: var(--text-2); }
+.tb-seg-btn--theme { padding: 5px 9px; }
+.tb-seg-btn--theme.on { background: var(--panel-hi); color: var(--text); }
+.tb-seg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+:root[data-theme="light"] .topbar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(244, 248, 253, 0.95));
+}
+:root[data-theme="light"] .tb-mark {
+  background: linear-gradient(140deg, #1d6fd9, #14539f);
+  border-color: rgba(29, 111, 217, 0.4);
+  color: #ffffff;
+}
+
+@media (max-width: 760px) {
+  .topbar { gap: 10px; padding: 10px 12px; }
+  .tb-title { font-size: 13.5px; letter-spacing: 0.8px; white-space: normal; }
+  .tb-sub { display: none; }
+  .tb-right { margin-left: 0; width: 100%; }
+}
