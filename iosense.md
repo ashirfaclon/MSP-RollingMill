@@ -2,12 +2,39 @@
 
 Resource and functionID calls made by this app, per CLAUDE.md.
 
-## Status (2026-09-28)
+## Status (2026-09-30)
 
-No IOsense calls yet. The HSM Visualization screen renders hardcoded values from
-`frontend/src/components/visualization/hsmValues.ts` by decision — data wiring (login,
-IOsense devices / insights, ERP order and stock) is a later step and will be logged here.
+HSM Visualization now reads live data for: Production and Mass yield cards, the mill
+mimic, Material & operating balance, Production & dispatch by size, and open orders.
+Every wired figure opens a drill-down drawer (chart with interactive legend + table + checks).
+Sources are the ERP cache (log sheet, PROD_TRAN, SALE, SORD — `npm run sync:erp`) and the
+plant historian (Influx). No wired KPI reads the IOsense logbook yet. The remaining cards
+and panels still render the sample model (`hsmSample.ts`).
 
-| Screen | Figure | Source | functionID / resource | Notes |
-|---|---|---|---|---|
-| — | — | — | — | — |
+## App routes (HSM) and the data behind them
+
+| Route | Source | Figures |
+|---|---|---|
+| `GET /api/hsm/production` | ERP log sheet PRODUCTION_MT · Influx `HSM / Finishing Mill / General / Total_Production_Ton` | Production card, ERP vs counter |
+| `GET /api/hsm/billets` | ERP log sheet INPUT_PCS · Influx `HSM / Finishing Mill / General / Dicharged_Billet` | Billets drawer, ERP vs counter |
+| `GET /api/hsm/logsheet` | ERP log sheet (all LOG_FIELDS) · PROD_TRAN finished-strip receipts | Yield, mass balance, losses, quality split, stores check |
+| `GET /api/hsm/sizes` | ERP PROD_TRAN receipts · SALE lines (finished-strip items) | Production & dispatch by size |
+| `GET /api/hsm/orders` | ERP SORD (ORDER_HEAD/BODY, latest amendment) | Orders placed per period, open order book |
+| `GET /api/hsm/live` | Influx `HSM / Roughing Mill, Finishing Mill / RM_0n, FM_0n` (On_Off, Motor_Current, Motor_RPM, Roll_Force_Ton) · `Rolling_Mill_Speed` · `Dicharged_Billet` | Mill mimic: billets today, stand groups |
+| `GET /api/hsm/stands` | Same stand fields, 1-min+ means | Stands drawer trend |
+
+## Calls
+
+| functionID | Method · endpoint | Used by | Purpose |
+|---|---|---|---|
+| `validateSSOToken` | `GET /api/retrieve-sso-token/{token}` | `server/logbook/client.ts` → `POST /api/logbook-sso` | Exchange the one-time SSO token from the app URL for a session (held in server memory only) |
+| `findUserDevices` | `PUT /api/account/devices/1/1` | `server/logbook/client.ts` → `probeLogbook` | Session probe — proves the bearer is accepted; one device, nothing used from it |
+| insightResult fetch (paginated) | `PUT /api/account/bruce/insightResult/fetch/paginated/{insightId}` | `server/logbook/client.ts` → `fetchLogbookWindow` | Logbook form entries for a window. **Inactive until `IOSENSE_HSM_INSIGHT_ID` is set** |
+
+All calls send `Authorization`, `organisation`, `ngsw-bypass: true`, `Content-Type: application/json`.
+
+## Resources
+
+| Resource | ID | Notes |
+|---|---|---|
+| MSP logbook insight | `INS_353018753af1` | HSM forms found: quality-report-hsm/hsm-online-profile-check-inspection-report, electrical-hsm/electrical-delays, ccm/hsm. `ccm/entry-os` (Entry OS) exists but its 3 entries in 60 days are all for mill RMS — not usable for HSM billet length |

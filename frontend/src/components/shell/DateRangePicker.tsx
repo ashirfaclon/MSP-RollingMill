@@ -1,82 +1,58 @@
 'use client';
 
 /**
- * Duration picker: preset list on the left, explicit start/end date-time and a month
- * calendar on the right, Cancel / Apply at the foot. Ported from pellet-frontend.
+ * Duration picker: preset list on the left, start/end date and a month calendar on the
+ * right, Cancel / Apply at the foot. Ported from pellet-frontend.
  *
- * Plant time throughout. A preset fills the fields so you can see exactly which window
- * it resolves to before applying, and editing any field switches to Custom — the fields
- * are the source of truth, the presets are shortcuts to them.
+ * Dates only — no time of day. Every date is a plant day, 06:00 IST to 06:00 IST the next
+ * day (lib/plantDay.ts): picking 24 Sep means 24 Sep 06:00 → 25 Sep 06:00. The cycle each
+ * choice covers is shown beside the dates and on the trigger, so nobody has to remember it.
+ *
+ * A preset fills the dates so you can see what it resolves to before applying; editing a
+ * date switches to Custom — the dates are the source of truth, presets are shortcuts.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  DURATION_LABELS, presetRange, setGlobalSel, useGlobalSel, type DurationPreset,
+  DURATION_LABELS, presetDates, selectedDates, setGlobalSel, useGlobalSel, type DurationPreset,
 } from '@/state/globalSel';
+import { PLANT_DAY_START, addDays, cycleLabel, dayCount, dm, isDate, plantDate } from '@/lib/plantDay';
+import { useMinute } from '@/services/hsmProduction';
 import './daterange.css';
 
-const IST_OFF = 330 * 60_000;
 const ORDER: DurationPreset[] = [
-  'custom', 'current_shift', 'today', 'yesterday',
+  'custom', 'today', 'yesterday',
   'current_week', 'previous_week', 'previous_7_days',
   'current_month', 'previous_month', 'previous_3_months',
   'previous_12_months', 'current_year', 'previous_year',
 ];
 
-type Parts = { date: string; time: string };
-
-/** epoch ms -> the date/time strings the inputs use, in plant time. */
-const toParts = (ms: number): Parts => {
-  const d = new Date(ms + IST_OFF);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return {
-    date: `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`,
-    time: `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`,
-  };
-};
-/** date + time strings in plant time -> epoch ms. */
-const toMs = (date: string, time: string): number | null => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  const t = /^(\d{2}):(\d{2})$/.exec(time);
-  if (!m || !t) return null;
-  return Date.UTC(+m[1], +m[2] - 1, +m[3], +t[1], +t[2]) - IST_OFF;
-};
-
-/** Human length of the selected window — "8 h 00 m", "2 days 4 h". */
-function spanLabel(fromMs: number, toMs: number): string {
-  const mins = Math.max(0, Math.round((toMs - fromMs) / 60_000));
-  const d = Math.floor(mins / 1440);
-  const h = Math.floor((mins % 1440) / 60);
-  const m = mins % 60;
-  if (d > 0) return `${d} day${d > 1 ? 's' : ''}${h ? ` ${h} h` : ''}`;
-  return `${h} h ${String(m).padStart(2, '0')} m`;
-}
-
 export default function DateRangePicker() {
   const sel = useGlobalSel();
+  const now = useMinute();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
   const [preset, setPreset] = useState<DurationPreset>(sel.duration);
-  const [from, setFrom] = useState<Parts>({ date: '', time: '' });
-  const [to, setTo] = useState<Parts>({ date: '', time: '' });
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [month, setMonth] = useState(() => new Date(0));
   /** True between the first and second click of a range selection. */
   const [anchored, setAnchored] = useState(false);
-  /** The clock as of opening — fixes "today" and the future cut-off while the picker is up. */
-  const [nowMs, setNowMs] = useState(0);
+  /** The clock when the picker opened — fixes "today" and the presets while it is up. */
+  const [openedAt, setOpenedAt] = useState(0);
+  const today = openedAt ? plantDate(openedAt) : '';
 
   /** Seed the form from the active selection each time the picker opens. */
   const openPicker = () => {
-    const now = Date.now();
-    const active = sel.duration === 'custom' && sel.customFromMs !== null && sel.customToMs !== null
-      ? { fromMs: sel.customFromMs, toMs: sel.customToMs }
-      : presetRange(sel.duration, now) ?? { fromMs: now - 3_600_000, toMs: now };
+    const nowMs = Date.now();
+    const t = plantDate(nowMs);
+    const active = selectedDates(sel, nowMs) ?? { from: t, to: t };
     setPreset(sel.duration);
-    setFrom(toParts(active.fromMs));
-    setTo(toParts(active.toMs));
-    setMonth(new Date(active.fromMs + IST_OFF));
+    setFrom(active.from);
+    setTo(active.to);
+    setMonth(new Date(`${active.from.slice(0, 7)}-01T00:00:00Z`));
     setAnchored(false);
-    setNowMs(now);
+    setOpenedAt(nowMs);
     setOpen(true);
   };
 
@@ -95,13 +71,13 @@ export default function DateRangePicker() {
   const pickPreset = (p: DurationPreset) => {
     setPreset(p);
     setAnchored(false);
-    const r = p === 'custom' ? null : presetRange(p, nowMs);
-    if (r) { setFrom(toParts(r.fromMs)); setTo(toParts(r.toMs)); setMonth(new Date(r.fromMs + IST_OFF)); }
+    const r = p === 'custom' ? null : presetDates(p, openedAt);
+    if (r) { setFrom(r.from); setTo(r.to); setMonth(new Date(`${r.from.slice(0, 7)}-01T00:00:00Z`)); }
   };
 
-  const edit = (which: 'from' | 'to', field: 'date' | 'time', value: string) => {
-    setPreset('custom');                       // touching a field means custom
-    (which === 'from' ? setFrom : setTo)((v) => ({ ...v, [field]: value }));
+  const edit = (which: 'from' | 'to', value: string) => {
+    setPreset('custom');                       // touching a date means custom
+    (which === 'from' ? setFrom : setTo)(value);
   };
 
   /**
@@ -111,30 +87,26 @@ export default function DateRangePicker() {
   const pickDay = (key: string) => {
     setPreset('custom');
     if (!anchored) {
-      setFrom((v) => ({ ...v, date: key }));
-      setTo((v) => ({ ...v, date: key }));
+      setFrom(key);
+      setTo(key);
       setAnchored(true);
       return;
     }
-    if (key < from.date) {
-      setTo({ date: from.date, time: to.time });
-      setFrom((v) => ({ ...v, date: key }));
-    } else {
-      setTo((v) => ({ ...v, date: key }));
-    }
+    if (key < from) { setTo(from); setFrom(key); } else setTo(key);
     setAnchored(false);
   };
 
-  const fromMs = toMs(from.date, from.time);
-  const toMsV = toMs(to.date, to.time);
-  const invalid = fromMs === null || toMsV === null || toMsV <= fromMs;
+  const problem = !isDate(from) || !isDate(to) ? 'Choose a start and an end date.'
+    : to < from ? 'End date must not be before start date.'
+    : from > today ? 'Start date is in the future.'
+    : null;
 
   const apply = () => {
-    if (invalid) return;
+    if (problem) return;
     setGlobalSel({
       duration: preset,
-      customFromMs: preset === 'custom' ? fromMs : null,
-      customToMs: preset === 'custom' ? toMsV : null,
+      customFrom: preset === 'custom' ? from : null,
+      customTo: preset === 'custom' ? to : null,
     });
     setOpen(false);
   };
@@ -144,27 +116,29 @@ export default function DateRangePicker() {
     const y = month.getUTCFullYear(); const m = month.getUTCMonth();
     const lead = new Date(Date.UTC(y, m, 1)).getUTCDay();
     const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-    const cells: Array<{ day: number; ms: number } | null> = Array(lead).fill(null);
-    for (let d = 1; d <= days; d += 1) cells.push({ day: d, ms: Date.UTC(y, m, d) - IST_OFF });
+    const cells: Array<{ day: number; key: string } | null> = Array(lead).fill(null);
+    for (let d = 1; d <= days; d += 1) cells.push({ day: d, key: new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10) });
     return cells;
   }, [month]);
 
-  const todayKey = toParts(nowMs).date;
-  const label = sel.duration === 'custom' && sel.customFromMs !== null && sel.customToMs !== null
-    ? `${toParts(sel.customFromMs).date} → ${toParts(sel.customToMs).date}`
-    : DURATION_LABELS[sel.duration];
+  // The trigger: the preset's name (if any) and the cycle it covers, e.g.
+  // "Today · 1 Oct 06:00 → 2 Oct 06:00", or just the cycle for a custom range.
+  const active = selectedDates(sel, now);
+  const cycle = active ? cycleLabel(active.from, active.to) : '';
+  const name = sel.duration === 'custom' ? null : DURATION_LABELS[sel.duration];
 
   return (
     <div className="dr" ref={box}>
       <button
         className="dr-trigger"
         onClick={() => (open ? setOpen(false) : openPicker())}
-        title="Select period"
+        title="Select period — each day runs 06:00 to 06:00"
         aria-expanded={open}
         aria-haspopup="dialog"
       >
         <span className="dr-trigger-k">Duration</span>
-        <span className="dr-trigger-v" suppressHydrationWarning>{label}</span>
+        {name && <span className="dr-trigger-v" suppressHydrationWarning>{name}</span>}
+        {cycle && <span className="dr-trigger-cycle num" suppressHydrationWarning>{cycle}</span>}
         <span className="dr-caret">{open ? '▴' : '▾'}</span>
       </button>
 
@@ -184,19 +158,19 @@ export default function DateRangePicker() {
             <div className="dr-fields">
               <label className="dr-f">
                 <span>Start Date <i>*</i></span>
-                <input type="date" value={from.date} onChange={(e) => edit('from', 'date', e.target.value)} />
-              </label>
-              <label className="dr-f">
-                <span>Start Time <i>*</i></span>
-                <input type="time" value={from.time} onChange={(e) => edit('from', 'time', e.target.value)} />
+                <span className="dr-f-row">
+                  <input type="date" value={from} max={today} onChange={(e) => edit('from', e.target.value)} />
+                  <span className="dr-f-cycle num" aria-hidden>from {PLANT_DAY_START}</span>
+                </span>
               </label>
               <label className="dr-f">
                 <span>End Date <i>*</i></span>
-                <input type="date" value={to.date} onChange={(e) => edit('to', 'date', e.target.value)} />
-              </label>
-              <label className="dr-f">
-                <span>End Time <i>*</i></span>
-                <input type="time" value={to.time} onChange={(e) => edit('to', 'time', e.target.value)} />
+                <span className="dr-f-row">
+                  <input type="date" value={to} max={today} onChange={(e) => edit('to', e.target.value)} />
+                  <span className="dr-f-cycle num" aria-hidden>
+                    to {isDate(to) ? dm(addDays(to, 1)) : 'next day'} {PLANT_DAY_START}
+                  </span>
+                </span>
               </label>
             </div>
 
@@ -212,17 +186,15 @@ export default function DateRangePicker() {
               <div className="dr-days">
                 {grid.map((c, i) => {
                   if (!c) return <span key={i} />;
-                  const key = toParts(c.ms).date;
-                  const future = c.ms > nowMs;
-                  const isFrom = key === from.date; const isTo = key === to.date;
-                  const inRange = key > from.date && key < to.date;
-                  const today = key === todayKey;
+                  const isFrom = c.key === from; const isTo = c.key === to;
+                  const inRange = c.key > from && c.key < to;
                   return (
                     <button
                       key={i}
-                      disabled={future}
-                      className={`${isFrom || isTo ? 'sel' : ''}${inRange ? ' in' : ''}${today ? ' today' : ''}`}
-                      onClick={() => pickDay(key)}
+                      disabled={c.key > today}
+                      className={`${isFrom || isTo ? 'sel' : ''}${inRange ? ' in' : ''}${c.key === today ? ' today' : ''}`}
+                      onClick={() => pickDay(c.key)}
+                      title={cycleLabel(c.key, c.key)}
                     >
                       {c.day}
                     </button>
@@ -232,14 +204,14 @@ export default function DateRangePicker() {
             </div>
 
             <div className="dr-foot">
-              <span className="dr-hint">
-                {invalid
-                  ? <b className="dr-bad">End must be after start.</b>
-                  : <><b>{spanLabel(fromMs as number, toMsV as number)}</b> · plant time (IST)</>}
+              <span className="dr-hint" role="status">
+                {problem
+                  ? <b className="dr-bad">{problem}</b>
+                  : <><b className="num">{cycleLabel(from, to)}</b> · {dayCount(from, to)} plant day{dayCount(from, to) > 1 ? 's' : ''} · IST</>}
               </span>
               <span className="dr-btns">
                 <button className="ghost" onClick={() => setOpen(false)}>Cancel</button>
-                <button className="primary" disabled={invalid} onClick={apply}>Apply</button>
+                <button className="primary" disabled={!!problem} onClick={apply}>Apply</button>
               </span>
             </div>
           </div>

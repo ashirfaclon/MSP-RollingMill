@@ -1,0 +1,114 @@
+/* Material flow — layout only; colours are tokens, series tones come from
+   .rm-tone--* in visualization.css (read here as --tone). */
+
+.mf-body { gap: 16px; }
+
+/* ------------------------------ main line -------------------------------- */
+
+.mf-flow {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; align-items: start; gap: 8px;
+  grid-template-columns:
+    minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+}
+.mf-step { display: flex; flex-direction: column; min-width: 0; }
+/* Level with the middle of a main node. */
+.mf-arrow { color: var(--muted-3); display: grid; place-items: center; margin-top: 32px; }
+
+.mf-node {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  padding: 9px 12px 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft); border-top: 2px solid var(--tone);
+  border-radius: var(--radius-sm);
+}
+.mf-node-title {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mf-node-value { font-size: 19px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
+.mf-node-meta {
+  font-size: 10px; font-weight: 600; color: var(--muted-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mf-node--compact { padding: 7px 11px; }
+.mf-node--compact .mf-node-value { font-size: 16px; }
+
+/* Accepted forks: a bracket from the arrow to both destinations. */
+.mf-ends { position: relative; gap: 8px; padding-left: 14px; }
+.mf-ends::before {
+  content: ""; position: absolute; left: 0; top: 30px; bottom: 30px;
+  border-left: 1.5px solid var(--muted-3);
+}
+.mf-ends > .mf-node { position: relative; }
+.mf-ends > .mf-node::before {
+  content: ""; position: absolute; left: -15px; top: 50%; width: 14px;
+  border-top: 1.5px solid var(--muted-3);
+}
+
+/* ------------------------ exits peeling off below ------------------------ */
+
+.mf-exits {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-left: 16px; padding: 10px 0 0 14px;
+  border-left: 1.5px dashed var(--border-hi);
+}
+.mf-exit {
+  position: relative;
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  padding: 7px 10px 8px;
+  /* The chip treatment — tinted fill, same-hue border — so an exit reads as a branch off
+     the line rather than another stage, whose tone sits on the top edge instead. */
+  background: color-mix(in srgb, var(--tone) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone) 34%, transparent);
+  border-radius: var(--radius-sm);
+}
+/* Tick from the dashed rail into the card. */
+.mf-exit::before {
+  content: ""; position: absolute; left: -16px; top: 15px; width: 14px;
+  border-top: 1.5px dashed var(--border-hi);
+}
+.mf-exit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.mf-exit-title {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mf-exit-value { font-size: 13px; font-weight: 800; color: var(--text); white-space: nowrap; }
+.mf-exit-note { font-size: 10px; font-weight: 700; color: var(--text-3); }
+
+.mf-reasons {
+  list-style: none; margin: 3px 0 0; padding: 5px 0 0;
+  border-top: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.mf-reasons li { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--muted); }
+.mf-reasons b { color: var(--text-2); font-weight: 800; white-space: nowrap; }
+
+/* ---------------------------- balance alert ------------------------------ */
+
+.mf-alert {
+  list-style: none; margin: 0; padding: 8px 12px;
+  background: var(--risk-dim); border: 1px solid color-mix(in srgb, var(--risk) 40%, transparent);
+  border-radius: var(--radius-sm); color: var(--risk); font-size: 11px;
+}
+.mf-alert b { font-weight: 800; }
+
+/* --------------------------- where it all went --------------------------- */
+
+.mf-split {
+  display: flex; flex-direction: column; gap: 8px;
+  padding-top: 12px; border-top: 1px solid var(--border-soft);
+}
+.mf-split-total { font-size: 13px; font-weight: 800; }
+.mf-split .mf-legend { gap: 6px 24px; }
+
+/* ------------------------------ breakpoints ------------------------------ */
+
+/* Narrow: the line runs top to bottom, each stage followed by what leaves it. */
+@media (max-width: 900px) {
+  .mf-flow { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .mf-arrow { margin-top: 0; transform: rotate(90deg); height: 18px; }
+  .mf-ends { padding-left: 0; }
+  .mf-ends::before, .mf-ends > .mf-node::before { display: none; }
+  .mf-split .mf-legend { flex-direction: column; align-items: flex-start; }
+}

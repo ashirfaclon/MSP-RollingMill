@@ -2,10 +2,18 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import AppShell from '@/components/shell/AppShell';
 import HsmVisualization from '@/components/visualization/HsmVisualization';
+import HsmDataModel from '@/components/datamodel/HsmDataModel';
 import ScreenPlaceholder from '@/components/ScreenPlaceholder';
-import { MILLS, SCREENS, isMill, isScreen, millOf, screenOf } from '@/config/navigation';
+import { MILLS, SCREENS, isMill, isScreen, millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
 
-/** Every mill × screen is known up front, so all twelve are prerendered. */
+/** Screens that exist so far; everything else shows a placeholder. */
+function screenFor(mill: MillId, screen: ScreenId) {
+  if (mill === 'hsm' && screen === 'visualization') return <HsmVisualization />;
+  if (mill === 'hsm' && screen === 'data-model') return <HsmDataModel />;
+  return <ScreenPlaceholder mill={mill} screen={screen} />;
+}
+
+/** Every mill × screen is known up front, so all of them are prerendered. */
 export const dynamicParams = false;
 
 export function generateStaticParams() {
@@ -23,10 +31,6 @@ export default async function Page(props: PageProps<'/[mill]/[screen]'>) {
   if (!isMill(mill) || !isScreen(screen)) notFound();
 
   return (
-    <AppShell mill={mill} screen={screen}>
-      {mill === 'hsm' && screen === 'visualization'
-        ? <HsmVisualization />
-        : <ScreenPlaceholder mill={mill} screen={screen} />}
-    </AppShell>
+    <AppShell mill={mill} screen={screen}>{screenFor(mill, screen)}</AppShell>
   );
 }

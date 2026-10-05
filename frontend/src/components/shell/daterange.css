@@ -12,6 +12,8 @@
 .dr-trigger:hover { border-color: var(--border-hi); }
 .dr-trigger-k { color: var(--muted-2); font-weight: 700; letter-spacing: .3px; }
 .dr-trigger-v { font-weight: 700; }
+/* The plant-day cycle the selection covers — every day runs 06:00 → 06:00. */
+.dr-trigger-cycle { font-weight: 700; color: var(--info); white-space: nowrap; }
 .dr-caret { color: var(--muted-2); font-size: 9px; }
 
 .dr-pop {
@@ -34,6 +36,18 @@
 .dr-right { padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 10px; }
 
 .dr-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+/* Each date with the cycle it starts or ends — one row per date so the cycle always fits. */
+.dr-fields:has(.dr-f-row) { grid-template-columns: 1fr; gap: 8px; }
+.dr-f > .dr-f-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: inherit; font-weight: inherit; letter-spacing: 0; text-transform: none; color: inherit;
+}
+.dr-f-row input { flex: 1; min-width: 0; }
+.dr-f-cycle {
+  flex: none; min-width: 112px; text-align: center; padding: 4px 7px; border-radius: 6px; white-space: nowrap;
+  font-size: 10.5px; font-weight: 800; color: var(--info);
+  background: var(--info-dim); border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
+}
 .dr-f { display: flex; flex-direction: column; gap: 4px; }
 .dr-f > span {
   font-size: 9.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
@@ -86,6 +100,7 @@
 .dr-btns .primary:disabled { opacity: .45; cursor: default; }
 
 @media (max-width: 720px) {
+  .dr-trigger-cycle { display: none; }
   .dr-pop { grid-template-columns: 1fr; min-width: min(94vw, 420px); right: -8px; }
   .dr-presets { max-height: 150px; border-right: 0; border-bottom: 1px solid var(--border); }
 }

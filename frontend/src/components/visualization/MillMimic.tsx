@@ -1,75 +1,111 @@
-import { Fragment } from 'react';
-import Panel from '@/components/Panel';
-import { fixed } from '@/lib/num';
-import type { HsmValues } from './hsmValues';
-
-type Zone =
-  | { kind: 'count'; key: string; title: string; value: string; foot: string }
-  | { kind: 'group'; key: string; title: string; state: string; foot: string };
-
-/** A running group is in band; anything else is the operator's to look at. */
-const stateTone = (s: string) => (s.toLowerCase() === 'running' ? 'ok' : s.toLowerCase() === 'idle' ? 'na' : 'risk');
+'use client';
 
 /**
- * Grouped process zones, billet infeed to finished exit. Stand-level detail waits on the
- * stand map, which the panel head says outright.
+ * Billet infeed to finished exit, live. Infeed and the two stand groups come from the
+ * plant historian (refreshed every 30 s); the exit is the Influx production counter
+ * (Total_Production_Ton) for the Duration period — the same figure as the Production card. Each zone opens the drill-down that shows where its figure comes from.
+ *
+ * The historian has no intermediate stand group — only Roughing RM 1–5 and Finishing
+ * FM 1–6 — so the mimic shows the groups that exist.
  */
-export default function MillMimic({ v }: { v: HsmValues }) {
-  const zones: Zone[] = [
-    { kind: 'count', key: 'infeed', title: 'Billet infeed', value: `${v.billets} billets`, foot: 'Counter / entry' },
-    { kind: 'group', key: 'roughing', title: 'Roughing group', state: v.mimic.roughing, foot: 'Group status' },
-    { kind: 'group', key: 'intermediate', title: 'Intermediate group', state: v.mimic.intermediate, foot: 'Group status' },
-    { kind: 'group', key: 'finishing', title: 'Finishing group', state: v.mimic.finishing, foot: 'Group status' },
-    { kind: 'count', key: 'exit', title: 'Finished exit', value: `${fixed(v.production, 1)} MT`, foot: 'ERP production' },
+import { Fragment, useState } from 'react';
+import Panel from '@/components/Panel';
+import { fixed } from '@/lib/num';
+import FlowArrow from './FlowArrow';
+import CounterDrawer, { BILLET_COUNTER, hhmm } from '@/components/drill/CounterDrawer';
+import StandsDrawer from '@/components/drill/StandsDrawer';
+import ProductionDrawer from '@/components/production/ProductionDrawer';
+import { useApi, type GroupNow, type HsmLive } from '@/services/hsmApi';
+import { useProduction, useSelection } from '@/services/hsmProduction';
+
+const HM = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
+const hm = (iso: string | null) => (iso ? HM.format(new Date(iso)) : '—');
+
+const TONE: Record<GroupNow['state'], string> = { 'all-on': 'ok', partial: 'risk', 'all-off': 'na', 'no-data': 'na' };
+
+export default function MillMimic() {
+  const live = useApi<HsmLive>('/api/hsm/live', 30_000);
+  const { dates, label } = useSelection();
+  const prod = useProduction(dates ? { ...dates, grain: 'day' } : null);
+  const [open, setOpen] = useState<'billets' | 'stands' | 'production' | null>(null);
+  const [group, setGroup] = useState<'roughing' | 'finishing'>('roughing');
+
+  const d = live.data;
+  const prodNow = prod.data && dates && prod.data.from === dates.from && prod.data.to === dates.to ? prod.data : null;
+  const exit = prodNow?.totals.influxMt ?? null;
+  const loading = !d && !live.error;
+
+  const chip = !d ? <span className="chip chip--na">{live.error ? 'Historian unavailable' : 'Connecting…'}</span>
+    : d.fresh ? <span className="chip chip--ok" title={`Last reading ${hhmm(d.lastReadingAt)}`}>Live · {hm(d.lastReadingAt)}</span>
+    : <span className="chip chip--warn" title={d.message}>No recent readings · last {hhmm(d.lastReadingAt)}</span>;
+
+  const zones = [
+    {
+      key: 'infeed', kind: 'count' as const, title: 'Billet infeed',
+      value: d?.billetsToday === null || d?.billetsToday === undefined ? 'NA' : `${d.billetsToday} billets`,
+      foot: 'Influx · since 06:00', open: () => setOpen('billets'), openLabel: 'Billets per day, ERP vs mill counter',
+    },
+    ...(d?.groups ?? []).map((g) => ({
+      key: g.id, kind: 'group' as const, title: g.label, g,
+      foot: `${g.total} stands · drive status`,
+      open: () => { setGroup(g.id); setOpen('stands'); }, openLabel: `${g.label} stand readings and trend`,
+    })),
+    {
+      key: 'exit', kind: 'count' as const, title: 'Finished exit',
+      value: exit === null ? 'NA' : `${fixed(exit, 1)} MT`,
+      foot: `Influx · ${label}`, open: () => setOpen('production'), openLabel: 'Mill counter vs ERP production',
+    },
   ];
 
   return (
-    <Panel
-      title="Mill mimic"
-      sub="Grouped process zones · representative running state"
-      right={<span className="chip chip--na">Stand map pending</span>}
-    >
-      <ol className="rm-mimic" aria-label="Mill process flow">
-        {zones.map((z, i) => (
-          <Fragment key={z.key}>
-            {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
-            <li className={`rm-zone ${z.kind === 'group' ? `rm-zone--${stateTone(z.state)}` : 'rm-zone--flow'}`}>
-              <span className="rm-zone-title">{z.title}</span>
-              <span className="rm-zone-body">
-                {z.kind === 'group' ? (
-                  <>
-                    <span className={`rm-zone-value rm-zone-state v-val`}>{z.state}</span>
-                    <StandGlyph />
-                  </>
-                ) : (
-                  <span className="rm-zone-value num v-val">{z.value}</span>
-                )}
-              </span>
-              <span className="rm-zone-foot">{z.foot}</span>
-            </li>
-          </Fragment>
-        ))}
-      </ol>
+    <Panel title="Mill mimic" sub="Plant historian · stand drive status" right={chip}>
+      {loading ? (
+        <span className="skel skel--block" style={{ height: 78 }} role="status" aria-label="Loading" />
+      ) : (
+        <ol className="rm-mimic" aria-label="Mill process flow">
+          {zones.map((z, i) => (
+            <Fragment key={z.key}>
+              {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
+              <li className="rm-mimic-cell">
+                <button
+                  type="button"
+                  className={`rm-zone rm-zone--button ${z.kind === 'group' ? `rm-zone--${TONE[z.g.state]}` : 'rm-zone--flow'}`}
+                  onClick={z.open}
+                  aria-haspopup="dialog"
+                  title={z.openLabel}
+                >
+                  <span className="rm-zone-title">{z.title}</span>
+                  <span className="rm-zone-body">
+                    {z.kind === 'group' ? (
+                      <>
+                        <span className="rm-zone-value rm-zone-state v-val">{z.g.stateLabel}</span>
+                        <StandDots stands={d!.stands.filter((s) => s.group === z.g.id)} />
+                      </>
+                    ) : (
+                      <span className="rm-zone-value num v-val">{z.value}</span>
+                    )}
+                  </span>
+                  <span className="rm-zone-foot">{z.foot}</span>
+                </button>
+              </li>
+            </Fragment>
+          ))}
+        </ol>
+      )}
+      <CounterDrawer open={open === 'billets'} onClose={() => setOpen(null)} config={BILLET_COUNTER} />
+      <StandsDrawer open={open === 'stands'} onClose={() => setOpen(null)} group={group} onGroup={setGroup} />
+      <ProductionDrawer open={open === 'production'} onClose={() => setOpen(null)} />
     </Panel>
   );
 }
 
-function FlowArrow() {
+/** One dot per stand: on, off, or no fresh reading. */
+function StandDots({ stands }: { stands: HsmLive['stands'] }) {
   return (
-    <svg width="28" height="12" viewBox="0 0 28 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 6h25M21 1.5 26 6l-5 4.5" />
-    </svg>
-  );
-}
-
-/** A roll pair seen end-on — the stand group. Takes the zone's status colour. */
-function StandGlyph() {
-  return (
-    <svg className="rm-zone-glyph" width="22" height="22" viewBox="0 0 22 22" aria-hidden>
-      <rect x="4" y="2" width="5" height="18" rx="2.5" fill="currentColor" opacity="0.9" />
-      <rect x="13" y="2" width="5" height="18" rx="2.5" fill="currentColor" opacity="0.9" />
-      <rect x="5.2" y="3.4" width="1.6" height="15" rx="0.8" fill="#ffffff" opacity="0.28" />
-      <rect x="14.2" y="3.4" width="1.6" height="15" rx="0.8" fill="#ffffff" opacity="0.28" />
-    </svg>
+    <span className="rm-dots" aria-label={stands.map((s) => `${s.id} ${s.on === null ? 'no data' : s.on ? 'on' : 'off'}`).join(', ')}>
+      {stands.map((s) => (
+        <i key={s.id} className={`rm-dot ${s.on === null ? 'rm-dot--na' : s.on ? 'rm-dot--on' : 'rm-dot--off'}`} title={`${s.id.replace('_', ' ')} · ${s.on === null ? 'no live data' : s.on ? 'on' : 'off'}`} />
+      ))}
+    </span>
   );
 }

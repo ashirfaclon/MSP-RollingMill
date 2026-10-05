@@ -20,28 +20,116 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
 
   const strip = page.getByRole('region', { name: 'Headline KPIs' });
   const card = (name: string) => strip.getByRole('article', { name, exact: true });
-  await expect(card('Production')).toContainText('342.0');
-  await expect(card('Production')).toContainText('95% plan · 15.83 TPH');
-  await expect(card('Mass yield')).toContainText('96.6');
-  await expect(card('Power consumption')).toContainText('30.78');
-  await expect(card('Specific energy')).toContainText('90.0');
-  await expect(card('Production without order')).toContainText('72.0');
-  await expect(card('Production without order')).toContainText('21.1% of day output');
-  await expect(card('Stock with order')).toContainText('420');
-  await expect(card('Stock with order')).toContainText('66.7% of finished stock');
-  await expect(card('Free stock')).toContainText('210');
+  // Production and Mass yield are live (production / wiring e2e specs).
+  await expect(strip.getByRole('button', { name: 'Production', exact: true })).toBeVisible();
+  await expect(strip.getByRole('button', { name: 'Mass yield', exact: true })).toBeVisible();
+  // No live source yet: these show 0, not sample figures, and are not faded.
+  await expect(card('Power consumption')).toContainText('0.00');
+  await expect(card('Specific energy')).toContainText('0.0');
+  await expect(card('Production without order')).toContainText('0.0');
+  await expect(card('Production without order')).toContainText('0.0% of day output');
+  await expect(card('Stock with order')).toContainText('0.0% of finished stock');
+  await expect(card('Free stock')).toContainText('0.0% of finished stock');
+  for (const sample of ['30.78', '90.0', '72.0', '420', '210']) await expect(strip).not.toContainText(sample);
+  await expect(page.locator('.rm-pending')).toHaveCount(0);
 
   const main = page.getByRole('main');
   for (const text of [
-    'Mill mimic', '282 billets', 'Production by shift', '118.0 MT', '120 MT target', '18.0 MT',
-    'Order allocation', '270.0 MT', '630 MT', 'Material & operating balance', '354.0 MT', '13.06/h',
-    'Finished stock by size', '190 MT', '130 MT',
+    'Mill mimic', 'Production by shift', 'Order allocation', 'Finished stock', 'Material & operating balance',
+    'Production & dispatch by size',
   ]) {
     await expect(main.getByText(text, { exact: false }).first()).toBeVisible();
   }
-  await expect(main.getByText('Running', { exact: true })).toHaveCount(3);
+  // Production by shift and the order split have no live source: 0 throughout.
+  const shifts = page.locator('section.panel', { hasText: 'Production by shift' });
+  await expect(shifts.locator('.rm-shift-val')).toHaveText(['0.0 MT', '0.0 MT', '0.0 MT']);
+  await expect(shifts).toContainText('0.00 TPH');
+  const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
+  await expect(split).toContainText('0.0 MT');
+  // Live panels: the mimic has infeed, the two stand groups that exist, and the exit.
+  for (const zone of [/Billet infeed/, /Roughing group/, /Finishing group/, /Finished exit/]) {
+    await expect(main.getByRole('button', { name: zone })).toBeVisible();
+  }
+  // Material flow lives on the Data Model screen, not here.
+  await expect(main.getByText('Material flow', { exact: true })).toHaveCount(0);
 
   await page.screenshot({ path: `${SHOTS}/hsm-visualization-dark.png`, fullPage: true });
+});
+
+test('data model screen lays out every ledger and all checks pass', async ({ page }) => {
+  await page.goto('/hsm/visualization');
+  await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Data Model/ }).click();
+  await expect(page).toHaveURL(/\/hsm\/data-model$/);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/Rolling Mill\s*\/\s*Data Model/);
+
+  const main = page.getByRole('main');
+  const shifts = main.getByRole('table', { name: 'Shift ledger' });
+  await expect(shifts.getByRole('row', { name: /^Shift B / })).toContainText('118.0');
+  await expect(shifts.getByRole('row', { name: /^Shift B / })).toContainText('7.4 h');
+  await expect(shifts.getByRole('row', { name: /^Day / })).toContainText('21.6 h');
+
+  await expect(main.getByRole('table', { name: 'Stops' }).getByRole('row')).toHaveCount(6);
+  await expect(main).toContainText('Running = drive power above 600 kW');
+
+  const stock = main.getByRole('table', { name: 'Stock ledger by size' });
+  await expect(stock.getByRole('row', { name: /^8 mm/ })).toContainText('130');
+  await expect(stock.getByRole('row', { name: /^Total / })).toContainText('420');
+
+  const orders = main.getByRole('table', { name: 'Orders' });
+  await expect(orders.getByRole('row', { name: /SO-2611/ })).toContainText('500');
+
+  const checks = main.getByRole('table', { name: 'Balance checks' });
+  const n = await checks.getByRole('row').count() - 1;
+  await expect(main.getByText(`${n} of ${n} pass`)).toBeVisible();
+  await expect(checks.getByLabel('Does not balance')).toHaveCount(0);
+
+  await page.screenshot({ path: `${SHOTS}/hsm-data-model.png`, fullPage: true });
+  // The page scrolls inside <main>, so capture the lower rows panel by panel.
+  const panel = (title: string) =>
+    main.locator('section.panel', { has: page.locator('.panel-title', { hasText: new RegExp(`^${title}$`) }) });
+  for (const [title, file] of [['Shifts', 'dm-shifts'], ['Stock ledger', 'dm-stock'], ['Orders', 'dm-orders'], ['Balance checks', 'dm-checks']]) {
+    await panel(title).screenshot({ path: `${SHOTS}/${file}.png` });
+  }
+});
+
+test('material flow shows every stage, exit and bucket, and the balance closes', async ({ page }) => {
+  await page.goto('/hsm/data-model');
+  const panel = page.locator('section.panel', { has: page.locator('.panel-title', { hasText: /^Material flow$/ }) });
+  await expect(panel.getByText('Balance closes')).toBeVisible();
+
+  const group = (name: string) => panel.getByRole('group', { name, exact: true });
+  await expect(group('Billets fed')).toContainText('354.0 MT');
+  await expect(group('Billets fed')).toContainText('282 billets');
+  await expect(group('Inline reject')).toContainText('3.8 MT');
+  await expect(group('Inline reject')).toContainText('3 billets');
+  await expect(group('Inline reject')).toContainText('Cobble');
+  await expect(group('Rolled')).toContainText('350.2 MT');
+  await expect(group('Rolled')).toContainText('279 billets');
+  await expect(group('Process loss')).toContainText('8.2 MT');
+  await expect(group('Production output')).toContainText('342.0 MT');
+  await expect(group('QC rejected')).toContainText('4.0 MT');
+  await expect(group('QC rejected')).toContainText('To remelt');
+  await expect(group('On hold')).toContainText('8.0 MT');
+  await expect(group('QC accepted')).toContainText('330.0 MT');
+  await expect(group('Production output')).toContainText('270.0 MT with order');
+  await expect(group('Warehouse · with order')).toContainText('262.0 MT');
+  await expect(group('Warehouse · free')).toContainText('68.0 MT');
+
+  const split = panel.getByRole('region', { name: 'Where the billets went' });
+  await expect(split.getByRole('img')).toBeVisible();
+  await expect(split).toContainText('Warehouse · with order262.0 MT · 74.0%');
+  await expect(split).toContainText('Process loss8.2 MT · 2.3%');
+  await expect(panel).toContainText('Prime yield93.2%');
+
+  await expect(group('Billets fed')).not.toContainText('of fed');
+  await expect(group('Inline reject')).toContainText('1 billet · 1.3 MT');
+  await panel.screenshot({ path: `${SHOTS}/material-flow.png` });
+
+  await page.getByRole('button', { name: 'Light theme' }).click();
+  await panel.screenshot({ path: `${SHOTS}/material-flow-light.png` });
+
+  await page.setViewportSize({ width: 820, height: 1000 });
+  await panel.screenshot({ path: `${SHOTS}/material-flow-narrow.png` });
 });
 
 test('sidebar switches screens and keeps the mill', async ({ page }) => {
@@ -65,8 +153,13 @@ test('mill picker switches mill, keeps the screen, and drives by keyboard', asyn
   const trigger = page.getByRole('button', { name: /^Rolling mill:/ });
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
-  await trigger.click();
   const list = page.getByRole('listbox', { name: 'Rolling mill' });
+  // The server-rendered button is visible a few hundred ms before the page is interactive;
+  // a click in that gap is lost, so retry the first one until the list opens.
+  await expect(async () => {
+    await trigger.click();
+    await expect(list).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
   await expect(list.getByRole('option')).toHaveText(['HSM', 'LSM', 'RMD', 'RMS']);
   await expect(list.getByRole('option', { name: 'HSM' })).toHaveAttribute('aria-selected', 'true');
   await page.screenshot({ path: `${SHOTS}/mill-picker-open.png`, clip: { x: 1100, y: 0, width: 500, height: 260 } });
@@ -79,6 +172,12 @@ test('mill picker switches mill, keeps the screen, and drives by keyboard', asyn
   await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Visualization/ }).click();
   await expect(page).toHaveURL(/\/lsm\/visualization$/);
   await expect(page.getByTestId('screen-placeholder')).toHaveText('LSM Visualization dashboard is coming soon.');
+
+  await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Data Model/ }).click();
+  await expect(page).toHaveURL(/\/lsm\/data-model$/);
+  await expect(page.getByTestId('screen-placeholder')).toHaveText('LSM Data Model dashboard is coming soon.');
+  await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Visualization/ }).click();
+  await expect(page).toHaveURL(/\/lsm\/visualization$/);
 
   // Keyboard: open with ArrowDown, move down twice from LSM to RMS, choose with Enter.
   await page.getByRole('button', { name: /^Rolling mill:/ }).focus();
@@ -147,14 +246,20 @@ test('light theme applies, persists across reload, and switches back', async ({ 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
-test('duration picker applies a preset and a custom range', async ({ page }) => {
+test('duration picker: dates only, each a 06:00 → 06:00 plant day, cycle shown', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const trigger = page.getByRole('button', { name: /Duration/ });
   await expect(trigger).toContainText('Today');
+  // The cycle of the running plant day sits beside the preset name.
+  await expect(trigger).toContainText(/\d{1,2} \w{3} 06:00 → \d{1,2} \w{3} 06:00/);
 
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
   await expect(dialog).toBeVisible();
+  // No time of day to set — only dates.
+  await expect(dialog.locator('input[type="time"]')).toHaveCount(0);
+  await expect(dialog.getByLabel('Start Time')).toHaveCount(0);
+  await expect(dialog.getByText('Current Shift')).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/duration-picker.png` });
 
   await dialog.getByRole('button', { name: 'Previous 7 Days' }).click();
@@ -162,19 +267,32 @@ test('duration picker applies a preset and a custom range', async ({ page }) => 
   await expect(dialog).toBeHidden();
   await expect(trigger).toContainText('Previous 7 Days');
 
+  // One date = that date 06:00 → the next date 06:00.
+  await trigger.click();
+  await dialog.getByLabel('Start Date').fill('2026-09-24');
+  await dialog.getByLabel('End Date').fill('2026-09-24');
+  await expect(dialog.getByRole('button', { name: 'Custom' })).toHaveClass(/on/);
+  await expect(dialog.locator('.dr-f-cycle').nth(0)).toHaveText('from 06:00');
+  await expect(dialog.locator('.dr-f-cycle').nth(1)).toHaveText('to 25 Sep 06:00');
+  await expect(dialog.getByRole('status')).toContainText('24 Sep 06:00 → 25 Sep 06:00 · 1 plant day');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  await expect(trigger).toContainText('24 Sep 06:00 → 25 Sep 06:00');
+
+  // A range: 16 → 17 Sep = 16 Sep 06:00 → 18 Sep 06:00, two plant days; survives a reload.
   await trigger.click();
   await dialog.getByLabel('Start Date').fill('2026-09-16');
-  await dialog.getByLabel('Start Time').fill('00:00');
   await dialog.getByLabel('End Date').fill('2026-09-17');
-  await dialog.getByLabel('End Time').fill('00:00');
-  await expect(dialog.getByRole('button', { name: 'Custom' })).toHaveClass(/on/);
+  await expect(dialog.getByRole('status')).toContainText('16 Sep 06:00 → 18 Sep 06:00 · 2 plant days');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  await expect(trigger).toContainText('2026-09-16 → 2026-09-17');
-
+  await expect(trigger).toContainText('16 Sep 06:00 → 18 Sep 06:00');
   await page.reload();
-  await expect(trigger).toContainText('2026-09-16 → 2026-09-17');
+  await expect(trigger).toContainText('16 Sep 06:00 → 18 Sep 06:00');
 
+  // An end before the start cannot be applied.
   await trigger.click();
+  await dialog.getByLabel('Start Date').fill('2026-09-18');
+  await dialog.getByLabel('End Date').fill('2026-09-17');
+  await expect(dialog.getByRole('button', { name: 'Apply' })).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });

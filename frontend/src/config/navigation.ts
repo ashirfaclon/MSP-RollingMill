@@ -36,6 +36,13 @@ export const SCREENS = [
     icon: 'shield-check',
     blurb: 'Equipment condition and maintenance',
   },
+  {
+    id: 'data-model',
+    label: 'Data Model',
+    sub: 'Flow · Ledgers · Checks',
+    icon: 'database',
+    blurb: 'Material flow, run time, stock and orders behind every KPI — and whether they balance',
+  },
 ] as const satisfies readonly { id: string; label: string; sub: string; icon: IconId; blurb: string }[];
 
 export type ScreenId = (typeof SCREENS)[number]['id'];
