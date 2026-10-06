@@ -50,8 +50,10 @@ export interface CounterEvent {
   end: number;
   startValue: number;
   endValue: number;
-  /** endValue − startValue: the production of this piece. */
+  /** What the piece counts: endValue − startValue, less any noise inside it. */
   value: number;
+  /** Noise removed from this piece (counter ticks with no billet behind them); 0 if none. */
+  noise: number;
   startedBy: 'day start' | 'reset' | 'first reading';
   endedBy: 'reset' | 'day end' | 'latest reading';
 }
@@ -139,9 +141,46 @@ function piece(
 ): CounterEvent {
   // A piece cannot be negative: a fall that is not a reset is a counter glitch, not output.
   // Unrounded here — the day totals round once, so events never drift a cent from them.
-  return { date, start, end, startValue, endValue, value: Math.max(0, endValue - startValue), startedBy, endedBy };
+  return { date, start, end, startValue, endValue, value: Math.max(0, endValue - startValue), noise: 0, startedBy, endedBy };
 }
 
 /** Events as dated amounts, for the per-day sums (each stamped inside its own plant day). */
 export const eventIncrements = (events: CounterEvent[]): Increment[] =>
   events.map((e) => ({ t: Math.max(e.start, e.end - 1), v: e.value }));
+
+/* --------------------------------- noise ---------------------------------- */
+
+/**
+ * After an operator reset the production counter sometimes ticks up with no billet going
+ * into the mill (e.g. 29 Sep 07:01–07:06, three ticks before the day's first billet at
+ * 07:59). A real tick always follows a billet discharge — normally within a minute. So:
+ * a tick counts only if a billet went in during the NOISE_WINDOW_MS before it, and each
+ * billet can stand behind one tick only. Measured over 22 Sep – 3 Oct 2026: 21 noise
+ * ticks, the same with a 5- or a 10-minute window.
+ */
+export const NOISE_WINDOW_MS = 5 * 60_000;
+
+/** Split counter ticks into kept and noise, matching each tick to the earliest unused billet in the window. Pure. */
+export function denoise(
+  ticks: Increment[], billets: Increment[], windowMs = NOISE_WINDOW_MS,
+): { kept: Increment[]; dropped: Increment[] } {
+  // One slot per billet (a reading can carry two billets).
+  const slots: number[] = [];
+  for (const b of [...billets].sort((x, y) => x.t - y.t)) for (let i = 0; i < Math.round(b.v); i += 1) slots.push(b.t);
+  const kept: Increment[] = [];
+  const dropped: Increment[] = [];
+  let next = 0;
+  for (const tick of [...ticks].sort((x, y) => x.t - y.t)) {
+    while (next < slots.length && tick.t - slots[next] > windowMs) next += 1;   // too old to explain this tick
+    if (next < slots.length && slots[next] <= tick.t) { kept.push(tick); next += 1; } else dropped.push(tick);
+  }
+  return { kept, dropped };
+}
+
+/** Take the noise ticks off the reset events they fall in (start < t ≤ end). Pure. */
+export function removeNoise(events: CounterEvent[], dropped: Increment[]): CounterEvent[] {
+  return events.map((e) => {
+    const noise = dropped.filter((d) => d.t > e.start && d.t <= e.end).reduce((a, d) => a + d.v, 0);
+    return noise ? { ...e, noise, value: Math.max(0, e.endValue - e.startValue - noise) } : e;
+  });
+}

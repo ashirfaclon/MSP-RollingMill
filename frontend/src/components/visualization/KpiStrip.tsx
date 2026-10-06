@@ -1,6 +1,7 @@
 import KpiCard from './KpiCard';
 import ProductionKpiCard from '@/components/production/ProductionKpiCard';
 import YieldKpiCard from '@/components/production/YieldKpiCard';
+import ProductionWithoutOrderCard from '@/components/production/ProductionWithoutOrderCard';
 import { fixed } from '@/lib/num';
 import type { MillModel } from '@/models/millModel';
 
@@ -27,16 +28,10 @@ export default function KpiStrip({ m }: { m: MillModel }) {
         note="Energy per finished MT"
         series="prod"
       />
+      {/* All production counts as without order: the ERP does not link production to orders. */}
+      <ProductionWithoutOrderCard />
       <KpiCard
-        label="Production without order"
-        value={fixed(k.productionFreeMt, 1)}
-        unit="MT"
-        note={`${fixed(k.productionFreePct, 1)}% of day output`}
-        series="free"
-        meterPct={k.productionFreePct ?? undefined}
-      />
-      <KpiCard
-        label="Stock with order"
+        label="Made For Order"
         value={fixed(m.stock.withOrder, 0)}
         unit="MT"
         note={`${fixed(m.stock.withOrderPct, 1)}% of finished stock`}
@@ -44,7 +39,7 @@ export default function KpiStrip({ m }: { m: MillModel }) {
         meterPct={m.stock.withOrderPct ?? undefined}
       />
       <KpiCard
-        label="Free stock"
+        label="Made To Stock"
         value={fixed(m.stock.free, 0)}
         unit="MT"
         note={`${fixed(m.stock.freePct, 1)}% of finished stock`}

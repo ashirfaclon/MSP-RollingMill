@@ -13,6 +13,23 @@ import DrillChart, { fmtNum, type DrillAxis, type DrillSeries } from './DrillCha
 import { hhmm } from './CounterDrawer';
 import { dm } from '@/services/hsmProduction';
 import type { StockReport } from '@/services/hsmApi';
+import SourceTable, { type SourceRow } from './SourceTable';
+
+const STRIP_ITEMS = "Strip-mill items only: ITEM_CODE received by division S1 in PROD_TRAN (DIV_CODE = 'S1', QTYRECD > 0, ITEM_CODE LIKE 'F%', since 30 Nov 2025)";
+const LEDGER = "ENTITY_CODE = 'MP', GODOWN_CODE = 'FGYRDP' (finished-goods yard), STOCK_FLAG ≠ '4'; VRDATE from 30 Nov 2025. " + STRIP_ITEMS;
+
+/** Where every figure in this drawer comes from in the ERP. */
+const STOCK_SOURCES: SourceRow[] = [
+  { figure: 'Production received', table: 'ITEMTRAN_BODY', fields: 'QTYRECD where TNATURE = PROD', filter: LEDGER },
+  { figure: 'Dispatched (sales)', table: 'ITEMTRAN_BODY', fields: 'QTYISSUED where TNATURE = SALE', filter: 'Same filter' },
+  { figure: 'Item-to-item transfer', table: 'ITEMTRAN_BODY', fields: 'QTYRECD / QTYISSUED where TNATURE = M2M', filter: 'Same filter' },
+  { figure: 'Sales returns', table: 'ITEMTRAN_BODY', fields: 'QTYRECD where TNATURE = SRET', filter: 'Same filter' },
+  { figure: 'Date of each movement', table: 'ITEMTRAN_BODY', fields: 'VRDATE', filter: 'Movements up to the end of the selected period' },
+  { figure: 'Loading advices', table: 'ITEMTRAN_BODY', fields: 'TNATURE = LADV (STOCK_FLAG 4)', filter: 'Left out: they reserve stock for an order, they do not move it' },
+  { figure: 'Opening stock (1 April)', table: 'ITEMOPBAL_MAST', fields: 'YROPQTY', filter: "ACC_YEAR = year of the period end (e.g. '26-27'), GODOWN_CODE = 'FGYRDP'. Empty for 25-26 and 26-27 today" },
+  { figure: 'Size', table: 'ITEM_MAST', fields: 'ITEM_NAME (by ITEM_CODE)', filter: 'Width × thickness read from the item name' },
+  { figure: 'Stock', table: '—', fields: 'Opening + received − issued', filter: 'Per item, then summed' },
+];
 
 const AXES: DrillAxis[] = [
   { title: 'Stock (MT)', unit: 'MT' },
@@ -103,6 +120,8 @@ function Content({ data }: { data: StockReport }) {
           </tbody>
         </table>
       </div>
+
+      <SourceTable rows={STOCK_SOURCES} />
 
       <ul className="pd-notes">
         <li><b>Source</b> — ERP stock ledger (ITEMTRAN_BODY) for strip-mill items in the finished-goods yard FGYRDP: production received (PROD), sales (SALE), item-to-item transfers (M2M) and sales returns (SRET), synced {hhmm(data.erp.syncedAt)}; latest movement {dm(data.erp.lastDate)}. Loading advices (LADV) only reserve stock and are left out. The yard is shared with LSM; only strip-mill items are counted.</li>

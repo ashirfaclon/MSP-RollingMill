@@ -143,3 +143,8 @@ p.pd-dim { margin: -6px 0 0; }
   margin: 0; padding: 8px 12px; font-size: 11px; line-height: 1.5; color: var(--warn);
   background: var(--warn-dim); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: var(--radius-sm);
 }
+
+/* Data-source table: table and field names in code style; long filters wrap. */
+.pd-source code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--text-2); white-space: normal; }
+table.grid.pd-source td { white-space: normal; vertical-align: top; }
+table.grid.pd-source td:last-child { min-width: 180px; }

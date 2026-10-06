@@ -18,9 +18,11 @@ import type { Env } from '../env';
 import { MSG } from '../sources';
 import { collect, esc, fluxTime, queryApi } from '../influx';
 import { historianConfigured } from '../historian/client';
-import { HSM_TOTAL_PRODUCTION, type TagDef } from '../historian/tags';
+import { HSM_DISCHARGED_BILLET, HSM_TOTAL_PRODUCTION, type TagDef } from '../historian/tags';
 import { readErpProduction, type ErpProductionRow } from '../erp/cache';
-import { counterEvents, eventIncrements, readCounterEvents, type CounterEvent } from './counterEvents';
+import {
+  NOISE_WINDOW_MS, counterEvents, denoise, eventIncrements, readCounterEvents, removeNoise, type CounterEvent,
+} from './counterEvents';
 
 export type Grain = 'day' | 'week' | 'month';
 
@@ -221,9 +223,11 @@ export interface ProductionComparison {
   /** The counter's reset events, split at each 06:00 — a day's figure is the total of its events. */
   events: {
     date: string; start: string; end: string;
-    startValue: number; endValue: number; value: number;
+    startValue: number; endValue: number; value: number; noise: number;
     startedBy: CounterEvent['startedBy']; endedBy: CounterEvent['endedBy'];
   }[];
+  /** Counter ticks dropped as noise (no billet behind them) — production only. */
+  noise: { applied: boolean; ticks: number; value: number; windowMinutes: number };
   days: DayValue[];
   rows: PeriodRow[];
   totals: PeriodRow;
@@ -239,9 +243,11 @@ export interface CounterSpec {
   tag: TagDef;
   /** The ERP value of one log-sheet voucher. */
   erp: (r: ErpProductionRow) => number | null;
+  /** Drop counter ticks with no billet behind them (counterEvents.ts `denoise`). */
+  denoise?: boolean;
 }
 
-export const PRODUCTION_SPEC: CounterSpec = { key: 'production', tag: HSM_TOTAL_PRODUCTION, erp: (r) => r.mt };
+export const PRODUCTION_SPEC: CounterSpec = { key: 'production', tag: HSM_TOTAL_PRODUCTION, erp: (r) => r.mt, denoise: true };
 
 const memo = new Map<string, { at: number; value: Promise<ProductionComparison> }>();
 const MEMO_MS = 60_000;
@@ -272,8 +278,23 @@ async function compute(env: Env, spec: CounterSpec, from: string, to: string, gr
     .filter((r) => r.date >= from && r.date <= to)
     .map((r) => ({ date: r.date, mt: spec.erp(r) }));
   // Production per plant day = the total of its reset events (counterEvents.ts).
-  const counter = await readCounterEvents(env, spec.tag, plantDayStart(from), Math.min(plantDayStart(to) + DAY_MS, nowMs));
-  const events = counterEvents(dates, counter, nowMs);
+  const fromMs = plantDayStart(from);
+  const toMs = Math.min(plantDayStart(to) + DAY_MS, nowMs);
+  const counter = await readCounterEvents(env, spec.tag, fromMs, toMs);
+  let events = counterEvents(dates, counter, nowMs);
+  // Noise: ticks with no billet discharged in the minutes before are dropped from their events.
+  let noise: ProductionComparison['noise'] = { applied: false, ticks: 0, value: 0, windowMinutes: NOISE_WINDOW_MS / 60_000 };
+  if (spec.denoise && counter.connection === 'up') {
+    const [ticks, billets] = await Promise.all([
+      readCounter(env, spec.tag, fromMs, toMs),
+      readCounter(env, HSM_DISCHARGED_BILLET, fromMs - NOISE_WINDOW_MS, toMs),
+    ]);
+    if (ticks.connection === 'up' && billets.connection === 'up') {
+      const { dropped } = denoise(ticks.increments, billets.increments);
+      events = removeNoise(events, dropped);
+      noise = { applied: true, ticks: dropped.length, value: round2(dropped.reduce((a, d) => a + d.v, 0)), windowMinutes: NOISE_WINDOW_MS / 60_000 };
+    }
+  }
   const days = buildDays(dates, erpRows, eventIncrements(events), counter.first?.t ?? null, counter.last?.t ?? null, nowMs);
   const iso = (ms: number | null) => (ms === null ? null : new Date(ms).toISOString());
   return {
@@ -289,9 +310,10 @@ async function compute(env: Env, spec: CounterSpec, from: string, to: string, gr
       connection: counter.connection, message: counter.message,
       firstReadingAt: iso(counter.first?.t ?? null), lastReadingAt: iso(counter.last?.t ?? null),
     },
+    noise,
     events: events.map((e) => ({
       date: e.date, start: iso(e.start)!, end: iso(e.end)!,
-      startValue: round2(e.startValue), endValue: round2(e.endValue), value: round2(e.value),
+      startValue: round2(e.startValue), endValue: round2(e.endValue), value: round2(e.value), noise: round2(e.noise),
       startedBy: e.startedBy, endedBy: e.endedBy,
     })),
     days,

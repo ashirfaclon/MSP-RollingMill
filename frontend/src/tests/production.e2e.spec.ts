@@ -43,8 +43,8 @@ test('the Production card shows the Influx counter total for the Duration filter
   await expect(card).toContainText('Influx');
 
   await pickCustom(page);
-  // 22–28 Sep: Σ daily counter increases 216.80 + 155.00 + 176.48 + 119.81 + 132.76 + 183.76 + 165.37 = 1,149.98
-  await expect(card).toContainText('1,150.0');
+  // 22–28 Sep, counter reset events less noise: 216.80 + 155.00 + 174.05 + 116.57 + 131.95 + 181.34 + 165.37 = 1,141.08
+  await expect(card).toContainText('1,141.1');
   await expect(card).toContainText('Influx · 7 days');
   await card.screenshot({ path: `${SHOTS}/production-card.png` });
 });
@@ -73,10 +73,12 @@ test('clicking the card opens the ERP-vs-Influx drawer on 21 Sep → today, dail
 
   await expect(drawer.locator('.pd-chart .highcharts-series-group path.highcharts-graph')).toHaveCount(3);
 
-  // Reset events: 25 Sep is three events (3.24 + 1.62 + 114.95) totalling the day's 119.81.
+  // Reset events: 25 Sep is three events (3.24 + 1.62 + 114.95); the first is 4 noise ticks (no
+  // billet behind them, 3.24 removed), so the day counts 1.62 + 114.95 = 116.57.
   const events = drawer.getByRole('table', { name: 'Counter reset events' });
   const d25 = events.getByRole('row', { name: /^25 Sep · plant day total, 3 events/ });
-  await expect(d25).toContainText('119.81');
+  await expect(d25).toContainText('116.57');
+  await expect(events.locator('tbody')).toContainText('− 3.24');
   for (const v of ['170.81', '174.05', '3.24', '1.62', '114.95']) await expect(events.locator('tbody')).toContainText(v);
   await page.waitForTimeout(800);   // let the lines finish drawing in
   await drawer.screenshot({ path: `${SHOTS}/production-drawer-daily.png` });

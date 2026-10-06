@@ -26,11 +26,11 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   // No live source yet: these show 0, not sample figures, and are not faded.
   await expect(card('Power consumption')).toContainText('0.00');
   await expect(card('Specific energy')).toContainText('0.0');
-  await expect(card('Production without order')).toContainText('0.0');
-  await expect(card('Production without order')).toContainText('0.0% of day output');
-  await expect(card('Stock with order')).toContainText('0.0% of finished stock');
-  await expect(card('Free stock')).toContainText('0.0% of finished stock');
-  for (const sample of ['30.78', '90.0', '72.0', '420', '210']) await expect(strip).not.toContainText(sample);
+  // All production counts as without order (no order link in the ERP).
+  await expect(card('Production without order')).toContainText('no order link in ERP');
+  await expect(card('Made For Order')).toContainText('0.0% of finished stock');
+  await expect(card('Made To Stock')).toContainText('0.0% of finished stock');
+  for (const sample of ['30.78', '90.0', '72.0', '420', '210', '342.0']) await expect(strip).not.toContainText(sample);
   await expect(page.locator('.rm-pending')).toHaveCount(0);
 
   const main = page.getByRole('main');
@@ -45,7 +45,7 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   await expect(shifts.locator('.rm-shift-val')).toHaveText(['0.0 MT', '0.0 MT', '0.0 MT']);
   await expect(shifts).toContainText('0.00 TPH');
   const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
-  await expect(split).toContainText('0.0 MT');
+  await expect(split).toContainText('Against order0.0 MT');
   // Live panels: the mimic has infeed, the two stand groups that exist, and the exit.
   for (const zone of [/Billet infeed/, /Roughing group/, /Finishing group/, /Finished exit/]) {
     await expect(main.getByRole('button', { name: zone })).toBeVisible();

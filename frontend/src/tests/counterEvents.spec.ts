@@ -3,7 +3,7 @@
  * Day end − day start would give −55.86 t for 25 Sep; the events give 119.81 t.
  */
 import { test, expect } from '@playwright/test';
-import { counterEvents, eventIncrements } from '@/server/hsm/counterEvents';
+import { counterEvents, denoise, eventIncrements, removeNoise } from '@/server/hsm/counterEvents';
 import { buildDays } from '@/server/hsm/production';
 
 const at = (s: string) => Date.parse(`${s}+05:30`);
@@ -62,4 +62,40 @@ test('the day still running ends at the latest reading; a day before the counter
   }, now);
   expect(done.at(-1)).toMatchObject({ endedBy: 'day end', endValue: 163.34 });
   expect(today.at(-1)).toMatchObject({ endedBy: 'latest reading', endValue: 90.03 });
+});
+
+test.describe('noise after a reset', () => {
+  // 29 Sep: reset 06:38; three ticks 07:03–07:09 with no billet; then billets 07:59, 08:20, 08:44,
+  // each followed ~40 s later by its tick.
+  const tick = (hms: string) => ({ t: at(`2026-09-29T${hms}`), v: 0.643 });
+  const ticks = ['07:03:37', '07:05:47', '07:09:57', '07:59:50', '08:21:32', '08:44:43'].map(tick);
+  const billets = ['07:59:10', '08:20:41', '08:44:03'].map((h) => ({ t: at(`2026-09-29T${h}`), v: 1 }));
+
+  test('a tick counts only if a billet went in during the 5 minutes before it', () => {
+    const { kept, dropped } = denoise(ticks, billets);
+    expect(dropped.map((d) => d.t)).toEqual(ticks.slice(0, 3).map((d) => d.t));
+    expect(kept).toHaveLength(3);
+  });
+
+  test('each billet stands behind one tick only', () => {
+    const two = [tick('08:00:00'), tick('08:00:30')];
+    const { kept, dropped } = denoise(two, [{ t: at('2026-09-29T07:59:50'), v: 1 }]);
+    expect([kept.length, dropped.length]).toEqual([1, 1]);
+  });
+
+  test('a billet older than the window does not explain a tick', () => {
+    const { dropped } = denoise([tick('08:10:00')], [{ t: at('2026-09-29T08:04:00'), v: 1 }]);
+    expect(dropped).toHaveLength(1);
+  });
+
+  test('noise is taken off the event it fell in', () => {
+    const ev = counterEvents(['2026-09-29'], {
+      first: { t: at('2026-09-21T12:47:25'), v: 0 },
+      last: { t: at('2026-09-30T12:00:00'), v: 10 },
+      atBoundary: boundary([['2026-09-29', 160.21], ['2026-09-30', 163.34]]),
+      resets: [{ t: at('2026-09-29T06:38:25'), before: 160.21, after: 0 }, { t: at('2026-09-29T09:04:14'), before: 3.86, after: 0 }],
+    }, at('2026-09-30T12:00:00'));
+    const clean = removeNoise(ev, denoise(ticks, billets).dropped);
+    expect(clean.map((e) => [+e.noise.toFixed(2), +e.value.toFixed(2)])).toEqual([[0, 0], [1.93, 1.93], [0, 163.34]]);
+  });
 });

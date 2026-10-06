@@ -2,7 +2,7 @@
 
 /**
  * "Finished stock" in the Order allocation panel, live from the ERP stock ledger, counted
- * to the end of the Duration period. The split with order / free is not wired (it needs
+ * to the end of the Duration period. The Made For Order / Made To Stock split is not wired (it needs
  * the open loading advices confirmed), so it is stated rather than drawn from sample data.
  */
 import { useState } from 'react';
@@ -37,7 +37,7 @@ export default function FinishedStockBlock() {
           </>
         )}
       </p>
-      <p className="rm-alloc-note rm-alloc-note--dim">With order / free split: not wired yet — needs the open loading advices confirmed.</p>
+      <p className="rm-alloc-note rm-alloc-note--dim">Made For Order / Made To Stock split: not wired yet — needs the open loading advices confirmed.</p>
       <StockDrawer open={open} onClose={() => setOpen(false)} data={data} loading={!data && !s.error} error={s.error} />
     </div>
   );

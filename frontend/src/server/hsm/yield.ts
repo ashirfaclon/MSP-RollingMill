@@ -32,7 +32,7 @@ import {
   type DayValue, type Grain, type Increment,
 } from './production';
 import { buildLogDays, type ErpMeta } from './erpKpis';
-import { counterEvents, eventIncrements, readCounterEvents } from './counterEvents';
+import { NOISE_WINDOW_MS, counterEvents, denoise, eventIncrements, readCounterEvents, removeNoise } from './counterEvents';
 
 const H_MS = 3_600_000;
 
@@ -251,23 +251,28 @@ async function compute(env: Env, from: string, to: string, grain: Grain, nowMs: 
   let sizeLog: YieldComparison['sizeEvents'] = [];
   if (historianConfigured(env)) {
     try {
-      const [out, bil, coil, h, w, l] = await Promise.all([
+      const [out, outTicks, bil, coil, h, w, l] = await Promise.all([
         readCounterEvents(env, HSM_TOTAL_PRODUCTION, fromMs, toMs),
-        readCounter(env, HSM_DISCHARGED_BILLET, fromMs, toMs),
+        readCounter(env, HSM_TOTAL_PRODUCTION, fromMs, toMs),
+        // From a few minutes early, so a tick just after the window start finds its billet.
+        readCounter(env, HSM_DISCHARGED_BILLET, fromMs - NOISE_WINDOW_MS, toMs),
         readCounter(env, COILS, fromMs, toMs),
         readSteps(env, HEIGHT, fromMs, toMs), readSteps(env, WIDTH, fromMs, toMs), readSteps(env, LENGTH, fromMs, toMs),
       ]);
-      if ([out, bil, coil].some((c) => c.connection === 'down')) throw new Error('historian');
-      // Output = the production counter's reset events, the same figure as the Production card.
-      const outIncrements = eventIncrements(counterEvents(dates, out, nowMs));
+      if ([out, outTicks, bil, coil].some((c) => c.connection === 'down')) throw new Error('historian');
+      // Output = the production counter's reset events less noise (ticks with no billet
+      // behind them) — the same figure as the Production card. Coils get the same rule.
+      const outIncrements = eventIncrements(removeNoise(counterEvents(dates, out, nowMs), denoise(outTicks.increments, bil.increments).dropped));
+      const coilKept = denoise(coil.increments, bil.increments).kept;
+      const billetsInWindow = bil.increments.filter((b) => b.t >= fromMs);
       const events = sizeEvents(h, w, l);
-      const { tonnes, unweighed } = weighBillets(bil.increments, events);
+      const { tonnes, unweighed } = weighBillets(billetsInWindow, events);
       // The events that touch the window, each with the billets and tonnes it carried inside it.
       sizeLog = events
         .filter((e) => e.start < toMs && (e.end === null || e.end > fromMs))
         .map((e) => {
           const inside = (t: number) => t >= Math.max(e.start, fromMs) && t < Math.min(e.end ?? Infinity, toMs);
-          const billets = bil.increments.filter((b) => inside(b.t)).reduce((a, b) => a + b.v, 0);
+          const billets = billetsInWindow.filter((b) => inside(b.t)).reduce((a, b) => a + b.v, 0);
           return {
             start: new Date(e.start).toISOString(), end: e.end === null ? null : new Date(e.end).toISOString(),
             lengthM: e.lengthM, breadthMm: e.breadthMm, heightMm: e.heightMm,
@@ -278,8 +283,8 @@ async function compute(env: Env, from: string, to: string, grain: Grain, nowMs: 
       const days = (c: typeof bil, inc: Increment[]) => buildDays(dates, [], inc, c.firstReadingAt, c.lastReadingAt, nowMs);
       outputDays = buildDays(dates, [], outIncrements, out.first?.t ?? null, out.last?.t ?? null, nowMs);
       inputDays = days(bil, tonnes);
-      billetDays = days(bil, bil.increments);
-      coilDays = days(coil, coil.increments);
+      billetDays = days(bil, billetsInWindow);
+      coilDays = days(coil, coilKept);
       influx = { connection: 'up', message: MSG.HISTORIAN_UP, unweighedBillets: unweighed };
     } catch {
       influx = { connection: 'down', message: MSG.HISTORIAN_UNREACHABLE, unweighedBillets: 0 };

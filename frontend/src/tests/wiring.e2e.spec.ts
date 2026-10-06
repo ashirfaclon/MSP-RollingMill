@@ -45,14 +45,20 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   await expect(yieldCard).toContainText('Influx live');
 
   await pickWeek(page);
-  // Both yields side by side: ERP 1,076.51 ÷ 1,121.34 = 96.00 %; Influx 1,149.98 ÷ 1,138.38 = 101.02 % (input weighed per billet-size event at 7.832 g/cm³).
+  // Both yields side by side: ERP 1,076.51 ÷ 1,121.34 = 96.00 %; Influx 1,141.08 ÷ 1,138.38 = 100.24 % (output less noise; input per billet-size event at 7.832 g/cm³).
   await expect(yieldCard.locator('.rm-card-pair-item').nth(0)).toContainText('96.0');
   await expect(yieldCard.locator('.rm-card-pair-item').nth(0)).toContainText('ERP');
-  await expect(yieldCard.locator('.rm-card-pair-item').nth(1)).toContainText('101.0');
+  await expect(yieldCard.locator('.rm-card-pair-item').nth(1)).toContainText('100.2');
   await expect(yieldCard.locator('.rm-card-pair-item').nth(1)).toContainText('Influx');
   // Finished exit = the Production card's Influx figure: Σ Total_Production_Ton increases, 22–28 Sep.
   const exit = page.getByRole('button', { name: /Finished exit/ });
-  await expect(exit).toContainText('1,150.0 MT');
+  await expect(exit).toContainText('1,141.1 MT');
+  // No order link in the ERP: all production is "without order" — same figure as the Production card.
+  await expect(page.getByRole('article', { name: 'Production without order', exact: true })).toContainText('1,141.1');
+  const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
+  await expect(split.locator('.rm-alloc-total')).toHaveText('1,141.1 MT');
+  await expect(split).toContainText('Without order1,141.1 MT');
+  await expect(split).toContainText('Against order0.0 MT');
   await expect(exit).toContainText(/Influx/i);
 
   const panel = page.locator('section.panel', { hasText: 'Material & operating balance' });
@@ -79,7 +85,7 @@ test('log-sheet drawer: yield, mass balance and quality views, each with chart, 
 
   await drawer.getByRole('button', { name: /Duration filter/ }).click();
   const table = drawer.getByRole('table', { name: /by period/ });
-  for (const v of ['1,121.34', '1,076.51', '96.00', '1,138.38', '1,149.98', '101.02', '1,491', '1,500']) {
+  for (const v of ['1,121.34', '1,076.51', '96.00', '1,138.38', '1,141.08', '100.24', '1,491']) {
     await expect(table.locator('tfoot')).toContainText(v);
   }
   await expect(drawer.locator('.pd-chart .highcharts-plot-line-label')).toContainText('100 %');
@@ -196,6 +202,9 @@ test('open orders: the book today, and orders placed per period', async ({ page 
   await expect(drawer.getByRole('list', { name: 'Pending by order age' }).locator('li')).toHaveCount(4);
   await drawer.getByRole('button', { name: 'Weekly' }).click();
   await expect(drawer.getByRole('table', { name: 'Orders placed by period' }).getByRole('row', { name: /^Week of/ }).first()).toBeVisible();
+  // Every figure names its ERP table and field.
+  const src = drawer.getByRole('table', { name: 'ERP data source' });
+  for (const t of ['ORDER_BODY', 'QTYORDER', 'QTYEXECUTED', 'QTYCANCELLED', 'DUEDATE', 'ACC_MAST.ACC_NAME']) await expect(src).toContainText(t);
   await page.waitForTimeout(700);
   await drawer.screenshot({ path: `${SHOTS}/drill-orders.png` });
 });
@@ -213,6 +222,8 @@ test('finished stock: ERP stock ledger to the period end, opening missing stated
   for (const t of ['PROD', 'SALE']) await expect(types.locator('tbody')).toContainText(t);
   await expect(types.locator('tfoot')).toContainText('0.00 +');
   await expect(drawer.getByRole('table', { name: 'Finished stock by size' }).locator('tbody tr').first()).toBeVisible();
+  const src = drawer.getByRole('table', { name: 'ERP data source' });
+  for (const t of ['ITEMTRAN_BODY', 'QTYRECD', 'QTYISSUED', 'FGYRDP', 'ITEMOPBAL_MAST', 'YROPQTY']) await expect(src).toContainText(t);
   await page.waitForTimeout(700);
   await drawer.screenshot({ path: `${SHOTS}/drill-stock.png` });
 });

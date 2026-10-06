@@ -18,7 +18,7 @@ import './visualization.css';
 
 /**
  * Figures with no live source yet show 0, not the sample model's numbers: power, specific
- * energy, the production-by-order split, stock with order / free, and production by shift
+ * energy, Made For Order / Made To Stock, and production by shift
  * (plan, output, running rate, plan gap). Each goes live when its source is confirmed.
  */
 function withoutSampleFigures(m: MillModel): MillModel {
@@ -27,7 +27,6 @@ function withoutSampleFigures(m: MillModel): MillModel {
     kpis: {
       ...m.kpis,
       energyMwh: 0, specificEnergyKwhPerMt: 0,
-      productionMt: 0, productionWithOrderMt: 0, productionFreeMt: 0, productionFreePct: 0,
       planMt: 0, planGapMt: 0, runningRateTph: 0,
     },
     stock: { ...m.stock, withOrder: 0, withOrderPct: 0, free: 0, freePct: 0 },
@@ -43,7 +42,7 @@ export default function HsmVisualization() {
       <MillMimic />
       <div className="rm-row">
         <ShiftProduction m={m} />
-        <OrderAllocation m={m} />
+        <OrderAllocation />
       </div>
       <div className="rm-row">
         <MaterialBalance />

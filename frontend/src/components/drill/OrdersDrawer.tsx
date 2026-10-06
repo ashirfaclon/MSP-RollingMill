@@ -13,6 +13,24 @@ import { useDrillRange } from './useDrillRange';
 import { hhmm } from './CounterDrawer';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type OrdersReport } from '@/services/hsmApi';
+import SourceTable, { type SourceRow } from './SourceTable';
+
+const STRIP_ITEMS = "Strip-mill items only: ITEM_CODE received by division S1 in PROD_TRAN (DIV_CODE = 'S1', QTYRECD > 0, ITEM_CODE LIKE 'F%', since 30 Nov 2025)";
+const ORDER_LINE = "ENTITY_CODE = 'MP', TNATURE = 'SORD'; latest amendment of each line only (max AMENDNO per VRNO + SLNO); CANCELLED_FLAG = 'Y' lines left out; VRDATE from 30 Nov 2025. " + STRIP_ITEMS;
+
+/** Where every figure in this drawer comes from in the ERP. */
+const ORDER_SOURCES: SourceRow[] = [
+  { figure: 'Order no. · line', table: 'ORDER_BODY', fields: 'VRNO · SLNO', filter: ORDER_LINE },
+  { figure: 'Order date', table: 'ORDER_BODY', fields: 'VRDATE', filter: 'Orders placed are grouped by this date' },
+  { figure: 'Client', table: 'ORDER_HEAD → ACC_MAST', fields: 'ORDER_HEAD.ACC_CODE → ACC_MAST.ACC_NAME', filter: 'ORDER_HEAD joined on ENTITY_CODE, TNATURE, SERIES, VRNO, AMENDNO' },
+  { figure: 'Size', table: 'ORDER_BODY → ITEM_MAST', fields: 'ORDER_BODY.ITEM_CODE → ITEM_MAST.ITEM_NAME', filter: 'Width × thickness read from the item name' },
+  { figure: 'Ordered', table: 'ORDER_BODY', fields: 'QTYORDER', filter: 'MT' },
+  { figure: 'Executed (dispatched)', table: 'ORDER_BODY', fields: 'QTYEXECUTED', filter: 'MT' },
+  { figure: 'Cancelled', table: 'ORDER_BODY', fields: 'QTYCANCELLED', filter: 'MT' },
+  { figure: 'Pending', table: 'ORDER_BODY', fields: 'QTYORDER − QTYEXECUTED − QTYCANCELLED', filter: 'Per line, never below 0; a line is open while pending > 0' },
+  { figure: 'Due date · past due', table: 'ORDER_BODY', fields: 'DUEDATE', filter: 'Past due = open line with DUEDATE before today' },
+  { figure: 'Age', table: 'ORDER_BODY', fields: 'VRDATE', filter: 'Today − order date, in days' },
+];
 
 const AXES = [{ title: 'MT', unit: 'MT' }];
 const PAGE = 60;
@@ -134,6 +152,8 @@ function Content({ data }: { data: OrdersReport }) {
           {all ? `Show the oldest ${PAGE} only` : `Show all ${o.list.length} open lines`}
         </button>
       )}
+
+      <SourceTable rows={ORDER_SOURCES} />
 
       <ul className="pd-notes">
         <li><b>Source</b> — ERP sales orders (ORDER_HEAD / ORDER_BODY, type SORD) for finished-strip items, synced {hhmm(data.erp.syncedAt)}; latest order dated <b>{dm(data.erp.lastDate)}</b>. An amended line is counted once, at its latest amendment.</li>

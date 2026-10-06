@@ -153,18 +153,23 @@ function ResetEvents({ data, config }: { data: ProductionComparison; config: Cou
   return (
     <>
       <h3 className="pd-h">Counter reset events · how each day&apos;s Influx figure is made</h3>
+      {data.noise.applied && data.noise.ticks > 0 && (
+        <p className="pd-dim">Noise removed in this period: {data.noise.ticks} counter tick{data.noise.ticks > 1 ? 's' : ''} ({f(data.noise.value)} {u}) with no billet discharged in the {data.noise.windowMinutes} minutes before.</p>
+      )}
       <div className="pd-table-wrap pd-table-wrap--tall">
         <table className="grid pd-table" aria-label="Counter reset events">
           <thead>
             <tr>
               <th>From (IST)</th><th>To (IST)</th>
-              <th className="r">Counter at start ({u})</th><th className="r">Counter at end ({u})</th>
-              <th className="r">Event ({u})</th>
+              <th className="r" title="Counter when the event started">Start ({u})</th>
+              <th className="r" title="Counter just before the reset, or at 06:00 / the latest reading">End ({u})</th>
+              {data.noise.applied && <th className="r" title="Counter ticks with no billet discharged in the minutes before">Noise ({u})</th>}
+              <th className="r" title="End − start − noise">Counted ({u})</th>
             </tr>
           </thead>
           <tbody>
             {[...byDay].map(([date, evs]) => (
-              <EventDay key={date} date={date} evs={evs} total={dayTotal.get(date) ?? null} f={f} u={u} />
+              <EventDay key={date} date={date} evs={evs} total={dayTotal.get(date) ?? null} f={f} u={u} noise={data.noise.applied} />
             ))}
           </tbody>
         </table>
@@ -173,22 +178,23 @@ function ResetEvents({ data, config }: { data: ProductionComparison; config: Cou
   );
 }
 
-function EventDay({ date, evs, total, f, u }: {
-  date: string; evs: ProductionComparison['events']; total: number | null; f: (v: number) => string; u: string;
+function EventDay({ date, evs, total, f, u, noise }: {
+  date: string; evs: ProductionComparison['events']; total: number | null; f: (v: number) => string; u: string; noise: boolean;
 }) {
   return (
     <>
       {evs.map((e) => (
         <tr key={e.start}>
-          <td className="num">{EV_TIME.format(new Date(e.start))} <span className="pd-dim">· {START_LABEL[e.startedBy]}</span></td>
-          <td className="num">{EV_TIME.format(new Date(e.end))} <span className="pd-dim">· {END_LABEL[e.endedBy]}</span></td>
+          <td className="num" title={START_LABEL[e.startedBy]}>{EV_TIME.format(new Date(e.start))}{e.startedBy !== 'reset' && <span className="pd-dim"> · {START_LABEL[e.startedBy]}</span>}</td>
+          <td className="num" title={END_LABEL[e.endedBy]}>{EV_TIME.format(new Date(e.end))}{e.endedBy !== 'reset' && <span className="pd-dim"> · {END_LABEL[e.endedBy]}</span>}</td>
           <td className="num r">{f(e.startValue)}</td>
           <td className="num r">{f(e.endValue)}</td>
+          {noise && <td className={`num r ${e.noise ? 'v-warn' : 'pd-dim'}`}>{e.noise ? `− ${f(e.noise)}` : '—'}</td>}
           <td className="num r v-val">{f(e.value)}</td>
         </tr>
       ))}
       <tr className="pd-subtotal">
-        <td colSpan={4}><b>{dm(date)}</b> <span className="pd-dim">· plant day total, {evs.length} event{evs.length > 1 ? 's' : ''}</span></td>
+        <td colSpan={noise ? 5 : 4}><b>{dm(date)}</b> <span className="pd-dim">· plant day total, {evs.length} event{evs.length > 1 ? 's' : ''}</span></td>
         <td className="num r"><b>{total === null ? '—' : `${f(total)} ${u}`}</b></td>
       </tr>
     </>
@@ -229,7 +235,7 @@ export const PRODUCTION_COUNTER: CounterConfig = {
   notes: (d) => (
     <>
       <li><b>ERP</b> — Production Log Sheet (strip mill, division S1), synced {hhmm(d.erp.syncedAt)}; entered up to <b>{dm(d.erp.lastDate)}</b>. The ERP is filled in 1–2 days after the production date.</li>
-      <li><b>Influx</b> — Finishing Mill · General · Total_Production_Ton, as reset events: each reset closes an event = counter before the reset − counter at the event&apos;s start, and a plant day ({d.dayBoundary} to {d.dayBoundary}) is the total of its events — listed below. The mill computes it as coils counted × the set billet weight — no losses taken off, not weighed strip. Readings since {hhmm(d.influx.firstReadingAt)}.</li>
+      <li><b>Influx</b> — Finishing Mill · General · Total_Production_Ton, as reset events: each reset closes an event = counter before the reset − counter at the event&apos;s start, and a plant day ({d.dayBoundary} to {d.dayBoundary}) is the total of its events — listed below. The mill computes it as coils counted × the set billet weight — no losses taken off, not weighed strip. <b>Noise</b>: right after an operator reset the counter sometimes ticks with no billet going in; a tick counts only if a billet was discharged in the 5 minutes before it, and each billet stands behind one tick. Readings since {hhmm(d.influx.firstReadingAt)}.</li>
       <li><b>Variance</b> = Influx − ERP: coils at the set billet weight minus weighed finished strip, so a small positive gap is mostly mill loss (scale, end cuts, miss-rolls). Counted only on days where the ERP has an entry and the counter covered the whole day.</li>
     </>
   ),
