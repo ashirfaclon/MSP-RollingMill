@@ -98,7 +98,7 @@ npm run dev                   # http://localhost:4000, reloads on change
 | Command | Does |
 |---|---|
 | `npm run dev` | Dev server with reload (`tsx watch`) |
-| `npm run build` / `npm start` | Bundle to `dist/` and run it |
+| `npm start` | Build to `dist/` (automatic, via `prestart`) and run it — works with only `npm install && npm start` |
 | `npm run typecheck` | `tsc --noEmit` over src and tests |
 | `npm test` | Unit and route tests (no plant access) |
 | `npm run test:live` | Tests against the real systems (needs `.env` and network) |
