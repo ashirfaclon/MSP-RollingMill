@@ -4,7 +4,10 @@ const PORT = Number(process.env.PW_PORT ?? 3107);
 /** The backend the frontend proxies /api to (next.config.ts) — started here if not running. */
 const API_PORT = Number(process.env.PW_API_PORT ?? 8521);
 
-/** E2E against the production build (`npm run build` first) and the backend service. */
+/**
+ * E2E against the dev server (it proxies /api to the backend — the static export cannot) and
+ * the backend service. The static build itself is checked by `npm run build` producing out/.
+ */
 export default defineConfig({
   testDir: './src/tests',
   outputDir: './test-results',
@@ -24,10 +27,10 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: `npx next start -p ${PORT}`,
+      command: `npx next dev -p ${PORT}`,
       url: `http://localhost:${PORT}/hsm/visualization`,
       reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
+      timeout: 120_000,
     },
   ],
 });

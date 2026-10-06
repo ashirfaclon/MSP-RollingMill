@@ -33,6 +33,8 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+# the public backend URL baked into the static build — not a secret
+!.env.production
 
 # vercel
 .vercel

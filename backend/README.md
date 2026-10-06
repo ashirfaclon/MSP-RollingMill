@@ -143,11 +143,12 @@ doesn't need that access.
    The ERP is entered 1–2 days late, so every few hours is plenty.
 4. **Probes.** Use `GET /api/health` for liveness and `GET /api/ready` for readiness.
    `SIGTERM` drains: readiness turns 503, in-flight requests finish, then the process exits.
-5. **Connect the frontend.** Pick one:
-   - **Proxy (recommended):** build the frontend with `BACKEND_URL=https://<api-host>`. The
-     browser only calls the frontend's own origin, so no CORS is needed.
-   - **Direct:** build the frontend with `NEXT_PUBLIC_API_BASE_URL=https://<api-host>`, and
-     set `CORS_ORIGINS=https://<frontend-host>` here.
+5. **Connect the frontend.** The frontend is a static site, so the browser calls this API
+   directly:
+   - build the frontend with `NEXT_PUBLIC_API_BASE_URL=https://<api-host>`;
+   - set `CORS_ORIGINS=https://<frontend-host>` here.
+
+   The API must be served over `https` when the site is.
 
 Logs are JSON lines (pino), one per request, carrying the request id. `authorization`,
 `cookie` and the SSO token are redacted.

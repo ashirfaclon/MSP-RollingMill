@@ -12,13 +12,14 @@ MSP-RollingMill/
 └── iosense.md    API and data-source tracking
 ```
 
-The two are **deployed separately**. The browser loads the frontend. The frontend gets its
-data from the backend, in one of two ways:
+The two are **deployed separately**:
 
-- **Proxy:** the browser calls `/api/*` on the frontend's own site, and Next forwards it to
-  `BACKEND_URL`.
-- **Direct:** the browser calls the backend itself at `NEXT_PUBLIC_API_BASE_URL`, and the
-  backend allows that site in `CORS_ORIGINS`.
+- **Frontend:** `next build` produces a static site in `frontend/out/`, served by nginx.
+  The browser calls the backend directly at `NEXT_PUBLIC_API_BASE_URL`, set at build time.
+- **Backend:** a Node service. It needs plant network access, and its `CORS_ORIGINS` must
+  allow the frontend's site.
+
+In local development, `next dev` proxies `/api/*` to `BACKEND_URL` instead.
 
 Response types are defined once, in `backend/src/contracts`. The frontend imports them as
 `@contracts` (types only).

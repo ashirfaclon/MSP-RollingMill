@@ -1,18 +1,21 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 import path from "node:path";
 
 /**
- * The data API is the separate backend service (../backend). Unless the browser is told to
- * call it directly (NEXT_PUBLIC_API_BASE_URL), `/api/*` on this site is proxied to it, so
- * the page and its data share one origin and no CORS is needed.
+ * The data API is the separate backend service (../backend).
+ *
+ *   next build → a STATIC site in `out/` (output: "export") — the hosting serves plain files
+ *                with nginx, no Node server. The browser calls the backend directly at
+ *                NEXT_PUBLIC_API_BASE_URL (inlined at build time); the backend must list this
+ *                site in CORS_ORIGINS. Each page is `<route>/index.html` (trailingSlash), so any
+ *                static host serves it without extra rules.
+ *   next dev   → `/api/*` is proxied to BACKEND_URL (static export cannot proxy), so local
+ *                work needs no CORS.
  */
 const BACKEND_URL = (process.env.BACKEND_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
-const nextConfig: NextConfig = {
-  async rewrites() {
-    if (process.env.NEXT_PUBLIC_API_BASE_URL) return [];
-    return [{ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*` }];
-  },
+const shared: NextConfig = {
   /*
    * The dev server is reached through the iocompute proxy, not localhost. Without this,
    * Next blocks its dev scripts for that host: the page renders but never hydrates, so
@@ -25,4 +28,21 @@ const nextConfig: NextConfig = {
   turbopack: { root: path.resolve(__dirname) },
 };
 
-export default nextConfig;
+export default function config(phase: string): NextConfig {
+  if (phase === PHASE_DEVELOPMENT_SERVER) {
+    return {
+      ...shared,
+      async rewrites() {
+        if (process.env.NEXT_PUBLIC_API_BASE_URL) return [];
+        return [{ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*` }];
+      },
+    };
+  }
+  if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+    console.warn(
+      "\n⚠ NEXT_PUBLIC_API_BASE_URL is not set: the static site will call /api on its own host, " +
+        "where there is no API. Set it to the backend URL (see .env.production).\n",
+    );
+  }
+  return { ...shared, output: "export", trailingSlash: true };
+}
