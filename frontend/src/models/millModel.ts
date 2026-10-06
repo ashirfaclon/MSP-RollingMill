@@ -22,7 +22,8 @@ import { runTime, type OperatingInput, type RunDetection, type RunTime } from '.
 import { resolveStock, type Stock, type StockInput } from './stock';
 import { resolveOrders, type OrderInput, type Orders } from './orders';
 
-export type ShiftName = 'A' | 'B' | 'C';
+/** Two 12-hour shifts per plant day: Day 06:00–18:00, Night 18:00–06:00 IST. */
+export type ShiftName = 'Day' | 'Night';
 
 export interface ShiftInput {
   name: ShiftName;
@@ -155,9 +156,9 @@ export function resolveMill(input: MillModelInput): MillModel {
     shifts.length ? sum(...shifts.map(pick)) : null;
   const checks: BalanceCheck[] = [
     ...flow.checks,
-    check('shifts.output', 'Shift A + B + C output = day output', output, shiftSum((s) => s.output.mt)),
-    check('shifts.fed', 'Shift A + B + C billets fed = day', fed, shiftSum((s) => s.fed.mt)),
-    check('shifts.inline', 'Shift A + B + C inline reject = day', flow.inlineReject.mt, shiftSum((s) => s.inlineReject.mt)),
+    check('shifts.output', 'Day + Night shift output = day output', output, shiftSum((s) => s.output.mt)),
+    check('shifts.fed', 'Day + Night shift billets fed = day', fed, shiftSum((s) => s.fed.mt)),
+    check('shifts.inline', 'Day + Night shift inline reject = day', flow.inlineReject.mt, shiftSum((s) => s.inlineReject.mt)),
     // Missing power readings would otherwise shrink run AND stop hours silently.
     check('power.coverage', 'Power readings cover the whole window (h)', run.windowH, run.coveredH),
     ...stock.checks,

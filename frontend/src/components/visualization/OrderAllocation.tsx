@@ -12,7 +12,6 @@ export default function OrderAllocation() {
   return (
     <Panel
       title="Order allocation"
-      sub="Day production and period-end stock"
       right={<OpenOrdersButton />}
       className="rm-panel"
       bodyClass="rm-body rm-alloc"

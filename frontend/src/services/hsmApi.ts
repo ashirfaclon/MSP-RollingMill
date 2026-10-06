@@ -1,19 +1,27 @@
 'use client';
 
 /**
- * One fetch hook for every HSM endpoint. The backend computes every figure; this only
- * fetches, keeps the last good answer on screen while a refresh runs, and discards a late
- * response for a URL that is no longer asked for.
+ * One fetch hook for every HSM endpoint. The backend (../backend, a separate service)
+ * computes every figure; this only fetches, keeps the last good answer on screen while a
+ * refresh runs, and discards a late response for a URL that is no longer asked for.
+ *
+ * Where the API is: NEXT_PUBLIC_API_BASE_URL when set (the browser calls the backend
+ * directly — the backend must list this site in CORS_ORIGINS); otherwise same-origin
+ * `/api/…`, which next.config.ts proxies to BACKEND_URL.
  *
  * Several panels read the same URL (the yield card and the balance panel share one log
  * sheet): requests within DEDUPE_MS share one network call.
  */
 import { useEffect, useRef, useState } from 'react';
 
-export type { Grain } from '@/server/hsm/production';
-export type { LogPeriod, LogSheetReport, SizeReport, SizeRow, OrdersReport, OrderPeriod, OpenLine, ErpMeta, StockReport } from '@/server/hsm/erpKpis';
-export type { HsmLive, StandNow, GroupNow, StandTrend, StandMetric } from '@/server/hsm/live';
-export type { YieldComparison, YieldPeriod } from '@/server/hsm/yield';
+/** Response types come from the backend's API contract (type-only — no backend code is bundled). */
+export type {
+  Grain, LogPeriod, LogSheetReport, SizeReport, SizeRow, OrdersReport, OrderPeriod, OpenLine, ErpMeta, StockReport,
+  HsmLive, StandNow, GroupNow, StandTrend, StandMetric, YieldComparison, YieldPeriod, RunningRateReport, RatePeriod, RateDay,
+} from '@contracts';
+
+/** '' = same origin (proxied); else e.g. https://api.hsm.example.com — no trailing slash. */
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? '').replace(/\/+$/, '');
 
 const DEDUPE_MS = 10_000;
 const inflight = new Map<string, { at: number; p: Promise<unknown> }>();
@@ -22,7 +30,7 @@ export async function fetchJson<T>(url: string): Promise<T> {
   const hit = inflight.get(url);
   if (hit && Date.now() - hit.at < DEDUPE_MS) return hit.p as Promise<T>;
   const p = (async () => {
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(`${API_BASE}${url}`, { cache: 'no-store' });
     const type = res.headers.get('content-type') ?? '';
     // A static deploy with no API behind it answers with the HTML page — say so plainly.
     if (!type.includes('application/json')) throw new Error('The data service is not reachable from this page');

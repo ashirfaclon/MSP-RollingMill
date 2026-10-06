@@ -27,17 +27,11 @@ export default function FinishedStockBlock() {
           {data ? `${fixed(data.totals.stockMt, 1)} MT` : s.error ? 'NA' : <span className="skel skel--num" role="status" aria-label="Loading" />}
         </span>
       </button>
-      <p className="rm-alloc-note">
-        {!data ? (s.error ?? 'Loading…') : (
-          <>
-            ERP · at end of {dm(data.asOf)} ·{' '}
-            {fromLedger
-              ? <span className="v-warn">change since {dm(data.basis.from)} &apos;25 — opening stock for {data.basis.year} not in the ERP yet</span>
-              : <>opening 1 Apr ({data.basis.year}) + movements</>}
-          </>
-        )}
-      </p>
-      <p className="rm-alloc-note rm-alloc-note--dim">Made For Order / Made To Stock split: not wired yet — needs the open loading advices confirmed.</p>
+      {/* Only the caveat that changes how the number reads: no opening stock in the ERP yet. */}
+      {s.error && <p className="rm-alloc-note v-warn">{s.error}</p>}
+      {fromLedger && data && (
+        <p className="rm-alloc-note v-warn">Since {dm(data.basis.from)} &apos;25 · no {data.basis.year} opening stock in ERP</p>
+      )}
       <StockDrawer open={open} onClose={() => setOpen(false)} data={data} loading={!data && !s.error} error={s.error} />
     </div>
   );

@@ -10,7 +10,8 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 const SHOTS = 'test-results/screenshots';
-const live = existsSync(path.resolve(process.cwd(), '.env.local')) && existsSync(path.resolve(process.cwd(), 'data/erp-hsm-production.json'));
+/** The backend holds the plant connections and the ERP cache. */
+const live = existsSync(path.resolve(process.cwd(), '../backend/.env')) && existsSync(path.resolve(process.cwd(), '../backend/data/erp-hsm-production.json'));
 
 const test = base.extend<{ page: Page }>({
   page: async ({ page }, provide) => {
@@ -23,7 +24,7 @@ const test = base.extend<{ page: Page }>({
 });
 
 test.describe.configure({ timeout: 120_000 });
-test.skip(!live, 'needs .env.local and a synced ERP cache');
+test.skip(!live, 'needs backend/.env and a synced ERP cache');
 
 /** Pick 22 → 28 Sep 2026 in the Duration filter. */
 async function pickCustom(page: Page) {
@@ -38,14 +39,18 @@ async function pickCustom(page: Page) {
 test('the Production card shows the Influx counter total for the Duration filter period', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const card = page.getByRole('button', { name: 'Production', exact: true });
-  // Default period is Today — live from the counter, counting up since 06:00.
-  await expect(card).toContainText(/\d[\d,]*\.\d/);
-  await expect(card).toContainText('Influx');
+  // Default period is Today — live from the counter; net waits for the ERP by-products.
+  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText(/\d[\d,]*\.\d/);
+  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('Total');
+  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('Net');
 
   await pickCustom(page);
   // 22–28 Sep, counter reset events less noise: 216.80 + 155.00 + 174.05 + 116.57 + 131.95 + 181.34 + 165.37 = 1,141.08
-  await expect(card).toContainText('1,141.1');
-  await expect(card).toContainText('Influx · 7 days');
+  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('1,141.1');
+  // Net = total − mill scale 14.84 − strip end cut 19.07 − miss-roll 10.92 − finish end cut 0 = 1,096.25
+  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('1,096.3');
+  // Every day has its by-products booked: nothing to flag, so no note.
+  await expect(card.locator('.rm-card-note')).toHaveText('');
   await card.screenshot({ path: `${SHOTS}/production-card.png` });
 });
 
@@ -69,9 +74,9 @@ test('clicking the card opens the ERP-vs-Influx drawer on 21 Sep → today, dail
   await expect(row('28 Sep')).toContainText('165.37');
   // 21 Sep: the counter only started at 12:47 — no variance for a part day.
   await expect(row('21 Sep')).toContainText('180.68');
-  await expect(row('21 Sep').locator('td').nth(3)).toHaveText('—');
+  await expect(row('21 Sep').locator('td').nth(4)).toHaveText('—');   // variance (col 3 is net)
 
-  await expect(drawer.locator('.pd-chart .highcharts-series-group path.highcharts-graph')).toHaveCount(3);
+  await expect(drawer.locator('.pd-chart .highcharts-series-group path.highcharts-graph')).toHaveCount(4);   // ERP, Influx, Influx net, variance
 
   // Reset events: 25 Sep is three events (3.24 + 1.62 + 114.95); the first is 4 noise ticks (no
   // billet behind them, 3.24 removed), so the day counts 1.62 + 114.95 = 116.57.

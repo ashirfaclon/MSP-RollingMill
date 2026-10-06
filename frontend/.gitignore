@@ -45,5 +45,3 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 
-# backend runtime caches (ERP sync) — survive a restart, not a re-clone
-/data/

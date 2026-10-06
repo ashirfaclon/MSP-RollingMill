@@ -18,14 +18,14 @@ export default function KpiStrip({ m }: { m: MillModel }) {
         label="Power consumption"
         value={fixed(k.energyMwh, 2)}
         unit="MWh"
-        note="Metered energy · day"
+        note=""
         series="prod"
       />
       <KpiCard
         label="Specific energy"
         value={fixed(k.specificEnergyKwhPerMt, 1)}
         unit="kWh/MT"
-        note="Energy per finished MT"
+        note=""
         series="prod"
       />
       {/* All production counts as without order: the ERP does not link production to orders. */}
@@ -34,7 +34,7 @@ export default function KpiStrip({ m }: { m: MillModel }) {
         label="Made For Order"
         value={fixed(m.stock.withOrder, 0)}
         unit="MT"
-        note={`${fixed(m.stock.withOrderPct, 1)}% of finished stock`}
+        note=""
         series="order"
         meterPct={m.stock.withOrderPct ?? undefined}
       />
@@ -42,7 +42,7 @@ export default function KpiStrip({ m }: { m: MillModel }) {
         label="Made To Stock"
         value={fixed(m.stock.free, 0)}
         unit="MT"
-        note={`${fixed(m.stock.freePct, 1)}% of finished stock`}
+        note=""
         series="free"
         meterPct={m.stock.freePct ?? undefined}
       />

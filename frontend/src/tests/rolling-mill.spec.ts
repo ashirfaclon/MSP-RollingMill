@@ -26,10 +26,10 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   // No live source yet: these show 0, not sample figures, and are not faded.
   await expect(card('Power consumption')).toContainText('0.00');
   await expect(card('Specific energy')).toContainText('0.0');
-  // All production counts as without order (no order link in the ERP).
-  await expect(card('Production without order')).toContainText('no order link in ERP');
-  await expect(card('Made For Order')).toContainText('0.0% of finished stock');
-  await expect(card('Made To Stock')).toContainText('0.0% of finished stock');
+  // Descriptive sub-texts are gone: cards with nothing to flag carry no note.
+  for (const name of ['Power consumption', 'Specific energy', 'Made For Order', 'Made To Stock']) {
+    await expect(card(name).locator('.rm-card-note')).toHaveText('');
+  }
   for (const sample of ['30.78', '90.0', '72.0', '420', '210', '342.0']) await expect(strip).not.toContainText(sample);
   await expect(page.locator('.rm-pending')).toHaveCount(0);
 
@@ -40,10 +40,11 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   ]) {
     await expect(main.getByText(text, { exact: false }).first()).toBeVisible();
   }
-  // Production by shift and the order split have no live source: 0 throughout.
+  // Shift output and the order split have no live source: 0. Running rate is calculated live.
   const shifts = page.locator('section.panel', { hasText: 'Production by shift' });
-  await expect(shifts.locator('.rm-shift-val')).toHaveText(['0.0 MT', '0.0 MT', '0.0 MT']);
-  await expect(shifts).toContainText('0.00 TPH');
+  await expect(shifts.locator('.rm-shift-name')).toHaveText(['Day', 'Night']);
+  await expect(shifts.locator('.rm-shift-val')).toHaveText(['0.0 MT', '0.0 MT']);
+  await expect(shifts.getByRole('button', { name: /Running rate/ })).toContainText(/\d+\.\d{2} TPH|NA/);
   const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
   await expect(split).toContainText('Against order0.0 MT');
   // Live panels: the mimic has infeed, the two stand groups that exist, and the exit.
@@ -64,9 +65,10 @@ test('data model screen lays out every ledger and all checks pass', async ({ pag
 
   const main = page.getByRole('main');
   const shifts = main.getByRole('table', { name: 'Shift ledger' });
-  await expect(shifts.getByRole('row', { name: /^Shift B / })).toContainText('118.0');
-  await expect(shifts.getByRole('row', { name: /^Shift B / })).toContainText('7.4 h');
-  await expect(shifts.getByRole('row', { name: /^Day / })).toContainText('21.6 h');
+  await expect(shifts.getByRole('row', { name: /^Night shift / })).toContainText('170.0');
+  await expect(shifts.getByRole('row', { name: /^Night shift / })).toContainText('11.0 h');
+  await expect(shifts.getByRole('row', { name: /^Day shift / })).toContainText('10.6 h');
+  await expect(shifts.getByRole('row', { name: /^Day (?!shift)/ })).toContainText('21.6 h');   // the day-total row, not the Day shift
 
   await expect(main.getByRole('table', { name: 'Stops' }).getByRole('row')).toHaveCount(6);
   await expect(main).toContainText('Running = drive power above 600 kW');

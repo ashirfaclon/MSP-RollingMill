@@ -31,7 +31,7 @@ export default function ShiftLedger({ m }: { m: MillModel }) {
           <tbody>
             {m.shifts.map((s) => (
               <tr key={s.name}>
-                <td><b>Shift {s.name}</b> <span className="dm-sub dm-sub-line">{fmtIst(s.fromMs)}–{fmtIst(s.toMs)}</span></td>
+                <td><b>{s.name} shift</b> <span className="dm-sub dm-sub-line">{fmtIst(s.fromMs)}–{fmtIst(s.toMs)}</span></td>
                 <td className="num r v-val">{s.fed.count ?? 'NA'}</td>
                 <td className="num r v-val">{fixed(s.fed.mt, 1)}</td>
                 <td className="num r v-val">{fixed(s.inlineReject.mt, 1)}</td>

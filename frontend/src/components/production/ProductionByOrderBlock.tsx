@@ -33,7 +33,6 @@ export default function ProductionByOrderBlock() {
         <LegendItem series="order" label="Against order" value="0.0 MT" />
         <LegendItem series="free" label="Without order" value={`${fixed(mt, 1)} MT`} />
       </div>
-      <p className="rm-alloc-note rm-alloc-note--dim">All production counts as without order: the ERP does not link production to orders.</p>
     </div>
   );
 }

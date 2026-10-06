@@ -7,14 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:e2e": "playwright test",
-    "sync:erp": "tsx src/server/erp/sync.ts"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@influxdata/influxdb-client": "^1.35.0",
     "highcharts": "^12.6.2",
     "next": "16.3.6",
-    "oracledb": "^7.0.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -22,14 +19,11 @@
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/oracledb": "^7.0.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "dotenv": "^16.6.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
-    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

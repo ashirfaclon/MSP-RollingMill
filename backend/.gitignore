@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+
+# secrets — only the template is committed
+.env
+.env.*
+!.env.example
+
+# ERP sync caches (runtime data, rebuilt by `npm run sync:erp`)
+data/
+
+*.log

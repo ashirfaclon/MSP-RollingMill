@@ -15,7 +15,7 @@ export default function ProductionWithoutOrderCard() {
       label="Production without order"
       value={fixed(mt, 1)}
       unit="MT"
-      note={mt === null ? 'No production data' : '100% of production · no order link in ERP'}
+      note={mt === null ? 'No production data' : ''}
       series="free"
       meterPct={mt ? 100 : 0}
       loading={loading}

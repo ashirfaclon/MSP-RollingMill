@@ -28,7 +28,7 @@ const VIEWS: { id: LogView; label: string }[] = [
 ];
 
 const TITLES: Record<LogView, string> = {
-  yield: 'Mass yield · ERP vs Influx',
+  yield: 'Mass yield · Influx',
   balance: 'Mass balance · ERP log sheet',
   quality: 'Quality split · ERP log sheet',
 };
@@ -105,65 +105,105 @@ function Content({ data, view }: { data: LogSheetReport; view: LogView }) {
 
 /* ------------------------------ yield view ------------------------------- */
 
-const YIELD_AXES: DrillAxis[] = [{ title: 'Yield %', unit: '%', line: { value: 100, label: '100 % — output = input' } }];
+const YIELD_AXES: DrillAxis[] = [{ title: 'Yield %', unit: '%' }];
 
 function YieldContent({ data }: { data: YieldComparison }) {
   const rows = data.rows;
   const t = data.totals;
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const series = useMemo<DrillSeries[]>(() => [
-    { id: 'erp', name: 'ERP yield (production ÷ input)', token: '--s-prod', type: 'line', data: rows.map((x) => x.erpYieldPct), dp: 2 },
-    { id: 'influx', name: 'Influx yield (output tag ÷ billets × set weight)', token: '--s-order', type: 'line', data: rows.map((x) => x.influxYieldPct), dp: 2 },
+    { id: 'influx', name: 'Influx yield (net output ÷ input)', token: '--s-order', type: 'line', data: rows.map((x) => x.netYieldPct), dp: 2 },
+    { id: 'erp', name: 'ERP yield (production ÷ input)', token: '--s-prod', type: 'line', dashed: true, data: rows.map((x) => x.erpYieldPct), dp: 2 },
   ], [rows]);
   const tooltip = useMemo(() => (i: number) => {
     const x = rows[i];
     if (!x) return '';
+    const bp = x.byProducts ? Object.values(x.byProducts).reduce((a, v) => a + v, 0) : null;
     return `<b>${x.label}</b><br/>`
-      + `ERP: <b>${fmtNum(x.erpYieldPct, 2)} %</b> = ${f(x.erpOutputMt)} ÷ ${f(x.erpInputMt)} MT<br/>`
-      + `Influx: <b>${fmtNum(x.influxYieldPct, 2)} %</b> = ${f(x.influxOutputT)} ÷ ${f(x.influxInputT)} t<br/>`
-      + `<span style="opacity:.75">Billets ${fmtNum(x.billets, 0)} · coils ${fmtNum(x.coils, 0)}</span>`;
+      + `Influx: <b>${fmtNum(x.netYieldPct, 2)} %</b> = ${f(x.netOutputT)} ÷ ${f(x.netInputT)} t<br/>`
+      + `<span style="opacity:.75">net = counter ${f(x.influxOutputT)} − by-products ${f(bp)}</span><br/>`
+      + `ERP: <b>${fmtNum(x.erpYieldPct, 2)} %</b> = ${f(x.erpOutputMt)} ÷ ${f(x.erpInputMt)} MT`;
   }, [rows]);
+  const awaiting = t.influxDays - t.netDays;
 
   return (
     <>
       <Stats items={[
+        { label: 'Influx yield', value: fmtNum(t.netYieldPct, 2), unit: `% · ${t.netDays} of ${t.days} days` },
+        { label: 'Net output (Influx)', value: fmtNum(t.netOutputT, 2), unit: 'MT' },
+        { label: 'Input (Influx)', value: fmtNum(t.netInputT, 2), unit: 'MT' },
         { label: 'ERP yield', value: fmtNum(t.erpYieldPct, 2), unit: `% · ${t.erpDays} of ${t.days} days` },
-        { label: 'Influx yield', value: fmtNum(t.influxYieldPct, 2), unit: `% · ${t.influxDays} of ${t.days} days`, tone: (t.influxYieldPct ?? 0) > 100 ? 'v-warn' : 'v-val' },
-        { label: 'Billets in (Influx)', value: fmtNum(t.billets, 0) },
-        { label: 'Coils out (Influx)', value: fmtNum(t.coils, 0), tone: (t.coils ?? 0) > (t.billets ?? 0) ? 'v-warn' : 'v-val' },
       ]} />
       <DrillChart
         series={series}
         categories={categories}
         axes={YIELD_AXES}
         tooltip={tooltip}
-        ariaLabel={`Yield per period: ${rows.map((x) => `${x.label} ERP ${fmtNum(x.erpYieldPct, 1)} %, Influx ${fmtNum(x.influxYieldPct, 1)} %`).join('; ')}`}
+        ariaLabel={`Yield per period: ${rows.map((x) => `${x.label} Influx ${fmtNum(x.netYieldPct, 1)} %, ERP ${fmtNum(x.erpYieldPct, 1)} %`).join('; ')}`}
       />
       <div className="pd-table-wrap">
-        <table className="grid pd-table" aria-label="Mass yield · ERP vs Influx by period">
+        <table className="grid pd-table" aria-label="Mass yield by period">
           <thead>
             <tr>
               <th>Period</th>
-              <th className="r">ERP input</th><th className="r">ERP output</th><th className="r">ERP yield %</th>
-              <th className="r">Influx input</th><th className="r">Influx output</th><th className="r">Influx yield %</th>
-              <th className="r">Billets</th><th className="r">Coils</th>
+              <th className="r" title="Billets × L × B × H × density">Influx input</th>
+              <th className="r" title="Total_Production_Ton, reset events less noise">Counter output</th>
+              <th className="r" title="Mill scale + strip end cut + miss-roll strip + strip finish end cut (ERP stores)">− By-products</th>
+              <th className="r">= Net output</th>
+              <th className="r">Influx yield %</th>
+              <th className="r">ERP yield %</th>
             </tr>
           </thead>
           <tbody>{rows.map((x) => <YieldRow key={x.key} r={x} />)}</tbody>
           <tfoot><YieldRow r={t} /></tfoot>
         </table>
       </div>
+
+      <h3 className="pd-h">By-products taken off · ERP stores (PROD_TRAN, division S1)</h3>
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label="By-products by period">
+          <thead>
+            <tr>
+              <th>Period</th>
+              {BY_PRODUCT_COLUMNS.map((c) => <th key={c.key} className="r" title={`Item ${c.code} · PROD_TRAN.QTYRECD · = log sheet ${c.logField}`}>{c.name}</th>)}
+              <th className="r">Total</th>
+            </tr>
+          </thead>
+          <tbody>{rows.map((x) => <ByProductRow key={x.key} r={x} />)}</tbody>
+          <tfoot><ByProductRow r={t} /></tfoot>
+        </table>
+      </div>
+
       <SizeEvents data={data} />
       <ul className="pd-notes">
-        <li><b>ERP yield</b> = Σ PRODUCTION_MT ÷ Σ INPUT_MT, Production Log Sheet (strip mill S1), synced {hhmm(data.erp.syncedAt)}; entered up to <b>{dm(data.erp.lastDate)}</b>. Production = prime + defective + rolling defect.</li>
-        <li><b>Influx input</b> = for each billet-size event, billets discharged (Dicharged_Billet) × that event&apos;s billet weight = length (m) × breadth (mm ÷ 1000) × height (mm ÷ 1000) × {data.densityGcm3} g/cm³ (= t/m³), in t. Every change of length, breadth or height starts a new event; changes within a minute of each other are one event. <b>Influx output</b> = Total_Production_Ton (MT), increases summed per plant day (06:00 → 06:00).</li>
-        <li><b>Why Influx sits at ~100 %</b>: Total_Production_Ton is not weighed strip — it is coils counted (Fineshed_Coil) × the set billet weight (the PLC uses 7.85, our input {data.densityGcm3}). So Influx yield ≈ coils ÷ billets × 7.85 ÷ {data.densityGcm3}. Scale, end cuts, miss-rolls and rejects never enter it.</li>
+        <li><b>Influx yield</b> = net output ÷ Influx input, over the days whose by-products are booked in the ERP{awaiting > 0 ? ` (${awaiting} day${awaiting > 1 ? 's' : ''} in this period still await them; by-products booked to ${dm(data.byProductsLastDate)})` : ''}.</li>
+        <li><b>Influx input</b> = for each billet-size event, billets discharged (Dicharged_Billet) × that event&apos;s billet weight = length (m) × breadth (mm ÷ 1000) × height (mm ÷ 1000) × {data.densityGcm3} g/cm³ (= t/m³). Every change of length, breadth or height starts a new event.</li>
+        <li><b>Net output</b> = counter output (Total_Production_Ton, reset events less noise, per plant day 06:00 → 06:00) − the four by-products: Mill Scale and Strip Endcut (weight taken off every coil), Miss Roll Strip and Strip Finish Endcut (whole pieces lost).</li>
+        <li><b>ERP yield</b> = Σ PRODUCTION_MT ÷ Σ INPUT_MT, Production Log Sheet (strip mill S1), synced {hhmm(data.erp.syncedAt)}; entered up to <b>{dm(data.erp.lastDate)}</b> — shown for comparison.</li>
         {data.influx.unweighedBillets > 0 && <li className="v-warn">{data.influx.unweighedBillets} billets had no billet-size setting in the historian and are left out of the Influx input.</li>}
         {(data.erp.connection === 'down' || data.influx.connection === 'down') && (
           <li className="v-warn">{data.erp.connection === 'down' ? data.erp.message : data.influx.message}</li>
         )}
       </ul>
     </>
+  );
+}
+
+const BY_PRODUCT_COLUMNS = [
+  { key: 'millScale', name: 'Mill Scale', code: 'C01010100093', logField: 'BLOSS_MT' },
+  { key: 'stripEndcut', name: 'Strip Endcut', code: 'C01010100033', logField: 'ENDCUT_MT' },
+  { key: 'missRoll', name: 'Miss Roll Strip', code: 'C01010100016', logField: 'MISSROLL_MT' },
+  { key: 'finishEndcut', name: 'Strip Finish Endcut', code: 'C01010100032', logField: 'REJECT_MT' },
+] as const;
+
+function ByProductRow({ r }: { r: YieldPeriod }) {
+  const b = r.byProducts;
+  return (
+    <tr>
+      <td><b>{r.label}</b></td>
+      {BY_PRODUCT_COLUMNS.map((c) => <td key={c.key} className="num r v-val">{b ? fmtNum(b[c.key], 2) : '—'}</td>)}
+      <td className="num r v-val"><b>{b ? fmtNum(Object.values(b).reduce((a, v) => a + v, 0), 2) : '—'}</b></td>
+    </tr>
   );
 }
 
@@ -220,19 +260,21 @@ function SizeEvents({ data }: { data: YieldComparison }) {
 
 function YieldRow({ r }: { r: YieldPeriod }) {
   const n = (v: number | null, dp = 2) => <td className="num r v-val">{fmtNum(v, dp)}</td>;
-  const over = (r.influxYieldPct ?? 0) > 100;
+  const bp = r.byProducts ? Object.values(r.byProducts).reduce((a, v) => a + v, 0) : null;
   return (
     <tr>
       <td>
         <b>{r.label}</b>
         {r.days > 1 && r.key !== 'total' ? <span className="pd-dim"> · {dm(r.fromDate)}–{dm(r.toDate)}</span> : null}
+        {r.netDays < r.influxDays && <span className="pd-dim" title="Days whose by-products are booked in the ERP"> · {r.netDays}/{r.influxDays}d</span>}
       </td>
-      {n(r.erpInputMt)}{n(r.erpOutputMt)}
-      <td className="num r v-val"><b>{fmtNum(r.erpYieldPct, 2)}</b></td>
-      {n(r.influxInputT)}{n(r.influxOutputT)}
-      <td className={`num r ${over ? 'v-warn' : 'v-val'}`}><b>{fmtNum(r.influxYieldPct, 2)}</b></td>
-      {n(r.billets, 0)}
-      <td className={`num r ${(r.coils ?? 0) > (r.billets ?? 0) ? 'v-warn' : 'v-val'}`}>{fmtNum(r.coils, 0)}</td>
+      {/* Booked days only once any are booked, so input, counter and net are one calculation. */}
+      {n(r.netDays ? r.netInputT : r.influxInputT)}
+      {n(r.netDays ? r.netCounterT : r.influxOutputT)}
+      <td className="num r v-val">{bp === null ? <span className="pd-dim" title="By-products not booked in the ERP yet">awaited</span> : `− ${fmtNum(bp, 2)}`}</td>
+      {n(r.netOutputT)}
+      <td className="num r v-val"><b>{fmtNum(r.netYieldPct, 2)}</b></td>
+      <td className="num r">{fmtNum(r.erpYieldPct, 2)}</td>
     </tr>
   );
 }

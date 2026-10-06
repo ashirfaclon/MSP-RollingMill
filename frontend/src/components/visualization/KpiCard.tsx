@@ -36,13 +36,18 @@ export default function KpiCard(props: {
   const { meterPct } = props;
   const body = (
     <>
-      <span className="rm-card-label">{props.label}</span>
+      <span className="rm-card-label">
+        {props.label}
+        {/* Two sections share one unit: shown once by the title, so each figure gets the full half. */}
+        {props.pair && <span className="rm-card-label-unit">· {props.unit}</span>}
+      </span>
       {props.pair && !props.loading ? (
         <span className="rm-card-value rm-card-pair num v-val">
           {props.pair.map((p) => (
             <span key={p.source} className="rm-card-pair-item">
-              <span>{p.value}<span className="rm-card-unit">{props.unit}</span></span>
+              {/* Each half is its own section: title on top, then the figure. */}
               <span className="rm-card-src">{p.source}</span>
+              <span className="rm-card-pair-v">{p.value}</span>
             </span>
           ))}
         </span>
@@ -54,7 +59,8 @@ export default function KpiCard(props: {
           <span className="rm-card-unit">{props.unit}</span>
         </span>
       )}
-      <span className="rm-card-note" title={props.note}>{props.note}</span>
+      {/* Always rendered (empty when there is nothing to flag) so the cards stay aligned. */}
+      <span className="rm-card-note" title={props.note || undefined}>{props.note}</span>
       {meterPct !== undefined && (
         <span
           className="rm-meter"

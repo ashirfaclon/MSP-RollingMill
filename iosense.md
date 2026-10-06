@@ -7,11 +7,11 @@ Resource and functionID calls made by this app, per CLAUDE.md.
 HSM Visualization now reads live data for: Production and Mass yield cards, the mill
 mimic, Material & operating balance, Production & dispatch by size, and open orders.
 Every wired figure opens a drill-down drawer (chart with interactive legend + table + checks).
-Sources are the ERP cache (log sheet, PROD_TRAN, SALE, SORD — `npm run sync:erp`) and the
+Sources are the ERP cache (log sheet, PROD_TRAN, SALE, SORD — `npm run sync:erp` in `backend/`) and the
 plant historian (Influx). No wired KPI reads the IOsense logbook yet. The remaining cards
 and panels still render the sample model (`hsmSample.ts`).
 
-## App routes (HSM) and the data behind them
+## API routes (served by `backend/`, proxied or called from `frontend/`) and the data behind them
 
 | Route | Source | Figures |
 |---|---|---|
@@ -22,6 +22,7 @@ and panels still render the sample model (`hsmSample.ts`).
 | `GET /api/hsm/orders` | ERP SORD (ORDER_HEAD/BODY, latest amendment) | Orders placed per period, open order book |
 | `GET /api/hsm/live` | Influx `HSM / Roughing Mill, Finishing Mill / RM_0n, FM_0n` (On_Off, Motor_Current, Motor_RPM, Roll_Force_Ton) · `Rolling_Mill_Speed` · `Dicharged_Billet` | Mill mimic: billets today, stand groups |
 | `GET /api/hsm/stands` | Same stand fields, 1-min+ means | Stands drawer trend |
+| `GET /api/hsm/running-rate` | Influx `HSM / Finishing Mill / General / Total_Production_Ton` + `Dicharged_Billet` (running hours: billets ≤ 10 min apart) · ERP log sheet PRODUCTION_MT, NET_RUNNING_HRS, DELAY_HRS | Running rate (Production by shift footer) and its drawer |
 
 ## Calls
 

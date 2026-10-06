@@ -24,7 +24,7 @@ export default function RunTimePanel({ m }: { m: MillModel }) {
         <div className="dm-tl-track">
           {m.shifts.map((s) => (
             <span key={s.name} className="dm-tl-shift" style={{ left: at(s.fromMs), width: at(window.fromMs + (s.toMs - s.fromMs)) }}>
-              Shift {s.name}
+              {s.name} shift
             </span>
           ))}
           {run.stops.map((st) => (

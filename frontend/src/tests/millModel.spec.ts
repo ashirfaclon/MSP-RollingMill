@@ -83,7 +83,7 @@ test.describe('run time from power', () => {
     const m = resolveMill(HSM_SAMPLE);
     const sumRun = m.shifts.reduce((s, x) => s + x.run.runH, 0);
     expect(sumRun).toBeCloseTo(m.run.runH, 9);
-    expect(m.shifts.map((s) => Number(s.run.runH.toFixed(1)))).toEqual([7.1, 7.4, 7.1]);
+    expect(m.shifts.map((s) => Number(s.run.runH.toFixed(1)))).toEqual([10.6, 11.0]);   // Day, Night
   });
 });
 
@@ -148,7 +148,7 @@ test.describe('whole model', () => {
   });
 
   test('shift totals that disagree with the day are flagged', () => {
-    const shifts = HSM_SAMPLE.shifts.map((s, i) => (i === 1 ? { ...s, output: t(110) } : s));
+    const shifts = HSM_SAMPLE.shifts.map((s, i) => (i === 1 ? { ...s, output: t(162) } : s));   // Night 170 → 162
     const m = resolveMill({ ...HSM_SAMPLE, shifts });
     expect(m.checks.find((c) => c.id === 'shifts.output')).toMatchObject({ ok: false, gap: 8 });
     expect(m.balanced).toBe(false);

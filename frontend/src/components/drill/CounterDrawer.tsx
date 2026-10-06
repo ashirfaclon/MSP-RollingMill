@@ -62,11 +62,14 @@ function Content({ data, config }: { data: ProductionComparison; config: Counter
   const u = config.unit;
   const f = (v: number | null) => fmtNum(v, config.dp);
   const rows = data.rows;
+  const hasNet = data.totals.byProductDays !== undefined;
   const series = useMemo<DrillSeries[]>(() => [
     { id: 'erp', name: config.erpName, token: '--s-prod', type: 'line', data: rows.map((x) => x.erpMt), dp: config.dp },
     { id: 'influx', name: config.influxName, token: '--s-order', type: 'line', data: rows.map((x) => x.influxMt), dp: config.dp },
+    // Production only: the counter less the four by-products booked in ERP stores.
+    ...(hasNet ? [{ id: 'net', name: 'Influx net (− 4 by-products)', token: '--s-alt', type: 'line' as const, data: rows.map((x) => x.netMt ?? null), dp: config.dp }] : []),
     { id: 'variance', name: 'Variance (Influx − ERP)', token: '--warn', type: 'line', dashed: true, data: rows.map((x) => x.varianceMt), dp: config.dp },
-  ], [rows, config]);
+  ], [rows, config, hasNet]);
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const axes = useMemo(() => [{ title: u, unit: u }], [u]);
   const tooltip = useMemo(() => (i: number) => {
@@ -106,15 +109,16 @@ function Content({ data, config }: { data: ProductionComparison; config: Counter
               <th>Period</th>
               <th className="r">ERP ({u})</th>
               <th className="r">Influx ({u})</th>
+              {hasNet && <th className="r" title="Influx less mill scale, strip end cut, miss-roll strip and strip finish end cut (ERP stores)">Net ({u})</th>}
               <th className="r">Variance ({u})</th>
               <th className="r">Variance %</th>
               <th className="r">Compared</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((x) => <Row key={x.key} r={x} f={f} />)}
+            {rows.map((x) => <Row key={x.key} r={x} f={f} net={hasNet} />)}
           </tbody>
-          <tfoot><Row r={t} f={f} /></tfoot>
+          <tfoot><Row r={t} f={f} net={hasNet} /></tfoot>
         </table>
       </div>
 
@@ -201,7 +205,7 @@ function EventDay({ date, evs, total, f, u, noise }: {
   );
 }
 
-function Row({ r, f }: { r: PeriodRow; f: (v: number | null) => string }) {
+function Row({ r, f, net }: { r: PeriodRow; f: (v: number | null) => string; net: boolean }) {
   const partial = r.days > 1 || r.key === 'total';
   return (
     <tr>
@@ -214,6 +218,11 @@ function Row({ r, f }: { r: PeriodRow; f: (v: number | null) => string }) {
         {f(r.influxMt)}
         {r.influxMt !== null && r.influxFullDays < r.days && <span className="pd-dim" title="Days the counter covered fully"> · {r.influxFullDays}/{r.days}d</span>}
       </td>
+      {net && (
+        <td className="num r v-val">
+          {r.netMt === null || r.netMt === undefined ? <span className="pd-dim" title="By-products not booked in the ERP yet">awaited</span> : f(r.netMt)}
+        </td>
+      )}
       <td className={`num r ${varClass(r.varianceMt)}`}>{f(r.varianceMt)}</td>
       <td className={`num r ${varClass(r.varianceMt)}`}>{r.variancePct === null ? '—' : `${fmtNum(r.variancePct, 1)}%`}</td>
       <td className="num r">{r.comparedDays}/{r.days}</td>

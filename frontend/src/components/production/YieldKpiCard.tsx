@@ -1,11 +1,13 @@
 'use client';
 
 /**
- * Mass yield for the Duration filter's period, two ways side by side (plant's request):
- *   ERP     Σ production ÷ Σ billet input, Production Log Sheet (closed days, 1–2 days late);
- *   Influx  Total_Production_Ton ÷ Σ per billet-size event (billets × L×B×H × 7.832 g/cm³), live.
- * The Influx output is coils × the set billet weight, not weighed strip, so its yield is
- * really coils ÷ billets — the drawer shows the counts next to it. Opens the Yield view.
+ * Mass yield for the Duration filter's period — one figure, from Influx (plant's rule):
+ *   input   Σ per billet-size event (billets × L×B×H × 7.832 g/cm³);
+ *   output  NET production = the counter (reset events less noise) less the four
+ *           by-products booked in ERP stores (mill scale, strip end cut, miss-roll strip,
+ *           strip finish end cut).
+ * Counted over the days whose by-products are booked (they arrive 1–2 days late). The
+ * drawer shows it per day beside the ERP yield.
  */
 import KpiCard from '@/components/visualization/KpiCard';
 import { useLogSheetDrawer } from '@/components/drill/LogSheetDrawer';
@@ -27,28 +29,24 @@ export default function YieldKpiCard() {
 
   let note = error ? 'Data unavailable' : 'Loading…';
   if (t && current) {
-    const erp = !t.erpDays ? `ERP not entered (to ${dm(current.erp.lastDate)})`
-      : t.erpDays < t.days ? `ERP ${t.erpDays}/${t.days} d` : `ERP ${t.days} d`;
-    const inf = !t.influxDays ? 'Influx no data' : t.influxFullDays < t.influxDays ? 'Influx live' : `Influx ${t.influxDays} d`;
-    note = `${erp} · ${inf}`;
+    if (!t.influxDays) note = 'No counter data';
+    else if (!t.netDays) note = `Awaits ERP losses (booked to ${dm(current.byProductsLastDate)})`;
+    else if (t.netDays < t.influxDays) note = `Net ÷ input · ${t.netDays} of ${t.influxDays} days have losses booked`;
+    else note = '';
   }
 
   return (
     <>
       <KpiCard
         label="Mass yield"
-        value="NA"
+        value={t?.netYieldPct === null || t?.netYieldPct === undefined ? 'NA' : fixed(t.netYieldPct, 1)}
         unit="%"
         note={note}
         series="order"
-        pair={t ? [
-          { source: 'ERP', value: t.erpYieldPct === null ? 'NA' : fixed(t.erpYieldPct, 1) },
-          { source: 'Influx', value: t.influxYieldPct === null ? 'NA' : fixed(t.influxYieldPct, 1) },
-        ] : undefined}
-        meterPct={t?.erpYieldPct ?? undefined}
+        meterPct={t?.netYieldPct ?? undefined}
         loading={!current && !error}
         onOpen={() => logSheet.open('yield')}
-        openLabel="Yield per day: ERP against Influx"
+        openLabel="Yield per day: Influx net output ÷ Influx input, with the ERP yield beside it"
       />
       {logSheet.drawer}
     </>

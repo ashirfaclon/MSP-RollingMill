@@ -12,7 +12,8 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 const SHOTS = 'test-results/screenshots';
-const live = existsSync(path.resolve(process.cwd(), '.env.local')) && existsSync(path.resolve(process.cwd(), 'data/erp-hsm-commercial.json'));
+/** The backend holds the plant connections and the ERP cache. */
+const live = existsSync(path.resolve(process.cwd(), '../backend/.env')) && existsSync(path.resolve(process.cwd(), '../backend/data/erp-hsm-commercial.json'));
 
 const test = base.extend<{ page: Page }>({
   page: async ({ page }, provide) => {
@@ -25,7 +26,7 @@ const test = base.extend<{ page: Page }>({
 });
 
 test.describe.configure({ timeout: 120_000 });
-test.skip(!live, 'needs .env.local and a synced ERP cache');
+test.skip(!live, 'needs backend/.env and a synced ERP cache');
 
 async function pickWeek(page: Page) {
   await page.goto('/hsm/visualization');
@@ -40,16 +41,13 @@ async function pickWeek(page: Page) {
 test('mass yield card and the material balance show the ERP log sheet for the period', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const yieldCard = page.getByRole('button', { name: 'Mass yield', exact: true });
-  // Today is never in the ERP yet — stated, not zero; Influx is live.
-  await expect(yieldCard).toContainText('ERP not entered');
-  await expect(yieldCard).toContainText('Influx live');
+  // Today: the by-products are not in the ERP yet, so the yield waits for them — stated, not guessed.
+  await expect(yieldCard).toContainText('Awaits ERP losses');
 
   await pickWeek(page);
-  // Both yields side by side: ERP 1,076.51 ÷ 1,121.34 = 96.00 %; Influx 1,141.08 ÷ 1,138.38 = 100.24 % (output less noise; input per billet-size event at 7.832 g/cm³).
-  await expect(yieldCard.locator('.rm-card-pair-item').nth(0)).toContainText('96.0');
-  await expect(yieldCard.locator('.rm-card-pair-item').nth(0)).toContainText('ERP');
-  await expect(yieldCard.locator('.rm-card-pair-item').nth(1)).toContainText('100.2');
-  await expect(yieldCard.locator('.rm-card-pair-item').nth(1)).toContainText('Influx');
+  // One yield: Influx net output 1,096.25 (counter 1,141.08 − by-products 44.83) ÷ Influx input 1,138.38 = 96.30 %.
+  await expect(yieldCard.locator('.rm-card-value')).toContainText('96.3');
+  await expect(yieldCard.locator('.rm-card-note')).toHaveText('');   // all 7 days have losses booked
   // Finished exit = the Production card's Influx figure: Σ Total_Production_Ton increases, 22–28 Sep.
   const exit = page.getByRole('button', { name: /Finished exit/ });
   await expect(exit).toContainText('1,141.1 MT');
@@ -59,7 +57,6 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   await expect(split.locator('.rm-alloc-total')).toHaveText('1,141.1 MT');
   await expect(split).toContainText('Without order1,141.1 MT');
   await expect(split).toContainText('Against order0.0 MT');
-  await expect(exit).toContainText(/Influx/i);
 
   const panel = page.locator('section.panel', { hasText: 'Material & operating balance' });
   await expect(panel.getByRole('button', { name: /^Billet input/ })).toContainText('1,121.3 MT');
@@ -80,15 +77,17 @@ test('log-sheet drawer: yield, mass balance and quality views, each with chart, 
   await page.getByRole('button', { name: 'Mass yield', exact: true }).click();
   // One drawer; its title follows the view, so find it by role and check the name.
   const drawer = page.getByRole('dialog');
-  await expect(drawer).toHaveAccessibleName('Mass yield · ERP vs Influx');
+  await expect(drawer).toHaveAccessibleName('Mass yield · Influx');
   await expect(drawer.getByRole('button', { name: 'Last 30 days' })).toHaveAttribute('aria-pressed', 'true');
 
   await drawer.getByRole('button', { name: /Duration filter/ }).click();
-  const table = drawer.getByRole('table', { name: /by period/ });
-  for (const v of ['1,121.34', '1,076.51', '96.00', '1,138.38', '1,141.08', '100.24', '1,491']) {
+  const table = drawer.getByRole('table', { name: 'Mass yield by period' });
+  for (const v of ['1,138.38', '1,141.08', '− 44.83', '1,096.25', '96.30', '96.00']) {
     await expect(table.locator('tfoot')).toContainText(v);
   }
-  await expect(drawer.locator('.pd-chart .highcharts-plot-line-label')).toContainText('100 %');
+  // The four by-products taken off, each from ERP stores: 14.84 + 19.07 + 10.92 + 0 = 44.83.
+  const bp = drawer.getByRole('table', { name: 'By-products by period' }).locator('tfoot');
+  for (const v of ['14.84', '19.07', '10.92', '0.00', '44.83']) await expect(bp).toContainText(v);
   // The billet-size events behind the Influx input: the week 22 Sep 06:00 → 29 Sep 06:00
   // holds the 160×160 → 275×125 change on 23 Sep 06:16:28 and the change back at 28 Sep 09:16:10.
   const events = drawer.getByRole('table', { name: 'Billet size events' });
@@ -214,7 +213,7 @@ test('finished stock: ERP stock ledger to the period end, opening missing stated
   const block = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').nth(1);
   // 30 Nov 2025 → 28 Sep: no 26-27 opening in the ERP, so the change since go-live is shown, and said so.
   await expect(block).toContainText(/-?\d[\d,]*\.\d MT/);
-  await expect(block).toContainText('opening stock for 26-27 not in the ERP yet');
+  await expect(block).toContainText('no 26-27 opening stock in ERP');
   await block.getByRole('button', { name: /Finished stock/ }).click();
   const drawer = page.getByRole('dialog', { name: 'Finished stock · ERP' });
   await expect(drawer.getByRole('note')).toContainText('no opening stock for 26-27');
@@ -226,4 +225,23 @@ test('finished stock: ERP stock ledger to the period end, opening missing stated
   for (const t of ['ITEMTRAN_BODY', 'QTYRECD', 'QTYISSUED', 'FGYRDP', 'ITEMOPBAL_MAST', 'YROPQTY']) await expect(src).toContainText(t);
   await page.waitForTimeout(700);
   await drawer.screenshot({ path: `${SHOTS}/drill-stock.png` });
+});
+
+test('running rate: Influx production ÷ running hours from billets, ERP rate beside it', async ({ page }) => {
+  await pickWeek(page);
+  // 22–28 Sep: 1,141.08 MT over 52.12 running hours = 21.89 TPH.
+  const btn = page.getByRole('button', { name: /Running rate/ });
+  await expect(btn).toContainText('21.89 TPH');
+  await btn.click();
+  const drawer = page.getByRole('dialog', { name: 'Running rate · calculated' });
+  const table = drawer.getByRole('table', { name: 'Running rate by period' });
+  await expect(table.locator('tfoot')).toContainText('1,141.08');
+  await expect(table.locator('tfoot')).toContainText('52.12');
+  await expect(table.locator('tfoot')).toContainText('21.89');
+  await expect(table.locator('tbody tr')).toHaveCount(7);
+  await expect(drawer.getByRole('table', { name: 'Mill runs' }).locator('tbody tr')).toHaveCount(43);
+  const src = drawer.getByRole('table', { name: 'Data source' });
+  for (const t of ['Dicharged_Billet', 'Total_Production_Ton', 'NET_RUNNING_HRS', 'DELAY_HRS', 'PROD_RATE_ON_RUNNING_HRS']) await expect(src).toContainText(t);
+  await page.waitForTimeout(700);
+  await drawer.screenshot({ path: `${SHOTS}/drill-running-rate.png` });
 });

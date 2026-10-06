@@ -25,7 +25,7 @@ const TONE: Record<GroupNow['state'], string> = { 'all-on': 'ok', partial: 'risk
 
 export default function MillMimic() {
   const live = useApi<HsmLive>('/api/hsm/live', 30_000);
-  const { dates, label } = useSelection();
+  const { dates } = useSelection();
   const prod = useProduction(dates ? { ...dates, grain: 'day' } : null);
   const [open, setOpen] = useState<'billets' | 'stands' | 'production' | null>(null);
   const [group, setGroup] = useState<'roughing' | 'finishing'>('roughing');
@@ -43,22 +43,22 @@ export default function MillMimic() {
     {
       key: 'infeed', kind: 'count' as const, title: 'Billet infeed',
       value: d?.billetsToday === null || d?.billetsToday === undefined ? 'NA' : `${d.billetsToday} billets`,
-      foot: 'Influx · since 06:00', open: () => setOpen('billets'), openLabel: 'Billets per day, ERP vs mill counter',
+      foot: 'Today · since 06:00', open: () => setOpen('billets'), openLabel: 'Billets per day, ERP vs mill counter',
     },
     ...(d?.groups ?? []).map((g) => ({
       key: g.id, kind: 'group' as const, title: g.label, g,
-      foot: `${g.total} stands · drive status`,
+      foot: '',
       open: () => { setGroup(g.id); setOpen('stands'); }, openLabel: `${g.label} stand readings and trend`,
     })),
     {
       key: 'exit', kind: 'count' as const, title: 'Finished exit',
       value: exit === null ? 'NA' : `${fixed(exit, 1)} MT`,
-      foot: `Influx · ${label}`, open: () => setOpen('production'), openLabel: 'Mill counter vs ERP production',
+      foot: '', open: () => setOpen('production'), openLabel: 'Mill counter vs ERP production',
     },
   ];
 
   return (
-    <Panel title="Mill mimic" sub="Plant historian · stand drive status" right={chip}>
+    <Panel title="Mill mimic" right={chip}>
       {loading ? (
         <span className="skel skel--block" style={{ height: 78 }} role="status" aria-label="Loading" />
       ) : (
@@ -85,7 +85,8 @@ export default function MillMimic() {
                       <span className="rm-zone-value num v-val">{z.value}</span>
                     )}
                   </span>
-                  <span className="rm-zone-foot">{z.foot}</span>
+                  {/* Always present (empty for most) so the zones line up. Infeed keeps "since 06:00": it is today-only, whatever the Duration. */}
+                  <span className="rm-zone-foot">{z.foot || '\u00a0'}</span>
                 </button>
               </li>
             </Fragment>

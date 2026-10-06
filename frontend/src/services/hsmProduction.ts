@@ -6,13 +6,13 @@
  */
 import { useSyncExternalStore } from 'react';
 import { rangeUrl, useApi } from './hsmApi';
-import type { Grain, ProductionComparison } from '@/server/hsm/production';
+import type { Grain, ProductionComparison } from '@contracts';
 import { DURATION_LABELS, selectedDates, useGlobalSel } from '@/state/globalSel';
 import { dm, plantDate } from '@/lib/plantDay';
 
 export { addDays, dm, plantDate, cycleLabel } from '@/lib/plantDay';
 
-export type { Grain, ProductionComparison, PeriodRow } from '@/server/hsm/production';
+export type { Grain, ProductionComparison, PeriodRow } from '@contracts';
 
 /** The day the Influx counter starts publishing — the comparison's default start. */
 export const COUNTER_START_DATE = '2026-09-21';

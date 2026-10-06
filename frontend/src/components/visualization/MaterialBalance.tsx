@@ -26,7 +26,6 @@ export default function MaterialBalance() {
   return (
     <Panel
       title="Material & operating balance"
-      sub="ERP log sheet · Duration period"
       right={<span className={`chip ${has ? (balanced ? 'chip--ok' : 'chip--warn') : 'chip--na'}`} title={note}>
         {has ? (balanced ? 'Balances ✓' : `Balances ${t!.balanceOkDays}/${t!.entryDays} days`) : 'Not in ERP yet'}
       </span>}

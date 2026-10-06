@@ -11,7 +11,7 @@ import type { OperatingInput, PowerSample } from '@/models/operating';
 
 const MIN = 60_000;
 const H = 3_600_000;
-/** 06:00 IST on 16 Sep 2026 = 00:30 UTC — the plant day starts with Shift A. */
+/** 06:00 IST on 16 Sep 2026 = 00:30 UTC — the plant day starts with the Day shift. */
 const DAY_START = Date.UTC(2026, 8, 16, 0, 30);
 const DAY_END = DAY_START + 24 * H;
 
@@ -58,29 +58,28 @@ const flow: MillFlowInput = {
 
 /* -------------------------------- shifts --------------------------------- */
 
+/** Two 12-hour shifts: Day 06:00–18:00, Night 18:00–06:00 IST. */
 const shift = (name: ShiftInput['name'], i: number, fed: Qty, inline: Qty, out: number): ShiftInput => ({
   name,
-  fromMs: DAY_START + i * 8 * H,
-  toMs: DAY_START + (i + 1) * 8 * H,
-  planMt: 120,
+  fromMs: DAY_START + i * 12 * H,
+  toMs: DAY_START + (i + 1) * 12 * H,
+  planMt: 180,
   fed,
   inlineReject: inline,
   output: tonnes(out),
 });
 
 const shifts: ShiftInput[] = [
-  shift('A', 0, billets(92, 115.5), billets(1, 1.3, 'entered'), 112.0),
-  shift('B', 1, billets(97, 121.8), billets(1, 1.2, 'entered'), 118.0),
-  shift('C', 2, billets(93, 116.7), billets(1, 1.3, 'entered'), 112.0),
+  shift('Day', 0, billets(141, 177.2), billets(2, 2.5, 'entered'), 172.0),
+  shift('Night', 1, billets(141, 176.8), billets(1, 1.3, 'entered'), 170.0),
 ];
 
 /* ----------------------------- power readings ----------------------------- */
 
 /** Stops, as [start minute from 06:00, length in minutes]. 54 + 36 + 54 = 144 min = 2.4 h. */
 const STOPS: [number, number][] = [
-  [190, 30], [361, 24],     // Shift A: 09:10, 12:01
-  [692, 36],                // Shift B: 17:32
-  [1141, 20], [1300, 34],   // Shift C: 01:01, 03:40
+  [190, 30], [361, 24], [692, 36],   // Day shift: 09:10, 12:01, 17:32
+  [1141, 20], [1300, 34],             // Night shift: 01:01, 03:40
 ];
 const IDLE_DRAW_KW = 320;
 /** Energy on the comp for the day. */
