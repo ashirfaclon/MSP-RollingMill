@@ -64,7 +64,7 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
 test('the Data Model tab is hidden from the sidebar for now', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const nav = page.getByRole('navigation', { name: 'Dashboard screens' });
-  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Condition Analytics/, /Asset Health/]);
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/]);
   await expect(nav.getByRole('link', { name: /Data Model/ })).toHaveCount(0);
 });
 
@@ -143,24 +143,18 @@ test('material flow shows every stage, exit and bucket, and the balance closes',
   await panel.screenshot({ path: `${SHOTS}/material-flow-narrow.png` });
 });
 
-test('sidebar switches screens and keeps the mill', async ({ page }) => {
+test('the sidebar has Visualization only — Condition Analytics and Asset Health are gone', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const nav = page.getByRole('navigation', { name: 'Dashboard screens' });
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/]);
   await expect(nav.getByRole('link', { name: /Visualization/ })).toHaveAttribute('aria-current', 'page');
-
-  await nav.getByRole('link', { name: /Condition Analytics/ }).click();
-  await expect(page).toHaveURL(/\/hsm\/condition-analytics$/);
-  await expect(page.getByTestId('screen-placeholder')).toHaveText('HSM Condition Analytics dashboard is coming soon.');
-  await expect(nav.getByRole('link', { name: /Condition Analytics/ })).toHaveAttribute('aria-current', 'page');
-
-  await nav.getByRole('link', { name: /Asset Health/ }).click();
-  await expect(page).toHaveURL(/\/hsm\/asset-health$/);
-  await expect(page.getByTestId('screen-placeholder')).toHaveText('HSM Asset Health dashboard is coming soon.');
-  await page.screenshot({ path: `${SHOTS}/hsm-asset-health-placeholder.png` });
+  for (const gone of ['/hsm/condition-analytics', '/hsm/asset-health']) {
+    expect((await page.request.get(gone)).status()).toBe(404);
+  }
 });
 
-test('mill picker switches mill, keeps the screen, and drives by keyboard', async ({ page }) => {
-  await page.goto('/hsm/asset-health');
+test('mill picker offers HSM and RMD, switches mill, keeps the screen, and drives by keyboard', async ({ page }) => {
+  await page.goto('/hsm/visualization');
   const trigger = page.getByRole('button', { name: /^Rolling mill:/ });
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
@@ -171,34 +165,23 @@ test('mill picker switches mill, keeps the screen, and drives by keyboard', asyn
     await trigger.click();
     await expect(list).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 15_000 });
-  await expect(list.getByRole('option')).toHaveText(['HSM', 'LSM', 'RMD', 'RMS']);
+  await expect(list.getByRole('option')).toHaveText(['HSM', 'RMD']);
   await expect(list.getByRole('option', { name: 'HSM' })).toHaveAttribute('aria-selected', 'true');
   await page.screenshot({ path: `${SHOTS}/mill-picker-open.png`, clip: { x: 1100, y: 0, width: 500, height: 260 } });
 
-  await list.getByRole('option', { name: 'LSM' }).click();
-  await expect(page).toHaveURL(/\/lsm\/asset-health$/);
+  await list.getByRole('option', { name: 'RMD' }).click();
+  await expect(page).toHaveURL(/\/rmd\/visualization$/);
   await expect(list).toBeHidden();
-  await expect(page.getByTestId('screen-placeholder')).toHaveText('LSM Asset Health dashboard is coming soon.');
+  await expect(page.getByTestId('screen-placeholder')).toHaveText('RMD Visualization dashboard is coming soon.');
 
-  await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Visualization/ }).click();
-  await expect(page).toHaveURL(/\/lsm\/visualization$/);
-  await expect(page.getByTestId('screen-placeholder')).toHaveText('LSM Visualization dashboard is coming soon.');
-
-  await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Asset Health/ }).click();
-  await expect(page).toHaveURL(/\/lsm\/asset-health$/);
-  await expect(page.getByTestId('screen-placeholder')).toHaveText('LSM Asset Health dashboard is coming soon.');
-  await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Visualization/ }).click();
-  await expect(page).toHaveURL(/\/lsm\/visualization$/);
-
-  // Keyboard: open with ArrowDown, move down twice from LSM to RMS, choose with Enter.
+  // Keyboard: open with ArrowDown, move up from RMD to HSM, choose with Enter.
   await page.getByRole('button', { name: /^Rolling mill:/ }).focus();
   await page.keyboard.press('ArrowDown');
   await expect(list).toBeVisible();
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/rms\/visualization$/);
-  await expect(page.locator('.tb-mark--mill')).toHaveText('RMS');
+  await expect(page).toHaveURL(/\/hsm\/visualization$/);
+  await expect(page.locator('.tb-mark--mill')).toHaveText('HSM');
 
   // Escape closes without changing mill; outside click closes too.
   await page.getByRole('button', { name: /^Rolling mill:/ }).click();
@@ -207,10 +190,7 @@ test('mill picker switches mill, keeps the screen, and drives by keyboard', asyn
   await page.getByRole('button', { name: /^Rolling mill:/ }).click();
   await page.mouse.click(700, 500);
   await expect(list).toBeHidden();
-  await expect(page).toHaveURL(/\/rms\/visualization$/);
-
-  await page.getByRole('button', { name: /^Rolling mill:/ }).click();
-  await list.getByRole('option', { name: 'HSM' }).click();
+  await expect(page).toHaveURL(/\/hsm\/visualization$/);
   await expect(page.getByRole('region', { name: 'Headline KPIs' })).toBeVisible();
 });
 
@@ -227,7 +207,7 @@ test('sidebar collapses to an icon rail and stays collapsed after reload', async
   await expect(page.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false');
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBeLessThan(70);
   // Labels hide, links stay reachable by name.
-  await expect(page.getByRole('link', { name: 'Asset Health' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Visualization' })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/hsm-visualization-sidebar-collapsed.png` });
 
   await page.reload();
@@ -313,6 +293,8 @@ test('unknown mill or screen is a 404', async ({ page }) => {
   expect(res.status()).toBe(404);
   const res2 = await page.request.get('/hsm/overview');
   expect(res2.status()).toBe(404);
+  // LSM and RMS are no longer mills of this app.
+  for (const gone of ['/lsm/visualization', '/rms/visualization']) expect((await page.request.get(gone)).status()).toBe(404);
 });
 
 test.describe('narrow viewports', () => {

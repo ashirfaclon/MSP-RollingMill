@@ -7,9 +7,7 @@ import type { IconId } from '@/components/Icon';
 
 export const MILLS = [
   { id: 'hsm', code: 'HSM' },
-  { id: 'lsm', code: 'LSM' },
   { id: 'rmd', code: 'RMD' },
-  { id: 'rms', code: 'RMS' },
 ] as const;
 
 export type MillId = (typeof MILLS)[number]['id'];
@@ -21,20 +19,6 @@ export const SCREENS = [
     sub: 'Production · Flow',
     icon: 'bars',
     blurb: 'Production, yield, energy, order-linked stock and mill flow',
-  },
-  {
-    id: 'condition-analytics',
-    label: 'Condition Analytics',
-    sub: 'Process · Deviations',
-    icon: 'trend',
-    blurb: 'Process condition against operating bands',
-  },
-  {
-    id: 'asset-health',
-    label: 'Asset Health',
-    sub: 'Condition · Diagnostics',
-    icon: 'shield-check',
-    blurb: 'Equipment condition and maintenance',
   },
   {
     id: 'data-model',

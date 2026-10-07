@@ -8,7 +8,7 @@ const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'MSP Rolling Mill',
-  description: 'MSP Steel rolling mill dashboards — HSM, LSM, RMD, RMS',
+  description: 'MSP Steel rolling mill dashboards — HSM, RMD',
 };
 
 /**
