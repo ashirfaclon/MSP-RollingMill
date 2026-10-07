@@ -47,6 +47,15 @@ export const SCREENS = [
 
 export type ScreenId = (typeof SCREENS)[number]['id'];
 
+/**
+ * Screens left out of the sidebar for now. The page still builds and opens from its direct
+ * link (/{mill}/data-model); remove an id here to bring its tab back.
+ */
+export const HIDDEN_SCREENS: readonly ScreenId[] = ['data-model'];
+
+/** The screens the sidebar lists. */
+export const NAV_SCREENS = SCREENS.filter((s) => !HIDDEN_SCREENS.includes(s.id));
+
 export const DEFAULT_MILL: MillId = 'hsm';
 export const DEFAULT_SCREEN: ScreenId = 'visualization';
 

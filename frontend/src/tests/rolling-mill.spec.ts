@@ -57,10 +57,15 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   await page.screenshot({ path: `${SHOTS}/hsm-visualization-dark.png`, fullPage: true });
 });
 
-test('data model screen lays out every ledger and all checks pass', async ({ page }) => {
+test('the Data Model tab is hidden from the sidebar for now', async ({ page }) => {
   await page.goto('/hsm/visualization');
-  await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Data Model/ }).click();
-  await expect(page).toHaveURL(/\/hsm\/data-model$/);
+  const nav = page.getByRole('navigation', { name: 'Dashboard screens' });
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Condition Analytics/, /Asset Health/]);
+  await expect(nav.getByRole('link', { name: /Data Model/ })).toHaveCount(0);
+});
+
+test('data model screen (direct link) lays out every ledger and all checks pass', async ({ page }) => {
+  await page.goto('/hsm/data-model');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(/Rolling Mill\s*\/\s*Data Model/);
 
   const main = page.getByRole('main');
@@ -175,9 +180,9 @@ test('mill picker switches mill, keeps the screen, and drives by keyboard', asyn
   await expect(page).toHaveURL(/\/lsm\/visualization$/);
   await expect(page.getByTestId('screen-placeholder')).toHaveText('LSM Visualization dashboard is coming soon.');
 
-  await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Data Model/ }).click();
-  await expect(page).toHaveURL(/\/lsm\/data-model$/);
-  await expect(page.getByTestId('screen-placeholder')).toHaveText('LSM Data Model dashboard is coming soon.');
+  await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Asset Health/ }).click();
+  await expect(page).toHaveURL(/\/lsm\/asset-health$/);
+  await expect(page.getByTestId('screen-placeholder')).toHaveText('LSM Asset Health dashboard is coming soon.');
   await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Visualization/ }).click();
   await expect(page).toHaveURL(/\/lsm\/visualization$/);
 
