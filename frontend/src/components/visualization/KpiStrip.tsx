@@ -2,6 +2,7 @@ import KpiCard from './KpiCard';
 import ProductionKpiCard from '@/components/production/ProductionKpiCard';
 import YieldKpiCard from '@/components/production/YieldKpiCard';
 import ProductionWithoutOrderCard from '@/components/production/ProductionWithoutOrderCard';
+import FreeStockCard from '@/components/production/FreeStockCard';
 import { fixed } from '@/lib/num';
 import type { MillModel } from '@/models/millModel';
 
@@ -38,14 +39,8 @@ export default function KpiStrip({ m }: { m: MillModel }) {
         series="order"
         meterPct={m.stock.withOrderPct ?? undefined}
       />
-      <KpiCard
-        label="Free stock"
-        value={fixed(m.stock.free, 0)}
-        unit="MT"
-        note=""
-        series="free"
-        meterPct={m.stock.freePct ?? undefined}
-      />
+      {/* Live: ERP stock ledger to the period end; all stock is free (no order link in the ERP). */}
+      <FreeStockCard />
     </section>
   );
 }

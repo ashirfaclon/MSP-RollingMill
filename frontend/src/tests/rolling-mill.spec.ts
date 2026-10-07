@@ -27,16 +27,20 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   await expect(card('Power consumption')).toContainText('0.00');
   await expect(card('Specific energy')).toContainText('0.0');
   // Descriptive sub-texts are gone: cards with nothing to flag carry no note.
-  for (const name of ['Power consumption', 'Specific energy', 'Stock with order', 'Free stock']) {
+  for (const name of ['Power consumption', 'Specific energy', 'Stock with order']) {
     await expect(card(name).locator('.rm-card-note')).toHaveText('');
   }
+  // Free stock is live (ERP ledger); its only note is the caveat that changes how it reads.
+  const freeStock = strip.getByRole('button', { name: 'Free stock', exact: true });   // opens the stock drawer
+  await expect(freeStock.locator('.rm-card-value')).toHaveText(/^\d[\d,]*\.\dMT$/);
+  await expect(freeStock.locator('.rm-card-note')).toHaveText('Change since 30 Nov ’25');
   for (const sample of ['30.78', '90.0', '72.0', '420', '210', '342.0']) await expect(strip).not.toContainText(sample);
   await expect(page.locator('.rm-pending')).toHaveCount(0);
 
   const main = page.getByRole('main');
   for (const text of [
     'Mill mimic', 'Production by shift', 'Order allocation', 'Finished stock', 'Material & operating balance',
-    'Production & dispatch by size',
+    'Finished stock by size',
   ]) {
     await expect(main.getByText(text, { exact: false }).first()).toBeVisible();
   }

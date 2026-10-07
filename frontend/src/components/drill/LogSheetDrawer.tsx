@@ -302,7 +302,7 @@ function chartOf(view: LogView, rows: LogPeriod[]): { series: DrillSeries[]; axe
         col('production', 'Production', '--s-prod', (r) => r.productionMt, 'out'),
         col('bloss', 'Burning loss', '--s-pred', (r) => r.burningLossMt, 'out'),
         col('endcut', 'End cut', '--s-alt', (r) => r.endCutMt, 'out'),
-        col('missroll', 'Miss-roll', '--s-free', (r) => r.missRollMt, 'out'),
+        col('missroll', 'Miss-roll', '--violet', (r) => r.missRollMt, 'out'),
         col('reject', 'Reject', '--risk', (r) => r.rejectMt, 'out'),
         line('input', 'Billet input', '--text', (r) => r.inputMt, { dashed: true }),
       ],

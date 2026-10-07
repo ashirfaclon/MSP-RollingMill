@@ -15,7 +15,10 @@
  * material leaves the line in the material flow (ok is accepted, hold is pending QC,
  * reject and inline go to remelt, loss is the un-weighed remainder).
  */
-export type Series = 'prod' | 'order' | 'free' | 'ok' | 'hold' | 'reject' | 'inline' | 'loss';
+export type Series =
+  | 'prod' | 'order' | 'free' | 'ok' | 'hold' | 'reject' | 'inline' | 'loss'
+  /* the mass balance: the input/output difference and the three other booked losses */
+  | 'diff' | 'bloss' | 'endcut' | 'missroll';
 
 export default function KpiCard(props: {
   label: string;

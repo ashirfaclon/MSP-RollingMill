@@ -15,6 +15,11 @@
 /* Inline reject is also a loss, but must read apart from QC reject in the same bar. */
 .rm-tone--inline { --tone: color-mix(in srgb, var(--risk) 50%, var(--panel-3)); }
 .rm-tone--loss   { --tone: var(--na); }
+/* Mass balance: the input/output difference, and the booked losses (same hues as the log-sheet drawer). */
+.rm-tone--diff     { --tone: var(--warn); }
+.rm-tone--bloss    { --tone: var(--s-pred); }
+.rm-tone--endcut   { --tone: var(--s-alt); }
+.rm-tone--missroll { --tone: var(--violet); }
 .rm-text--order { color: var(--s-order); }
 
 /* Label convention: muted, small, uppercase, heavy — the value is the brightest thing. */
@@ -209,38 +214,83 @@
 
 /* --------------------------- Material balance ----------------------------- */
 
-.rm-balance {
-  flex: 1; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
-  align-content: center;
-}
-.rm-stat-btn {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0;
-  margin: -6px; padding: 6px; border-radius: var(--radius-sm);
+/* Two bars: the input split into finished | difference, then the difference opened out
+   into the four losses. Segment widths are true proportions; the zoom shape between the
+   bars shows that the second is the first's last segment, magnified. */
+.rm-mb { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; min-width: 0; }
+.rm-mb-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 3px; }
+.rm-mb-figure {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0;
+  margin: -5px -6px; padding: 5px 6px; border-radius: var(--radius-sm);
   background: transparent; border: 1px solid transparent;
   font: inherit; color: inherit; text-align: left; cursor: pointer;
 }
-.rm-stat-btn:hover { background: var(--panel-2); border-color: var(--border-soft); }
-.rm-stat-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.rm-stat { font-size: 19px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
-.rm-stat-note { margin: 0; font-size: 10px; font-weight: 600; color: var(--muted-2); white-space: nowrap; }
+.rm-mb-figure--end { align-items: flex-end; text-align: right; }
+.rm-mb-figure:hover { background: var(--panel-2); border-color: var(--border-soft); }
+.rm-mb-figure:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rm-mb-figure-v { font-size: 19px; font-weight: 800; line-height: 1.15; white-space: nowrap; color: var(--tone, var(--text)); }
+.rm-mb-figure.rm-tone--order .rm-k { color: var(--s-order); }
 
+.rm-mb-bar { display: flex; gap: 2px; width: 100%; height: 22px; border-radius: 5px; overflow: hidden; background: var(--panel-3); }
+.rm-mb-bar--loss { height: 18px; }
+.rm-mb-bar--pieces { height: 5px; border-radius: 3px; }
+.rm-mb-seg { display: block; height: 100%; flex: none; background: var(--tone); }
+.rm-mb-seg--gap {
+  background: repeating-linear-gradient(135deg, var(--tone) 0 3px, transparent 3px 6px);
+}
+
+.rm-mb-labels { display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; }
+.rm-mb-link {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+  margin: -2px -5px; padding: 2px 5px; border-radius: 5px;
+  background: transparent; border: 0; font: inherit; color: var(--text-2); cursor: pointer;
+  font-size: 10.5px; font-weight: 600; white-space: nowrap;
+}
+.rm-mb-link:hover { background: var(--panel-2); }
+.rm-mb-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rm-mb-link b { color: var(--tone); font-weight: 800; font-size: 11.5px; }
+.rm-mb-link .rm-dot { background: var(--tone); }
+.rm-mb-dim { margin-left: 2px; color: var(--muted-2); font-weight: 600; }
+
+.rm-mb-zoom { display: block; width: 100%; height: 12px; margin: -1px 0; }
+.rm-mb-zoom-fill { fill: color-mix(in srgb, var(--warn) 22%, transparent); }
+.rm-mb-zoom-edge { stroke: var(--warn); stroke-opacity: 0.75; stroke-width: 1; stroke-dasharray: 3 3; }
+
+.rm-mb-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 2px; }
+.rm-mb-note { margin: 0; font-size: 10.5px; font-weight: 600; color: var(--muted-2); }
+
+.rm-mb-pieces {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 12px;
+  margin: 6px -6px 0; padding: 10px 6px 4px; border: 0; border-top: 1px solid var(--border-soft); border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.rm-mb-pieces:hover { background: var(--panel-2); }
+.rm-mb-pieces:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rm-mb-pieces .rm-mb-bar { grid-column: 1 / -1; }
+.rm-mb-pieces-v { font-size: 11.5px; font-weight: 600; color: var(--text-2); justify-self: end; }
+.rm-mb-pieces-v b { font-weight: 800; color: var(--text); }
+
+/* Shared by the Data Model screen's flow panel. */
 .rm-ops {
   margin: 0; padding-top: 10px; border-top: 1px solid var(--border-soft);
   display: flex; align-items: baseline; justify-content: space-between; gap: 8px 18px; flex-wrap: wrap;
 }
-.rm-op-btn {
-  display: inline-flex; align-items: baseline; gap: 6px;
-  margin: -3px -5px; padding: 3px 5px; border-radius: 5px;
-  background: transparent; border: 0; font: inherit; cursor: pointer;
-}
-.rm-op-btn:hover { background: var(--panel-2); }
-.rm-op-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.rm-op-k { font-size: 10px; font-weight: 700; color: var(--muted-2); }
-.rm-op-v { font-size: 11.5px; font-weight: 800; color: var(--text); }
-.rm-ops-yield .rm-op-k { font-size: 9.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--s-order); }
-.rm-ops-yield .rm-op-v { color: var(--s-order); }
 
 /* ---------------------------- Stock by size ------------------------------- */
+
+/* Series pills in the panel head, as on the comp. */
+.rm-chip-series {
+  display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; white-space: nowrap;
+  color: var(--tone); background: color-mix(in srgb, var(--tone) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone) 38%, transparent);
+}
+/* One bar per size: with order | free stock, on a shared scale; the total at the right. */
+.rm-size--stock { grid-template-columns: 104px minmax(0, 1fr) 78px; }
+.rm-size-stack { display: flex; gap: 2px; height: 10px; border-radius: 5px; background: var(--panel-3); overflow: hidden; min-width: 0; }
+.rm-size-stack > i { display: block; height: 100%; flex: none; background: var(--tone); }
+.rm-size-total { font-size: 11.5px; font-weight: 800; text-align: right; color: var(--text); white-space: nowrap; }
+.rm-sizes-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; }
 
 .rm-sizes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-around; gap: 12px; flex: 1; }
 /* All sizes, scrolling in place: takes the height the row gives it (set by the balance panel
@@ -301,7 +351,6 @@
   .rm-mimic { grid-template-columns: minmax(0, 1fr); }
   .rm-mimic-arrow { transform: rotate(90deg); height: 14px; }
   .rm-mimic-arrow:nth-child(4) { display: grid; }
-  .rm-balance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rm-shift, .rm-shift-target-label { grid-template-columns: 52px minmax(0, 1fr) 64px; gap: 10px; }
   .rm-legend-end { margin-left: 0; }
   .panel-head { flex-wrap: wrap; row-gap: 4px; }

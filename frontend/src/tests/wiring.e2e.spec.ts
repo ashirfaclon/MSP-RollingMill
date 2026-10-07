@@ -60,14 +60,29 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
 
   const panel = page.locator('section.panel', { hasText: 'Material & operating balance' });
   await expect(panel.getByRole('button', { name: /^Billet input/ })).toContainText('1,121.3 MT');
+  await expect(panel.getByRole('button', { name: /^Yield/ })).toContainText('96.0%');
   await expect(panel.getByRole('button', { name: /^Finished/ })).toContainText('1,076.5 MT');
-  await expect(panel.getByRole('button', { name: /^Mass difference/ })).toContainText('44.8 MT');
-  await expect(panel.getByRole('button', { name: /^Billets/ })).toContainText('1,496');
-  const ops = panel.getByRole('group', { name: 'Yield and losses' });
-  for (const [k, v] of [['Yield', '96.0%'], ['Burning loss', '14.8 MT'], ['End cut', '19.1 MT'], ['Miss-roll', '10.9 MT'], ['Reject', '0.0 MT']]) {
-    await expect(ops.getByRole('button', { name: new RegExp(`^${k}`) })).toContainText(v);
+  await expect(panel.getByRole('button', { name: /^Mass difference/ })).toContainText('44.8 MT · 4.0% of input');
+  await expect(panel.getByRole('button', { name: /^Billets/ })).toContainText('1,496 in · 1,481 coils out');
+  const losses = panel.getByRole('group', { name: 'Losses' });
+  for (const [k, v] of [['Burning loss', '14.8 MT 1.3%'], ['End cut', '19.1 MT 1.7%'], ['Miss-roll', '10.9 MT 1.0%'], ['Reject', '0.0 MT 0.0%']]) {
+    await expect(losses.getByRole('button', { name: new RegExp(`^${k}`) })).toContainText(v);
   }
   await expect(panel.getByText('Balances ✓')).toBeVisible();
+  // The bars are the balance drawn to scale: finished is 96.0 % of the input bar, and the
+  // loss bar is the 4.0 % difference opened out — 14.8 + 19.1 + 10.9 + 0 = 44.8, so it fills.
+  const widths = (sel: string) => panel.locator(sel).evaluateAll((els) => {
+    const track = els[0].parentElement!.getBoundingClientRect().width;
+    return els.map((e) => Math.round((e.getBoundingClientRect().width / track) * 1000) / 10);
+  });
+  const input = await widths('.rm-mb-bar--input .rm-mb-seg');
+  expect(input[0]).toBeGreaterThan(95); expect(input[0]).toBeLessThan(97);
+  expect(input[1]).toBeGreaterThan(3); expect(input[1]).toBeLessThan(5);
+  const loss = await widths('.rm-mb-bar--loss .rm-mb-seg');
+  expect(loss.length).toBe(4);                                       // nothing unaccounted on a balanced week
+  expect(loss.reduce((a, b) => a + b, 0)).toBeGreaterThan(98);
+  expect(Math.max(...loss)).toBe(loss[1]);                           // end cut is the biggest loss this week
+  await expect(panel.getByRole('img', { name: /^Billet input 1,121\.3 MT: finished 1,076\.5 MT \(96\.0% yield\)/ })).toBeVisible();
   await page.locator('.rm-strip').screenshot({ path: `${SHOTS}/wired-kpi-strip.png` });
   await panel.screenshot({ path: `${SHOTS}/wired-material-balance.png` });
 });
@@ -159,29 +174,42 @@ test('mill mimic is live: billets today, stand groups, and the stands drawer', a
   await drawer.screenshot({ path: `${SHOTS}/drill-stands.png` });
 });
 
-test('production & dispatch by size, and its drawer', async ({ page }) => {
+test('finished stock by size: the ERP stock ledger per size, and its drawers', async ({ page }) => {
   await pickWeek(page);
-  const panel = page.locator('section.panel', { hasText: 'Production & dispatch by size' });
+  const panel = page.locator('section.panel', { hasText: 'Finished stock by size' });
   const first = panel.locator('.rm-size--button').first();
-  await expect(first).toContainText('358–360 × 2.50');
-  await expect(first).toContainText('254.1');
-  // The panel names the actual dates, and each figure its meaning.
-  await expect(panel.locator('.panel-sub')).toHaveText('ERP · 22 Sep – 28 Sep');
-  await expect(first.locator('.rm-size-val-row').nth(0)).toHaveText(/Produced\s*254\.1/);
-  await expect(first.locator('.rm-size-val-row').nth(1)).toHaveText(/Dispatched\s*177\.8/);
-  // Every size is listed (22 in this week); the list scrolls inside the panel instead of
-  // hiding sizes or stretching the row past the balance panel beside it.
-  await expect(panel.locator('.rm-size--button')).toHaveCount(22);
-  await expect(panel.getByRole('button', { name: /^22 sizes/ })).toBeVisible();
+  await expect(first).toContainText('358–360 × 2.80');
+  await expect(first).toContainText('103.5 MT');
+  // Counted to the period end; no opening stock in the ERP, so it is the change since go-live.
+  await expect(panel.locator('.panel-sub')).toHaveText('ERP · at end of 28 Sep · since 30 Nov ’25');
+  // No order link in the ERP: every bar is free stock, and the legend keeps both series.
+  await expect(first).toHaveAttribute('aria-label', '358–360 × 2.80 mm: with order 0.0 MT, free stock 103.5 MT');
+  await expect(panel.getByText('With order')).toBeVisible();
+  // 45 sizes in stock, drawn to one scale; the 25 below zero are counted, not drawn.
+  await expect(panel.locator('.rm-size--button')).toHaveCount(45);
+  const bars = await panel.locator('.rm-size-stack > i:nth-child(2)').evaluateAll((els) =>
+    els.map((e) => e.getBoundingClientRect().width / e.parentElement!.getBoundingClientRect().width));
+  expect(bars[0]).toBeCloseTo(1, 2);
+  expect(bars[1]).toBeCloseTo(59.4 / 103.5, 1);
+  await expect(panel.getByRole('button', { name: '45 sizes in stock · 498.8 MT · 25 below zero (-361.5 MT) · net 137.3 MT' })).toBeVisible();
+  // Agrees with the Free stock card and the Order allocation block.
+  await expect(page.getByRole('button', { name: 'Free stock', exact: true })).toContainText('137.3');
+  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').nth(1)).toContainText('137.3 MT');
+  // The list scrolls inside the panel instead of stretching the row past the balance panel beside it.
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
   const [hSizes, hBalance] = await Promise.all([panel.evaluate((e) => e.getBoundingClientRect().height), balance.evaluate((e) => e.getBoundingClientRect().height)]);
   expect(Math.abs(hSizes - hBalance)).toBeLessThan(2);
   const scroller = panel.locator('.rm-sizes-scroll');
   expect(await scroller.evaluate((e) => e.scrollHeight > e.clientHeight && e.scrollWidth <= e.clientWidth)).toBe(true);
-  await panel.screenshot({ path: `${SHOTS}/wired-sizes-panel.png` });
-  await scroller.evaluate((e) => { e.scrollTop = e.scrollHeight; });
-  await panel.screenshot({ path: `${SHOTS}/wired-sizes-panel-scrolled.png` });
+  await panel.screenshot({ path: `${SHOTS}/wired-stock-by-size.png` });
+
+  // A row opens the stock drawer, on the size table.
   await first.click();
+  const stock = page.getByRole('dialog', { name: 'Finished stock · ERP' });
+  await expect(stock.getByRole('table', { name: 'Finished stock by size' }).getByRole('row', { name: /^358–360 × 2\.80/ }).first()).toBeVisible();
+  await stock.getByRole('button', { name: 'Close Finished stock · ERP' }).click();
+  // Produced & dispatched per size moved to its own drawer, opened from the footer.
+  await panel.getByRole('button', { name: 'Produced & dispatched by size' }).click();
   const drawer = page.getByRole('dialog', { name: 'Production & dispatch by size' });
   await expect(drawer.getByRole('button', { name: /Duration filter/ })).toHaveAttribute('aria-pressed', 'true');
   const row = drawer.getByRole('table', { name: 'Production and dispatch by size' }).getByRole('row', { name: /^358–360 × 2\.50\b/ });
