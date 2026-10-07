@@ -51,12 +51,12 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   // Finished exit = the Production card's Influx figure: Σ Total_Production_Ton increases, 22–28 Sep.
   const exit = page.getByRole('button', { name: /Finished exit/ });
   await expect(exit).toContainText('1,141.1 MT');
-  // No order link in the ERP: all production is "without order" — same figure as the Production card.
-  await expect(page.getByRole('article', { name: 'Production without order', exact: true })).toContainText('1,141.1');
+  // No order link in the ERP: all production is Made To Stock — same figure as the Production card.
+  await expect(page.getByRole('article', { name: 'Made To Stock', exact: true })).toContainText('1,141.1');
   const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
   await expect(split.locator('.rm-alloc-total')).toHaveText('1,141.1 MT');
-  await expect(split).toContainText('Without order1,141.1 MT');
-  await expect(split).toContainText('Against order0.0 MT');
+  await expect(split).toContainText('Made To Stock1,141.1 MT');
+  await expect(split).toContainText('Made To Order0.0 MT');
 
   const panel = page.locator('section.panel', { hasText: 'Material & operating balance' });
   await expect(panel.getByRole('button', { name: /^Billet input/ })).toContainText('1,121.3 MT');

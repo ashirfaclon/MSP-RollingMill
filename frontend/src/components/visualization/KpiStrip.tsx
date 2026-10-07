@@ -28,10 +28,10 @@ export default function KpiStrip({ m }: { m: MillModel }) {
         note=""
         series="prod"
       />
-      {/* All production counts as without order: the ERP does not link production to orders. */}
+      {/* Made To Stock = all production: the ERP does not link production to orders. */}
       <ProductionWithoutOrderCard />
       <KpiCard
-        label="Made For Order"
+        label="Stock with order"
         value={fixed(m.stock.withOrder, 0)}
         unit="MT"
         note=""
@@ -39,7 +39,7 @@ export default function KpiStrip({ m }: { m: MillModel }) {
         meterPct={m.stock.withOrderPct ?? undefined}
       />
       <KpiCard
-        label="Made To Stock"
+        label="Free stock"
         value={fixed(m.stock.free, 0)}
         unit="MT"
         note=""

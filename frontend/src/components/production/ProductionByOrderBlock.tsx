@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Production split by order linkage, in the Order allocation panel. The ERP does not link
- * production to sales orders, so none of it can be shown as made against an order: all of
- * it counts as without order. The total is the Production card's figure (Influx counter,
+ * Production split by order linkage, in the Order allocation panel: Made To Order (with an
+ * order) and Made To Stock (without). The ERP does not link production to sales orders, so
+ * none of it can be shown as made to order: all of it counts as made to stock. The total is the Production card's figure (Influx counter,
  * reset events less noise, for the Duration period), so the two always agree.
  */
 import StackBar from '@/components/visualization/StackBar';
@@ -23,15 +23,15 @@ export default function ProductionByOrderBlock() {
         </span>
       </div>
       <StackBar
-        label={`Production ${fixed(mt, 1)} MT: with order 0.0 MT, without order ${fixed(mt, 1)} MT`}
+        label={`Production ${fixed(mt, 1)} MT: made to order 0.0 MT, made to stock ${fixed(mt, 1)} MT`}
         parts={[
-          { label: 'Against order', value: 0, series: 'order' },
-          { label: 'Without order', value: total, series: 'free' },
+          { label: 'Made To Order', value: 0, series: 'order' },
+          { label: 'Made To Stock', value: total, series: 'free' },
         ]}
       />
       <div className="rm-legend">
-        <LegendItem series="order" label="Against order" value="0.0 MT" />
-        <LegendItem series="free" label="Without order" value={`${fixed(mt, 1)} MT`} />
+        <LegendItem series="order" label="Made To Order" value="0.0 MT" />
+        <LegendItem series="free" label="Made To Stock" value={`${fixed(mt, 1)} MT`} />
       </div>
     </div>
   );

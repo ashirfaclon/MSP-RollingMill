@@ -4,7 +4,7 @@ import ProductionByOrderBlock from '@/components/production/ProductionByOrderBlo
 import FinishedStockBlock from '@/components/production/FinishedStockBlock';
 
 /**
- * Production split by order linkage (all of it without order — the ERP does not link
+ * Production split Made To Order / Made To Stock (all of it made to stock — the ERP does not link
  * production to orders) and finished stock (ERP stock ledger), both for the Duration
  * period. The open-orders button in the head is live.
  */
@@ -16,7 +16,7 @@ export default function OrderAllocation() {
       className="rm-panel"
       bodyClass="rm-body rm-alloc"
     >
-      {/* All production counts as without order: the ERP does not link production to orders. */}
+      {/* All production counts as Made To Stock: the ERP does not link production to orders. */}
       <ProductionByOrderBlock />
 
       {/* Live: ERP stock ledger to the end of the Duration period. */}

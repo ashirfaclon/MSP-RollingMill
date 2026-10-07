@@ -2,7 +2,7 @@
 
 /**
  * "Finished stock" in the Order allocation panel, live from the ERP stock ledger, counted
- * to the end of the Duration period. The Made For Order / Made To Stock split is not wired (it needs
+ * to the end of the Duration period. The stock with order / free stock split is not wired (it needs
  * the open loading advices confirmed), so it is stated rather than drawn from sample data.
  */
 import { useState } from 'react';

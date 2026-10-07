@@ -27,7 +27,7 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   await expect(card('Power consumption')).toContainText('0.00');
   await expect(card('Specific energy')).toContainText('0.0');
   // Descriptive sub-texts are gone: cards with nothing to flag carry no note.
-  for (const name of ['Power consumption', 'Specific energy', 'Made For Order', 'Made To Stock']) {
+  for (const name of ['Power consumption', 'Specific energy', 'Stock with order', 'Free stock']) {
     await expect(card(name).locator('.rm-card-note')).toHaveText('');
   }
   for (const sample of ['30.78', '90.0', '72.0', '420', '210', '342.0']) await expect(strip).not.toContainText(sample);
@@ -46,7 +46,7 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   await expect(shifts.locator('.rm-shift-val')).toHaveText(['0.0 MT', '0.0 MT']);
   await expect(shifts.getByRole('button', { name: /Running rate/ })).toContainText(/\d+\.\d{2} TPH|NA/);
   const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
-  await expect(split).toContainText('Against order0.0 MT');
+  await expect(split).toContainText('Made To Order0.0 MT');
   // Live panels: the mimic has infeed, the two stand groups that exist, and the exit.
   for (const zone of [/Billet infeed/, /Roughing group/, /Finishing group/, /Finished exit/]) {
     await expect(main.getByRole('button', { name: zone })).toBeVisible();

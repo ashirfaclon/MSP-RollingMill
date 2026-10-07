@@ -19,7 +19,7 @@ import './visualization.css';
 
 /**
  * Figures with no live source yet show 0, not the sample model's numbers: power, specific
- * energy, Made For Order / Made To Stock, and production by shift
+ * energy, stock with order / free stock, and production by shift
  * (plan, output, plan gap). Each goes live when its source is confirmed. Running rate is
  * calculated live in its own component.
  */
