@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { SEL_STORAGE_KEY } from '@/state/storageKey';
+import AuthGate from '@/auth/AuthGate';
 import './globals.css';
 
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
@@ -23,7 +24,10 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {/* Nothing renders until IOsense has signed the reader in (src/auth). */}
+        <AuthGate>{children}</AuthGate>
+      </body>
     </html>
   );
 }

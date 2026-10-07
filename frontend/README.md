@@ -26,6 +26,15 @@ Without a server there is no proxy, so the browser calls the backend directly:
 The API URL must be `https` when the site is served over `https`; browsers block `http`
 calls from an `https` page.
 
+## Sign-in
+
+The dashboard opens only from IOsense. `src/auth/` reads the one-time `?token=` from the URL
+and removes it from the address bar. It exchanges the token with the backend for a session,
+kept per tab in `sessionStorage`, and sends that session on every API call. Until this
+succeeds, `AuthGate` shows a sign-in screen and nothing else.
+
+Locally, the backend runs with `AUTH_DISABLED=true`, so no token is needed.
+
 ## Where things are
 
 - `src/services/hsmApi.ts`: the single fetch path (`useApi`, `fetchJson`) and the API base URL.

@@ -16,9 +16,9 @@ import { checkSources } from './status.service';
 export interface Lifecycle { shuttingDown: boolean }
 
 export async function systemRoutes(app: FastifyInstance, opts: { lifecycle: Lifecycle }) {
-  app.get('/health', async (): Promise<HealthResponse> => ({ ok: true, time: new Date().toISOString() }));
+  app.get('/health', { config: { public: true } }, async (): Promise<HealthResponse> => ({ ok: true, time: new Date().toISOString() }));
 
-  app.get('/ready', async (_req, reply): Promise<ReadyResponse> => {
+  app.get('/ready', { config: { public: true } }, async (_req, reply): Promise<ReadyResponse> => {
     const env = loadEnv();
     const ready = !opts.lifecycle.shuttingDown;
     if (!ready) reply.status(503);

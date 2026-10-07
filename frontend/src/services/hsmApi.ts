@@ -13,6 +13,8 @@
  * sheet): requests within DEDUPE_MS share one network call.
  */
 import { useEffect, useRef, useState } from 'react';
+import { authHeader, sessionRejected } from '@/auth/session';
+import { API_BASE } from './apiBase';
 
 /** Response types come from the backend's API contract (type-only — no backend code is bundled). */
 export type {
@@ -20,8 +22,6 @@ export type {
   HsmLive, StandNow, GroupNow, StandTrend, StandMetric, YieldComparison, YieldPeriod, RunningRateReport, RatePeriod, RateDay,
 } from '@contracts';
 
-/** '' = same origin (proxied); else e.g. https://api.hsm.example.com — no trailing slash. */
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? '').replace(/\/+$/, '');
 
 const DEDUPE_MS = 10_000;
 const inflight = new Map<string, { at: number; p: Promise<unknown> }>();
@@ -30,7 +30,9 @@ export async function fetchJson<T>(url: string): Promise<T> {
   const hit = inflight.get(url);
   if (hit && Date.now() - hit.at < DEDUPE_MS) return hit.p as Promise<T>;
   const p = (async () => {
-    const res = await fetch(`${API_BASE}${url}`, { cache: 'no-store' });
+    const res = await fetch(`${API_BASE}${url}`, { cache: 'no-store', headers: authHeader() });
+    // The backend refuses every call without a valid session — back to the sign-in screen.
+    if (res.status === 401) { sessionRejected(); throw new Error('Signed out'); }
     const type = res.headers.get('content-type') ?? '';
     // A static deploy with no API behind it answers with the HTML page — say so plainly.
     if (!type.includes('application/json')) throw new Error('The data service is not reachable from this page');

@@ -38,4 +38,9 @@ export const MSG = {
   LOGBOOK_SESSION_EXPIRED: 'Logbook session expired — open the app from the IOsense portal again',
   LOGBOOK_UNREACHABLE: 'Logbook unreachable',
   LOGBOOK_NOT_MAPPED: 'Logbook forms for this mill are not mapped yet',
+
+  AUTH_REQUIRED: 'Open this dashboard from IOsense to sign in',
+  AUTH_LINK_USED: 'The sign-in link has expired or was already used — open the dashboard again from IOsense',
+  AUTH_UNAVAILABLE: 'IOsense could not be reached to sign you in — try again in a moment',
+  AUTH_ORG_DENIED: 'Your IOsense organisation does not have access to this dashboard',
 } as const;

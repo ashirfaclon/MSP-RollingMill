@@ -7,6 +7,8 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type { ServerConfig } from './config/server';
 import errorHandler from './plugins/error-handler';
 import security from './plugins/security';
+import auth from './plugins/auth';
+import { authRoutes } from './modules/auth/auth.routes';
 import { hsmRoutes } from './modules/hsm/hsm.routes';
 import { sourcesRoutes } from './modules/sources/sources.routes';
 import { systemRoutes, type Lifecycle } from './modules/system/system.routes';
@@ -41,9 +43,11 @@ export async function buildApp({ config, lifecycle = { shuttingDown: false } }: 
 
   await app.register(errorHandler);
   await app.register(security, { config });
+  await app.register(auth, { config });
 
   await app.register(async (api) => {
     await api.register(systemRoutes, { lifecycle });
+    await api.register(authRoutes, { prefix: '/auth', config });
     await api.register(sourcesRoutes);
     await api.register(hsmRoutes, { prefix: '/hsm' });
   }, { prefix: '/api' });

@@ -3,8 +3,9 @@
  * from the pellet client (handover §5).
  *
  * Auth: a one-time SSO token arrives on the app URL (?token=); the browser posts it to
- * /api/logbook-sso and it is exchanged here for a Bearer JWT held IN PROCESS MEMORY only —
- * never sent to the browser, never written to disk. A PAT in .env.local may seed a session
+ * /api/auth/sso, which exchanges it here (signing the user in to the app) and keeps the
+ * resulting Bearer JWT IN PROCESS MEMORY only — never sent to the browser, never written
+ * to disk. A PAT in .env.local may seed a session
  * (a PAT does not expire; an SSO session dies with the process). With no valid session
  * every logbook-derived value stays NA. No substitution, ever.
  *
@@ -55,20 +56,32 @@ const headers = (env: Env, auth?: string): Record<string, string> => ({
 const isAuthFailure = (status: number, errors: unknown) =>
   status === 401 || /session expired|auth|token|unauthor/i.test(String(errors ?? ''));
 
-/** Exchange a one-time SSO token (functionID validateSSOToken) for a session. */
-export async function exchangeSsoToken(ssoToken: string, env = loadEnv()): Promise<{ ok: boolean; message: string }> {
+export interface SsoExchange {
+  ok: boolean;
+  message: string;
+  /** Who IOsense signed in — present when ok. */
+  user?: { userId: string; organisation: string };
+  /** true when IOsense answered and refused the token (vs. could not be reached). */
+  rejected?: boolean;
+}
+
+/**
+ * Exchange a one-time SSO token (functionID validateSSOToken) for a session. The token is
+ * single-use and lives 60 s, so it is exchanged exactly once and never retried.
+ */
+export async function exchangeSsoToken(ssoToken: string, env = loadEnv()): Promise<SsoExchange> {
   try {
     const res = await fetch(`${env.iosenseBase}/api/retrieve-sso-token/${encodeURIComponent(ssoToken)}`, {
       headers: headers(env), signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    const body = (await res.json()) as { success?: boolean; token?: string };
-    if (!body.success || !body.token) return { ok: false, message: MSG.LOGBOOK_SESSION_EXPIRED };
+    const body = (await res.json()) as { success?: boolean; token?: string; userId?: string; organisation?: string };
+    if (!body.success || !body.token) return { ok: false, rejected: true, message: MSG.LOGBOOK_SESSION_EXPIRED };
     // Already prefixed "Bearer " — store and send as-is.
     bearer = body.token.startsWith('Bearer ') ? body.token : `Bearer ${body.token}`;
     droppedReason = null;
     // A new session invalidates everything fetched under the old one.
     cache.length = 0;
-    return { ok: true, message: MSG.LOGBOOK_UP };
+    return { ok: true, message: MSG.LOGBOOK_UP, user: { userId: String(body.userId ?? ''), organisation: String(body.organisation ?? '') } };
   } catch {
     return { ok: false, message: MSG.LOGBOOK_UNREACHABLE };
   }

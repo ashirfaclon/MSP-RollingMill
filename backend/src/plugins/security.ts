@@ -19,7 +19,7 @@ export default fp(async function security(app: FastifyInstance, opts: { config: 
   await app.register(cors, {
     origin: config.CORS_ORIGINS.includes('*') ? true : config.CORS_ORIGINS.length ? config.CORS_ORIGINS : false,
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-Request-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
     exposedHeaders: ['X-Request-Id'],
     maxAge: 600,
   });

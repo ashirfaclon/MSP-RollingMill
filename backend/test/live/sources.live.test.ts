@@ -106,7 +106,7 @@ describe.skipIf(!env.iosenseBearer)('logbook (live)', () => {
 
 describe.skipIf(!historianConfigured(env))('API (live, through the app)', () => {
   let app: FastifyInstance;
-  beforeAll(async () => { app = await buildApp({ config: loadServerConfig({ LOG_LEVEL: 'silent' }) }); });
+  beforeAll(async () => { app = await buildApp({ config: loadServerConfig({ LOG_LEVEL: 'silent', AUTH_DISABLED: 'true' }) }); });
   afterAll(() => app.close());
   const get = (url: string) => app.inject({ method: 'GET', url });
 

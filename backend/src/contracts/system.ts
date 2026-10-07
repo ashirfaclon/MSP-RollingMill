@@ -43,3 +43,20 @@ export type SourceId = 'historian' | 'ems' | 'erp' | 'logbook';
 export interface HealthResponse { ok: true; time: string }
 export interface ReadyResponse { ready: boolean; checks: Record<string, boolean> }
 export interface ConfigResponse { poll_interval_seconds: number }
+
+/** POST /api/auth/sso — the IOsense SSO token exchanged for an app session. */
+export interface SsoExchangeResponse {
+  /** Send as `Authorization: Bearer <sessionToken>` on every API call. */
+  sessionToken: string;
+  expiresAt: string;
+  user: { userId: string; organisation: string };
+}
+
+/** GET /api/auth/session — whether the caller may use the API. */
+export interface SessionResponse {
+  authenticated: true;
+  /** false only when the backend runs with AUTH_DISABLED (local development). */
+  authRequired: boolean;
+  user: { userId: string; organisation: string } | null;
+  expiresAt: string | null;
+}

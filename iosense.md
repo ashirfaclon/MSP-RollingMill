@@ -22,6 +22,7 @@ and panels still render the sample model (`hsmSample.ts`).
 | `GET /api/hsm/orders` | ERP SORD (ORDER_HEAD/BODY, latest amendment) | Orders placed per period, open order book |
 | `GET /api/hsm/live` | Influx `HSM / Roughing Mill, Finishing Mill / RM_0n, FM_0n` (On_Off, Motor_Current, Motor_RPM, Roll_Force_Ton) · `Rolling_Mill_Speed` · `Dicharged_Billet` | Mill mimic: billets today, stand groups |
 | `GET /api/hsm/stands` | Same stand fields, 1-min+ means | Stands drawer trend |
+| `POST /api/auth/sso` | IOsense functionID **validateSSOToken** (`GET /api/retrieve-sso-token/{token}`) | Sign-in: the portal's one-time `?token=` → app session; every other route requires it |
 | `GET /api/hsm/running-rate` | Influx `HSM / Finishing Mill / General / Total_Production_Ton` + `Dicharged_Billet` (running hours: billets ≤ 10 min apart) · ERP log sheet PRODUCTION_MT, NET_RUNNING_HRS, DELAY_HRS | Running rate (Production by shift footer) and its drawer |
 
 ## Calls

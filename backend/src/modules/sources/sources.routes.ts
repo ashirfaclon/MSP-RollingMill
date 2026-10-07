@@ -4,7 +4,8 @@
  *   GET  /historian/catalogue  measurements; `?measurement=` its Units, Groups and fields
  *   GET  /ems/equipment        feeders the electrical meters published in the last day
  *   GET  /logbook              logbook session status; entry counts once forms are mapped
- *   POST /logbook-sso          exchange the portal's one-time SSO token for a session
+ *
+ * (The IOsense SSO token is exchanged by POST /api/auth/sso, which also starts the logbook session.)
  */
 import type { FastifyInstance } from 'fastify';
 import { loadEnv } from '../../config/env';
@@ -13,7 +14,7 @@ import { searchParams } from '../../shared/request';
 import { erpStatus } from '../../integrations/erp/cache';
 import { catalogue, probeHistorian } from '../../integrations/historian/client';
 import { probeEms } from '../../integrations/ems/client';
-import { exchangeSsoToken, fetchLogbookWindow, probeLogbook } from '../../integrations/logbook/client';
+import { fetchLogbookWindow, probeLogbook } from '../../integrations/logbook/client';
 
 export async function sourcesRoutes(app: FastifyInstance) {
   app.get('/erp', { config: { errorCode: 'erp_status_failed' } }, async () => erpStatus(loadEnv()));
@@ -44,15 +45,5 @@ export async function sourcesRoutes(app: FastifyInstance) {
     const now = Date.now();
     const win = await fetchLogbookWindow(now - days * 86_400_000, now, now, env);
     return { session, forms: { connection: win.connection, message: win.message, days, counts: win.formCounts } };
-  });
-
-  /** The resulting Bearer stays in server memory — it is never returned to the browser. */
-  app.post('/logbook-sso', { config: { errorCode: 'logbook_sso_failed' }, bodyLimit: 16_384 }, async (req) => {
-    const body = req.body as { token?: unknown } | null | undefined;
-    const token = typeof body?.token === 'string' ? body.token.trim() : '';
-    if (!token || token.length > 4096) throw new HttpError(400, 'missing_token', 'An access token is required');
-    const r = await exchangeSsoToken(token);
-    if (!r.ok) throw new HttpError(401, 'sso_rejected', r.message);
-    return { ok: true, message: r.message };
   });
 }

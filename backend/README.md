@@ -55,8 +55,9 @@ there first, and the compiler shows every place in both apps that needs updating
 
 ## API
 
-All paths are under `/api`. Every response has `Cache-Control: no-store` and an
-`X-Request-Id` header. Errors always look like `{ "error": "<code>", "message": "…" }`.
+All paths are under `/api`. **Every route except `/health`, `/ready` and `/auth/*` needs a
+session** (`Authorization: Bearer <sessionToken>`), otherwise it answers `401 unauthenticated`.
+Every response has `Cache-Control: no-store` and an `X-Request-Id` header. Errors always look like `{ "error": "<code>", "message": "…" }`.
 
 | Method | Path | What |
 |---|---|---|
@@ -78,12 +79,31 @@ All paths are under `/api`. Every response has `Cache-Control: no-store` and an
 | GET | `/historian/catalogue[?measurement]` | Historian discovery |
 | GET | `/ems/equipment` | Meter feeders seen in the last day |
 | GET | `/logbook[?days]` | Logbook session (and form counts once mapped) |
-| POST | `/logbook-sso` | `{ token }` — exchange the portal SSO token for a server-side session |
+| POST | `/auth/sso` | `{ token }` — the IOsense SSO token → an app session (public) |
+| GET | `/auth/session` | Is the caller's session valid? (public) |
 
 Query rules:
 - `from` and `to` are plant dates (`YYYY-MM-DD`, 06:00 → 06:00 IST), at most 400 days apart.
 - `grain` is `day`, `week` or `month`.
 - Bad input returns a named 400: `bad_range`, `range_too_long`, `bad_grain`, `bad_group`, `bad_metric` or `bad_hours`.
+
+## Access (IOsense SSO)
+
+The app opens only from IOsense:
+
+1. IOsense opens the dashboard with a one-time SSO token in the URL (`?token=…`, valid 60 s).
+2. The frontend sends it to `POST /api/auth/sso`.
+3. The backend exchanges it with IOsense (functionID `validateSSOToken`). It then issues an
+   app session: a JWT signed with `SESSION_SECRET`, valid for `SESSION_TTL_HOURS`, carrying
+   only the IOsense `userId` and `organisation`. IOsense's own JWT never reaches the browser.
+4. Every other route checks that session.
+
+Without one (opened directly, a reused or expired link, or a session that has ended), the
+frontend shows a "Open from IOsense" screen instead of the dashboard.
+
+Optional: `AUTH_ALLOWED_ORGANISATIONS` limits sign-in to given IOsense organisations.
+`AUTH_DISABLED=true` opens every route for **local development only**; the service refuses
+to start with it in production.
 
 ## Run locally
 

@@ -30,6 +30,16 @@ const schema = z.object({
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(0).default(600),
   /** Run the ERP sync every N minutes inside this service. 0 = off (run `sync:erp` from cron instead). */
   ERP_SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(0),
+
+  /* --- Access: the app opens only from IOsense, through its one-time SSO token --- */
+  /** Local development only — every route open, no IOsense sign-in. Refused in production. */
+  AUTH_DISABLED: bool,
+  /** Signs app sessions (HMAC). ≥ 32 characters; keep it stable so sessions survive a restart. */
+  SESSION_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(32, 'must be at least 32 characters').optional()),
+  /** How long a session lasts after the IOsense sign-in. */
+  SESSION_TTL_HOURS: z.coerce.number().positive().max(168).default(12),
+  /** IOsense organisation ids allowed in, comma-separated. Empty = any organisation IOsense signs in. */
+  AUTH_ALLOWED_ORGANISATIONS: list,
 });
 
 export type ServerConfig = z.infer<typeof schema>;
@@ -43,6 +53,9 @@ export function loadServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCo
   const cfg = parsed.data;
   if (cfg.NODE_ENV === 'production' && cfg.CORS_ORIGINS.includes('*')) {
     throw new Error('Invalid configuration — CORS_ORIGINS must list the frontend origin(s), not "*", in production');
+  }
+  if (cfg.NODE_ENV === 'production' && cfg.AUTH_DISABLED) {
+    throw new Error('Invalid configuration — AUTH_DISABLED cannot be used in production');
   }
   return cfg;
 }
