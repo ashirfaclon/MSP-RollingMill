@@ -22,10 +22,9 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   if (state.status === 'checking') {
     return (
       <main className="auth-screen" aria-busy="true">
-        <div className="auth-card">
-          <Icon id="shield-check" size={34} color="#4da3ff" />
-          <h1 className="auth-title">Signing you in…</h1>
-          <span className="skel skel--num" role="status" aria-label="Signing in" />
+        <div className="app-loader" role="status">
+          <span className="app-loader-ring" aria-hidden />
+          <span className="app-loader-text">Loading…</span>
         </div>
       </main>
     );
