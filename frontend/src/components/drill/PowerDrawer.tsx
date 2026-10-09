@@ -21,9 +21,14 @@ const METER_TOKENS = ['--s-prod', '--s-order', '--s-alt', '--s-free', '--violet'
 
 const k = (v: number | null | undefined) => (v === null || v === undefined ? '—' : fmtNum(v, 1));
 
+export type PowerMill = 'hsm' | 'rmd';
+
 export default function PowerDrawer(props: {
   open: boolean; onClose: () => void; data: PowerReport | null; loading: boolean; error: string | null;
+  /** Whose logbook form: decides the source and formula boxes. */
+  mill?: PowerMill;
 }) {
+  const mill = props.mill ?? 'hsm';
   // The card's period; only the grouping is chosen here.
   const r = useDrillRange(['selection'], 'selection');
   return (
@@ -31,18 +36,18 @@ export default function PowerDrawer(props: {
       open={props.open}
       onClose={props.onClose}
       title="Power consumption · logbook"
-      sub="HSM · kWh"
+      sub={`${mill.toUpperCase()} · kWh`}
       controls={r.controls}
       loading={props.loading}
       error={props.error}
       hasData={!!props.data}
     >
-      {props.data && <Content data={props.data} grain={r.grain} />}
+      {props.data && <Content data={props.data} grain={r.grain} mill={mill} />}
     </DrillDrawer>
   );
 }
 
-function Content({ data, grain }: { data: PowerReport; grain: Grain }) {
+function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill: PowerMill }) {
   const eq = data.equipment;
   const t = data.totals;
   const rows = useMemo(() => powerPeriods(data.days, grain), [data.days, grain]);
@@ -81,7 +86,7 @@ function Content({ data, grain }: { data: PowerReport; grain: Grain }) {
 
       <Entries entries={data.entries} />
 
-      <SourceBox sources={SOURCES} formula={FORMULA} />
+      <SourceBox sources={SOURCES[mill]} formula={FORMULA[mill]} />
       {data.logbook.connection === 'down' && <p className="v-warn">{data.logbook.message}</p>}
     </>
   );
@@ -118,11 +123,10 @@ function Entries({ entries }: { entries: PowerEntry[] }) {
       </div>
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Logbook power entries">
-          <thead><tr><th>Shift</th><th>Meter</th><th className="r">Previous reading</th><th className="r">Present reading</th><th className="r">Power consumed (kWh)</th></tr></thead>
+          <thead><tr><th>Meter</th><th className="r">Previous reading</th><th className="r">Present reading</th><th className="r">Power consumed (kWh)</th></tr></thead>
           <tbody>
             {shown.map((e, j) => (
               <tr key={`${e.enteredAt}-${e.equipment}-${j}`}>
-                <td>{e.shift}</td>
                 <td>{e.equipment}</td>
                 <td className="num r">{fmtNum(e.previousReading, 3)}</td>
                 <td className="num r">{fmtNum(e.presentReading, 3)}</td>
@@ -136,18 +140,32 @@ function Entries({ entries }: { entries: PowerEntry[] }) {
   );
 }
 
-const SOURCES: SourceSystem[] = [
-  {
+const SOURCES: Record<PowerMill, SourceSystem[]> = {
+  hsm: [{
     name: 'Logbook',
     rows: [
       ['Form', 'Electrical HSM → Power Consumption'],
       ['Field', 'POWER_CONSUMED (kWh), per equipment'],
       ['Date', "the form's date, as entered"],
     ],
-  },
-];
+  }],
+  rmd: [{
+    name: 'Logbook',
+    rows: [
+      ['Form', 'TMT Electrical Department → Power Reading VCB 1, VCB 2, VCB 3'],
+      ['Field', 'ACTUAL_KWH_VCB_1, ACTUAL_KWH_VCB_2, ACTUAL_KWH_VCB_3 (kWh)'],
+      ['Date', "the form's date, as entered"],
+    ],
+  }],
+};
 
-const FORMULA = [
-  'Power (kWh) = Σ POWER_CONSUMED of every entry dated in the period, all meters',
-  'Power (MWh) = Power (kWh) ÷ 1000',
-];
+const FORMULA: Record<PowerMill, string[]> = {
+  hsm: [
+    'Power (kWh) = Σ POWER_CONSUMED of every entry dated in the period, all meters',
+    'Power (MWh) = Power (kWh) ÷ 1000',
+  ],
+  rmd: [
+    'Power (kWh) = Σ ACTUAL_KWH_VCB_n of every entry dated in the period, VCB 1 + 2 + 3',
+    'Power (MWh) = Power (kWh) ÷ 1000',
+  ],
+};

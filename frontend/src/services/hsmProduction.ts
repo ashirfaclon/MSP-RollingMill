@@ -9,6 +9,7 @@ import { rangeUrl, useApi } from './hsmApi';
 import type { Grain, ProductionComparison } from '@contracts';
 import { DURATION_LABELS, selectedDates, useGlobalSel } from '@/state/globalSel';
 import { dm, plantDate } from '@/lib/plantDay';
+import { useDayStartHour } from '@/lib/useDayStartHour';
 
 export { addDays, dm, plantDate, cycleLabel } from '@/lib/plantDay';
 
@@ -48,10 +49,11 @@ export const ERP_START_DATE = '2025-11-30';
 export function useSelection(): { dates: { from: string; to: string } | null; label: string; today: string | null } {
   const sel = useGlobalSel();
   const now = useMinute();
-  const dates = selectedDates(sel, now);
+  const hour = useDayStartHour();
+  const dates = selectedDates(sel, now, hour);
   const label = sel.duration === 'custom' && dates
     ? (dates.from === dates.to ? dm(dates.from) : `${dm(dates.from)} – ${dm(dates.to)}`)
     : DURATION_LABELS[sel.duration];
   // The plant day running now: before 06:00 IST it is still yesterday's date.
-  return { dates, label, today: now ? plantDate(now) : null };
+  return { dates, label, today: now ? plantDate(now, hour) : null };
 }

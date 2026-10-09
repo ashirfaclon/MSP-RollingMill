@@ -421,3 +421,74 @@ test('production by shift: the bars open plan vs actual per shift, per day', asy
   await page.getByRole('button', { name: /^Plan gap/ }).click();
   await expect(drawer).toBeVisible();
 });
+
+test('RMD: mass yield drawer shows billets in per line from Influx; power from the VCB forms', async ({ page }) => {
+  await page.goto('/rmd/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+
+  await page.getByRole('button', { name: 'Mass yield', exact: true }).click();
+  const y = page.getByRole('dialog', { name: 'Mass yield · billets in' });
+  // RMD's day is 08:00 → 08:00 IST (shifts 08–20, 20–08) — the filter says so.
+  await expect(page.getByRole('button', { name: /Duration/ })).toContainText('1 Oct 08:00 IST → 9 Oct 08:00 IST');
+  // BILLET_COUNT increases per RMD day: M1 3,173 + M2 3,021 = 6,194 over 1–8 Oct.
+  for (const v of ['6,194', '3,173', '3,021']) await expect(y.locator('.pd-stats')).toContainText(v);
+  // The material balance counts the same billets for the period.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('section.panel', { hasText: 'Material & operating balance' }).locator('.rmd-mb-pieces')).toContainText('6,194 in');
+  await page.getByRole('button', { name: 'Mass yield', exact: true }).click();
+  await expect(y.locator('.pd-stats')).toContainText('ERP finished pending');
+  const table = y.getByRole('table', { name: 'Billets in by period' });
+  await expect(table.locator('tbody tr')).toHaveCount(8);
+  await expect(table.getByRole('row', { name: /^8 Oct/ })).toContainText('937');
+  await expect(y.getByRole('region', { name: 'Data source' })).toContainText("_measurement = 'TMT-RMD'");
+  await expect(y.getByRole('region', { name: 'Formula' })).toContainText('Mass yield = finished production (ERP) ÷ billet input × 100');
+  await page.waitForTimeout(700);
+  await y.screenshot({ path: `${SHOTS}/rmd-drill-yield.png` });
+  await page.keyboard.press('Escape');
+
+  // Power: only the 16 Sep readings exist so far — VCB 1 18,022.3 + VCB 2 8,506.7 + VCB 3 4,441.6.
+  await page.getByRole('button', { name: /Duration/ }).click();
+  await dialog.getByLabel('Start Date').fill('2026-09-14');
+  await dialog.getByLabel('End Date').fill('2026-09-20');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const power = page.getByRole('button', { name: 'Power consumption', exact: true });
+  await expect(power.locator('.rm-card-value')).toContainText('30.97', { timeout: 60_000 });
+  await power.click();
+  const p = page.getByRole('dialog', { name: 'Power consumption · logbook' });
+  await expect(p.getByRole('table', { name: 'Power by period' }).locator('thead th')).toHaveText(['Period', 'VCB 1', 'VCB 2', 'VCB 3', 'Total (kWh)']);
+  await expect(p.getByRole('region', { name: 'Data source' })).toContainText('Power Reading VCB 1, VCB 2, VCB 3');
+  // No logbook shift on the dashboard (a "General" shift would only confuse).
+  await expect(p.getByRole('table', { name: 'Logbook power entries' }).locator('thead th')).toHaveText(['Meter', 'Previous reading', 'Present reading', 'Power consumed (kWh)']);
+  await page.waitForTimeout(700);
+  await p.screenshot({ path: `${SHOTS}/rmd-drill-power.png` });
+});
+
+test('RMD mill flow: route / diverter and finishing open their points, live, with source and formula', async ({ page }) => {
+  await page.goto('/rmd/visualization');
+  const mimic = page.getByRole('list', { name: 'Mill process flow' });
+  await mimic.getByRole('button', { name: /Route \/ diverter/ }).click();
+  const route = page.getByRole('dialog', { name: 'Route / diverter · L1 S1–S8, L2 S1–S6' });
+  await expect(route.getByRole('table', { name: 'Running status now' }).locator('tbody tr')).toHaveCount(14);
+  await expect(route.getByRole('region', { name: 'Data source' })).toContainText("Unit = 'CR Mill1/2'");
+  await expect(route.getByRole('region', { name: 'Formula' })).toContainText('On = latest status 1, read in the last 15 min');
+  await page.waitForTimeout(700);
+  await route.screenshot({ path: `${SHOTS}/rmd-drill-route.png` });
+  await page.keyboard.press('Escape');
+
+  await mimic.getByRole('button', { name: /Finishing group/ }).click();
+  const fin = page.getByRole('dialog', { name: 'Finishing group · line 1 and line 2' });
+  const rows = fin.getByRole('table', { name: 'Running status now' }).locator('tbody tr');
+  await expect(rows).toHaveCount(10);
+  await expect(fin.getByRole('region', { name: 'Data source' })).toContainText("Unit = 'Line-2', Group = 'General'");
+  await page.keyboard.press('Escape');
+
+  // Billet infeed opens billets in per line (no yield in this view).
+  await mimic.getByRole('button', { name: /Billet infeed/ }).click();
+  const inf = page.getByRole('dialog', { name: 'Billet infeed · Influx' });
+  await expect(inf.locator('.pd-stats')).not.toContainText('Mass yield');
+  await expect(inf.getByRole('table', { name: 'Billets in by period' })).toBeVisible();
+});

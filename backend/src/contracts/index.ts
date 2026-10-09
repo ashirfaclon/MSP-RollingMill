@@ -9,3 +9,4 @@ export type * from './live';
 export type * from './yield';
 export type * from './running-rate';
 export type * from './system';
+export type * from './rmd';

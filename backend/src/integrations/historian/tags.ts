@@ -123,3 +123,51 @@ export const HSM_STANDS: StandDef[] = [
   stand('roughing', 1), stand('roughing', 2), stand('roughing', 3), stand('roughing', 4), stand('roughing', 5, 'Motor_Curren5'),
   stand('finishing', 1, 'Motor_Curren1'), stand('finishing', 2), stand('finishing', 3), stand('finishing', 4), stand('finishing', 5), stand('finishing', 6),
 ];
+
+/**
+ * RMD (TMT rolling mill) billet counters, one per line: measurement TMT-RMD, Unit
+ * "CR Mill1/2", Group M1 / M2, field BILLET_COUNT. A running count, +1 per billet, reset at
+ * any hour (several times a day) — so a day's billets are the SUM OF ITS INCREASES, as for
+ * HSM. Checked 9 Oct 2026: a reading every ~10 s, steps of 1. (RMD FACLON PERSONA sheet.)
+ */
+const rmdBillets = (group: 'M1' | 'M2'): TagDef => ({
+  key: `rmd_billet_count_${group.toLowerCase()}`,
+  label: 'BILLET_COUNT',
+  measurement: 'TMT-RMD',
+  unitTag: 'CR Mill1/2',
+  group,
+  field: 'BILLET_COUNT',
+  unit: 'pcs',
+  scale: 1,
+  mapped: true,
+});
+export const RMD_BILLET_COUNT = { M1: rmdBillets('M1'), M2: rmdBillets('M2') } as const;
+
+/**
+ * RMD running-status points for the mill flow (RMD FACLON PERSONA sheet), each 0 / 1:
+ *   route / diverter  CR Mill1/2 · M1 · RUNNING_STATUS_S1…S8 (line 1) and M2 · S1…S6 (line 2);
+ *   finishing         Line-1 · M1 · RUNNING_STATUS_FS / PRI / PR2 / TB1 / TB2 and
+ *                     Line-2 · General · CS / Pinch_Roll_Pre / Pinch_Roll_Post /
+ *                     Tail_Breaker_01 / Tail_Breaker_02 _On_Off.
+ * The sheet places line 2's finishing points under "Line-2" with no group; the historian has
+ * them in Group "General" (seen 9 Oct 2026). Labels are the tag codes, not guessed names.
+ */
+export type RmdZone = 'route' | 'finishing';
+export interface RmdStationDef { id: string; zone: RmdZone; line: 1 | 2; label: string; unitTag: string; group: string; field: string }
+
+const routeStation = (line: 1 | 2, n: number): RmdStationDef => ({
+  id: `L${line}_S${n}`, zone: 'route', line, label: `S${n}`, unitTag: 'CR Mill1/2', group: line === 1 ? 'M1' : 'M2', field: `RUNNING_STATUS_S${n}`,
+});
+export const RMD_STATIONS: RmdStationDef[] = [
+  ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => routeStation(1, n)),
+  ...[1, 2, 3, 4, 5, 6].map((n) => routeStation(2, n)),
+  ...(['FS', 'PRI', 'PR2', 'TB1', 'TB2'] as const).map((c): RmdStationDef => ({
+    id: `L1_${c}`, zone: 'finishing', line: 1, label: c, unitTag: 'Line-1', group: 'M1', field: `RUNNING_STATUS_${c}`,
+  })),
+  ...([
+    ['CS', 'CS_On_Off'], ['PR pre', 'Pinch_Roll_Pre_On_Off'], ['PR post', 'Pinch_Roll_Post_On_Off'],
+    ['TB 1', 'Tail_Breaker_01_On_Off'], ['TB 2', 'Tail_Breaker_02_On_Off'],
+  ] as const).map(([label, field]): RmdStationDef => ({
+    id: `L2_${field}`, zone: 'finishing', line: 2, label, unitTag: 'Line-2', group: 'General', field,
+  })),
+];

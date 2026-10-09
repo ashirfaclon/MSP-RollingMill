@@ -7,7 +7,7 @@ import { buildApp } from './app';
 import { loadServerConfig } from './config/server';
 import { startErpSyncSchedule } from './jobs/scheduler';
 import { loadEnv } from './config/env';
-import { warmPowerIndex } from './modules/hsm/power.service';
+import { warmPowerIndex } from './modules/power/power.service';
 
 const SHUTDOWN_GRACE_MS = 10_000;
 

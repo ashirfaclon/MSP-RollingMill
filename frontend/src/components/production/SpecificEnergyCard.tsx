@@ -17,7 +17,7 @@ export default function SpecificEnergyCard() {
   const t = data?.totals;
   const note = error ? 'Logbook unavailable'
     : data?.logbook.connection === 'down' ? data.logbook.message
-    : t && t.kwh === null ? 'No power entries for this period'
+    : t && t.kwh === null ? 'No power entries'
     : t && !t.productionMt ? 'No production for this period'
     : '';
   return (

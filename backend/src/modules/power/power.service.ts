@@ -1,26 +1,63 @@
 /**
- * HSM power consumption, from the IOsense logbook form "Electrical HSM → Power Consumption"
- * (form `electrical-hsm/power-consumption`). A day's figure is the SUM of `power-consumed`
- * (kWh) over every entry the plant dated that day — all meters (roughing, finishing, billet
- * heater …). The form's own date is used as entered: no 06:00 shift, no correction, so the
- * dashboard shows exactly what is being filled in.
+ * Power consumption from the IOsense logbook, for every mill. A day's figure is the SUM of
+ * the kWh consumed over every entry the plant dated that day, all meters together. The
+ * form's own date is used as entered: no 06:00 shift, no correction, so the dashboard shows
+ * exactly what is being filled in.
  *
- * Specific energy = that power ÷ the Production card's Total (Influx counter, reset events
- * less noise) for the same period, kWh/MT. Power is summed by the form's date, production by
- * the 06:00 plant day — the same date, a few hours apart.
+ *   HSM  one form, "Electrical HSM → Power Consumption" (electrical-hsm/power-consumption):
+ *        one entry per meter, `power-consumed` (kWh), the meter in `equipment`.
+ *   RMD  one form per meter, "TMT Electrical Department → Power Reading VCB 1 / 2 / 3"
+ *        (tmt-electrical-department/power-reading-vcb-n): `actual-kwh-vcb-n` (kWh).
  *
- * The logbook engine ignores filters and returns every form's entries newest first, so an
- * in-memory index of this form's entries is kept: topped up from the newest page every few
- * minutes, and extended further back only when a period needs older entries. Entries are
- * often typed days after their date, so reading starts a week before the period.
+ * Specific energy = that power ÷ the mill's production for the same period, kWh/MT — HSM's
+ * Production card (the Influx counter); RMD's production is not wired yet, so its specific
+ * energy is NA until it is. Power is summed by the form's date, production by the 06:00
+ * plant day — the same date, a few hours apart.
+ *
+ * The logbook engine ignores filters and returns every form's entries newest first, so ONE
+ * in-memory index holds the power forms of every mill: topped up from the newest page every
+ * few minutes, and extended further back only when a period needs older entries. Entries
+ * are often typed days after their date, so reading starts a week before the period.
  */
 import type { Env } from '../../config/env';
 import type { PowerDay, PowerEntry, PowerReport } from '../../contracts';
 import { fetchInsightPage, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
-import { dateRange, plantDayStart, productionComparison, round2 } from './production.service';
+import { dateRange, plantDayStart, productionComparison, round2 } from '../hsm/production.service';
+
+export type PowerMill = 'hsm' | 'rmd';
+
+/** How one logbook form becomes power entries: its mill, and the meter and kWh of a result. */
+interface PowerForm {
+  mill: PowerMill;
+  read: (res: Record<string, unknown>) => Pick<PowerEntry, 'equipment' | 'previousReading' | 'presentReading' | 'kwh'>;
+}
 
 export const POWER_FORM = 'electrical-hsm/power-consumption';
+const vcb = (n: number): [string, PowerForm] => [`tmt-electrical-department/power-reading-vcb-${n}`, {
+  mill: 'rmd',
+  read: (res) => ({
+    equipment: `VCB ${n}`,
+    previousReading: num(res[`previous-kwh-vcb-${n}`]),
+    presentReading: num(res[`present-kwh-vcb-${n}`]),
+    kwh: num(res[`actual-kwh-vcb-${n}`]),
+  }),
+}];
+/** Every power form, by its logbook tag. */
+const FORMS = new Map<string, PowerForm>([
+  [POWER_FORM, {
+    mill: 'hsm',
+    read: (res) => ({
+      equipment: String(res['equipment'] ?? '').trim() || 'Meter not filled',
+      previousReading: num(res['previous-meter-reading']),
+      presentReading: num(res['present-meter-reading']),
+      kwh: num(res['power-consumed']),
+    }),
+  }],
+  vcb(1), vcb(2), vcb(3),
+]);
+const formsOf = (mill: PowerMill) => [...FORMS].filter(([, f]) => f.mill === mill).map(([tag]) => tag);
+
 const DAY_MS = 86_400_000;
 
 /** kWh per tonne; null without both figures or without production. */
@@ -30,8 +67,9 @@ const ENTRY_LAG_MS = 7 * DAY_MS;
 const TOP_UP_MS = 3 * 60_000;
 const MAX_PAGES = 200;
 
+type Row = PowerEntry & { mill: PowerMill; createdMs: number };
 interface Index {
-  rows: Map<string, PowerEntry & { createdMs: number }>;
+  rows: Map<string, Row>;
   /** Oldest submission time the scan has reached. */
   reachedMs: number;
   newestMs: number;
@@ -43,23 +81,24 @@ const idx: Index = { rows: new Map(), reachedMs: Infinity, newestMs: 0, toppedAt
 let pending: Promise<void> | null = null;
 
 function keep(r: InsightEntry) {
-  if ((r.tags ?? [])[0] !== POWER_FORM && r.resultName !== POWER_FORM) return;
+  const tag = String((r.tags ?? [])[0] ?? r.resultName ?? '');
+  const form = FORMS.get(tag) ?? FORMS.get(String(r.resultName ?? ''));
+  if (!form) return;
   const res = r.result ?? {};
   const createdMs = Date.parse(r.createdAt ?? r.invocationTime ?? '');
-  const id = r._id ?? `${r.createdAt}|${res['equipment']}|${res['previous-meter-reading']}`;
+  const read = form.read(res);
+  const id = r._id ?? `${tag}|${r.createdAt}|${read.equipment}|${read.previousReading}`;
   idx.rows.set(id, {
+    mill: form.mill,
     date: String(res['date'] ?? '').slice(0, 10),
     shift: String(res['shift'] ?? ''),
-    equipment: String(res['equipment'] ?? '').trim() || 'Meter not filled',
-    previousReading: num(res['previous-meter-reading']),
-    presentReading: num(res['present-meter-reading']),
-    kwh: num(res['power-consumed']),
+    ...read,
     enteredAt: r.createdAt ?? r.invocationTime ?? null,
     createdMs: Number.isFinite(createdMs) ? createdMs : 0,
   });
 }
 
-/** Page from the newest entry back until `stopMs` (submission time), indexing this form's rows. */
+/** Page from the newest entry back until `stopMs` (submission time), indexing the power forms' rows. */
 async function scan(env: Env, stopMs: number, topUpOnly: boolean) {
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     const p = await fetchInsightPage(page, env);
@@ -88,9 +127,12 @@ async function ensure(env: Env, sinceMs: number, nowMs: number) {
   try { await pending; } finally { pending = null; }
 }
 
-export async function powerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
+/** Production per plant date and in total, MT — what specific energy divides by. */
+interface Production { byDay: Map<string, number | null>; total: number | null }
+
+async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs: number, production: Promise<Production | null>): Promise<PowerReport> {
   const dates = dateRange(from, to);
-  const base = { from, to, form: POWER_FORM };
+  const base = { from, to, form: formsOf(mill).join(', ') };
   if (!env.logbookInsightId) {
     return {
       ...base, logbook: { connection: 'down', message: MSG.LOGBOOK_NOT_MAPPED, readSince: null }, equipment: [],
@@ -98,13 +140,9 @@ export async function powerReport(env: Env, from: string, to: string, nowMs = Da
       totals: { kwh: null, entries: 0, byEquipment: {}, productionMt: null, kwhPerMt: null }, entries: [],
     };
   }
-  const [prod] = await Promise.all([
-    productionComparison(env, from, to, 'day', nowMs).catch(() => null),
-    ensure(env, plantDayStart(from) - ENTRY_LAG_MS, nowMs),
-  ]);
-  const prodByDay = new Map((prod?.days ?? []).map((d) => [d.date, d.influxMt]));
+  const [prod] = await Promise.all([production.catch(() => null), ensure(env, plantDayStart(from) - ENTRY_LAG_MS, nowMs)]);
 
-  const inRange = [...idx.rows.values()].filter((e) => e.date >= from && e.date <= to);
+  const inRange = [...idx.rows.values()].filter((e) => e.mill === mill && e.date >= from && e.date <= to);
   // The meters that have entries in this period — a blank meter name shows as its own column only if filled that way here.
   const equipment = [...new Set(inRange.map((e) => e.equipment))].sort();
   const days: PowerDay[] = dates.map((date) => {
@@ -113,7 +151,7 @@ export async function powerReport(env: Env, from: string, to: string, nowMs = Da
     for (const e of es) byEquipment[e.equipment] = round2((byEquipment[e.equipment] ?? 0) + (e.kwh ?? 0));
     const vals = es.map((e) => e.kwh).filter((v): v is number => v !== null);
     const kwh = vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null;
-    const productionMt = prodByDay.get(date) ?? null;
+    const productionMt = prod?.byDay.get(date) ?? null;
     return { date, kwh, entries: es.length, byEquipment, productionMt, kwhPerMt: specificEnergy(kwh, productionMt) };
   });
   const byEquipment: Record<string, number> = {};
@@ -129,13 +167,27 @@ export async function powerReport(env: Env, from: string, to: string, nowMs = Da
     days,
     totals: (() => {
       const kwh = withKwh.length ? round2(withKwh.reduce((a, d) => a + d.kwh!, 0)) : null;
-      const productionMt = prod?.totals.influxMt ?? null;
+      const productionMt = prod?.total ?? null;
       return { kwh, entries: inRange.length, byEquipment, productionMt, kwhPerMt: specificEnergy(kwh, productionMt) };
     })(),
     entries: inRange
       .sort((a, b) => (a.date === b.date ? b.createdMs - a.createdMs : b.date.localeCompare(a.date)))
-      .map(({ createdMs: _c, ...e }) => e),
+      .map(({ createdMs: _c, mill: _m, ...e }) => e),
   };
+}
+
+/** HSM: the logbook's power over the Production card's Influx figure. */
+export function powerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
+  const production = productionComparison(env, from, to, 'day', nowMs).then((p) => ({
+    byDay: new Map(p.days.map((d) => [d.date, d.influxMt])),
+    total: p.totals.influxMt,
+  }));
+  return report(env, 'hsm', from, to, nowMs, production);
+}
+
+/** RMD: the three VCB forms. Production is not wired yet (ERP on hold), so specific energy is NA. */
+export function rmdPowerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
+  return report(env, 'rmd', from, to, nowMs, Promise.resolve(null));
 }
 
 /**

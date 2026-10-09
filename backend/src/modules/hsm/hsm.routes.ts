@@ -13,7 +13,7 @@ import { logSheetReport, ordersReport, sizeReport, stockReport } from './erp-kpi
 import { STAND_METRICS, hsmLive, standTrend, type StandMetric } from './live.service';
 import { yieldComparison } from './yield.service';
 import { runningRate } from './running-rate.service';
-import { powerReport } from './power.service';
+import { powerReport } from '../power/power.service';
 import { planReport } from './plan.service';
 
 /** Billets into the mill: ERP log sheet INPUT_PCS vs the Influx Dicharged_Billet counter. */

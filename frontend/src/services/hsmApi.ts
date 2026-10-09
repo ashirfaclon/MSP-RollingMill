@@ -20,7 +20,8 @@ import { API_BASE } from './apiBase';
 export type {
   Grain, LogPeriod, LogSheetReport, SizeReport, SizeRow, OrdersReport, OrderPeriod, OpenLine, ErpMeta, StockReport,
   HsmLive, StandNow, GroupNow, StandTrend, StandMetric, YieldComparison, YieldPeriod, RunningRateReport, RatePeriod, RateDay,
-  PowerReport, PowerDay, PowerEntry, PlanReport, PlanDay,
+  PowerReport, PowerDay, PowerEntry, PlanReport, PlanDay, RmdBilletsReport, RmdBilletPeriod,
+  RmdLive, RmdStationNow, RmdZoneNow, RmdZoneId, RmdStationTrend, RmdRunningRateReport, RmdRatePeriod,
 } from '@contracts';
 
 

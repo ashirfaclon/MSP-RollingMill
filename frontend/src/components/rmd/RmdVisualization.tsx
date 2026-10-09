@@ -1,158 +1,101 @@
+'use client';
+
 /**
- * RMD · Visualization — the approved comp, laid out like the HSM screen: KPI strip, mill
- * mimic, then two rows of paired panels. Figures are ILLUSTRATIVE (rmdSample.ts) until the
- * RMD sources are wired; the screen says so in its head.
+ * RMD · Visualization — laid out like the HSM screen: KPI strip, mill mimic, then two rows of
+ * paired panels. Only what the plant has confirmed is wired; everything else is NA, never a
+ * sample figure:
+ *   Production by shift   NA until the rolling plan arrives; running rate's logic is in place
+ *                         (production ÷ running hours) and waits for production.
+ *   Order allocation      NA — the ERP side is on hold (as the headline cards).
+ *   Material balance      Billets (Influx BILLET_COUNT, M1 + M2) live; billet input in MT,
+ *                         finished and yield NA; mass difference = input − finished (logic
+ *                         in place, NA until both are there).
+ *   Finished stock by size  not wired yet: NA.
  *
  * Names follow the HSM screen: production with / without an order is Made To Order / Made
  * To Stock; finished stock is Stock with order / Free stock.
  */
-import { Fragment } from 'react';
 import Panel from '@/components/Panel';
-import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import FlowArrow from '@/components/visualization/FlowArrow';
-import StackBar from '@/components/visualization/StackBar';
-import LegendItem from '@/components/visualization/Legend';
+import type { Series } from '@/components/visualization/KpiCard';
 import ShiftBars from '@/components/visualization/ShiftBars';
 import { fixed } from '@/lib/num';
-import { RMD_SAMPLE, rmdView, type RmdView } from './rmdSample';
+import { useSelection } from '@/services/hsmProduction';
+import { rangeUrl, useApi, type RmdBilletsReport, type RmdRunningRateReport } from '@/services/hsmApi';
+import RmdKpiStrip from './RmdKpiStrip';
+import RmdMillMimic from './RmdMillMimic';
 import '@/components/visualization/visualization.css';
 import './rmd.css';
 
+/** Mass difference = billet input − finished, MT; null until both are known. */
+export const massDifference = (inputMt: number | null, finishedMt: number | null) =>
+  (inputMt === null || finishedMt === null ? null : inputMt - finishedMt);
+
+const NA_SHIFT = { planMt: null, outputMt: null, compliancePct: null };
+
 export default function RmdVisualization() {
-  const v = rmdView(RMD_SAMPLE);
   return (
     <div className="rm-viz">
-      <p className="rmd-banner" role="note">
-        <span className="chip chip--na">Illustrative data</span>
-        RMD figures are sample values from the design — the plant sources are not connected yet.
-      </p>
-      <KpiStrip v={v} />
-      <MillMimic v={v} />
+      <RmdKpiStrip />
+      <RmdMillMimic />
       <div className="rm-row">
         <ShiftBars
-          shifts={v.shifts.map((s) => ({ ...s, compliancePct: s.planMt ? (s.outputMt / s.planMt) * 100 : null }))}
-          day={{ planMt: v.planMt, outputMt: v.productionMt, compliancePct: v.planMt ? (v.productionMt / v.planMt) * 100 : null }}
-          planMt={v.planMt}
-          planGapMt={v.planGapMt}
-          rate={
-            <span className="rm-foot-item">
-              <span className="rm-k">Running rate</span>
-              <span className="rm-foot-v num v-val">{fixed(v.runningRateTph, 2)} TPH</span>
-            </span>
-          }
+          shifts={[{ name: 'Day', ...NA_SHIFT }, { name: 'Night', ...NA_SHIFT }]}
+          day={NA_SHIFT}
+          planMt={null}
+          planGapMt={null}
+          sub="Day 08:00–20:00 IST · Night 20:00–08:00 IST"
+          rate={<RunningRateFoot />}
         />
-        <OrderAllocation v={v} />
+        <OrderAllocation />
       </div>
       <div className="rm-row">
-        <MaterialBalance v={v} />
-        <StockBySize v={v} />
+        <MaterialBalance />
+        <Panel title="Finished stock by size" className="rm-panel" bodyClass="rm-body">
+          <p className="rm-empty">NA</p>
+        </Panel>
       </div>
     </div>
   );
 }
 
-/* ------------------------------- KPI strip ------------------------------- */
+/* ----------------------------- Running rate ------------------------------ */
 
-function KpiStrip({ v }: { v: RmdView }) {
-  const cards: { label: string; value: string; unit: string; note: string; series: Series; meterPct?: number }[] = [
-    { label: 'Production', value: fixed(v.productionMt, 1), unit: 'MT', note: `${fixed(v.planPct, 0)}% plan · ${fixed(v.runningRateTph, 2)} TPH`, series: 'prod', meterPct: v.planPct },
-    { label: 'Mass yield', value: fixed(v.yieldPct, 1), unit: '%', note: `${fixed(v.productionMt, 1)} ÷ ${fixed(v.billetInputMt, 1)} MT`, series: 'order', meterPct: v.yieldPct },
-    { label: 'Power consumption', value: fixed(v.energyMwh, 2), unit: 'MWh', note: 'Metered energy · day', series: 'prod' },
-    { label: 'Specific energy', value: fixed(v.specificEnergyKwhPerMt, 1), unit: 'kWh/MT', note: 'Energy per finished MT', series: 'prod' },
-    { label: 'Made To Stock', value: fixed(v.output.withoutOrderMt, 1), unit: 'MT', note: `${fixed(v.withoutOrderPct, 1)}% of day output`, series: 'free', meterPct: v.withoutOrderPct },
-    { label: 'Stock with order', value: fixed(v.stockWithOrderMt, 0), unit: 'MT', note: `${fixed(v.stockWithOrderPct, 1)}% of finished stock`, series: 'order', meterPct: v.stockWithOrderPct },
-    { label: 'Free stock', value: fixed(v.stockFreeMt, 0), unit: 'MT', note: `${fixed(v.stockFreePct, 1)}% of finished stock`, series: 'free', meterPct: v.stockFreePct },
-  ];
+/** Production ÷ running hours over the Duration period — NA until production is wired. */
+function RunningRateFoot() {
+  const { dates } = useSelection();
+  const url = rangeUrl('/api/rmd/running-rate', dates ? { ...dates, grain: 'day' } : null);
+  const { data, dataUrl, error } = useApi<RmdRunningRateReport>(url);
+  const current = data && dataUrl === url ? data : null;
+  const rate = current?.totals.rateTph ?? null;
   return (
-    <section className="rm-strip" aria-label="Headline KPIs">
-      {cards.map((c) => <KpiCard key={c.label} {...c} />)}
-    </section>
-  );
-}
-
-/* ------------------------------- Mill mimic ------------------------------ */
-
-function MillMimic({ v }: { v: RmdView }) {
-  const m = v.mimic;
-  const zones = [
-    { key: 'infeed', title: 'Billet infeed', value: `${m.infeedBillets} billets`, foot: 'Counter / entry', state: null },
-    { key: 'roughing', title: 'Roughing group', value: m.roughing, foot: 'Group status', state: m.roughing },
-    { key: 'route', title: 'Route / diverter', value: m.route, foot: 'Route state', state: m.route },
-    { key: 'finishing', title: 'Finishing group', value: m.finishing, foot: 'Group status', state: m.finishing },
-    { key: 'exit', title: 'Finished exit', value: `${fixed(v.productionMt, 1)} MT`, foot: 'ERP production', state: null },
-  ];
-  const tone = (s: string | null) => (s === null ? 'rm-zone--flow' : s === 'Running' || s === 'Active' ? 'rm-zone--ok' : s === 'Stopped' ? 'rm-zone--risk' : 'rm-zone--na');
-  return (
-    <Panel title="Mill mimic" sub="Grouped process zones · representative running state" right={<span className="chip chip--na">Stand map pending</span>}>
-      <ol className="rm-mimic rmd-mimic" aria-label="Mill process flow">
-        {zones.map((z, i) => (
-          <Fragment key={z.key}>
-            {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
-            <li className="rm-mimic-cell">
-              <div className={`rm-zone ${tone(z.state)}`}>
-                <span className="rm-zone-title">{z.title}</span>
-                <span className="rm-zone-body">
-                  <span className={`rm-zone-value v-val${z.state ? ' rm-zone-state' : ' num'}`}>{z.value}</span>
-                  {z.state && <PauseGlyph />}
-                </span>
-                <span className="rm-zone-foot">{z.foot}</span>
-              </div>
-            </li>
-          </Fragment>
-        ))}
-      </ol>
-    </Panel>
-  );
-}
-
-/** Two bars: a stand group / route marker, as on the comp. */
-function PauseGlyph() {
-  return (
-    <svg className="rm-zone-glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden>
-      <rect x="3" y="2" width="3.5" height="12" rx="1.5" fill="currentColor" opacity="0.85" />
-      <rect x="9.5" y="2" width="3.5" height="12" rx="1.5" fill="currentColor" opacity="0.85" />
-    </svg>
+    <span className="rm-foot-item" title="Production ÷ running hours (billets no more than 10 min apart, either line)">
+      <span className="rm-k">Running rate</span>
+      {!current && !error
+        ? <span className="skel skel--num" role="status" aria-label="Loading" />
+        : <span className={`rm-foot-v num ${rate === null ? 'v-na' : 'v-val'}`}>{rate === null ? 'NA' : `${fixed(rate, 2)} TPH`}</span>}
+    </span>
   );
 }
 
 /* ---------------------------- Order allocation --------------------------- */
 
-function OrderAllocation({ v }: { v: RmdView }) {
+function OrderAllocation() {
   return (
-    <Panel title="Order allocation" sub="Day production and period-end stock" right={<span className="chip chip--na">ERP</span>} className="rm-panel" bodyClass="rm-body rm-alloc">
+    <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
       <div className="rm-alloc-block">
         <div className="rm-alloc-head">
           <span className="rm-k">Production</span>
-          <span className="rm-alloc-total num v-val">{fixed(v.productionMt, 1)} MT</span>
+          <span className="rm-alloc-total num v-na">NA</span>
         </div>
-        <StackBar
-          label={`Production ${fixed(v.productionMt, 1)} MT: made to order ${fixed(v.output.withOrderMt, 1)} MT, made to stock ${fixed(v.output.withoutOrderMt, 1)} MT`}
-          parts={[
-            { label: 'Made To Order', value: v.output.withOrderMt, series: 'order' },
-            { label: 'Made To Stock', value: v.output.withoutOrderMt, series: 'free' },
-          ]}
-        />
         <div className="rm-legend">
-          <LegendItem series="order" label="Made To Order" value={`${fixed(v.output.withOrderMt, 1)} MT`} />
-          <LegendItem series="free" label="Made To Stock" value={`${fixed(v.output.withoutOrderMt, 1)} MT`} />
+          <span className="rmd-legend-item rm-tone--order"><i className="rm-dot" aria-hidden />Made To Order <b className="num v-na">NA</b></span>
+          <span className="rmd-legend-item rm-tone--free"><i className="rm-dot" aria-hidden />Made To Stock <b className="num v-na">NA</b></span>
         </div>
       </div>
       <div className="rm-alloc-block">
         <div className="rm-alloc-head">
           <span className="rm-k">Finished stock</span>
-          <span className="rm-alloc-total num v-val">{fixed(v.stockMt, 0)} MT</span>
-        </div>
-        <StackBar
-          label={`Finished stock ${fixed(v.stockMt, 0)} MT: with order ${fixed(v.stockWithOrderMt, 0)} MT, free ${fixed(v.stockFreeMt, 0)} MT`}
-          parts={[
-            { label: 'With order', value: v.stockWithOrderMt, series: 'order' },
-            { label: 'Free', value: v.stockFreeMt, series: 'free' },
-          ]}
-        />
-        <div className="rm-legend">
-          <LegendItem series="order" label="With order" value={`${fixed(v.stockWithOrderMt, 0)} MT`} />
-          <LegendItem series="free" label="Free" value={`${fixed(v.stockFreeMt, 0)} MT`} />
-          <span className="rm-legend-end"><b className="num">{fixed(v.orderCoverPct, 1)}%</b><span className="rm-k">order cover</span></span>
+          <span className="rm-alloc-total num v-na">NA</span>
         </div>
       </div>
     </Panel>
@@ -162,97 +105,51 @@ function OrderAllocation({ v }: { v: RmdView }) {
 /* ----------------------- Material & operating balance --------------------- */
 
 /**
- * Drawn like the HSM panel: the input split into finished | difference, to scale; then the
- * day split into run | non-run time. RMD books no loss breakdown on the comp, so the
- * difference is not opened out.
+ * Drawn like the HSM panel: billet input split into finished | mass difference, to scale,
+ * then the billet count. Only the count is wired (Influx); the bar stays empty until billet
+ * input (MT) and finished production are.
  */
-function MaterialBalance({ v }: { v: RmdView }) {
-  const finishedPct = (v.productionMt / v.billetInputMt) * 100;
-  const hours = v.run.runH + v.run.nonRunH;
+function MaterialBalance() {
+  const { dates } = useSelection();
+  const url = rangeUrl('/api/rmd/billets', dates ? { ...dates, grain: 'day' } : null);
+  const { data, dataUrl, error } = useApi<RmdBilletsReport>(url);
+  const billets = data && dataUrl === url ? data.totals.totalPcs : null;
+  const loading = !(data && dataUrl === url) && !error;
+
+  const inputMt: number | null = null;      // needs billet weight — no way to weigh billets yet
+  const finishedMt: number | null = null;   // ERP on hold
+  const diff = massDifference(inputMt, finishedMt);
+
   return (
     <Panel title="Material & operating balance" className="rm-panel" bodyClass="rm-body">
       <div className="rm-mb">
         <div className="rm-mb-head">
-          <Figure label="Billet input" value={`${fixed(v.billetInputMt, 1)} MT`} />
-          <Figure label="Yield" value={`${fixed(v.yieldPct, 1)}%`} tone="order" end />
+          <Figure label="Billet input" value="NA" />
+          <Figure label="Yield" value="NA" tone="order" end />
         </div>
-        <span className="rm-mb-bar rm-mb-bar--input" role="img"
-          aria-label={`Billet input ${fixed(v.billetInputMt, 1)} MT: finished ${fixed(v.productionMt, 1)} MT (${fixed(v.yieldPct, 1)}% yield), mass difference ${fixed(v.massDiffMt, 1)} MT`}>
-          <i className="rm-mb-seg rm-tone--order" style={{ width: `${finishedPct}%` }} />
-          <i className="rm-mb-seg rm-tone--diff" style={{ width: `${100 - finishedPct}%` }} />
-        </span>
+        <span className="rm-mb-bar rm-mb-bar--input" role="img" aria-label="Billet input: not available yet" />
         <div className="rm-mb-labels">
-          <span className="rm-mb-caption rm-tone--order">Finished <b className="num">{fixed(v.productionMt, 1)} MT</b></span>
-          <span className="rm-mb-caption rm-tone--diff">
-            Mass difference <b className="num">{fixed(v.massDiffMt, 1)} MT</b>{' '}
-            <span className="rm-mb-dim num">· {fixed(v.massDiffPct, 1)}% of input</span>
-          </span>
-        </div>
-
-        <div className="rm-mb-head rmd-mb-op">
-          <Figure label="Run time" value={`${fixed(v.run.runH, 1)} h`} />
-          <Figure label="Availability" value={`${fixed(v.availabilityPct, 1)}%`} tone="ok" end />
-        </div>
-        <span className="rm-mb-bar rm-mb-bar--loss" role="img"
-          aria-label={`Day ${fixed(hours, 0)} h: run ${fixed(v.run.runH, 1)} h, non-run ${fixed(v.run.nonRunH, 1)} h, availability ${fixed(v.availabilityPct, 1)}%`}>
-          <i className="rm-mb-seg rm-tone--prod" style={{ width: `${(v.run.runH / hours) * 100}%` }} />
-          <i className="rm-mb-seg rm-tone--loss" style={{ width: `${(v.run.nonRunH / hours) * 100}%` }} />
-        </span>
-        <div className="rm-mb-labels">
-          <span className="rm-mb-caption rm-tone--prod">Run <b className="num">{fixed(v.run.runH, 1)} h</b></span>
-          <span className="rm-mb-caption rm-tone--loss">Non-run <b className="num">{fixed(v.run.nonRunH, 1)} h</b></span>
+          <span className="rm-mb-caption rm-tone--order">Finished <b className="num v-na">NA</b></span>
+          <span className="rm-mb-caption rm-tone--diff">Mass difference <b className="num v-na">{diff === null ? 'NA' : `${fixed(diff, 1)} MT`}</b></span>
         </div>
 
         <div className="rmd-mb-pieces">
           <span className="rm-k">Billets</span>
-          <span className="rm-mb-pieces-v num"><b>{v.billetsIn}</b> in · <b>{fixed(v.billetRatePerH, 2)}</b> per run hour</span>
+          {loading
+            ? <span className="skel skel--num" role="status" aria-label="Loading" />
+            : <span className="rm-mb-pieces-v num">{billets === null ? 'NA' : <><b>{billets.toLocaleString('en-IN')}</b>{' '}in</>}</span>}
         </div>
       </div>
     </Panel>
   );
 }
 
+/** A plain headline figure (no drill-down yet). */
 function Figure(props: { label: string; value: string; tone?: Series; end?: boolean }) {
   return (
     <span className={`rmd-figure${props.tone ? ` rm-tone--${props.tone}` : ''}${props.end ? ' rmd-figure--end' : ''}`}>
       <span className="rm-k">{props.label}</span>
-      <span className="rm-mb-figure-v num">{props.value}</span>
+      <span className={`rm-mb-figure-v num ${props.value === 'NA' ? 'v-na' : ''}`}>{props.value}</span>
     </span>
-  );
-}
-
-/* ------------------------- Finished stock by size ------------------------ */
-
-function StockBySize({ v }: { v: RmdView }) {
-  const max = Math.max(...v.stock.map((s) => s.withOrderMt + s.freeMt), 1);
-  return (
-    <Panel
-      title="Finished stock by size"
-      right={
-        <span className="rm-legend rm-legend--head" aria-label="Series">
-          <span className="rm-chip-series rm-tone--order">With order</span>
-          <span className="rm-chip-series rm-tone--free">Free stock</span>
-        </span>
-      }
-      className="rm-panel"
-      bodyClass="rm-body"
-    >
-      <ul className="rm-sizes" aria-label={`${v.stock.length} sizes in stock`}>
-        {v.stock.map((s) => {
-          const total = s.withOrderMt + s.freeMt;
-          return (
-            <li key={s.size} className="rm-size rm-size--stock"
-              aria-label={`${s.size}: with order ${fixed(s.withOrderMt, 0)} MT, free stock ${fixed(s.freeMt, 0)} MT`}>
-              <span className="rm-size-name">{s.size}</span>
-              <span className="rm-size-stack" aria-hidden>
-                <i className="rm-tone--order" style={{ width: `${(s.withOrderMt / max) * 100}%` }} />
-                <i className="rm-tone--free" style={{ width: `${(s.freeMt / max) * 100}%` }} />
-              </span>
-              <span className="rm-size-total num">{fixed(total, 0)} MT</span>
-            </li>
-          );
-        })}
-      </ul>
-    </Panel>
   );
 }

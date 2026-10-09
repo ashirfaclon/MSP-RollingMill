@@ -117,9 +117,9 @@ export function useGlobalSel(): GlobalSel {
  * now — at 03:00 IST that is still yesterday's date, whose cycle ends at 06:00.
  * `custom` has none — the caller supplies it.
  */
-export function presetDates(preset: DurationPreset, nowMs: number): { from: string; to: string } | null {
+export function presetDates(preset: DurationPreset, nowMs: number, hour?: number): { from: string; to: string } | null {
   if (preset === 'custom') return null;
-  const t = plantDate(nowMs);
+  const t = plantDate(nowMs, hour);
   const y = Number(t.slice(0, 4));
   const m = Number(t.slice(5, 7));
   const monday = addDays(t, -((new Date(`${t}T00:00:00Z`).getUTCDay() + 6) % 7));
@@ -141,8 +141,8 @@ export function presetDates(preset: DurationPreset, nowMs: number): { from: stri
 }
 
 /** The selection as plant dates (inclusive); null before the clock is known. */
-export function selectedDates(sel: GlobalSel, nowMs: number): { from: string; to: string } | null {
+export function selectedDates(sel: GlobalSel, nowMs: number, hour?: number): { from: string; to: string } | null {
   if (!nowMs) return null;
   if (sel.duration === 'custom') return sel.customFrom && sel.customTo ? { from: sel.customFrom, to: sel.customTo } : null;
-  return presetDates(sel.duration, nowMs);
+  return presetDates(sel.duration, nowMs, hour);
 }

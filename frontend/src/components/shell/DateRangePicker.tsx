@@ -15,7 +15,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DURATION_LABELS, presetDates, selectedDates, setGlobalSel, useGlobalSel, type DurationPreset,
 } from '@/state/globalSel';
-import { PLANT_DAY_START_IST, addDays, cycleLabel, dayCount, dm, isDate, plantDate } from '@/lib/plantDay';
+import { addDays, cycleLabel, dayCount, dayStartIst, dm, isDate, plantDate } from '@/lib/plantDay';
+import { useDayStartHour } from '@/lib/useDayStartHour';
 import { useMinute } from '@/services/hsmProduction';
 import './daterange.css';
 
@@ -29,6 +30,8 @@ const ORDER: DurationPreset[] = [
 export default function DateRangePicker() {
   const sel = useGlobalSel();
   const now = useMinute();
+  /** The mill's day start (HSM 06:00, RMD 08:00): every date and label below follows it. */
+  const hour = useDayStartHour();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
@@ -40,13 +43,13 @@ export default function DateRangePicker() {
   const [anchored, setAnchored] = useState(false);
   /** The clock when the picker opened — fixes "today" and the presets while it is up. */
   const [openedAt, setOpenedAt] = useState(0);
-  const today = openedAt ? plantDate(openedAt) : '';
+  const today = openedAt ? plantDate(openedAt, hour) : '';
 
   /** Seed the form from the active selection each time the picker opens. */
   const openPicker = () => {
     const nowMs = Date.now();
-    const t = plantDate(nowMs);
-    const active = selectedDates(sel, nowMs) ?? { from: t, to: t };
+    const t = plantDate(nowMs, hour);
+    const active = selectedDates(sel, nowMs, hour) ?? { from: t, to: t };
     setPreset(sel.duration);
     setFrom(active.from);
     setTo(active.to);
@@ -71,7 +74,7 @@ export default function DateRangePicker() {
   const pickPreset = (p: DurationPreset) => {
     setPreset(p);
     setAnchored(false);
-    const r = p === 'custom' ? null : presetDates(p, openedAt);
+    const r = p === 'custom' ? null : presetDates(p, openedAt, hour);
     if (r) { setFrom(r.from); setTo(r.to); setMonth(new Date(`${r.from.slice(0, 7)}-01T00:00:00Z`)); }
   };
 
@@ -123,8 +126,8 @@ export default function DateRangePicker() {
 
   // The trigger: the preset's name (if any) and the cycle it covers, e.g.
   // "Today · 1 Oct 06:00 IST → 2 Oct 06:00 IST", or just the cycle for a custom range.
-  const active = selectedDates(sel, now);
-  const cycle = active ? cycleLabel(active.from, active.to) : '';
+  const active = selectedDates(sel, now, hour);
+  const cycle = active ? cycleLabel(active.from, active.to, hour) : '';
   const name = sel.duration === 'custom' ? null : DURATION_LABELS[sel.duration];
 
   return (
@@ -132,7 +135,7 @@ export default function DateRangePicker() {
       <button
         className="dr-trigger"
         onClick={() => (open ? setOpen(false) : openPicker())}
-        title="Select period — each day runs 06:00 IST to 06:00 IST"
+        title={`Select period — each day runs ${dayStartIst(hour)} to ${dayStartIst(hour)}`}
         aria-expanded={open}
         aria-haspopup="dialog"
       >
@@ -160,7 +163,7 @@ export default function DateRangePicker() {
                 <span>Start Date <i>*</i></span>
                 <span className="dr-f-row">
                   <input type="date" value={from} max={today} onChange={(e) => edit('from', e.target.value)} />
-                  <span className="dr-f-cycle num" aria-hidden>from {PLANT_DAY_START_IST}</span>
+                  <span className="dr-f-cycle num" aria-hidden>from {dayStartIst(hour)}</span>
                 </span>
               </label>
               <label className="dr-f">
@@ -168,7 +171,7 @@ export default function DateRangePicker() {
                 <span className="dr-f-row">
                   <input type="date" value={to} max={today} onChange={(e) => edit('to', e.target.value)} />
                   <span className="dr-f-cycle num" aria-hidden>
-                    to {isDate(to) ? dm(addDays(to, 1)) : 'next day'} {PLANT_DAY_START_IST}
+                    to {isDate(to) ? dm(addDays(to, 1)) : 'next day'} {dayStartIst(hour)}
                   </span>
                 </span>
               </label>
@@ -194,7 +197,7 @@ export default function DateRangePicker() {
                       disabled={c.key > today}
                       className={`${isFrom || isTo ? 'sel' : ''}${inRange ? ' in' : ''}${c.key === today ? ' today' : ''}`}
                       onClick={() => pickDay(c.key)}
-                      title={cycleLabel(c.key, c.key)}
+                      title={cycleLabel(c.key, c.key, hour)}
                     >
                       {c.day}
                     </button>
@@ -207,7 +210,7 @@ export default function DateRangePicker() {
               <span className="dr-hint" role="status">
                 {problem
                   ? <b className="dr-bad">{problem}</b>
-                  : <><b className="num">{cycleLabel(from, to)}</b> · {dayCount(from, to)} plant day{dayCount(from, to) > 1 ? 's' : ''}</>}
+                  : <><b className="num">{cycleLabel(from, to, hour)}</b> · {dayCount(from, to)} plant day{dayCount(from, to) > 1 ? 's' : ''}</>}
               </span>
               <span className="dr-btns">
                 <button className="ghost" onClick={() => setOpen(false)}>Cancel</button>

@@ -32,20 +32,22 @@ export const RUN_GAP_MS = 10 * 60_000;
 export interface Run { date: string; start: number; end: number; billets: number }
 
 /**
- * Runs from billet-counter increases. Pure. A run is cut at each 06:00 so every piece
- * belongs to one plant day; a lone billet with no neighbour within the gap adds no time.
+ * Runs from billet-counter increases. Pure. A run is cut at each day start (HSM 06:00; RMD
+ * passes 08:00) so every piece belongs to one plant day; a lone billet with no neighbour
+ * within the gap adds no time.
  */
-export function runsOf(ticks: Increment[], gapMs = RUN_GAP_MS): Run[] {
+export function runsOf(ticks: Increment[], gapMs = RUN_GAP_MS, dayStartHour = PLANT_DAY_START_HOUR): Run[] {
   const ts = [...ticks].sort((a, b) => a.t - b.t);
   const runs: Run[] = [];
   let cur: Run | null = null;
-  const dayOf = (t: number) => istDate(t - PLANT_DAY_START_HOUR * H_MS);
+  const dayOf = (t: number) => istDate(t - dayStartHour * H_MS);
+  const dayStart = (d: string) => plantDayStart(d) + (dayStartHour - PLANT_DAY_START_HOUR) * H_MS;
   for (let i = 0; i < ts.length; i++) {
     const p = ts[i];
     const prev = ts[i - 1];
     if (cur && prev && p.t - prev.t <= gapMs) {
-      // Same run; cut at a 06:00 that falls inside the gap.
-      const boundary = plantDayStart(dayOf(p.t));
+      // Same run; cut at a day start that falls inside the gap.
+      const boundary = dayStart(dayOf(p.t));
       if (prev.t < boundary) {
         cur.end = boundary;
         runs.push(cur);

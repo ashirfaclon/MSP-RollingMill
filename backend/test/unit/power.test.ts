@@ -5,15 +5,26 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { Env } from '../../src/config/env';
-import { powerReport, resetPowerIndex, specificEnergy, POWER_FORM } from '../../src/modules/hsm/power.service';
+import { powerReport, resetPowerIndex, rmdPowerReport, specificEnergy, POWER_FORM } from '../../src/modules/power/power.service';
 import { resetLogbookSession } from '../../src/integrations/logbook/client';
 
 const entry = (id: string, date: string, equipment: string, kwh: number | string, created: string, form = POWER_FORM) => ({
   _id: id, tags: [form], resultName: form, createdAt: created, invocationTime: created,
   result: { date, shift: 'DAY', equipment, 'previous-meter-reading': 100, 'present-meter-reading': 100 + Number(kwh || 0), 'power-consumed': kwh },
 });
-// Newest first, as the engine returns them; one row of another form; one wrongly dated row.
+/** An RMD reading: one form per meter (VCB n), actual-kwh-vcb-n. */
+const vcbEntry = (id: string, n: number, date: string, kwh: number, created: string) => {
+  const form = `tmt-electrical-department/power-reading-vcb-${n}`;
+  return {
+    _id: id, tags: [form], resultName: form, createdAt: created, invocationTime: created,
+    result: { date, shift: 'DAY', [`previous-kwh-vcb-${n}`]: 1000, [`present-kwh-vcb-${n}`]: 1000 + kwh, [`actual-kwh-vcb-${n}`]: kwh },
+  };
+};
+// Newest first, as the engine returns them; one row of another form; one wrongly dated row;
+// two RMD readings mixed in (they belong to RMD only).
 const ROWS = [
+  vcbEntry('r1', 1, '2026-10-07', 18022.303, '2026-10-08T15:07:00Z'),
+  vcbEntry('r2', 3, '2026-10-07', 4441.558, '2026-10-08T15:06:30Z'),
   entry('a', '2026-10-07', 'ROUGHING VCB-01', 240.204, '2026-10-08T15:06:00Z'),
   entry('b', '2026-10-07', 'FINISHING VCB-02', 650.506, '2026-10-08T15:05:00Z'),
   entry('c', '2026-10-07', 'BILLET HEATER VCB-03', 211.619, '2026-10-08T15:04:00Z'),
@@ -86,6 +97,19 @@ describe('power consumption from the logbook', () => {
     expect((await powerReport(env({ logbookInsightId: null }), '2026-10-07', '2026-10-07')).logbook).toMatchObject({ connection: 'down' });
     const r = await powerReport(env({ iosenseBearer: null }), '2026-10-07', '2026-10-07');
     expect(r).toMatchObject({ logbook: { connection: 'down' }, totals: { kwh: null, entries: 0 } });
+  });
+});
+
+describe('RMD power from the three VCB forms', () => {
+  test('a day is the sum of actual-kwh-vcb-n over its readings; HSM entries stay out, and the reverse', async () => {
+    const now = Date.parse('2026-10-09T08:00:00Z');
+    const r = await rmdPowerReport(env(), '2026-10-07', '2026-10-07', now);
+    expect(r.totals.kwh).toBe(22463.86);
+    expect(r.equipment).toEqual(['VCB 1', 'VCB 3']);
+    expect(r.entries[0]).toMatchObject({ equipment: 'VCB 1', previousReading: 1000, kwh: 18022.303 });
+    // Production is not wired for RMD yet: specific energy is NA, never a guess.
+    expect(r.totals).toMatchObject({ productionMt: null, kwhPerMt: null });
+    expect((await powerReport(env(), '2026-10-07', '2026-10-07', now)).equipment).not.toContain('VCB 1');
   });
 });
 

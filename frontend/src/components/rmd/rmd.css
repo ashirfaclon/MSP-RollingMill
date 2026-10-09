@@ -1,10 +1,25 @@
 /* RMD · Visualization — only what differs from the shared HSM styles (visualization.css). */
 
-/* Sample-data notice above the KPI strip. */
-.rmd-banner {
-  display: flex; align-items: center; gap: 10px; margin: 0;
-  font-size: 11px; font-weight: 600; color: var(--muted-2);
-}
+/* Order allocation legend while its figures are NA: a dot, the name, the value. */
+.rmd-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 600; color: var(--text-2); }
+.rmd-legend-item b { font-weight: 800; font-size: 11.5px; }
+.rmd-legend-item .rm-dot { background: var(--tone); }
+
+/* A zone's points, line 1 then line 2, a little apart — on their own row under the state, so
+   a long state ("No live data") never squeezes them out. */
+.rmd-mimic .rm-zone-body { flex-wrap: wrap; row-gap: 6px; }
+.rmd-dot-lines { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; flex: 1 0 100%; }
+
+/* Status timeline: one row per point, time across. */
+.rmd-timeline { display: grid; gap: 6px; }
+.rmd-timeline svg { display: block; height: auto; overflow: visible; }
+.rmd-tl-label { font-size: 10px; font-weight: 700; fill: var(--muted); }
+.rmd-tl-tick { font-size: 9.5px; font-weight: 600; fill: var(--muted-2); }
+.rmd-tl-track { fill: var(--panel-3); }
+.rmd-tl-on { fill: var(--ok); }
+.rmd-tl-grid { stroke: var(--border-soft); stroke-width: 1; }
+.rmd-tl-legend { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600; color: var(--muted-2); }
+.rmd-tl-key { width: 14px; height: 8px; border-radius: 2px; background: var(--ok); }
 
 /* Five zones (infeed, roughing, route/diverter, finishing, exit) instead of HSM's four. */
 .rmd-mimic {
@@ -18,7 +33,6 @@
 .rmd-figure .rm-mb-figure-v { color: var(--tone, var(--text)); }
 .rmd-figure.rm-tone--order .rm-k { color: var(--s-order); }
 .rmd-figure.rm-tone--ok .rm-k { color: var(--ok); }
-.rmd-mb-op { margin-top: 10px; }
 .rm-mb-caption { font-size: 10.5px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
 .rm-mb-caption b { color: var(--tone); font-weight: 800; font-size: 11.5px; }
 .rmd-mb-pieces {
@@ -34,3 +48,9 @@
   .rmd-mimic { grid-template-columns: minmax(0, 1fr); }
   .rmd-mimic .rm-mimic-arrow:nth-child(4), .rmd-mimic .rm-mimic-arrow:nth-child(8) { display: grid; }
 }
+
+/* NA reads the same muted grey everywhere — never in a series colour. */
+.rmd-figure .rm-mb-figure-v.v-na, .rm-mb-caption b.v-na { color: var(--muted-3); }
+
+/* Every zone the same height, whether or not it carries a row of dots. */
+.rmd-mimic { align-items: stretch; }

@@ -150,8 +150,10 @@
 /* One dot per stand: on / off / no fresh reading. */
 .rm-dots { display: inline-flex; gap: 4px; flex: none; }
 .rm-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--na); opacity: 0.45; }
-.rm-dot--on  { background: var(--ok); opacity: 1; }
-.rm-dot--off { background: transparent; border: 1.5px solid var(--muted-2); opacity: 1; }
+.rm-dots .rm-dot--on  { background: var(--ok); opacity: 1; }
+.rm-dots .rm-dot--off { background: transparent; border: 1.5px solid var(--muted-2); opacity: 1; }
+/* Scoped to .rm-dots so the legend-dot rule further down (.rm-dot { background: var(--tone) }) cannot blank them. */
+.rm-dots .rm-dot--na  { background: var(--na); opacity: 0.45; }
 .rm-zone-foot {
   align-self: flex-end;
   font-size: 9px; font-weight: 800; letter-spacing: 0.7px; text-transform: uppercase; color: var(--muted-3);

@@ -131,8 +131,8 @@ function Bars({ rows, label, onOpen }: { rows: ShiftBar[]; label: string; onOpen
             <i className="rm-shift-fill" style={{ width: pctOf(s.outputMt) }} />
             {s.planMt !== null && <i className="rm-shift-target" />}
           </span>
-          <span className="rm-shift-val num v-val">
-            {fixed(s.outputMt, 1)} MT
+          <span className={`rm-shift-val num ${s.outputMt === null ? 'v-na' : 'v-val'}`}>
+            {s.outputMt === null ? 'NA' : `${fixed(s.outputMt, 1)} MT`}
             {/* Rows with different targets (e.g. the plan puts it all on one shift): each says its own. */}
             {commonPlan === null && s.planMt !== null && <span className="rm-shift-of"> / {fixed(s.planMt, 0)}</span>}
           </span>
