@@ -148,3 +148,25 @@ p.pd-dim { margin: -6px 0 0; }
 .pd-source code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--text-2); white-space: normal; }
 table.grid.pd-source td { white-space: normal; vertical-align: top; }
 table.grid.pd-source td:last-child { min-width: 180px; }
+
+/* Source / formula boxes at a drawer's foot: a small caption over a quiet code-style box. */
+.pd-src { display: grid; gap: 12px; }
+.pd-src section { display: grid; gap: 6px; }
+.pd-src-title { margin: 0; font-size: 10px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted-2); }
+.pd-src-box {
+  display: grid; gap: 10px; padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.6; color: var(--text-2);
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.pd-src-name { font-weight: 700; color: var(--text); }
+.pd-src-sys dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 12px; }
+.pd-src-sys dl > div { display: contents; }
+.pd-src-sys dt { color: var(--muted-2); }
+.pd-src-sys dd { margin: 0; overflow-wrap: anywhere; }
+.pd-src-box--formula { gap: 2px; }
+.pd-src-line { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* A list shown one date at a time: its heading with a ‹ date › stepper on the right. */
+.pd-entries-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
+.pd-entries-head .pd-h { margin: 0; }
+.pd-entries-date { display: inline-flex; align-items: center; padding: 0 10px; font-size: 11px; font-weight: 700; color: var(--text); white-space: nowrap; }

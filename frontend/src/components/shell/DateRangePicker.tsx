@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DURATION_LABELS, presetDates, selectedDates, setGlobalSel, useGlobalSel, type DurationPreset,
 } from '@/state/globalSel';
-import { PLANT_DAY_START, addDays, cycleLabel, dayCount, dm, isDate, plantDate } from '@/lib/plantDay';
+import { PLANT_DAY_START_IST, addDays, cycleLabel, dayCount, dm, isDate, plantDate } from '@/lib/plantDay';
 import { useMinute } from '@/services/hsmProduction';
 import './daterange.css';
 
@@ -122,7 +122,7 @@ export default function DateRangePicker() {
   }, [month]);
 
   // The trigger: the preset's name (if any) and the cycle it covers, e.g.
-  // "Today · 1 Oct 06:00 → 2 Oct 06:00", or just the cycle for a custom range.
+  // "Today · 1 Oct 06:00 IST → 2 Oct 06:00 IST", or just the cycle for a custom range.
   const active = selectedDates(sel, now);
   const cycle = active ? cycleLabel(active.from, active.to) : '';
   const name = sel.duration === 'custom' ? null : DURATION_LABELS[sel.duration];
@@ -132,7 +132,7 @@ export default function DateRangePicker() {
       <button
         className="dr-trigger"
         onClick={() => (open ? setOpen(false) : openPicker())}
-        title="Select period — each day runs 06:00 to 06:00"
+        title="Select period — each day runs 06:00 IST to 06:00 IST"
         aria-expanded={open}
         aria-haspopup="dialog"
       >
@@ -160,7 +160,7 @@ export default function DateRangePicker() {
                 <span>Start Date <i>*</i></span>
                 <span className="dr-f-row">
                   <input type="date" value={from} max={today} onChange={(e) => edit('from', e.target.value)} />
-                  <span className="dr-f-cycle num" aria-hidden>from {PLANT_DAY_START}</span>
+                  <span className="dr-f-cycle num" aria-hidden>from {PLANT_DAY_START_IST}</span>
                 </span>
               </label>
               <label className="dr-f">
@@ -168,7 +168,7 @@ export default function DateRangePicker() {
                 <span className="dr-f-row">
                   <input type="date" value={to} max={today} onChange={(e) => edit('to', e.target.value)} />
                   <span className="dr-f-cycle num" aria-hidden>
-                    to {isDate(to) ? dm(addDays(to, 1)) : 'next day'} {PLANT_DAY_START}
+                    to {isDate(to) ? dm(addDays(to, 1)) : 'next day'} {PLANT_DAY_START_IST}
                   </span>
                 </span>
               </label>
@@ -207,7 +207,7 @@ export default function DateRangePicker() {
               <span className="dr-hint" role="status">
                 {problem
                   ? <b className="dr-bad">{problem}</b>
-                  : <><b className="num">{cycleLabel(from, to)}</b> · {dayCount(from, to)} plant day{dayCount(from, to) > 1 ? 's' : ''} · IST</>}
+                  : <><b className="num">{cycleLabel(from, to)}</b> · {dayCount(from, to)} plant day{dayCount(from, to) > 1 ? 's' : ''}</>}
               </span>
               <span className="dr-btns">
                 <button className="ghost" onClick={() => setOpen(false)}>Cancel</button>

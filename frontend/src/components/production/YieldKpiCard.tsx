@@ -1,16 +1,21 @@
 'use client';
 
 /**
- * Mass yield for the Duration filter's period — one figure, from Influx (plant's rule):
- *   input   Σ per billet-size event (billets × L×B×H × 7.832 g/cm³);
- *   output  NET production = the counter (reset events less noise) less the four
- *           by-products booked in ERP stores (mill scale, strip end cut, miss-roll strip,
- *           strip finish end cut).
- * Counted over the days whose by-products are booked (they arrive 1–2 days late). The
- * drawer shows it per day beside the ERP yield.
+ * Mass yield for the Duration filter's period — output BEFORE quality rejection ÷ input,
+ * two figures side by side:
+ *   ERP     log sheet Σ PRODUCTION_MT ÷ Σ INPUT_MT (production = prime + defective +
+ *           rolling defect, i.e. before rejection); entered 1–2 days late.
+ *   INFLUX  net output ÷ input:
+ *             input   Σ per billet-size event (billets × L×B×H × 7.832 g/cm³);
+ *             output  the counter (reset events less noise) less the four by-products
+ *                     booked in ERP stores (mill scale, strip end cut, miss-roll strip,
+ *                     strip finish end cut) — nothing graded defective comes off.
+ *           Counted over the days whose by-products are booked (they arrive 1–2 days late).
+ * The drawer shows both per day.
  */
+import { useState, type ReactNode } from 'react';
 import KpiCard from '@/components/visualization/KpiCard';
-import { useLogSheetDrawer } from '@/components/drill/LogSheetDrawer';
+import MassYieldDrawer, { yieldDelta } from '@/components/drill/MassYieldDrawer';
 import { fixed } from '@/lib/num';
 import { dm, useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type YieldComparison } from '@/services/hsmApi';
@@ -24,31 +29,44 @@ export function useYield() {
 
 export default function YieldKpiCard() {
   const { current, error } = useYield();
-  const logSheet = useLogSheetDrawer();
+  const [open, setOpen] = useState(false);
   const t = current?.totals;
 
-  let note = error ? 'Data unavailable' : 'Loading…';
+  let note: ReactNode = error ? 'Data unavailable' : 'Loading…';
   if (t && current) {
-    if (!t.influxDays) note = 'No counter data';
-    else if (!t.netDays) note = `Awaits ERP losses (booked to ${dm(current.byProductsLastDate)})`;
-    else if (t.netDays < t.influxDays) note = `Net ÷ input · ${t.netDays} of ${t.influxDays} days have losses booked`;
-    else note = '';
+    // ERP lag first (it is the one a reader compares against), then the Influx side's.
+    if (!t.erpDays) note = `ERP not entered yet · entered to ${dm(current.erp.lastDate)}`;
+    else if (t.erpDays < t.days) note = `ERP entered to ${dm(current.erp.lastDate)}`;
+    else if (!t.influxDays) note = 'No counter data';
+    else if (!t.netDays) note = `Influx awaits ERP losses (booked to ${dm(current.byProductsLastDate)})`;
+    else if (t.netDays < t.influxDays) note = `Influx: losses booked to ${dm(current.byProductsLastDate)}`;
+    else if (yieldDelta(t) !== null) {
+      // Both cover the whole period: Influx − ERP, highlighted like the Production card's delta.
+      const d = yieldDelta(t)!;
+      note = (
+        <span className="rm-card-delta">
+          Delta <b className={`num ${Math.abs(d) < 0.05 ? 'v-ok' : 'v-warn'}`}>{fixed(d, 1)} %</b>
+        </span>
+      );
+    } else note = '';
   }
+  const pct = (v: number | null | undefined) => (v === null || v === undefined ? 'NA' : fixed(v, 1));
+  const erp = t?.erpDays ? t.erpYieldPct : null;
 
   return (
     <>
       <KpiCard
         label="Mass yield"
-        value={t?.netYieldPct === null || t?.netYieldPct === undefined ? 'NA' : fixed(t.netYieldPct, 1)}
+        value={pct(t?.netYieldPct)}
+        pair={t ? [{ source: 'ERP', value: pct(erp) }, { source: 'Influx', value: pct(t.netYieldPct) }] : undefined}
         unit="%"
         note={note}
         series="order"
-        meterPct={t?.netYieldPct ?? undefined}
         loading={!current && !error}
-        onOpen={() => logSheet.open('yield')}
-        openLabel="Yield per day: Influx net output ÷ Influx input, with the ERP yield beside it"
+        onOpen={() => setOpen(true)}
+        openLabel="Yield per day, ERP and Influx"
       />
-      {logSheet.drawer}
+      <MassYieldDrawer open={open} onClose={() => setOpen(false)} />
     </>
   );
 }

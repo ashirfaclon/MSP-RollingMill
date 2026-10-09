@@ -36,25 +36,26 @@ async function pickCustom(page: Page) {
   await dialog.getByRole('button', { name: 'Apply' }).click();
 }
 
-test('the Production card shows the Influx counter total for the Duration filter period', async ({ page }) => {
+test('the Production card shows ERP and Influx production for the Duration filter period', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const card = page.getByRole('button', { name: 'Production', exact: true });
-  // Default period is Today — live from the counter; net waits for the ERP by-products.
-  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText(/\d[\d,]*\.\d/);
-  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('Total');
-  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('Net');
+  // Default period is Today — Influx is live; the ERP is entered 1–2 days late, and the note says so.
+  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('ERP');
+  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('Influx');
+  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText(/\d[\d,]*\.\d/);
+  await expect(card.locator('.rm-card-note')).toContainText('ERP');
 
   await pickCustom(page);
-  // 22–28 Sep, counter reset events less noise: 216.80 + 155.00 + 174.05 + 116.57 + 131.95 + 181.34 + 165.37 = 1,141.08
-  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('1,141.1');
-  // Net = total − mill scale 14.84 − strip end cut 19.07 − miss-roll 10.92 − finish end cut 0 = 1,096.25
-  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('1,096.3');
-  // Every day has its by-products booked: nothing to flag, so no note.
-  await expect(card.locator('.rm-card-note')).toHaveText('');
+  // 22–28 Sep. ERP log sheet PRODUCTION_MT: 1,076.51.
+  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('1,076.5');
+  // Influx counter reset events less noise: 216.80 + 155.00 + 174.05 + 116.57 + 131.95 + 181.34 + 165.37 = 1,141.08
+  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('1,141.1');
+  // The ERP covers every day of the period: the note gives Influx − ERP, 1,141.08 − 1,076.51 = 64.57.
+  await expect(card.locator('.rm-card-note')).toHaveText('Delta 64.6 MT');
   await card.screenshot({ path: `${SHOTS}/production-card.png` });
 });
 
-test('clicking the card opens the ERP-vs-Influx drawer on 21 Sep → today, daily', async ({ page }) => {
+test('clicking the card opens the ERP-vs-Influx drawer on the dashboard period — totals, two lines, one table', async ({ page }) => {
   await page.goto('/hsm/visualization');
   await pickCustom(page);
   const card = page.getByRole('button', { name: 'Production', exact: true });
@@ -62,54 +63,59 @@ test('clicking the card opens the ERP-vs-Influx drawer on 21 Sep → today, dail
 
   const drawer = page.getByRole('dialog', { name: 'Production · ERP vs Influx' });
   await expect(drawer).toBeVisible();
-  await expect(drawer.getByRole('button', { name: /21 Sep → today/ })).toHaveAttribute('aria-pressed', 'true');
+  // The dashboard's period (22–28 Sep), with no second period to choose from.
+  await expect(drawer.getByRole('group', { name: 'Period' })).toHaveCount(0);
   await expect(drawer.getByRole('button', { name: 'Daily' })).toHaveAttribute('aria-pressed', 'true');
 
+  // Three totals — the same figures as the card.
+  await expect(drawer.locator('.pd-stats')).toContainText('1,076.51');
+  await expect(drawer.locator('.pd-stats')).toContainText('1,141.08');
+  await expect(drawer.locator('.pd-stats')).toContainText('Delta');
+  await expect(drawer.getByText('Days compared')).toHaveCount(0);
+
   const table = drawer.getByRole('table', { name: 'Production by period' });
+  await expect(table.locator('thead th')).toHaveText(['Period', 'ERP (MT)', 'Influx (MT)', 'Delta (MT)']);
   const row = (label: string) => table.getByRole('row', { name: new RegExp(`^${label}\\b`) });
   await expect(row('22 Sep')).toContainText('202.40');
   await expect(row('22 Sep')).toContainText('216.80');
   await expect(row('22 Sep')).toContainText('14.40');
   await expect(row('28 Sep')).toContainText('152.21');
   await expect(row('28 Sep')).toContainText('165.37');
-  // 21 Sep: the counter only started at 12:47 — no variance for a part day.
-  await expect(row('21 Sep')).toContainText('180.68');
-  await expect(row('21 Sep').locator('td').nth(4)).toHaveText('—');   // variance (col 3 is net)
+  await expect(table.locator('tbody tr')).toHaveCount(7);
+  await expect(table.locator('tfoot')).toContainText('1,076.51');
 
-  await expect(drawer.locator('.pd-chart .highcharts-series-group path.highcharts-graph')).toHaveCount(4);   // ERP, Influx, Influx net, variance
+  // Two lines only (ERP, Influx); no reset-events table.
+  await expect(drawer.locator('.pd-chart .highcharts-series-group path.highcharts-graph')).toHaveCount(2);
+  await expect(drawer.getByRole('table', { name: 'Counter reset events' })).toHaveCount(0);
 
-  // Reset events: 25 Sep is three events (3.24 + 1.62 + 114.95); the first is 4 noise ticks (no
-  // billet behind them, 3.24 removed), so the day counts 1.62 + 114.95 = 116.57.
-  const events = drawer.getByRole('table', { name: 'Counter reset events' });
-  const d25 = events.getByRole('row', { name: /^25 Sep · plant day total, 3 events/ });
-  await expect(d25).toContainText('116.57');
-  await expect(events.locator('tbody')).toContainText('− 3.24');
-  for (const v of ['170.81', '174.05', '3.24', '1.62', '114.95']) await expect(events.locator('tbody')).toContainText(v);
+  // Source as boxes: the ERP table + filter and the Influx tag + filter, then the formula.
+  const source = drawer.getByRole('region', { name: 'Data source' });
+  await expect(source).toContainText("ATTR_CODE = 'PRODUCTION_MT'");
+  await expect(source).toContainText("SERIES = 'L6P'");
+  await expect(source).toContainText('Total_Production_Ton');
+  await expect(source).toContainText("Unit = 'Finishing Mill'");
+  await expect(drawer.getByRole('region', { name: 'Formula' }).locator('.pd-src-line')).toHaveText(['Delta = Influx − ERP  (days with both)']);
   await page.waitForTimeout(800);   // let the lines finish drawing in
   await drawer.screenshot({ path: `${SHOTS}/production-drawer-daily.png` });
-  await drawer.locator('.pd-body').evaluate((el) => { el.scrollTop = el.scrollHeight; });
-  await drawer.screenshot({ path: `${SHOTS}/production-drawer-daily-table.png` });
-  await drawer.locator('.pd-body').evaluate((el) => { el.scrollTop = 0; });
 
-  // Legend: hide Influx, then show it again.
-  const influx = drawer.getByRole('button', { name: /Influx · Total_Production_Ton/ });
+  // Legend: hide Influx — it leaves the chart AND the tooltip (and so does the delta) — then show it again.
+  const influx = drawer.getByRole('button', { name: /^Influx/ });
   await influx.click();
   await expect(influx).toHaveAttribute('aria-pressed', 'false');
-  await expect(drawer.locator('.pd-chart .highcharts-series-group > .highcharts-series-1:not(.highcharts-markers)')).toHaveAttribute('visibility', 'hidden');
+  const plot = await drawer.locator('.pd-chart .highcharts-plot-background').boundingBox();
+  await page.mouse.move(plot!.x + 5, plot!.y + 5);
+  await page.mouse.move(plot!.x + plot!.width / 2, plot!.y + plot!.height / 2, { steps: 10 });
+  await page.waitForTimeout(300);
+  const tip = page.locator('.highcharts-tooltip-container').last();
+  await expect(tip).toContainText('ERP:');
+  await expect(tip).not.toContainText('Influx:');
+  await expect(tip).not.toContainText('Delta:');
   await influx.click();
   await expect(influx).toHaveAttribute('aria-pressed', 'true');
 
-  // Weekly: the week of 21 Sep compares 6 full days (21 Sep is a part day).
+  // Weekly groups the same days.
   await drawer.getByRole('button', { name: 'Weekly' }).click();
-  await expect(row('Week of 21 Sep')).toContainText('6/7');
-  await drawer.getByRole('button', { name: 'Monthly' }).click();
-  await expect(row('Sep 2026')).toBeVisible();
-
-  // The Duration filter's own period: 22–28 Sep.
-  await drawer.getByRole('button', { name: 'Daily' }).click();
-  await drawer.getByRole('button', { name: /Duration filter/ }).click();
-  await expect(table.locator('tfoot')).toContainText('1,076.51');
-  await expect(table.locator('tfoot')).toContainText('7/7');
+  await expect(table.locator('tbody tr').first()).toContainText('Week of');
 
   await page.keyboard.press('Escape');
   await expect(drawer).toBeHidden();
@@ -125,4 +131,16 @@ test('drawer in the light theme', async ({ page }) => {
   await drawer.getByRole('button', { name: 'Weekly' }).click();
   await page.waitForTimeout(800);
   await drawer.screenshot({ path: `${SHOTS}/production-drawer-light.png` });
+});
+
+test('reset puts the global filter back to Today', async ({ page }) => {
+  await page.goto('/hsm/visualization');
+  const reset = page.getByRole('button', { name: 'Reset' });
+  await expect(reset).toBeDisabled();
+  await pickCustom(page);
+  await expect(page.getByRole('button', { name: /Duration/ })).toContainText('22 Sep');
+  await expect(reset).toBeEnabled();
+  await reset.click();
+  await expect(page.getByRole('button', { name: /Duration/ })).toContainText('Today');
+  await expect(reset).toBeDisabled();
 });

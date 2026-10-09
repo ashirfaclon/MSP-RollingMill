@@ -1,0 +1,331 @@
+{
+ "month": "2026-10",
+ "source": "Daily_Rolling_Tracker_Oct2026.xlsx \u00b7 sheet Daily Log (static import \u2014 to be replaced by the plan-import feature)",
+ "importedAt": "2026-10-09T09:56:02+00:00",
+ "rows": [
+  {
+   "date": "2026-10-01",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 200,
+   "mt": 3.0,
+   "remarks": "",
+   "excelRow": 4
+  },
+  {
+   "date": "2026-10-01",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 200,
+   "mt": 26.0,
+   "remarks": "",
+   "excelRow": 5
+  },
+  {
+   "date": "2026-10-01",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 200,
+   "mt": 5.0,
+   "remarks": "",
+   "excelRow": 6
+  },
+  {
+   "date": "2026-10-01",
+   "shift": "Day",
+   "thicknessMm": 2,
+   "widthMm": 200,
+   "mt": 56.0,
+   "remarks": "",
+   "excelRow": 7
+  },
+  {
+   "date": "2026-10-01",
+   "shift": "Day",
+   "thicknessMm": 1.8,
+   "widthMm": 200,
+   "mt": 56.0,
+   "remarks": "",
+   "excelRow": 8
+  },
+  {
+   "date": "2026-10-01",
+   "shift": "Day",
+   "thicknessMm": 1.6,
+   "widthMm": 200,
+   "mt": 57.0,
+   "remarks": "",
+   "excelRow": 9
+  },
+  {
+   "date": "2026-10-02",
+   "shift": "Day",
+   "thicknessMm": 3.2,
+   "widthMm": 280,
+   "mt": 10.0,
+   "remarks": "",
+   "excelRow": 10
+  },
+  {
+   "date": "2026-10-02",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 280,
+   "mt": 30.0,
+   "remarks": "",
+   "excelRow": 11
+  },
+  {
+   "date": "2026-10-02",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 280,
+   "mt": 20.0,
+   "remarks": "",
+   "excelRow": 12
+  },
+  {
+   "date": "2026-10-02",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 280,
+   "mt": 80.0,
+   "remarks": "",
+   "excelRow": 13
+  },
+  {
+   "date": "2026-10-02",
+   "shift": "Day",
+   "thicknessMm": 3.2,
+   "widthMm": 266,
+   "mt": 5.0,
+   "remarks": "",
+   "excelRow": 14
+  },
+  {
+   "date": "2026-10-03",
+   "shift": "Day",
+   "thicknessMm": 3.2,
+   "widthMm": 280,
+   "mt": 5.0,
+   "remarks": "",
+   "excelRow": 15
+  },
+  {
+   "date": "2026-10-03",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 280,
+   "mt": 8.0,
+   "remarks": "",
+   "excelRow": 16
+  },
+  {
+   "date": "2026-10-03",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 280,
+   "mt": 20.0,
+   "remarks": "",
+   "excelRow": 17
+  },
+  {
+   "date": "2026-10-03",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 280,
+   "mt": 5.0,
+   "remarks": "",
+   "excelRow": 18
+  },
+  {
+   "date": "2026-10-03",
+   "shift": "Day",
+   "thicknessMm": 2,
+   "widthMm": 280,
+   "mt": 160.0,
+   "remarks": "",
+   "excelRow": 19
+  },
+  {
+   "date": "2026-10-04",
+   "shift": "Day",
+   "thicknessMm": 3.2,
+   "widthMm": 280,
+   "mt": 15.0,
+   "remarks": "",
+   "excelRow": 20
+  },
+  {
+   "date": "2026-10-04",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 280,
+   "mt": 20.0,
+   "remarks": "",
+   "excelRow": 21
+  },
+  {
+   "date": "2026-10-04",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 280,
+   "mt": 20.0,
+   "remarks": "",
+   "excelRow": 22
+  },
+  {
+   "date": "2026-10-04",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 280,
+   "mt": 90.0,
+   "remarks": "",
+   "excelRow": 23
+  },
+  {
+   "date": "2026-10-04",
+   "shift": "Day",
+   "thicknessMm": 2,
+   "widthMm": 280,
+   "mt": 35.0,
+   "remarks": "",
+   "excelRow": 24
+  },
+  {
+   "date": "2026-10-04",
+   "shift": "Day",
+   "thicknessMm": 3.2,
+   "widthMm": 266,
+   "mt": 2.0,
+   "remarks": "",
+   "excelRow": 25
+  },
+  {
+   "date": "2026-10-04",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 266,
+   "mt": 5.0,
+   "remarks": "",
+   "excelRow": 26
+  },
+  {
+   "date": "2026-10-04",
+   "shift": "Day",
+   "thicknessMm": 2,
+   "widthMm": 266,
+   "mt": 15.0,
+   "remarks": "",
+   "excelRow": 27
+  },
+  {
+   "date": "2026-10-05",
+   "shift": "Day",
+   "thicknessMm": 3.2,
+   "widthMm": 280,
+   "mt": 50.0,
+   "remarks": "",
+   "excelRow": 28
+  },
+  {
+   "date": "2026-10-05",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 280,
+   "mt": 90.0,
+   "remarks": "",
+   "excelRow": 29
+  },
+  {
+   "date": "2026-10-05",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 280,
+   "mt": 90.0,
+   "remarks": "",
+   "excelRow": 30
+  },
+  {
+   "date": "2026-10-05",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 266,
+   "mt": 0.0,
+   "remarks": "",
+   "excelRow": 31
+  },
+  {
+   "date": "2026-10-06",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 240,
+   "mt": 60.0,
+   "remarks": "",
+   "excelRow": 32
+  },
+  {
+   "date": "2026-10-06",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 240,
+   "mt": 40.0,
+   "remarks": "",
+   "excelRow": 33
+  },
+  {
+   "date": "2026-10-06",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 240,
+   "mt": 10.0,
+   "remarks": "",
+   "excelRow": 34
+  },
+  {
+   "date": "2026-10-06",
+   "shift": "Day",
+   "thicknessMm": 2,
+   "widthMm": 240,
+   "mt": 20.0,
+   "remarks": "",
+   "excelRow": 35
+  },
+  {
+   "date": "2026-10-06",
+   "shift": "Day",
+   "thicknessMm": 1.8,
+   "widthMm": 240,
+   "mt": 20.0,
+   "remarks": "",
+   "excelRow": 36
+  },
+  {
+   "date": "2026-10-06",
+   "shift": "Day",
+   "thicknessMm": 1.6,
+   "widthMm": 240,
+   "mt": 60.0,
+   "remarks": "",
+   "excelRow": 37
+  },
+  {
+   "date": "2026-10-06",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 230,
+   "mt": 10.0,
+   "remarks": "",
+   "excelRow": 38
+  },
+  {
+   "date": "2026-10-06",
+   "shift": "Day",
+   "thicknessMm": 1.8,
+   "widthMm": 230,
+   "mt": 5.0,
+   "remarks": "",
+   "excelRow": 39
+  }
+ ]
+}

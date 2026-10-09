@@ -13,6 +13,8 @@ import { logSheetReport, ordersReport, sizeReport, stockReport } from './erp-kpi
 import { STAND_METRICS, hsmLive, standTrend, type StandMetric } from './live.service';
 import { yieldComparison } from './yield.service';
 import { runningRate } from './running-rate.service';
+import { powerReport } from './power.service';
+import { planReport } from './plan.service';
 
 /** Billets into the mill: ERP log sheet INPUT_PCS vs the Influx Dicharged_Billet counter. */
 const BILLETS: CounterSpec = { key: 'billets', tag: HSM_DISCHARGED_BILLET, erp: (r) => r.v?.INPUT_PCS ?? null };
@@ -45,6 +47,18 @@ export async function hsmRoutes(app: FastifyInstance) {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
     return runningRate(loadEnv(), from, to, parseGrain(q));
+  });
+
+  /** Power consumption: Σ power-consumed of the logbook form "Electrical HSM → Power Consumption", by the form's date. */
+  app.get('/power', { config: { errorCode: 'hsm_power_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return powerReport(loadEnv(), from, to);
+  });
+
+  /** Rolling plan (targets) per day and shift, and plan gap against production. */
+  app.get('/plan', { config: { errorCode: 'hsm_plan_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return planReport(loadEnv(), from, to);
   });
 
   /** ERP Production Log Sheet sums per period — yield, mass balance, quality split, stores check. */

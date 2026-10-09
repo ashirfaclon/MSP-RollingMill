@@ -3,32 +3,23 @@ import ProductionKpiCard from '@/components/production/ProductionKpiCard';
 import YieldKpiCard from '@/components/production/YieldKpiCard';
 import ProductionWithoutOrderCard from '@/components/production/ProductionWithoutOrderCard';
 import FreeStockCard from '@/components/production/FreeStockCard';
+import PowerKpiCard from '@/components/production/PowerKpiCard';
+import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import { fixed } from '@/lib/num';
 import type { MillModel } from '@/models/millModel';
 
 /** The seven headline figures, left to right as on the comp. Cards with no live source show 0. */
 export default function KpiStrip({ m }: { m: MillModel }) {
-  const k = m.kpis;
   return (
     <section className="rm-strip" aria-label="Headline KPIs">
       {/* Live from the ERP, for the Duration filter's period; opens the ERP-vs-Influx drawer. */}
       <ProductionKpiCard />
       {/* Live from the ERP log sheet: Σ production ÷ Σ billet input; opens the yield drawer. */}
       <YieldKpiCard />
-      <KpiCard
-        label="Power consumption"
-        value={fixed(k.energyMwh, 2)}
-        unit="MWh"
-        note=""
-        series="prod"
-      />
-      <KpiCard
-        label="Specific energy"
-        value={fixed(k.specificEnergyKwhPerMt, 1)}
-        unit="kWh/MT"
-        note=""
-        series="prod"
-      />
+      {/* Live: Σ power-consumed of the logbook form Electrical HSM → Power Consumption, by the form's date. */}
+      <PowerKpiCard />
+      {/* Live: logbook power ÷ the Production card's Total (Influx), kWh/MT. */}
+      <SpecificEnergyCard />
       {/* Made To Stock = all production: the ERP does not link production to orders. */}
       <ProductionWithoutOrderCard />
       <KpiCard

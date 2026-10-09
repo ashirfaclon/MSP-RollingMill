@@ -6,6 +6,8 @@
 import { buildApp } from './app';
 import { loadServerConfig } from './config/server';
 import { startErpSyncSchedule } from './jobs/scheduler';
+import { loadEnv } from './config/env';
+import { warmPowerIndex } from './modules/hsm/power.service';
 
 const SHUTDOWN_GRACE_MS = 10_000;
 
@@ -16,6 +18,7 @@ async function main() {
   await app.listen({ host: config.HOST, port: config.PORT });
 
   const stopSync = startErpSyncSchedule(config.ERP_SYNC_INTERVAL_MINUTES, app.log);
+  warmPowerIndex(loadEnv());
 
   const shutdown = async (signal: string) => {
     if (lifecycle.shuttingDown) return;

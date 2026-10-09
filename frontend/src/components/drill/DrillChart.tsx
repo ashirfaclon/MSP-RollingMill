@@ -51,7 +51,7 @@ function options(p: {
   series: DrillSeries[];
   categories?: string[];
   axes: DrillAxis[];
-  tooltip?: (index: number) => string;
+  tooltip?: (index: number, visible: Set<string>) => string;
   hidden: Set<string>;
   horizontal?: boolean;
 }): Options {
@@ -75,6 +75,8 @@ function options(p: {
       type: time ? 'datetime' : 'category',
       categories: p.categories, lineColor: grid, tickColor: grid,
       dateTimeLabelFormats: { minute: '%H:%M', hour: '%H:%M', day: '%e %b' },
+      // Tick times are IST (the chart is in plant time); said once, under the axis.
+      title: time ? { text: 'IST', style: { color: muted, fontSize: '10px' } } : undefined,
       labels: { style: { color: muted, fontSize: '10.5px' } },
     },
     yAxis: p.axes.map((a, i) => ({
@@ -95,8 +97,9 @@ function options(p: {
       backgroundColor: tok('--panel'), borderColor: tok('--border-hi'), style: { color: text },
       formatter() {
         const pts = this.points ?? [];
-        if (p.tooltip && !time) return p.tooltip(pts[0]?.index ?? 0);
-        const head = time ? TIME.format(new Date(Number(this.x))) : String(p.categories?.[pts[0]?.index ?? 0] ?? '');
+        // Shared tooltips only carry the visible series' points — those are the ones to describe.
+        if (p.tooltip && !time) return p.tooltip(pts[0]?.index ?? 0, new Set(pts.map((pt) => String(pt.series.options.id))));
+        const head = time ? `${TIME.format(new Date(Number(this.x)))} IST` : String(p.categories?.[pts[0]?.index ?? 0] ?? '');
         return `<b>${head}</b><br/>` + pts.map((pt) => {
           const s = p.series.find((x) => x.id === pt.series.options.id);
           const unit = p.axes[s?.axis ?? 0]?.unit ?? '';
@@ -129,8 +132,11 @@ export default function DrillChart(props: {
   /** Omit for a time axis. */
   categories?: string[];
   axes: DrillAxis[];
-  /** Tooltip body for category charts; the default lists each visible series. */
-  tooltip?: (index: number) => string;
+  /**
+   * Tooltip body for category charts; the default lists each visible series. A custom one
+   * gets the ids of the series currently shown, so a line hidden in the legend leaves it too.
+   */
+  tooltip?: (index: number, visible: Set<string>) => string;
   /** Text alternative — the figures the chart draws. */
   ariaLabel: string;
   height?: number;
@@ -173,7 +179,9 @@ export default function DrillChart(props: {
 
   return (
     <div className="pd-chart-wrap">
-      <div className="pd-legend" role="group" aria-label="Show or hide series">
+      {/* A legend is for choosing between lines: with one there is nothing to choose — the
+          axis title and the drawer's heading already say what it is. */}
+      {series.length > 1 && <div className="pd-legend" role="group" aria-label="Show or hide series">
         {series.map((s) => {
           const on = !hidden.has(s.id);
           return (
@@ -195,7 +203,7 @@ export default function DrillChart(props: {
             </button>
           );
         })}
-      </div>
+      </div>}
       <div className="pd-chart" ref={host} role="img" aria-label={props.ariaLabel} style={props.height ? { height: props.height } : undefined} />
     </div>
   );

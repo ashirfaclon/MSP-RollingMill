@@ -90,6 +90,14 @@ export function setGlobalSel(patch: Partial<GlobalSel>) {
   listeners.forEach((l) => l());
 }
 
+/** The filters (not the theme or the rail) as they are by default. */
+export const isDefaultFilter = (sel: GlobalSel) => sel.duration === DEFAULTS.duration;
+
+/** Put the filters back to their defaults — Duration "Today". Theme and rail are kept. */
+export function resetFilters() {
+  setGlobalSel({ duration: DEFAULTS.duration, customFrom: DEFAULTS.customFrom, customTo: DEFAULTS.customTo });
+}
+
 /**
  * The server renders with the defaults; the client hydrates against the same defaults and
  * then re-renders with what was stored, so there is no hydration mismatch. The theme itself

@@ -29,9 +29,12 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 /** "22 Sep" */
 export const dm = (d: string | null | undefined) => (d ? `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]}` : '—');
 
-/** The cycle a range of plant dates covers: "24 Sep 06:00 → 25 Sep 06:00". */
+/** "06:00 IST" — every time on screen names its zone. */
+export const PLANT_DAY_START_IST = `${PLANT_DAY_START} IST`;
+
+/** The cycle a range of plant dates covers: "24 Sep 06:00 IST → 25 Sep 06:00 IST". */
 export const cycleLabel = (from: string, to: string) =>
-  `${dm(from)} ${PLANT_DAY_START} → ${dm(addDays(to, 1))} ${PLANT_DAY_START}`;
+  `${dm(from)} ${PLANT_DAY_START_IST} → ${dm(addDays(to, 1))} ${PLANT_DAY_START_IST}`;
 
 /** Whole plant days in an inclusive range. */
 export const dayCount = (from: string, to: string) =>

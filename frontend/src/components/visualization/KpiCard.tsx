@@ -20,11 +20,14 @@ export type Series =
   /* the mass balance: the input/output difference and the three other booked losses */
   | 'diff' | 'bloss' | 'endcut' | 'missroll';
 
+import type { ReactNode } from 'react';
+
 export default function KpiCard(props: {
   label: string;
   value: string;
   unit: string;
-  note: string;
+  /** One line under the value; a node when part of it is a figure (e.g. a highlighted delta). */
+  note: ReactNode;
   series: Series;
   /** 0–100; omitted when the figure has no natural share to show. */
   meterPct?: number;
@@ -63,7 +66,7 @@ export default function KpiCard(props: {
         </span>
       )}
       {/* Always rendered (empty when there is nothing to flag) so the cards stay aligned. */}
-      <span className="rm-card-note" title={props.note || undefined}>{props.note}</span>
+      <span className="rm-card-note" title={typeof props.note === 'string' && props.note ? props.note : undefined}>{props.note}</span>
       {meterPct !== undefined && (
         <span
           className="rm-meter"

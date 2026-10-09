@@ -7,6 +7,7 @@
  */
 import { useState } from 'react';
 import { Seg } from './DrillDrawer';
+import { autoGrain } from '@/lib/periods';
 import {
   COUNTER_START_DATE, ERP_START_DATE, addDays, dm, useSelection, type Grain,
 } from '@/services/hsmProduction';
@@ -24,7 +25,9 @@ const GRAINS: { id: Grain; label: string }[] = [
 export function useDrillRange(ids: RangeId[], initial: RangeId, opts: { grain?: boolean } = {}) {
   const sel = useSelection();
   const [range, setRange] = useState<RangeId>(initial);
-  const [grain, setGrain] = useState<Grain>('day');
+  // Until the reader picks one, the grouping follows the period's length (autoGrain), so a
+  // two-month period opens on weeks rather than sixty daily rows.
+  const [picked, setGrain] = useState<Grain | null>(null);
   const today = sel.today;
 
   const datesOf = (id: RangeId): { from: string; to: string } | null => {
@@ -43,14 +46,18 @@ export function useDrillRange(ids: RangeId[], initial: RangeId, opts: { grain?: 
   };
 
   const dates = datesOf(range);
+  const grain = picked ?? autoGrain(dates);
   const controls = (
     <>
-      <Seg
-        label="Period"
-        value={range}
-        options={ids.map((id) => ({ id, ...labelOf[id], disabled: !datesOf(id) }))}
-        onChange={setRange}
-      />
+      {/* One choice is no choice: the period control shows only when there are several. */}
+      {ids.length > 1 && (
+        <Seg
+          label="Period"
+          value={range}
+          options={ids.map((id) => ({ id, ...labelOf[id], disabled: !datesOf(id) }))}
+          onChange={setRange}
+        />
+      )}
       {opts.grain !== false && <Seg label="Group by" value={grain} options={GRAINS} onChange={setGrain} />}
     </>
   );

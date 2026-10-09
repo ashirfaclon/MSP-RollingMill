@@ -65,3 +65,76 @@ export interface ProductionComparison {
   rows: PeriodRow[];
   totals: PeriodRow;
 }
+
+/** GET /api/hsm/power — HSM power from the logbook form "Electrical HSM → Power Consumption". */
+export interface PowerEntry {
+  /** The date the plant entered on the form — used as-is. */
+  date: string;
+  shift: string;
+  equipment: string;
+  previousReading: number | null;
+  presentReading: number | null;
+  /** `power-consumed`, kWh; null when the field is blank or not a number. */
+  kwh: number | null;
+  /** When the entry was submitted (ISO). */
+  enteredAt: string | null;
+}
+
+export interface PowerDay {
+  date: string;
+  /** Σ power-consumed of the day's entries; null when the day has none. */
+  kwh: number | null;
+  entries: number;
+  /** equipment → kWh. */
+  byEquipment: Record<string, number>;
+  /** Influx production for the plant day (the Production card's Total), MT. */
+  productionMt: number | null;
+  /** kwh ÷ productionMt. */
+  kwhPerMt: number | null;
+}
+
+export interface PowerReport {
+  from: string;
+  to: string;
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string; readSince: string | null };
+  equipment: string[];
+  days: PowerDay[];
+  totals: { kwh: number | null; entries: number; byEquipment: Record<string, number>; productionMt: number | null; kwhPerMt: number | null };
+  /** Every entry in the range, newest date first. */
+  entries: PowerEntry[];
+}
+
+/** GET /api/hsm/plan — the rolling plan (targets) per day and shift, as filled in by the plant. */
+export interface PlanDay {
+  date: string;
+  /** Σ target MT for the day; null when the plan has no rows for it. */
+  planMt: number | null;
+  /** Shift as written in the plan (e.g. "Day", "Night") → target MT. */
+  byShift: Record<string, number>;
+  /** Influx production for the plant day (the Production card's Total), MT. */
+  actualMt: number | null;
+  /** That production split by shift (Day 06–18, Night 18–06); null when there is none. */
+  actualByShift: Record<string, number> | null;
+}
+
+export interface PlanReport {
+  from: string;
+  to: string;
+  /** Where the plan comes from today (a static import of the plant's Excel). */
+  source: string;
+  days: PlanDay[];
+  totals: {
+    /** Σ target over the period's planned days; null when none is planned. */
+    planMt: number | null;
+    byShift: Record<string, number>;
+    plannedDays: number;
+    days: number;
+    /** Production over the same planned days only. */
+    actualMt: number | null;
+    /** planMt − actualMt: positive = short of plan. */
+    gapMt: number | null;
+    /** Production per shift over the WHOLE period (planned or not). */
+    actualByShift: Record<string, number>;
+  };
+}

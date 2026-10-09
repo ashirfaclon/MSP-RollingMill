@@ -1,45 +1,35 @@
 'use client';
 
 /**
- * Running rate, calculated: Influx production ÷ hours the mill was running, where running
- * = billets leaving the furnace less than 10 minutes apart. The ERP log sheet's own rate
- * (production ÷ operator-entered running hours) sits beside it for comparison.
+ * Running rate drill-down — ERP beside Influx for the dashboard's period, per day / week /
+ * month: the two rates and their delta, a chart of the two lines, a table of the same
+ * numbers, and where they come from. ERP divides by the hours operators enter; Influx by
+ * the hours the billet counter shows the mill running — the delta is how far those agree.
  */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import DrillDrawer, { Stats } from './DrillDrawer';
-import DrillChart, { fmtNum, type DrillAxis, type DrillSeries } from './DrillChart';
-import { useDrillRange, type RangeId } from './useDrillRange';
-import { hhmm } from './CounterDrawer';
+import DrillChart, { fmtNum, type DrillSeries } from './DrillChart';
+import SourceBox, { type SourceSystem } from './SourceBox';
+import { useDrillRange } from './useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RunningRateReport } from '@/services/hsmApi';
-import SourceTable, { type SourceRow } from './SourceTable';
 
-const AXES: DrillAxis[] = [
-  { title: 'Running rate (TPH)', unit: 'TPH', min: 0 },
-  { title: 'Running hours', unit: 'h', opposite: true, min: 0 },
-];
-const PAGE = 60;
+type Row = RunningRateReport['totals'];
 
-const SOURCES: SourceRow[] = [
-  { figure: 'Production', table: 'Influx · HSM / Finishing Mill / General', fields: 'Total_Production_Ton', filter: 'Same figure as the Production card (Total): reset events per 06:00 plant day, noise removed' },
-  { figure: 'Running hours', table: 'Influx · HSM / Finishing Mill / General', fields: 'Dicharged_Billet', filter: 'Time between two billets counts as running when the gap is 10 minutes or less; split at 06:00' },
-  { figure: 'Running rate', table: '—', fields: 'Production ÷ running hours', filter: 'A period: total MT ÷ total hours, not an average of daily rates' },
-  { figure: 'ERP production', table: 'ATTR_TRAN_DATA_HEAD / BODY', fields: 'PRODUCTION_MT', filter: "Log sheet: ENTITY_CODE = 'MP', DIV_CODE = 'S1', TNATURE = 'PRLOG', SERIES = 'L6P'; all entries of the day summed" },
-  { figure: 'ERP running hours', table: 'ATTR_TRAN_DATA_HEAD / BODY', fields: 'NET_RUNNING_HRS', filter: 'Entered by operators; all entries of the day summed' },
-  { figure: 'ERP delay hours', table: 'ATTR_TRAN_DATA_HEAD / BODY', fields: 'DELAY_HRS', filter: 'Same filter' },
-  { figure: 'ERP running rate', table: '—', fields: 'PRODUCTION_MT ÷ NET_RUNNING_HRS', filter: 'Equals the log sheet’s PROD_RATE_ON_RUNNING_HRS on every entry' },
-];
+const f = (v: number | null) => fmtNum(v, 2);
+const tone = (v: number | null) => (v === null ? 'v-na' : Math.abs(v) < 0.005 ? 'v-ok' : 'v-warn');
 
-export default function RunningRateDrawer(props: { open: boolean; onClose: () => void; initial?: RangeId }) {
-  const r = useDrillRange(['selection', 'counter', 'last30'], props.initial ?? 'selection');
+export default function RunningRateDrawer(props: { open: boolean; onClose: () => void }) {
+  // The same period as the dashboard, so the drawer's totals are the panel's.
+  const r = useDrillRange(['selection'], 'selection');
   const url = props.open && r.dates ? rangeUrl('/api/hsm/running-rate', { ...r.dates, grain: r.grain }) : null;
   const { data, dataUrl, loading, error } = useApi<RunningRateReport>(url);
   return (
     <DrillDrawer
       open={props.open}
       onClose={props.onClose}
-      title="Running rate · calculated"
-      sub="HSM · production ÷ hours the mill was running, TPH"
+      title="Running rate · ERP vs Influx"
+      sub="HSM · TPH"
       controls={r.controls}
       loading={loading}
       stale={!!data && dataUrl !== url}
@@ -51,37 +41,47 @@ export default function RunningRateDrawer(props: { open: boolean; onClose: () =>
   );
 }
 
-const diffClass = (v: number | null) => (v === null ? 'v-na' : 'v-val');
-
 function Content({ data }: { data: RunningRateReport }) {
-  const [all, setAll] = useState(false);
   const t = data.totals;
   const rows = data.rows;
+  /** Influx − ERP, only where the ERP is entered for every day of the row. */
+  const delta = (x: Row) => (x.rateTph !== null && x.erpRateTph !== null && !!data.erp.lastDate && x.toDate <= data.erp.lastDate
+    ? x.rateTph - x.erpRateTph
+    : null);
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const series = useMemo<DrillSeries[]>(() => [
-    { id: 'runH', name: 'Running hours (billets)', token: '--s-prod', type: 'column', axis: 1, data: rows.map((x) => x.runH), dp: 2 },
-    { id: 'erpRunH', name: 'Running hours (ERP)', token: '--s-free', type: 'column', axis: 1, data: rows.map((x) => x.erpRunH), dp: 2 },
-    { id: 'rate', name: 'Running rate (calculated)', token: '--s-order', type: 'line', data: rows.map((x) => x.rateTph), dp: 2 },
-    { id: 'erpRate', name: 'Running rate (ERP)', token: '--s-free', type: 'line', dashed: true, data: rows.map((x) => x.erpRateTph), dp: 2 },
+    { id: 'erp', name: 'ERP', token: '--s-prod', type: 'line', data: rows.map((x) => x.erpRateTph), dp: 2 },
+    { id: 'influx', name: 'Influx', token: '--s-order', type: 'line', data: rows.map((x) => x.rateTph), dp: 2 },
   ], [rows]);
-  const runs = all ? data.runs : data.runs.slice(-PAGE);
-  const diff = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);
+  const axes = useMemo(() => [{ title: 'TPH', unit: 'TPH', min: 0 }], []);
+  const tooltip = useMemo(() => (i: number, visible: Set<string>) => {
+    const x = rows[i];
+    if (!x) return '';
+    const lines = [`<b>${x.label}</b>`];
+    if (visible.has('erp')) lines.push(`ERP: <b>${f(x.erpRateTph)} TPH</b>`);
+    if (visible.has('influx')) lines.push(`Influx: <b>${f(x.rateTph)} TPH</b>`);
+    const d = delta(x);
+    // The delta needs both lines.
+    if (visible.has('erp') && visible.has('influx') && d !== null) lines.push(`Delta: <b>${f(d)} TPH</b>`);
+    return lines.join('<br/>');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+  const d = delta(t);
 
   return (
     <>
       <Stats items={[
-        { label: 'Running rate', value: fmtNum(t.rateTph, 2), unit: 'TPH' },
-        { label: 'Production', value: fmtNum(t.influxMt, 1), unit: 'MT' },
-        { label: 'Running hours', value: fmtNum(t.runH, 1), unit: `h of ${fmtNum(t.elapsedH, 0)} h · ${t.runs} runs` },
-        { label: 'ERP running rate', value: fmtNum(t.erpRateTph, 2), unit: 'TPH', tone: t.erpRateTph === null ? 'v-na' : 'v-val' },
+        { label: 'ERP', value: f(t.erpRateTph), unit: 'TPH' },
+        { label: 'Influx', value: f(t.rateTph), unit: 'TPH' },
+        { label: 'Delta', value: f(d), unit: 'TPH', tone: tone(d) },
       ]} />
-      {data.influx.connection === 'down' && <p className="pd-notice" role="note">{data.influx.message}</p>}
 
       <DrillChart
         series={series}
         categories={categories}
-        axes={AXES}
-        ariaLabel={`Running rate per period: ${rows.map((x) => `${x.label} ${fmtNum(x.rateTph, 1)} TPH over ${fmtNum(x.runH, 1)} h`).join('; ')}`}
+        axes={axes}
+        tooltip={tooltip}
+        ariaLabel={`Running rate by period: ${rows.map((x) => `${x.label} ERP ${f(x.erpRateTph)}, Influx ${f(x.rateTph)} TPH`).join('; ')}`}
       />
 
       <div className="pd-table-wrap">
@@ -89,75 +89,55 @@ function Content({ data }: { data: RunningRateReport }) {
           <thead>
             <tr>
               <th>Period</th>
-              <th className="r">Production (MT)</th><th className="r">Running h</th><th className="r">Running rate (TPH)</th>
-              <th className="r">ERP MT</th><th className="r">ERP running h</th><th className="r">ERP delay h</th><th className="r">ERP rate (TPH)</th>
-              <th className="r">Difference (TPH)</th>
+              <th className="r">ERP (TPH)</th>
+              <th className="r">Influx (TPH)</th>
+              <th className="r">Delta (TPH)</th>
             </tr>
           </thead>
-          <tbody>
-            {rows.map((x) => {
-              const d = diff(x.rateTph, x.erpRateTph);
-              return (
-                <tr key={x.key}>
-                  <td><b>{x.label}</b>{x.fromDate !== x.toDate && <span className="pd-dim"> · {dm(x.fromDate)}–{dm(x.toDate)}</span>}</td>
-                  <td className="num r v-val">{fmtNum(x.influxMt, 2)}</td>
-                  <td className="num r v-val">{fmtNum(x.runH, 2)}</td>
-                  <td className="num r v-val"><b>{fmtNum(x.rateTph, 2)}</b></td>
-                  <td className="num r">{fmtNum(x.erpMt, 2)}</td>
-                  <td className="num r">{fmtNum(x.erpRunH, 2)}</td>
-                  <td className="num r">{fmtNum(x.erpDelayH, 2)}</td>
-                  <td className="num r">{fmtNum(x.erpRateTph, 2)}</td>
-                  <td className={`num r ${diffClass(d)}`}>{d === null ? '—' : `${d > 0 ? '+' : ''}${fmtNum(d, 2)}`}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td><b>Total</b></td>
-              <td className="num r">{fmtNum(t.influxMt, 2)}</td>
-              <td className="num r">{fmtNum(t.runH, 2)}</td>
-              <td className="num r"><b>{fmtNum(t.rateTph, 2)}</b></td>
-              <td className="num r">{fmtNum(t.erpMt, 2)}</td>
-              <td className="num r">{fmtNum(t.erpRunH, 2)}</td>
-              <td className="num r">{fmtNum(t.erpDelayH, 2)}</td>
-              <td className="num r">{fmtNum(t.erpRateTph, 2)}</td>
-              <td className="num r">{(() => { const d = diff(t.rateTph, t.erpRateTph); return d === null ? '—' : `${d > 0 ? '+' : ''}${fmtNum(d, 2)}`; })()}</td>
-            </tr>
-          </tfoot>
+          <tbody>{rows.map((x) => <RateRow key={x.key} r={x} d={delta(x)} />)}</tbody>
+          <tfoot><RateRow r={t} d={d} /></tfoot>
         </table>
       </div>
 
-      <h3 className="pd-h">Runs · billets less than {data.gapMinutes} min apart · {data.runs.length}</h3>
-      <div className="pd-table-wrap pd-table-wrap--tall">
-        <table className="grid pd-table" aria-label="Mill runs">
-          <thead><tr><th>Plant day</th><th>Start</th><th>End</th><th className="r">Hours</th><th className="r">Billets</th></tr></thead>
-          <tbody>
-            {runs.map((x) => (
-              <tr key={x.start}>
-                <td>{dm(x.date)}</td>
-                <td className="num">{hhmm(x.start)}</td>
-                <td className="num">{hhmm(x.end)}</td>
-                <td className="num r v-val">{fmtNum(x.hours, 2)}</td>
-                <td className="num r">{x.billets}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {data.runs.length > PAGE && (
-        <button type="button" className="pd-more" onClick={() => setAll(!all)}>
-          {all ? `Show the latest ${PAGE} only` : `Show all ${data.runs.length} runs`}
-        </button>
-      )}
-
-      <SourceTable rows={SOURCES} label="Data source" />
-
-      <ul className="pd-notes">
-        <li><b>Running rate</b> = production ÷ running hours. Production is the Production card&apos;s Total (Influx). Running hours are worked out from the billet counter: the mill is taken as running while billets leave the furnace less than {data.gapMinutes} minutes apart; a longer gap is a stop. Today counts up live.</li>
-        <li><b>ERP</b> — log sheet, synced {hhmm(data.erp.syncedAt)}; entered up to <b>{dm(data.erp.lastDate)}</b>. Its hours are entered by hand. Most days have a second, small entry — a few billets rolled slowly over several hours (27 Sep: 9 billets, 5.36 MT, 3.75 h) — which pulls the ERP rate down. Here billets more than {data.gapMinutes} minutes apart count as stops, so those hours are not running time.</li>
-        <li><b>Days split at 06:00</b> — a run that crosses 06:00 is cut there; the ERP may book it all on one day. When a single day differs a lot, compare by week.</li>
-      </ul>
+      <SourceBox sources={SOURCES} formula={formula(data.gapMinutes)} />
+      {data.influx.connection === 'down' && <p className="v-warn">{data.influx.message}</p>}
     </>
   );
 }
+
+function RateRow({ r, d }: { r: Row; d: number | null }) {
+  const range = r.days > 1 && r.key !== 'total';
+  return (
+    <tr>
+      <td><b>{r.label}</b>{range && <span className="pd-dim"> · {dm(r.fromDate)}–{dm(r.toDate)}</span>}</td>
+      <td className="num r v-val">{f(r.erpRateTph)}</td>
+      <td className="num r v-val">{f(r.rateTph)}</td>
+      <td className={`num r ${tone(d)}`}>{f(d)}</td>
+    </tr>
+  );
+}
+
+const SOURCES: SourceSystem[] = [
+  {
+    name: 'ERP',
+    rows: [
+      ['Table', 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],
+      ['Filter', "ENTITY_CODE = 'MP', DIV_CODE = 'S1', TNATURE = 'PRLOG', SERIES = 'L6P'"],
+      ['Field', "ATTR_CODE = 'PRODUCTION_MT', 'NET_RUNNING_HRS', summed per VRDATE"],
+    ],
+  },
+  {
+    name: 'Influx',
+    rows: [
+      ['Tag', 'Total_Production_Ton, Dicharged_Billet'],
+      ['Filter', "_measurement = 'HSM', Unit = 'Finishing Mill', Group = 'General'"],
+    ],
+  },
+];
+
+const formula = (gapMinutes: number) => [
+  'ERP rate = PRODUCTION_MT ÷ NET_RUNNING_HRS',
+  'Influx rate = Influx production ÷ running hours',
+  `Running hours = time between two Dicharged_Billet counts, when ${gapMinutes} min or less apart`,
+  'Delta = Influx − ERP  (days with both)',
+];

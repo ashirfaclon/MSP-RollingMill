@@ -26,7 +26,7 @@ export default function RunningRateFoot() {
         className="rm-foot-item rm-foot-btn"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        title="Production ÷ running hours, by day, with the ERP rate beside it"
+        title="Running rate per day, ERP and Influx"
       >
         <span className="rm-k">Running rate</span>
         {!current && !error

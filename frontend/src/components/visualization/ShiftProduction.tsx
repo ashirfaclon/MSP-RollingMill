@@ -1,60 +1,63 @@
-import Panel from '@/components/Panel';
-import { fixed } from '@/lib/num';
-import type { MillModel } from '@/models/millModel';
-import RunningRateFoot from '@/components/production/RunningRateFoot';
+'use client';
 
-/** Headroom past the largest shift target, so a shift over target still has track to fill. */
-const SCALE_OVER_TARGET = 1.25;
+import { useState } from 'react';
+import type { MillModel } from '@/models/millModel';
+import ShiftPlanDrawer, { type ShiftView } from '@/components/drill/ShiftPlanDrawer';
+import RunningRateFoot from '@/components/production/RunningRateFoot';
+import { useSelection } from '@/services/hsmProduction';
+import { rangeUrl, useApi, type PlanReport } from '@/services/hsmApi';
+import ShiftBars from './ShiftBars';
 
 /**
- * Finished output per shift against its share of the plan. No live source yet (the ERP has no shift split): shows 0.
- * Running rate is live (calculated — RunningRateFoot); plan gap stays 0 until a plan exists.
+ * HSM · Production by shift, all from /api/hsm/plan:
+ *   – output per shift: the Production card's figure split Day 06–18 / Night 18–06 by where the
+ *     counter's ticks fell (Day + Night = the card);
+ *   – targets: the rolling plan (today a static import of the plant's Excel), per shift
+ *     exactly as written there; NA where the period has no plan;
+ *   – plan gap: plan − production over the planned days only — the sub-line says how many;
+ *   – compliance: actual ÷ plan × 100 over those same planned days — per shift (NA where the
+ *     shift's target is 0) and, on the card's back face, for the whole day.
+ * Running rate is live (RunningRateFoot).
  */
 export default function ShiftProduction({ m }: { m: MillModel }) {
-  const plans = m.shifts.map((s) => s.planMt ?? 0);
-  const scale = Math.max(...plans, ...m.shifts.map((s) => s.output.mt ?? 0)) * SCALE_OVER_TARGET || 1;
-  const pctOf = (x: number | null) => `${Math.min(100, ((x ?? 0) / scale) * 100)}%`;
-  // One label for the target line when every shift shares it, as on the comp.
-  const commonPlan = plans.every((p) => p === plans[0]) ? m.shifts[0]?.planMt ?? null : null;
+  const { dates } = useSelection();
+  const url = rangeUrl('/api/hsm/plan', dates);
+  const s = useApi<PlanReport>(url);
+  const plan = s.data && s.dataUrl === url ? s.data : null;
+  const planned = !!plan && plan.totals.plannedDays > 0;
+  /** The drawer opens in the card's view (by shift / whole day); null = closed. */
+  const [open, setOpen] = useState<ShiftView | null>(null);
+  const [lastView, setLastView] = useState<ShiftView>('shift');
+  // Output over the PLANNED days only, so compliance compares like with like.
+  const plannedDays = plan ? plan.days.filter((d) => d.planMt !== null) : [];
+  const plannedOut = (shift: string) => plannedDays.reduce((a, d) => a + (d.actualByShift?.[shift] ?? 0), 0);
+  const comply = (actual: number | null, target: number | null) => (actual === null || !target ? null : (actual / target) * 100);
+  const totalOut = plan ? Object.values(plan.totals.actualByShift).reduce((a, v) => a + v, 0) : null;
 
   return (
-    <Panel
-      title="Production by shift"
-      right={<span className="chip chip--info">Plan {fixed(m.kpis.planMt, 0)} MT</span>}
-      className="rm-panel"
-      bodyClass="rm-body"
-    >
-      <div className="rm-shifts" style={{ ['--target' as string]: pctOf(commonPlan) }}>
-        {commonPlan !== null && (
-          <div className="rm-shift-target-label" aria-hidden>
-            <span>{fixed(commonPlan, 0)} MT target</span>
-          </div>
-        )}
-        {m.shifts.map((s) => (
-          <div className="rm-shift" key={s.name} style={{ ['--target' as string]: pctOf(s.planMt) }}>
-            <span className="rm-shift-name">{s.name}</span>
-            <span
-              className="rm-shift-track"
-              role="img"
-              aria-label={`${s.name} shift: ${fixed(s.output.mt, 1)} MT against ${fixed(s.planMt, 0)} MT target`}
-            >
-              <i className="rm-shift-fill" style={{ width: pctOf(s.output.mt) }} />
-              {s.planMt !== null && <i className="rm-shift-target" />}
-            </span>
-            <span className="rm-shift-val num v-val">{fixed(s.output.mt, 1)} MT</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="rm-foot">
-        <RunningRateFoot />
-        <span className="rm-foot-item">
-          <span className="rm-k">Plan gap</span>
-          <span className={`rm-foot-v num ${(m.kpis.planGapMt ?? 0) > 0 ? 'v-warn' : 'v-ok'}`}>
-            {fixed(m.kpis.planGapMt, 1)} MT
-          </span>
-        </span>
-      </div>
-    </Panel>
+    <>
+    <ShiftBars
+      shifts={m.shifts.map((sh) => ({
+        name: sh.name,
+        // A planned period with no row for this shift is a 0 target, as filled; no plan at all is NA.
+        planMt: planned ? plan!.totals.byShift[sh.name] ?? 0 : null,
+        outputMt: plan ? plan.totals.actualByShift[sh.name] ?? 0 : null,
+        compliancePct: planned ? comply(plannedOut(sh.name), plan!.totals.byShift[sh.name] ?? 0) : null,
+      }))}
+      day={{
+        planMt: plan?.totals.planMt ?? null,
+        outputMt: totalOut,
+        compliancePct: planned ? comply(plan!.totals.actualMt, plan!.totals.planMt) : null,
+      }}
+      planMt={plan?.totals.planMt ?? null}
+      planGapMt={plan?.totals.gapMt ?? null}
+      sub={planned && plan!.totals.plannedDays < plan!.totals.days
+        ? `Plan covers ${plan!.totals.plannedDays} of ${plan!.totals.days} days · gap over those`
+        : undefined}
+      rate={<RunningRateFoot />}
+      onOpen={(v) => { setLastView(v); setOpen(v); }}
+    />
+    <ShiftPlanDrawer open={open !== null} view={open ?? lastView} onClose={() => setOpen(null)} />
+    </>
   );
 }

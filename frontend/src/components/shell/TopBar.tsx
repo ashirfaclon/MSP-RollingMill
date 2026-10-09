@@ -8,7 +8,7 @@
 import DateRangePicker from './DateRangePicker';
 import MillPicker from './MillPicker';
 import { millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
-import { setGlobalSel, useGlobalSel, type ThemeSel } from '@/state/globalSel';
+import { isDefaultFilter, resetFilters, setGlobalSel, useGlobalSel, type ThemeSel } from '@/state/globalSel';
 import './topbar.css';
 
 export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenId }) {
@@ -30,6 +30,17 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
         <MillPicker mill={mill} screen={screen} />
 
         <DateRangePicker />
+        {/* Back to the default filter (Today); disabled when already there. */}
+        <button
+          type="button"
+          className="tb-reset"
+          onClick={resetFilters}
+          disabled={isDefaultFilter(sel)}
+          title="Reset the filter to Today"
+        >
+          <ResetGlyph />
+          Reset
+        </button>
 
         <div className="tb-seg" role="group" aria-label="Appearance">
           {(['dark', 'light'] as ThemeSel[]).map((th) => (
@@ -51,6 +62,15 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
 }
 
 /* Drawn rather than emoji, so the glyph takes the segment's colour on both themes. */
+function ResetGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+    </svg>
+  );
+}
+
 function MoonGlyph() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

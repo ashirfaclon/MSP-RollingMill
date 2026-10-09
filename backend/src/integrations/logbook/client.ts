@@ -322,3 +322,47 @@ export function resetLogbookSession() {
   cache.length = 0;
   inflight.length = 0;
 }
+
+/* ---------------------------- raw insight pages ---------------------------- */
+
+/** One logbook entry with its id and timestamps, as the engine returns it. */
+export interface InsightEntry extends InsightRow { _id?: string; updatedAt?: string }
+
+export type InsightPage =
+  | { ok: true; rows: InsightEntry[]; total: number }
+  | { ok: false; message: string };
+
+/**
+ * One page of the insight, NEWEST FIRST. The engine ignores every filter (dates, form) and
+ * always returns all entries in this order, so a reader pages from the top until it is past
+ * the time it needs. A rejected session is dropped, as everywhere in this client.
+ */
+export async function fetchInsightPage(page: number, env = loadEnv(), count = PAGE): Promise<InsightPage> {
+  const auth = currentBearer(env);
+  if (!auth) return { ok: false, message: droppedReason ?? MSG.LOGBOOK_NO_SESSION };
+  const insightId = env.logbookInsightId;
+  if (!insightId) return { ok: false, message: MSG.LOGBOOK_NOT_MAPPED };
+  try {
+    const res = await fetch(
+      `${env.iosenseBase}/api/account/bruce/insightResult/fetch/paginated/${encodeURIComponent(insightId)}`,
+      {
+        method: 'PUT',
+        headers: headers(env, auth),
+        body: JSON.stringify({ insightID: insightId, pagination: { page, count } }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+    );
+    const body = (await res.json().catch(() => ({}))) as {
+      success?: boolean; errors?: unknown; data?: { data?: InsightEntry[]; totalCount?: number } | InsightEntry[];
+    };
+    if (!body.success) {
+      const authFail = isAuthFailure(res.status, body.errors);
+      if (authFail) dropSession(MSG.LOGBOOK_SESSION_EXPIRED);
+      return { ok: false, message: authFail ? MSG.LOGBOOK_SESSION_EXPIRED : MSG.LOGBOOK_UNREACHABLE };
+    }
+    const payload = Array.isArray(body.data) ? { data: body.data, totalCount: body.data.length } : (body.data ?? {});
+    return { ok: true, rows: payload.data ?? [], total: payload.totalCount ?? 0 };
+  } catch {
+    return { ok: false, message: MSG.LOGBOOK_UNREACHABLE };
+  }
+}

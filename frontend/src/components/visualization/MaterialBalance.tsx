@@ -5,19 +5,19 @@
  * Sheet for the Duration filter's period, drawn as a mass balance:
  *
  *   input bar    [ finished ──────────────────────────────── | difference ]
- *                                                             ╲            ╲
  *   loss bar     [ burning loss | end cut | miss-roll | reject            ]
  *
  * Each loss is 1–5 % of the input — a sliver on the input bar — so the difference is
  * opened out into its own full-width bar, where the biggest loss stands out at a glance.
- * Both bars keep true proportions. Every figure opens the drawer that shows it per day
- * beside the check that proves it (input = production + the four losses).
+ * Both bars keep true proportions. The whole balance is ONE click: it opens the material
+ * balance drawer (the same split per day / week / month). The figures inside are not
+ * separate doors — yield and billets have their own drawers from the Mass yield card and
+ * the mill flow.
  */
-import { useState, type ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import Panel from '@/components/Panel';
 import { fixed } from '@/lib/num';
-import { useLogSheetDrawer } from '@/components/drill/LogSheetDrawer';
-import CounterDrawer, { BILLET_COUNTER } from '@/components/drill/CounterDrawer';
+import BalanceDrawer from '@/components/drill/BalanceDrawer';
 import { useErpPeriod } from '@/components/production/useErpPeriod';
 import type { LogPeriod } from '@/services/hsmApi';
 import type { Series } from './KpiCard';
@@ -39,11 +39,10 @@ const mt = (v: number | null | undefined) => `${fixed(v, 1)} MT`;
 
 export default function MaterialBalance() {
   const { current, loading, note } = useErpPeriod();
-  const logSheet = useLogSheetDrawer();
-  const [billets, setBillets] = useState(false);
+  const [open, setOpen] = useState(false);
+  const openOnKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } };
   const t = current?.totals;
   const has = !!t?.entryDays;
-  const balanced = has && t!.balanceOkDays === t!.entryDays;
 
   // Input bar: finished | difference, as shares of the input.
   const finishedPct = has ? pct(t!.productionMt, t!.inputMt) : 0;
@@ -65,42 +64,38 @@ export default function MaterialBalance() {
     : 'Losses: not in ERP yet';
 
   return (
-    <Panel
-      title="Material & operating balance"
-      right={<span className={`chip ${has ? (balanced ? 'chip--ok' : 'chip--warn') : 'chip--na'}`} title={note}>
-        {has ? (balanced ? 'Balances ✓' : `Balances ${t!.balanceOkDays}/${t!.entryDays} days`) : 'Not in ERP yet'}
-      </span>}
-      className="rm-panel"
-      bodyClass="rm-body"
-    >
-      <div className="rm-mb">
+    <Panel title="Material & operating balance" className="rm-panel" bodyClass="rm-body">
+      <div
+        className="rm-mb rm-mb--button"
+        role="button"
+        tabIndex={0}
+        aria-haspopup="dialog"
+        aria-label="Material balance, per day"
+        title="Billet input, finished and losses, per day"
+        onClick={() => setOpen(true)}
+        onKeyDown={openOnKey}
+      >
         {/* Input: billets in, and the yield they gave. */}
         <div className="rm-mb-head">
-          <Figure label="Billet input" value={has ? mt(t!.inputMt) : 'NA'} loading={loading}
-            onOpen={() => logSheet.open('balance')} title="Billet input per day and its split" />
-          <Figure label="Yield" value={has ? `${fixed(t!.yieldPct, 1)}%` : 'NA'} loading={loading} tone="order" align="end"
-            onOpen={() => logSheet.open('yield')} title="Yield per day, ERP beside the mill counter" />
+          <Figure label="Billet input" value={has ? mt(t!.inputMt) : 'NA'} loading={loading} />
+          <Figure label="Yield" value={has ? `${fixed(t!.yieldPct, 1)}%` : 'NA'} loading={loading} tone="order" align="end" />
         </div>
         <span className="rm-mb-bar rm-mb-bar--input" role="img" aria-label={inputLabel}>
           <i className="rm-mb-seg rm-tone--order" style={{ width: `${finishedPct}%` }} title={has ? `Finished ${mt(t!.productionMt)}` : undefined} />
           <i className="rm-mb-seg rm-tone--diff" style={{ width: `${diffPct}%` }} title={has ? `Mass difference ${mt(t!.massDiffMt)}` : undefined} />
         </span>
         <div className="rm-mb-labels">
-          <Link tone="order" onOpen={() => logSheet.open('quality')} title="Production, prime/defective split and stores check per day">
+          <Link tone="order">
             Finished <b className="num">{has ? mt(t!.productionMt) : 'NA'}</b>
           </Link>
-          <Link tone="diff" onOpen={() => logSheet.open('balance')} title="Where the difference went, per day">
+          <Link tone="diff">
             Mass difference <b className="num">{has ? mt(t!.massDiffMt) : 'NA'}</b>
             {has && <>{' '}<span className="rm-mb-dim num">· {fixed(diffPct, 1)}% of input</span></>}
           </Link>
         </div>
 
         {/* The difference, opened out to full width. */}
-        <svg className="rm-mb-zoom" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden style={{ visibility: has && diff > MIN_MT ? 'visible' : 'hidden' }}>
-          <polygon className="rm-mb-zoom-fill" points={`${finishedPct},0 100,0 100,10 0,10`} />
-          <line className="rm-mb-zoom-edge" x1={finishedPct} y1="0" x2="0" y2="10" vectorEffect="non-scaling-stroke" />
-          <line className="rm-mb-zoom-edge" x1="100" y1="0" x2="100" y2="10" vectorEffect="non-scaling-stroke" />
-        </svg>
+        <div className="rm-mb-losses">
         <span className="rm-mb-bar rm-mb-bar--loss" role="img" aria-label={lossLabel}>
           {losses.map((l) => (
             <i key={l.key} className={`rm-mb-seg rm-tone--${l.series}`} style={{ width: `${pct(l.value, lossScale)}%` }} title={`${l.label} ${mt(l.value)}`} />
@@ -109,23 +104,24 @@ export default function MaterialBalance() {
             <i className="rm-mb-seg rm-mb-seg--gap rm-tone--loss" style={{ width: `${pct(unaccounted, lossScale)}%` }} title={`Unaccounted ${mt(unaccounted)}`} />
           )}
         </span>
-        <div className="rm-mb-legend" role="group" aria-label="Losses">
+        <div className="rm-mb-legend">
           {losses.map((l) => (
-            <Link key={l.key} tone={l.series} dot onOpen={() => logSheet.open('balance')} title={l.hint}>
+            <Link key={l.key} tone={l.series} dot title={l.hint}>
               {l.label} <b className="num">{has ? mt(l.value) : 'NA'}</b>
               {has && <>{' '}<span className="rm-mb-dim num">{fixed(pct(l.value, t!.inputMt), 1)}%</span></>}
             </Link>
           ))}
           {unaccounted > MIN_MT && (
-            <Link tone="loss" dot onOpen={() => logSheet.open('balance')} title="Difference the four losses do not explain — see the balance check per day">
+            <Link tone="loss" dot title="Difference the four losses do not explain">
               Unaccounted <b className="num">{mt(unaccounted)}</b>
             </Link>
           )}
         </div>
+        </div>
         {!has && !loading && <p className="rm-mb-note">{note}</p>}
 
         {/* Pieces: the same balance counted in billets and coils. */}
-        <button type="button" className="rm-mb-pieces" onClick={() => setBillets(true)} aria-haspopup="dialog" title="ERP billet count against the mill counter">
+        <div className="rm-mb-pieces">
           <span className="rm-k">Billets</span>
           {loading
             ? <span className="skel skel--num" role="status" aria-label="Loading" />
@@ -134,32 +130,31 @@ export default function MaterialBalance() {
             <i className="rm-mb-seg rm-tone--order" style={{ width: `${has ? pct(t!.productionPcs, t!.inputPcs) : 0}%` }} />
             <i className="rm-mb-seg rm-tone--diff" style={{ width: `${has ? Math.max(0, 100 - pct(t!.productionPcs, t!.inputPcs)) : 0}%` }} />
           </span>
-        </button>
+        </div>
       </div>
 
-      {logSheet.drawer}
-      <CounterDrawer open={billets} onClose={() => setBillets(false)} config={BILLET_COUNTER} />
+      <BalanceDrawer open={open} onClose={() => setOpen(false)} />
     </Panel>
   );
 }
 
-/** A headline figure that opens its drawer. */
-function Figure(props: { label: string; value: string; loading: boolean; onOpen: () => void; title: string; tone?: Series; align?: 'end' }) {
+/** A headline figure. */
+function Figure(props: { label: string; value: string; loading: boolean; tone?: Series; align?: 'end' }) {
   return (
-    <button type="button" className={`rm-mb-figure${props.tone ? ` rm-tone--${props.tone}` : ''}${props.align ? ' rm-mb-figure--end' : ''}`}
-      onClick={props.onOpen} aria-haspopup="dialog" title={props.title}>
+    <span className={`rm-mb-figure${props.tone ? ` rm-tone--${props.tone}` : ''}${props.align ? ' rm-mb-figure--end' : ''}`}>
       <span className="rm-k">{props.label}</span>
       {props.loading ? <span className="skel skel--num" role="status" aria-label="Loading" /> : <span className="rm-mb-figure-v num">{props.value}</span>}
-    </button>
+    </span>
   );
 }
 
-/** A bar's caption or a legend entry — clickable, coloured like its segment. */
-function Link(props: { tone: Series; dot?: boolean; onOpen: () => void; title: string; children: ReactNode }) {
+/** A bar's caption or a legend entry, coloured like its segment. */
+function Link(props: { tone: Series; dot?: boolean; title?: string; children: ReactNode }) {
   return (
-    <button type="button" className={`rm-mb-link rm-tone--${props.tone}`} onClick={props.onOpen} aria-haspopup="dialog" title={props.title}>
+    <span className={`rm-mb-link rm-tone--${props.tone}`} title={props.title}>
       {props.dot && <i className="rm-dot" aria-hidden />}
       <span>{props.children}</span>
-    </button>
+    </span>
   );
 }
+

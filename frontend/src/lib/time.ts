@@ -3,7 +3,7 @@ const HHMM = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata',
 });
 
-export const fmtIst = (ms: number): string => HHMM.format(ms);
+export const fmtIst = (ms: number): string => `${HHMM.format(ms)} IST`;
 
 /** "8 h 00 m", "36 m". */
 export function fmtDuration(ms: number): string {

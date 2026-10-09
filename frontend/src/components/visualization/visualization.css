@@ -91,6 +91,11 @@
   font-size: 10px; font-weight: 600; color: var(--muted-2);
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* A card with no meter: its note takes the meter's place at the foot, so the spare height
+   sits between value and note rather than piling up empty under the note. */
+.rm-card-note:last-child { grid-row: span 2; align-self: end; }
+.rm-card-delta { display: inline-flex; align-items: baseline; gap: 6px; }
+.rm-card-delta b { font-size: 15px; font-weight: 800; line-height: 1; }
 .rm-meter {
   display: block; align-self: end; height: 4px; border-radius: 3px;
   background: var(--panel-3); overflow: hidden;
@@ -156,7 +161,7 @@
 
 .rm-shifts { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding-top: 4px; }
 .rm-shift, .rm-shift-target-label {
-  display: grid; grid-template-columns: 64px minmax(0, 1fr) 80px; align-items: center; gap: 14px;
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) 128px 64px; align-items: center; gap: 14px;
 }
 .rm-shift-target-label { margin-bottom: -8px; }
 .rm-shift-target-label > span {
@@ -180,7 +185,30 @@
   position: absolute; left: var(--target); top: -9px; bottom: -9px; width: 0;
   border-left: 1.5px dashed var(--gold);
 }
-.rm-shift-val { font-size: 11.5px; font-weight: 800; text-align: right; }
+.rm-shift-val { font-size: 11.5px; font-weight: 800; text-align: right; white-space: nowrap; }
+/* Compliance column: the % right-aligned under its caption. */
+.rm-shift-comp { font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
+.rm-shift-target-label > .rm-shift-col {
+  grid-column: 4; left: auto; transform: none; justify-self: end; color: var(--muted-2);
+}
+.rm-shift-head { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* The card turns over (180°) between By shift and Whole day: two faces back to back in one
+   grid cell, so the card keeps the height of the taller face. */
+.rm-flip { display: grid; min-width: 0; perspective: 1600px; }
+.rm-flip-inner {
+  display: grid; transform-style: preserve-3d;
+  transition: transform 600ms cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+.rm-flip.is-flipped .rm-flip-inner { transform: rotateY(180deg); }
+.rm-flip-face {
+  grid-area: 1 / 1; display: flex; flex-direction: column; min-width: 0;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+}
+.rm-flip-face > .panel { flex: 1; }
+.rm-flip-face--back { transform: rotateY(180deg); }
+@media (prefers-reduced-motion: reduce) { .rm-flip-inner { transition: none; } }
+.rm-shift-of { color: var(--gold); font-weight: 700; }
 
 /* Footer readouts shared by the shift panel. */
 .rm-foot {
@@ -215,19 +243,20 @@
 /* --------------------------- Material balance ----------------------------- */
 
 /* Two bars: the input split into finished | difference, then the difference opened out
-   into the four losses. Segment widths are true proportions; the zoom shape between the
-   bars shows that the second is the first's last segment, magnified. */
+   into the four losses. Segment widths are true proportions. */
 .rm-mb { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; min-width: 0; }
+/* The whole balance opens its drill-down: one target, a quiet hover. */
+.rm-mb--button { cursor: pointer; border-radius: var(--radius-sm); margin: -6px; padding: 6px; transition: background-color 130ms ease; }
+.rm-mb--button:hover { background: color-mix(in srgb, var(--panel-hi) 45%, transparent); }
+.rm-mb--button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rm-mb-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 3px; }
 .rm-mb-figure {
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0;
   margin: -5px -6px; padding: 5px 6px; border-radius: var(--radius-sm);
   background: transparent; border: 1px solid transparent;
-  font: inherit; color: inherit; text-align: left; cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
 }
 .rm-mb-figure--end { align-items: flex-end; text-align: right; }
-.rm-mb-figure:hover { background: var(--panel-2); border-color: var(--border-soft); }
-.rm-mb-figure:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .rm-mb-figure-v { font-size: 19px; font-weight: 800; line-height: 1.15; white-space: nowrap; color: var(--tone, var(--text)); }
 .rm-mb-figure.rm-tone--order .rm-k { color: var(--s-order); }
 
@@ -243,18 +272,15 @@
 .rm-mb-link {
   display: inline-flex; align-items: center; gap: 6px; min-width: 0;
   margin: -2px -5px; padding: 2px 5px; border-radius: 5px;
-  background: transparent; border: 0; font: inherit; color: var(--text-2); cursor: pointer;
+  background: transparent; border: 0; font: inherit; color: var(--text-2);
   font-size: 10.5px; font-weight: 600; white-space: nowrap;
 }
-.rm-mb-link:hover { background: var(--panel-2); }
-.rm-mb-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .rm-mb-link b { color: var(--tone); font-weight: 800; font-size: 11.5px; }
 .rm-mb-link .rm-dot { background: var(--tone); }
 .rm-mb-dim { margin-left: 2px; color: var(--muted-2); font-weight: 600; }
 
-.rm-mb-zoom { display: block; width: 100%; height: 12px; margin: -1px 0; }
-.rm-mb-zoom-fill { fill: color-mix(in srgb, var(--warn) 22%, transparent); }
-.rm-mb-zoom-edge { stroke: var(--warn); stroke-opacity: 0.75; stroke-width: 1; stroke-dasharray: 3 3; }
+/* The loss breakdown under the input bar. */
+.rm-mb-losses { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
 
 .rm-mb-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 2px; }
 .rm-mb-note { margin: 0; font-size: 10.5px; font-weight: 600; color: var(--muted-2); }
@@ -262,10 +288,8 @@
 .rm-mb-pieces {
   display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 12px;
   margin: 6px -6px 0; padding: 10px 6px 4px; border: 0; border-top: 1px solid var(--border-soft); border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  background: transparent; font: inherit; color: inherit; text-align: left;
 }
-.rm-mb-pieces:hover { background: var(--panel-2); }
-.rm-mb-pieces:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .rm-mb-pieces .rm-mb-bar { grid-column: 1 / -1; }
 .rm-mb-pieces-v { font-size: 11.5px; font-weight: 600; color: var(--text-2); justify-self: end; }
 .rm-mb-pieces-v b { font-weight: 800; color: var(--text); }
@@ -290,7 +314,6 @@
 .rm-size-stack { display: flex; gap: 2px; height: 10px; border-radius: 5px; background: var(--panel-3); overflow: hidden; min-width: 0; }
 .rm-size-stack > i { display: block; height: 100%; flex: none; background: var(--tone); }
 .rm-size-total { font-size: 11.5px; font-weight: 800; text-align: right; color: var(--text); white-space: nowrap; }
-.rm-sizes-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; }
 
 .rm-sizes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-around; gap: 12px; flex: 1; }
 /* All sizes, scrolling in place: takes the height the row gives it (set by the balance panel
@@ -308,24 +331,12 @@
 /* Each figure carries its own name, so it reads without matching colours to the legend. */
 .rm-size-val-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .rm-size-val-k { font-size: 9px; font-weight: 700; letter-spacing: 0.3px; color: var(--muted-2); }
-.rm-size--button {
-  width: 100%; margin: -4px -6px; padding: 4px 6px; box-sizing: content-box;
-  background: transparent; border: 0; border-radius: 5px; font: inherit; color: inherit; text-align: left; cursor: pointer;
-}
-.rm-size--button:hover { background: var(--panel-2); }
-.rm-size--button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .rm-size-bars { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .rm-size-bar { display: block; height: 7px; border-radius: 4px; background: var(--panel-3); overflow: hidden; }
 .rm-size-bar > i { display: block; height: 100%; border-radius: 4px; background: var(--tone); }
 
 .rm-empty { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 8px; margin: 0; font-size: 11.5px; color: var(--muted); }
 .rm-empty p { margin: 0; }
-.rm-link-btn {
-  align-self: flex-start; padding: 0; background: none; border: 0; cursor: pointer;
-  font: inherit; font-size: 11px; font-weight: 700; color: var(--accent);
-}
-.rm-link-btn:hover { text-decoration: underline; }
-.rm-link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 .rm-chip-btn { cursor: pointer; font: inherit; font-size: 10.5px; font-weight: 700; }
 .rm-chip-btn b { font-weight: 800; }
 .rm-chip-btn:hover { filter: brightness(1.12); }
@@ -351,13 +362,13 @@
   .rm-mimic { grid-template-columns: minmax(0, 1fr); }
   .rm-mimic-arrow { transform: rotate(90deg); height: 14px; }
   .rm-mimic-arrow:nth-child(4) { display: grid; }
-  .rm-shift, .rm-shift-target-label { grid-template-columns: 52px minmax(0, 1fr) 64px; gap: 10px; }
+  .rm-shift, .rm-shift-target-label { grid-template-columns: 52px minmax(0, 1fr) 108px 52px; gap: 10px; }
   .rm-legend-end { margin-left: 0; }
   .panel-head { flex-wrap: wrap; row-gap: 4px; }
   .panel-head .panel-sub { order: 3; flex-basis: 100%; }
 }
 
-/* Finished stock block (live): the head opens the stock drawer. */
+/* Finished stock block: the head opens the stock drawer. */
 .rm-alloc-head--button {
   width: 100%; padding: 0; background: none; border: 0; cursor: pointer;
   font: inherit; color: inherit; text-align: left;
@@ -375,3 +386,8 @@
 }
 .rm-foot-btn:hover { background: var(--panel-2); border-color: var(--border-soft); }
 .rm-foot-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Production by shift: the bars open the plan-vs-actual drill-down. */
+.rm-shifts--button { cursor: pointer; border-radius: var(--radius-sm); margin: -4px; padding: 4px; padding-top: 8px; transition: background-color 130ms ease; }
+.rm-shifts--button:hover { background: color-mix(in srgb, var(--panel-hi) 45%, transparent); }
+.rm-shifts--button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

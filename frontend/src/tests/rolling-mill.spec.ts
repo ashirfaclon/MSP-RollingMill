@@ -24,10 +24,11 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   await expect(strip.getByRole('button', { name: 'Production', exact: true })).toBeVisible();
   await expect(strip.getByRole('button', { name: 'Mass yield', exact: true })).toBeVisible();
   // No live source yet: these show 0, not sample figures, and are not faded.
-  await expect(card('Power consumption')).toContainText('0.00');
-  await expect(card('Specific energy')).toContainText('0.0');
+  // Power is live from the logbook (a button that opens its entries).
+  await expect(strip.getByRole('button', { name: 'Power consumption', exact: true })).toBeVisible();
   // Descriptive sub-texts are gone: cards with nothing to flag carry no note.
-  for (const name of ['Power consumption', 'Specific energy', 'Stock with order']) {
+  await expect(strip.getByRole('button', { name: 'Specific energy', exact: true })).toBeVisible();
+  for (const name of ['Stock with order']) {
     await expect(card(name).locator('.rm-card-note')).toHaveText('');
   }
   // Free stock is live (ERP ledger); its only note is the caveat that changes how it reads.
@@ -44,10 +45,10 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   ]) {
     await expect(main.getByText(text, { exact: false }).first()).toBeVisible();
   }
-  // Shift output and the order split have no live source: 0. Running rate is calculated live.
-  const shifts = page.locator('section.panel', { hasText: 'Production by shift' });
+  // Shift output is live (production split by shift); the order split has no source: 0.
+  const shifts = page.locator('.rm-flip-face--front section.panel');
   await expect(shifts.locator('.rm-shift-name')).toHaveText(['Day', 'Night']);
-  await expect(shifts.locator('.rm-shift-val')).toHaveText(['0.0 MT', '0.0 MT']);
+  await expect(shifts.locator('.rm-shift-val')).toHaveText([/^\d[\d,]*\.\d MT/, /^\d[\d,]*\.\d MT/]);   // live, split by shift
   await expect(shifts.getByRole('button', { name: /Running rate/ })).toContainText(/\d+\.\d{2} TPH|NA/);
   const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
   await expect(split).toContainText('Made To Order0.0 MT');
@@ -172,7 +173,8 @@ test('mill picker offers HSM and RMD, switches mill, keeps the screen, and drive
   await list.getByRole('option', { name: 'RMD' }).click();
   await expect(page).toHaveURL(/\/rmd\/visualization$/);
   await expect(list).toBeHidden();
-  await expect(page.getByTestId('screen-placeholder')).toHaveText('RMD Visualization dashboard is coming soon.');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/Rolling Mill\s*\/\s*Visualization/);
+  await expect(page.getByText('Illustrative data')).toBeVisible();
 
   // Keyboard: open with ArrowDown, move up from RMD to HSM, choose with Enter.
   await page.getByRole('button', { name: /^Rolling mill:/ }).focus();
@@ -242,7 +244,7 @@ test('duration picker: dates only, each a 06:00 → 06:00 plant day, cycle shown
   const trigger = page.getByRole('button', { name: /Duration/ });
   await expect(trigger).toContainText('Today');
   // The cycle of the running plant day sits beside the preset name.
-  await expect(trigger).toContainText(/\d{1,2} \w{3} 06:00 → \d{1,2} \w{3} 06:00/);
+  await expect(trigger).toContainText(/\d{1,2} \w{3} 06:00 IST → \d{1,2} \w{3} 06:00 IST/);
 
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
@@ -263,21 +265,21 @@ test('duration picker: dates only, each a 06:00 → 06:00 plant day, cycle shown
   await dialog.getByLabel('Start Date').fill('2026-09-24');
   await dialog.getByLabel('End Date').fill('2026-09-24');
   await expect(dialog.getByRole('button', { name: 'Custom' })).toHaveClass(/on/);
-  await expect(dialog.locator('.dr-f-cycle').nth(0)).toHaveText('from 06:00');
-  await expect(dialog.locator('.dr-f-cycle').nth(1)).toHaveText('to 25 Sep 06:00');
-  await expect(dialog.getByRole('status')).toContainText('24 Sep 06:00 → 25 Sep 06:00 · 1 plant day');
+  await expect(dialog.locator('.dr-f-cycle').nth(0)).toHaveText('from 06:00 IST');
+  await expect(dialog.locator('.dr-f-cycle').nth(1)).toHaveText('to 25 Sep 06:00 IST');
+  await expect(dialog.getByRole('status')).toContainText('24 Sep 06:00 IST → 25 Sep 06:00 IST · 1 plant day');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  await expect(trigger).toContainText('24 Sep 06:00 → 25 Sep 06:00');
+  await expect(trigger).toContainText('24 Sep 06:00 IST → 25 Sep 06:00 IST');
 
-  // A range: 16 → 17 Sep = 16 Sep 06:00 → 18 Sep 06:00, two plant days; survives a reload.
+  // A range: 16 → 17 Sep = 16 Sep 06:00 IST → 18 Sep 06:00 IST, two plant days; survives a reload.
   await trigger.click();
   await dialog.getByLabel('Start Date').fill('2026-09-16');
   await dialog.getByLabel('End Date').fill('2026-09-17');
-  await expect(dialog.getByRole('status')).toContainText('16 Sep 06:00 → 18 Sep 06:00 · 2 plant days');
+  await expect(dialog.getByRole('status')).toContainText('16 Sep 06:00 IST → 18 Sep 06:00 IST · 2 plant days');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  await expect(trigger).toContainText('16 Sep 06:00 → 18 Sep 06:00');
+  await expect(trigger).toContainText('16 Sep 06:00 IST → 18 Sep 06:00 IST');
   await page.reload();
-  await expect(trigger).toContainText('16 Sep 06:00 → 18 Sep 06:00');
+  await expect(trigger).toContainText('16 Sep 06:00 IST → 18 Sep 06:00 IST');
 
   // An end before the start cannot be applied.
   await trigger.click();
@@ -308,4 +310,49 @@ test.describe('narrow viewports', () => {
       await page.screenshot({ path: `${SHOTS}/hsm-visualization-${name}.png`, fullPage: true });
     }
   });
+});
+
+test('RMD visualization: the comp laid out with its sample figures, labelled illustrative', async ({ page }) => {
+  await page.goto('/rmd/visualization');
+  await expect(page.locator('.tb-mark--mill')).toHaveText('RMD');
+  // Sample figures are never presented as plant data.
+  await expect(page.getByRole('note')).toContainText('sample values from the design');
+  const strip = page.getByRole('region', { name: 'Headline KPIs' });
+  const card = (name: string) => strip.getByRole('article', { name, exact: true });
+  for (const [name, value, note] of [
+    ['Production', '399.0', '95% plan · 18.14 TPH'],
+    ['Mass yield', '97.3', '399.0 ÷ 410.0 MT'],
+    ['Power consumption', '33.52', 'Metered energy · day'],
+    ['Specific energy', '84.0', 'Energy per finished MT'],
+    ['Made To Stock', '91.0', '22.8% of day output'],
+    ['Stock with order', '540', '67.5% of finished stock'],
+    ['Free stock', '260', '32.5% of finished stock'],
+  ]) {
+    await expect(card(name).locator('.rm-card-value')).toContainText(value);
+    await expect(card(name).locator('.rm-card-note')).toHaveText(note);
+  }
+  const mimic = page.getByRole('list', { name: 'Mill process flow' });
+  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit']);
+  await expect(mimic).toContainText('328 billets');
+  await expect(mimic).toContainText('399.0 MT');
+  const shifts = page.locator('.rm-flip-face--front section.panel');
+  await expect(shifts.locator('.rm-shift-name')).toHaveText(['Shift A', 'Shift B', 'Shift C']);
+  await expect(shifts.locator('.rm-shift-val')).toHaveText(['134.0 MT', '136.0 MT', '129.0 MT']);
+  // Compliance = output ÷ target: 134/140, 136/140, 129/140.
+  await expect(shifts.locator('.rm-shift-comp')).toHaveText(['95.7%', '97.1%', '92.1%']);
+  await expect(shifts).toContainText('Plan 420 MT');
+  await expect(shifts).toContainText('140 MT target');
+  await expect(shifts).toContainText('18.14 TPH');
+  await expect(shifts).toContainText('21.0 MT');
+  const alloc = page.locator('section.panel', { hasText: 'Order allocation' });
+  await expect(alloc).toContainText('Made To Order308.0 MT');
+  await expect(alloc).toContainText('Made To Stock91.0 MT');
+  await expect(alloc).toContainText('800 MT');
+  await expect(alloc).toContainText('75.0%');
+  const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
+  for (const t of ['410.0 MT', '97.3%', 'Finished 399.0 MT', 'Mass difference 11.0 MT', '22.0 h', '91.7%', 'Non-run 2.0 h', '14.91']) await expect(balance).toContainText(t);
+  const sizes = page.locator('section.panel', { hasText: 'Finished stock by size' }).locator('.rm-size--stock');
+  await expect(sizes.locator('.rm-size-name')).toHaveText(['8 mm', '10 mm', '12 mm', '16 mm']);
+  await expect(sizes.locator('.rm-size-total')).toHaveText(['240 MT', '215 MT', '185 MT', '160 MT']);
+  await page.screenshot({ path: `${SHOTS}/rmd-visualization.png`, fullPage: true });
 });

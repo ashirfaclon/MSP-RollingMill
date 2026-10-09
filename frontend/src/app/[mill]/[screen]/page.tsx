@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import AppShell from '@/components/shell/AppShell';
 import HsmVisualization from '@/components/visualization/HsmVisualization';
 import HsmDataModel from '@/components/datamodel/HsmDataModel';
+import RmdVisualization from '@/components/rmd/RmdVisualization';
 import ScreenPlaceholder from '@/components/ScreenPlaceholder';
 import { MILLS, SCREENS, isMill, isScreen, millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
 
@@ -10,6 +11,7 @@ import { MILLS, SCREENS, isMill, isScreen, millOf, screenOf, type MillId, type S
 function screenFor(mill: MillId, screen: ScreenId) {
   if (mill === 'hsm' && screen === 'visualization') return <HsmVisualization />;
   if (mill === 'hsm' && screen === 'data-model') return <HsmDataModel />;
+  if (mill === 'rmd' && screen === 'visualization') return <RmdVisualization />;
   return <ScreenPlaceholder mill={mill} screen={screen} />;
 }
 

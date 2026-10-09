@@ -9,8 +9,8 @@ const at = (d: string, hhmm: string) => Date.parse(`${d}T${hhmm}:00+05:30`);
 
 test('selecting 24 Sep means 24 Sep 06:00 → 25 Sep 06:00', () => {
   expect(plantDayStartMs('2026-09-24')).toBe(at('2026-09-24', '06:00'));
-  expect(cycleLabel('2026-09-24', '2026-09-24')).toBe('24 Sep 06:00 → 25 Sep 06:00');
-  expect(cycleLabel('2026-09-22', '2026-09-28')).toBe('22 Sep 06:00 → 29 Sep 06:00');
+  expect(cycleLabel('2026-09-24', '2026-09-24')).toBe('24 Sep 06:00 IST → 25 Sep 06:00 IST');
+  expect(cycleLabel('2026-09-22', '2026-09-28')).toBe('22 Sep 06:00 IST → 29 Sep 06:00 IST');
   expect(dayCount('2026-09-22', '2026-09-28')).toBe(7);
 });
 

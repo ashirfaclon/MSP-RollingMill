@@ -19,7 +19,7 @@ import { useApi, type GroupNow, type HsmLive } from '@/services/hsmApi';
 import { useProduction, useSelection } from '@/services/hsmProduction';
 
 const HM = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
-const hm = (iso: string | null) => (iso ? HM.format(new Date(iso)) : '—');
+const hm = (iso: string | null) => (iso ? `${HM.format(new Date(iso))} IST` : '—');
 
 const TONE: Record<GroupNow['state'], string> = { 'all-on': 'ok', partial: 'risk', 'all-off': 'na', 'no-data': 'na' };
 
@@ -43,7 +43,7 @@ export default function MillMimic() {
     {
       key: 'infeed', kind: 'count' as const, title: 'Billet infeed',
       value: d?.billetsToday === null || d?.billetsToday === undefined ? 'NA' : `${d.billetsToday} billets`,
-      foot: 'Today · since 06:00', open: () => setOpen('billets'), openLabel: 'Billets per day, ERP vs mill counter',
+      foot: 'Today · since 06:00 IST', open: () => setOpen('billets'), openLabel: 'Billets per day, ERP vs mill counter',
     },
     ...(d?.groups ?? []).map((g) => ({
       key: g.id, kind: 'group' as const, title: g.label, g,
@@ -94,7 +94,7 @@ export default function MillMimic() {
         </ol>
       )}
       <CounterDrawer open={open === 'billets'} onClose={() => setOpen(null)} config={BILLET_COUNTER} />
-      <StandsDrawer open={open === 'stands'} onClose={() => setOpen(null)} group={group} onGroup={setGroup} />
+      <StandsDrawer open={open === 'stands'} onClose={() => setOpen(null)} group={group} />
       <ProductionDrawer open={open === 'production'} onClose={() => setOpen(null)} />
     </Panel>
   );
