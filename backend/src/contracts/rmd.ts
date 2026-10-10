@@ -88,9 +88,9 @@ export interface RmdRatePeriod {
   days: number;
   /** Hours the mill was running: billets (either line) no more than 10 min apart. */
   runH: number | null;
-  /** RMD production, MT — not wired yet (ERP on hold): null. */
+  /** RMD production, MT — the ERP log sheet (PRODUCT_PRIME_SLENGTH_MT); null with no entry. */
   productionMt: number | null;
-  /** productionMt ÷ runH; null until production is wired. */
+  /** productionMt ÷ runH; null without both. */
   rateTph: number | null;
 }
 
@@ -102,4 +102,39 @@ export interface RmdRunningRateReport {
   influx: { connection: 'up' | 'down'; message: string };
   rows: RmdRatePeriod[];
   totals: RmdRatePeriod;
+}
+
+/** GET /api/rmd/production — the RMD Production Log Sheet (ERP), per date / week / month. */
+export interface RmdProductionPeriod {
+  key: string;
+  label: string;
+  fromDate: string;
+  toDate: string;
+  days: number;
+  /** Days with at least one log-sheet entry. */
+  entryDays: number;
+  /** PRODUCT_PRIME_SLENGTH_MT, Σ over the period's entries; null with no entry. */
+  productionMt: number | null;
+  burningLossMt: number | null;
+  endCutMt: number | null;
+  missRollMt: number | null;
+  /** CHIP_OFF_MT — the plant's rejection. */
+  chipOffMt: number | null;
+  /** burning loss + end cut + miss roll + chip off. */
+  lossesMt: number | null;
+  /** Billet input in MT — not available yet (no source): null. */
+  billetInputMt: number | null;
+  /** billetInputMt − productionMt; null until billet input MT exists. */
+  massDiffMt: number | null;
+  /** productionMt ÷ billetInputMt × 100; null until billet input MT exists. */
+  massYieldPct: number | null;
+}
+
+export interface RmdProductionReport {
+  from: string;
+  to: string;
+  grain: Grain;
+  erp: { connection: 'up' | 'down'; message: string; syncedAt: string | null; lastDate: string | null };
+  rows: RmdProductionPeriod[];
+  totals: RmdProductionPeriod;
 }

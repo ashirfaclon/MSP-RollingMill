@@ -440,12 +440,12 @@ test('RMD: mass yield drawer shows billets in per line from Influx; power from t
   await page.keyboard.press('Escape');
   await expect(page.locator('section.panel', { hasText: 'Material & operating balance' }).locator('.rmd-mb-pieces')).toContainText('6,194 in');
   await page.getByRole('button', { name: 'Mass yield', exact: true }).click();
-  await expect(y.locator('.pd-stats')).toContainText('ERP finished pending');
+  await expect(y.locator('.pd-stats')).toContainText('billet input MT pending');
   const table = y.getByRole('table', { name: 'Billets in by period' });
   await expect(table.locator('tbody tr')).toHaveCount(8);
   await expect(table.getByRole('row', { name: /^8 Oct/ })).toContainText('937');
   await expect(y.getByRole('region', { name: 'Data source' })).toContainText("_measurement = 'TMT-RMD'");
-  await expect(y.getByRole('region', { name: 'Formula' })).toContainText('Mass yield = finished production (ERP) ÷ billet input × 100');
+  await expect(y.getByRole('region', { name: 'Formula' })).toContainText('Mass yield = finished production (ERP) ÷ billet input (MT) × 100');
   await page.waitForTimeout(700);
   await y.screenshot({ path: `${SHOTS}/rmd-drill-yield.png` });
   await page.keyboard.press('Escape');
@@ -491,4 +491,44 @@ test('RMD mill flow: route / diverter and finishing open their points, live, wit
   const inf = page.getByRole('dialog', { name: 'Billet infeed · Influx' });
   await expect(inf.locator('.pd-stats')).not.toContainText('Mass yield');
   await expect(inf.getByRole('table', { name: 'Billets in by period' })).toBeVisible();
+});
+
+test('RMD: production and losses from the ERP log sheet (FA-SKJ), and what they feed', async ({ page }) => {
+  await page.goto('/rmd/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+
+  // Σ PRODUCT_PRIME_SLENGTH_MT, 1–8 Oct = 1,689.86 MT (7 Oct: 96.34 + 103.78 = 200.12).
+  const card = page.getByRole('button', { name: 'Production', exact: true });
+  await expect(card.locator('.rm-card-value')).toContainText('1,689.9');
+  await expect(page.getByRole('list', { name: 'Mill process flow' }).getByRole('button', { name: /Finished exit/ })).toContainText('1,689.9 MT');
+  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('1,689.9 MT');
+  // Running rate now calculates: production ÷ running hours.
+  await expect(page.locator('.rm-flip-face--front .rm-foot')).toContainText(/Running rate\s*\d+\.\d{2} TPH/);
+
+  await card.click();
+  const prod = page.getByRole('dialog', { name: 'Production · ERP log sheet' });
+  const table = prod.getByRole('table', { name: 'Production by period' });
+  await expect(table.getByRole('row', { name: /^7 Oct/ })).toContainText('200.12');
+  await expect(table.locator('tfoot')).toContainText('1,689.86');
+  await expect(prod.getByRole('region', { name: 'Data source' })).toContainText("USER_CODE = 'FA-SKJ'");
+  await page.keyboard.press('Escape');
+
+  // Material balance: finished and the four losses; billet input (MT) still pending, so no mass difference / yield.
+  const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
+  await expect(balance).toContainText('Finished 1,689.9 MT');
+  await expect(balance).toContainText('Mass difference NA');
+  await expect(balance.locator('.rm-mb-legend')).toContainText('Chip off');
+  await page.getByRole('button', { name: 'Material balance, per day' }).click();
+  const bal = page.getByRole('dialog', { name: 'Material balance · ERP log sheet' });
+  const bt = bal.getByRole('table', { name: 'Material balance by period' });
+  // 7 Oct: burning loss 3.27 + end cut 4.25 + miss-roll 1.12 + chip off 1 = 9.64 MT.
+  for (const v of ['200.12', '3.27', '4.25', '1.12', '9.64']) await expect(bt.getByRole('row', { name: /^7 Oct/ })).toContainText(v);
+  await expect(bt.locator('tfoot')).toContainText('62.17');
+  await expect(bal.getByRole('region', { name: 'Formula' })).toContainText('Losses = BLOSS_MT + ENDCUT_MT + MISROLL_MT + CHIP_OFF_MT');
+  await page.waitForTimeout(700);
+  await bal.screenshot({ path: `${SHOTS}/rmd-drill-balance.png` });
 });

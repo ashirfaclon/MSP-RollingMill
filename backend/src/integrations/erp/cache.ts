@@ -36,8 +36,25 @@ export const cachePaths = (env: Env) => {
     attempt: path.join(dir, 'erp-hsm-sync.json'),
     production: path.join(dir, 'erp-hsm-production.json'),
     commercial: path.join(dir, 'erp-hsm-commercial.json'),
+    rmdProduction: path.join(dir, 'erp-rmd-production.json'),
   };
 };
+
+/**
+ * RMD log-sheet codes, exactly as the plant gave them (RMD - ERP Data Filled.xlsx, 10 Oct
+ * 2026): table ATTR_TRAN_DATA_BODY, USER_CODE = 'FA-SKJ', ATTR_CODE → ATTR_VALUE, dated by
+ * VRDATE. Two spellings differ from the sheet (MISSROLL_MT → MISROLL_MT, CHIP_OFF →
+ * CHIP_OFF_MT): the sheet's spelling returned no rows; these are the codes in the table,
+ * confirmed with the user. Chip off is the plant's rejection.
+ */
+export const RMD_LOG_FIELDS = ['PRODUCT_PRIME_SLENGTH_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT'] as const;
+export type RmdLogField = (typeof RMD_LOG_FIELDS)[number];
+export interface RmdLogRow { date: string; vrno: string; v: Record<RmdLogField, number | null> }
+export interface RmdProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmdLogRow[] }
+
+export function readErpRmdProduction(env: Env): RmdProductionCache | null {
+  return readJson<RmdProductionCache>(cachePaths(env).rmdProduction);
+}
 
 /**
  * Log-sheet fields pulled per voucher. Chosen because each is verified against another

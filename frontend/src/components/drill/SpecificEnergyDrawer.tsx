@@ -13,11 +13,14 @@ import { useDrillRange } from './useDrillRange';
 import { powerPeriods } from './powerPeriods';
 import { dm } from '@/services/hsmProduction';
 import type { Grain } from '@contracts';
+import type { PowerMill } from './PowerDrawer';
 import type { PowerReport } from '@/services/hsmApi';
 
 export default function SpecificEnergyDrawer(props: {
   open: boolean; onClose: () => void; data: PowerReport | null; loading: boolean; error: string | null;
+  mill?: PowerMill;
 }) {
+  const mill = props.mill ?? 'hsm';
   // The card's period; only the grouping is chosen here.
   const r = useDrillRange(['selection'], 'selection');
   return (
@@ -25,18 +28,18 @@ export default function SpecificEnergyDrawer(props: {
       open={props.open}
       onClose={props.onClose}
       title="Specific energy · power ÷ production"
-      sub="HSM · kWh/MT"
+      sub={`${mill.toUpperCase()} · kWh/MT`}
       controls={r.controls}
       loading={props.loading}
       error={props.error}
       hasData={!!props.data}
     >
-      {props.data && <Content data={props.data} grain={r.grain} />}
+      {props.data && <Content data={props.data} grain={r.grain} mill={mill} />}
     </DrillDrawer>
   );
 }
 
-function Content({ data, grain }: { data: PowerReport; grain: Grain }) {
+function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill: PowerMill }) {
   const t = data.totals;
   const rows = useMemo(() => powerPeriods(data.days, grain), [data.days, grain]);
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
@@ -51,7 +54,7 @@ function Content({ data, grain }: { data: PowerReport; grain: Grain }) {
       <Stats items={[
         { label: 'Specific energy', value: n(t.kwhPerMt), unit: 'kWh/MT' },
         { label: 'Power', value: n(t.kwh), unit: 'kWh' },
-        { label: 'Production (Influx)', value: n(t.productionMt), unit: 'MT' },
+        { label: mill === 'rmd' ? 'Production (ERP)' : 'Production (Influx)', value: n(t.productionMt), unit: 'MT' },
       ]} />
 
       {t.entries > 0 ? (
@@ -82,27 +85,49 @@ function Content({ data, grain }: { data: PowerReport; grain: Grain }) {
         </table>
       </div>
 
-      <SourceBox sources={SOURCES} formula={FORMULA} />
+      <SourceBox sources={SOURCES[mill]} formula={FORMULA[mill]} />
       {data.logbook.connection === 'down' && <p className="v-warn">{data.logbook.message}</p>}
     </>
   );
 }
 
-const SOURCES: SourceSystem[] = [
-  {
-    name: 'Logbook',
-    rows: [
-      ['Form', 'Electrical HSM → Power Consumption'],
-      ['Field', 'POWER_CONSUMED (kWh), all equipment, by the form\'s date'],
-    ],
-  },
-  {
-    name: 'Influx',
-    rows: [
-      ['Tag', 'Total_Production_Ton'],
-      ['Filter', "_measurement = 'HSM', Unit = 'Finishing Mill', Group = 'General'"],
-    ],
-  },
-];
+const SOURCES: Record<PowerMill, SourceSystem[]> = {
+  hsm: [
+    {
+      name: 'Logbook',
+      rows: [
+        ['Form', 'Electrical HSM → Power Consumption'],
+        ['Field', 'POWER_CONSUMED (kWh), all equipment, by the form\'s date'],
+      ],
+    },
+    {
+      name: 'Influx',
+      rows: [
+        ['Tag', 'Total_Production_Ton'],
+        ['Filter', "_measurement = 'HSM', Unit = 'Finishing Mill', Group = 'General'"],
+      ],
+    },
+  ],
+  rmd: [
+    {
+      name: 'Logbook',
+      rows: [
+        ['Form', 'TMT Electrical Department → Power Reading VCB 1, VCB 2, VCB 3'],
+        ['Field', 'ACTUAL_KWH_VCB_1, _2, _3 (kWh), by the form\'s date'],
+      ],
+    },
+    {
+      name: 'ERP',
+      rows: [
+        ['Table', 'ATTR_TRAN_DATA_BODY'],
+        ['Filter', "USER_CODE = 'FA-SKJ'"],
+        ['Field', "ATTR_CODE = 'PRODUCT_PRIME_SLENGTH_MT' (value in ATTR_VALUE), by VRDATE"],
+      ],
+    },
+  ],
+};
 
-const FORMULA = ['Specific energy = Power (kWh) ÷ Influx production (MT)'];
+const FORMULA: Record<PowerMill, string[]> = {
+  hsm: ['Specific energy = Power (kWh) ÷ Influx production (MT)'],
+  rmd: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
+};

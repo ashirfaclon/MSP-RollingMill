@@ -4,12 +4,12 @@
  * RMD · Visualization — laid out like the HSM screen: KPI strip, mill mimic, then two rows of
  * paired panels. Only what the plant has confirmed is wired; everything else is NA, never a
  * sample figure:
- *   Production by shift   NA until the rolling plan arrives; running rate's logic is in place
- *                         (production ÷ running hours) and waits for production.
- *   Order allocation      NA — the ERP side is on hold (as the headline cards).
- *   Material balance      Billets (Influx BILLET_COUNT, M1 + M2) live; billet input in MT,
- *                         finished and yield NA; mass difference = input − finished (logic
- *                         in place, NA until both are there).
+ *   Production by shift   NA until the rolling plan arrives; running rate = ERP production ÷
+ *                         running hours (billet counters).
+ *   Order allocation      production total from the ERP log sheet; MTO / MTS and stock NA.
+ *   Material balance      finished and the four losses from the ERP log sheet (FA-SKJ);
+ *                         billets from Influx; billet input in MT has no source yet, so mass
+ *                         difference and yield (computed in the backend) stay NA until it does.
  *   Finished stock by size  not wired yet: NA.
  *
  * Names follow the HSM screen: production with / without an order is Made To Order / Made
@@ -19,16 +19,14 @@ import Panel from '@/components/Panel';
 import type { Series } from '@/components/visualization/KpiCard';
 import ShiftBars from '@/components/visualization/ShiftBars';
 import { fixed } from '@/lib/num';
+import { useState, type KeyboardEvent } from 'react';
 import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdBilletsReport, type RmdRunningRateReport } from '@/services/hsmApi';
 import RmdKpiStrip from './RmdKpiStrip';
+import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
 import RmdMillMimic from './RmdMillMimic';
 import '@/components/visualization/visualization.css';
 import './rmd.css';
-
-/** Mass difference = billet input − finished, MT; null until both are known. */
-export const massDifference = (inputMt: number | null, finishedMt: number | null) =>
-  (inputMt === null || finishedMt === null ? null : inputMt - finishedMt);
 
 const NA_SHIFT = { planMt: null, outputMt: null, compliancePct: null };
 
@@ -60,7 +58,7 @@ export default function RmdVisualization() {
 
 /* ----------------------------- Running rate ------------------------------ */
 
-/** Production ÷ running hours over the Duration period — NA until production is wired. */
+/** ERP production ÷ running hours over the Duration period. */
 function RunningRateFoot() {
   const { dates } = useSelection();
   const url = rangeUrl('/api/rmd/running-rate', dates ? { ...dates, grain: 'day' } : null);
@@ -80,12 +78,14 @@ function RunningRateFoot() {
 /* ---------------------------- Order allocation --------------------------- */
 
 function OrderAllocation() {
+  const { dates } = useSelection();
+  const prod = useRmdProduction(dates).data?.totals.productionMt ?? null;
   return (
     <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
       <div className="rm-alloc-block">
         <div className="rm-alloc-head">
           <span className="rm-k">Production</span>
-          <span className="rm-alloc-total num v-na">NA</span>
+          <span className={`rm-alloc-total num ${prod === null ? 'v-na' : 'v-val'}`}>{prod === null ? 'NA' : `${fixed(prod, 1)} MT`}</span>
         </div>
         <div className="rm-legend">
           <span className="rmd-legend-item rm-tone--order"><i className="rm-dot" aria-hidden />Made To Order <b className="num v-na">NA</b></span>
@@ -104,10 +104,21 @@ function OrderAllocation() {
 
 /* ----------------------- Material & operating balance --------------------- */
 
+/** The four losses the RMD log sheet books (codes as the plant gave them). */
+const LOSSES: { key: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'chipOffMt'; label: string; series: Series }[] = [
+  { key: 'burningLossMt', label: 'Burning loss', series: 'bloss' },
+  { key: 'endCutMt', label: 'End cut', series: 'endcut' },
+  { key: 'missRollMt', label: 'Miss-roll', series: 'missroll' },
+  { key: 'chipOffMt', label: 'Chip off', series: 'reject' },
+];
+const mt = (v: number | null | undefined) => (v === null || v === undefined ? 'NA' : `${fixed(v, 1)} MT`);
+
 /**
  * Drawn like the HSM panel: billet input split into finished | mass difference, to scale,
- * then the billet count. Only the count is wired (Influx); the bar stays empty until billet
- * input (MT) and finished production are.
+ * then the losses opened out, then the billet count. Finished and the losses come from the
+ * ERP log sheet; billet input in MT has no source yet, so the input bar stays empty and mass
+ * difference and yield read NA (computed in the backend the moment it exists). The whole
+ * balance is one click: the drawer shows it per day.
  */
 function MaterialBalance() {
   const { dates } = useSelection();
@@ -115,22 +126,53 @@ function MaterialBalance() {
   const { data, dataUrl, error } = useApi<RmdBilletsReport>(url);
   const billets = data && dataUrl === url ? data.totals.totalPcs : null;
   const loading = !(data && dataUrl === url) && !error;
+  const t = useRmdProduction(dates).data?.totals ?? null;
+  const [open, setOpen] = useState(false);
+  const openOnKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } };
 
-  const inputMt: number | null = null;      // needs billet weight — no way to weigh billets yet
-  const finishedMt: number | null = null;   // ERP on hold
-  const diff = massDifference(inputMt, finishedMt);
+  const losses = LOSSES.map((l) => ({ ...l, value: t?.[l.key] ?? null }));
+  const lossSum = losses.reduce((a, l) => a + (l.value ?? 0), 0);
+  const finishedPct = t?.productionMt != null && t.billetInputMt ? (t.productionMt / t.billetInputMt) * 100 : 0;
 
   return (
     <Panel title="Material & operating balance" className="rm-panel" bodyClass="rm-body">
-      <div className="rm-mb">
+      <div
+        className="rm-mb rm-mb--button"
+        role="button"
+        tabIndex={0}
+        aria-haspopup="dialog"
+        aria-label="Material balance, per day"
+        title="Finished and losses, per day"
+        onClick={() => setOpen(true)}
+        onKeyDown={openOnKey}
+      >
         <div className="rm-mb-head">
-          <Figure label="Billet input" value="NA" />
-          <Figure label="Yield" value="NA" tone="order" end />
+          <Figure label="Billet input" value={mt(t?.billetInputMt)} />
+          <Figure label="Yield" value={t?.massYieldPct == null ? 'NA' : `${fixed(t.massYieldPct, 1)}%`} tone="order" end />
         </div>
-        <span className="rm-mb-bar rm-mb-bar--input" role="img" aria-label="Billet input: not available yet" />
+        <span className="rm-mb-bar rm-mb-bar--input" role="img" aria-label={t?.billetInputMt == null ? 'Billet input: not available yet' : `Finished ${fixed(finishedPct, 1)}% of billet input`}>
+          {t?.billetInputMt != null && <i className="rm-mb-seg rm-tone--order" style={{ width: `${finishedPct}%` }} />}
+        </span>
         <div className="rm-mb-labels">
-          <span className="rm-mb-caption rm-tone--order">Finished <b className="num v-na">NA</b></span>
-          <span className="rm-mb-caption rm-tone--diff">Mass difference <b className="num v-na">{diff === null ? 'NA' : `${fixed(diff, 1)} MT`}</b></span>
+          <span className="rm-mb-caption rm-tone--order">Finished <b className={`num ${t?.productionMt == null ? 'v-na' : ''}`}>{mt(t?.productionMt)}</b></span>
+          <span className="rm-mb-caption rm-tone--diff">Mass difference <b className={`num ${t?.massDiffMt == null ? 'v-na' : ''}`}>{mt(t?.massDiffMt)}</b></span>
+        </div>
+
+        {/* The losses the log sheet books, opened out to full width, to scale with each other. */}
+        <div className="rm-mb-losses">
+          <span className="rm-mb-bar rm-mb-bar--loss" role="img" aria-label={`Losses ${mt(t?.lossesMt)}: ${losses.map((l) => `${l.label.toLowerCase()} ${mt(l.value)}`).join(', ')}`}>
+            {lossSum > 0 && losses.map((l) => (
+              <i key={l.key} className={`rm-mb-seg rm-tone--${l.series}`} style={{ width: `${((l.value ?? 0) / lossSum) * 100}%` }} title={`${l.label} ${mt(l.value)}`} />
+            ))}
+          </span>
+          <div className="rm-mb-legend">
+            {losses.map((l) => (
+              <span key={l.key} className={`rm-mb-link rm-tone--${l.series}`}>
+                <i className="rm-dot" aria-hidden />
+                <span>{l.label} <b className={`num ${l.value === null ? 'v-na' : ''}`}>{mt(l.value)}</b></span>
+              </span>
+            ))}
+          </div>
         </div>
 
         <div className="rmd-mb-pieces">
@@ -140,6 +182,7 @@ function MaterialBalance() {
             : <span className="rm-mb-pieces-v num">{billets === null ? 'NA' : <><b>{billets.toLocaleString('en-IN')}</b>{' '}in</>}</span>}
         </div>
       </div>
+      <RmdProductionDrawer view="balance" open={open} onClose={() => setOpen(false)} />
     </Panel>
   );
 }

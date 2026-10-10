@@ -55,7 +55,7 @@ function Content({ data, view }: { data: RmdBilletsReport; view: BilletsView }) 
   return (
     <>
       <Stats items={[
-        ...(view === 'yield' ? [{ label: 'Mass yield', value: 'NA', unit: 'ERP finished pending', tone: 'v-na' }] : []),
+        ...(view === 'yield' ? [{ label: 'Mass yield', value: 'NA', unit: 'billet input MT pending', tone: 'v-na' }] : []),
         { label: 'Billets in', value: n(t.totalPcs), unit: 'pcs' },
         { label: 'Line 1 (M1)', value: n(t.m1), unit: 'pcs' },
         { label: 'Line 2 (M2)', value: n(t.m2), unit: 'pcs' },
@@ -104,11 +104,15 @@ const SOURCES: SourceSystem[] = [
   },
   {
     name: 'ERP',
-    rows: [['Field', 'finished production — pending']],
+    rows: [
+      ['Table', 'ATTR_TRAN_DATA_BODY'],
+      ['Filter', "USER_CODE = 'FA-SKJ'"],
+      ['Field', "ATTR_CODE = 'PRODUCT_PRIME_SLENGTH_MT' (value in ATTR_VALUE)"],
+    ],
   },
 ];
 
 const FORMULA = [
-  'Mass yield = finished production (ERP) ÷ billet input × 100',
+  'Mass yield = finished production (ERP) ÷ billet input (MT) × 100   (billet input MT pending)',
   'Billets in = Σ BILLET_COUNT increases per day (08:00 IST → 08:00 IST), M1 + M2',
 ];

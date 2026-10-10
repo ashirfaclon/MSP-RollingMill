@@ -1,7 +1,7 @@
 /**
  * RMD running rate (TPH) = production ÷ hours the mill was running, per RMD day (08:00 →
- * 08:00 IST) / week / month. The logic is in place; production is not wired yet (its ERP
- * field is on hold), so the rate is null until it is — running hours are real already.
+ * 08:00 IST) / week / month. Production is the ERP log sheet (PRODUCT_PRIME_SLENGTH_MT,
+ * production.service.ts), summed by its date.
  *
  * Running hours, as for HSM: the mill is running while billets keep entering less than
  * RUN_GAP_MS apart (10 min); a longer gap is a stop. RMD has two lines, so the mill counts as
@@ -14,6 +14,7 @@ import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, readCounter, round2 } from '../hsm/production.service';
 import { RUN_GAP_MS, runsOf } from '../hsm/running-rate.service';
 import { RMD_DAY_START_HOUR, rmdDayStart } from './billets.service';
+import { rmdProductionByDay } from './production.service';
 
 const DAY_MS = 86_400_000;
 const H_MS = 3_600_000;
@@ -32,8 +33,8 @@ export async function rmdRunningRate(env: Env, from: string, to: string, grain: 
   const runs = runsOf([...m1.increments, ...m2.increments], RUN_GAP_MS, RMD_DAY_START_HOUR);
   const hoursOn = (d: string) => runs.filter((r) => r.date === d).reduce((a, r) => a + (r.end - r.start), 0) / H_MS;
   const up = m1.connection === 'up' || m2.connection === 'up';
-  // Production is not wired for RMD yet: every day's production is null, so is every rate.
-  const productionOf = (_d: string): number | null => null;
+  const production = rmdProductionByDay(env, dates);
+  const productionOf = (d: string): number | null => production.get(d) ?? null;
 
   const period = (key: string, label: string, ds: string[]): RmdRatePeriod => {
     const runH = up ? round2(ds.reduce((a, d) => a + hoursOn(d), 0)) : null;

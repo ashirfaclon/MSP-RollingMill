@@ -1,18 +1,19 @@
 'use client';
 
 /**
- * Specific energy = power consumption (logbook form, kWh) ÷ production (the Production card's
- * Total, Influx, MT) for the Duration period — computed in the backend's power report. Opens
- * the power drawer, which shows both per day.
+ * Specific energy = power consumption (logbook forms, kWh) ÷ production for the Duration
+ * period — computed in the backend's power report. HSM divides by the Influx counter, RMD by
+ * the ERP log sheet. Opens the drawer that shows both per day.
  */
 import { useState } from 'react';
 import KpiCard from '@/components/visualization/KpiCard';
 import SpecificEnergyDrawer from '@/components/drill/SpecificEnergyDrawer';
 import { fixed } from '@/lib/num';
+import type { PowerMill } from '@/components/drill/PowerDrawer';
 import { usePower } from './PowerKpiCard';
 
-export default function SpecificEnergyCard() {
-  const { data, loading, error } = usePower();
+export default function SpecificEnergyCard({ mill = 'hsm' }: { mill?: PowerMill }) {
+  const { data, loading, error } = usePower(mill);
   const [open, setOpen] = useState(false);
   const t = data?.totals;
   const note = error ? 'Logbook unavailable'
@@ -32,7 +33,7 @@ export default function SpecificEnergyCard() {
         onOpen={() => setOpen(true)}
         openLabel="Power and production per day"
       />
-      <SpecificEnergyDrawer open={open} onClose={() => setOpen(false)} data={data} loading={loading} error={error} />
+      <SpecificEnergyDrawer open={open} onClose={() => setOpen(false)} data={data} loading={loading} error={error} mill={mill} />
     </>
   );
 }

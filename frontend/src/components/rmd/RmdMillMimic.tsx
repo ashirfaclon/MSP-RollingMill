@@ -3,8 +3,9 @@
 /**
  * RMD mill flow, live from the plant historian (refreshed every 30 s) — the same anatomy as
  * HSM's: billet infeed (billets since 08:00 IST, M1 + M2), then each zone's running state
- * with one dot per point. Roughing group and Finished exit are not sourced yet: NA, and they
- * open nothing. Each live zone opens the drill-down that shows where its figure comes from.
+ * with one dot per point; finished exit is the ERP log sheet's production for the period.
+ * Roughing group is not sourced yet: NA, and it opens nothing. Each live zone opens the
+ * drill-down that shows where its figure comes from.
  */
 import { Fragment, useState } from 'react';
 import Panel from '@/components/Panel';
@@ -13,6 +14,9 @@ import { hhmm } from '@/components/drill/CounterDrawer';
 import { useApi, type RmdLive, type RmdStationNow, type RmdZoneId, type RmdZoneNow } from '@/services/hsmApi';
 import RmdYieldDrawer from './RmdYieldDrawer';
 import RmdStationsDrawer from './RmdStationsDrawer';
+import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
+import { useSelection } from '@/services/hsmProduction';
+import { fixed } from '@/lib/num';
 
 const HM = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
 const hm = (iso: string | null) => (iso ? `${HM.format(new Date(iso))} IST` : '—');
@@ -24,7 +28,9 @@ type Zone =
 
 export default function RmdMillMimic() {
   const live = useApi<RmdLive>('/api/rmd/live', 30_000);
-  const [open, setOpen] = useState<'infeed' | RmdZoneId | null>(null);
+  const [open, setOpen] = useState<'infeed' | 'exit' | RmdZoneId | null>(null);
+  const { dates } = useSelection();
+  const prod = useRmdProduction(dates).data?.totals.productionMt ?? null;
   const [zone, setZone] = useState<RmdZoneId>('route');
   const d = live.data;
   const loading = !d && !live.error;
@@ -48,7 +54,10 @@ export default function RmdMillMimic() {
     },
     { key: 'roughing', kind: 'count', title: 'Roughing group', value: 'NA', foot: '' },
     ...[zoneOf('route'), zoneOf('finishing')].filter((z): z is Zone => z !== null),
-    { key: 'exit', kind: 'count', title: 'Finished exit', value: 'NA', foot: '' },
+    {
+      key: 'exit', kind: 'count', title: 'Finished exit', value: prod === null ? 'NA' : `${fixed(prod, 1)} MT`,
+      foot: '', open: () => setOpen('exit'), openLabel: 'Production per day, from the ERP log sheet',
+    },
   ];
 
   return (
@@ -69,6 +78,7 @@ export default function RmdMillMimic() {
       )}
       <RmdYieldDrawer view="infeed" open={open === 'infeed'} onClose={() => setOpen(null)} />
       <RmdStationsDrawer zone={zone} open={open === 'route' || open === 'finishing'} onClose={() => setOpen(null)} />
+      <RmdProductionDrawer view="production" open={open === 'exit'} onClose={() => setOpen(null)} />
     </Panel>
   );
 }

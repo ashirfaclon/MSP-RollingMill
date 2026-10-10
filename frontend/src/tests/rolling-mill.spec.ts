@@ -320,32 +320,26 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   const strip = page.getByRole('region', { name: 'Headline KPIs' });
   // The same seven cards as HSM, in the same order.
   await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/, /^Made To Stock/, /^Stock with order/, /^Free stock/]);
-  // On hold (ERP) or not sourced yet: NA, and nothing to open.
+  // Not sourced yet: NA, and nothing to open.
   const card = (name: string) => strip.getByRole('article', { name, exact: true });
-  for (const [name, note] of [
-    ['Production', 'ERP source pending'],
-    ['Specific energy', 'Production pending'],
-    ['Made To Stock', ''],
-    ['Stock with order', ''],
-    ['Free stock', ''],
-  ]) {
+  for (const name of ['Made To Stock', 'Stock with order', 'Free stock']) {
     await expect(card(name).locator('.rm-card-value')).toContainText('NA');
-    await expect(card(name).locator('.rm-card-note')).toHaveText(note);
+    await expect(card(name).locator('.rm-card-note')).toHaveText('');
   }
-  // Wired: mass yield opens its billets-in drawer (yield itself NA), power is live from the forms.
+  // Wired: production (ERP), power (forms), specific energy (power ÷ ERP production) open their drawers;
+  // mass yield opens its billets-in drawer and stays NA until billet input in MT has a source.
+  for (const name of ['Production', 'Power consumption', 'Specific energy']) await expect(strip.getByRole('button', { name, exact: true })).toBeVisible();
   const yieldCard = strip.getByRole('button', { name: 'Mass yield', exact: true });
   await expect(yieldCard.locator('.rm-card-value')).toContainText('NA');
-  await expect(yieldCard.locator('.rm-card-note')).toHaveText('ERP finished pending');
-  await expect(strip.getByRole('button', { name: 'Power consumption', exact: true })).toBeVisible();
-  // Mill flow, live: infeed and the two status zones wired; roughing and exit not sourced yet.
+  await expect(yieldCard.locator('.rm-card-note')).toHaveText('Billet input MT pending');
+  // Mill flow, live: infeed, the two status zones and the exit (ERP production) wired; roughing not sourced yet.
   const mimic = page.getByRole('list', { name: 'Mill process flow' });
   await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit']);
   await expect(mimic.getByRole('button', { name: /Billet infeed/ })).toContainText('Today · since 08:00 IST');
-  for (const z of ['Roughing group', 'Finished exit']) {
-    const tile = mimic.locator('.rm-zone', { hasText: z });
-    await expect(tile).toContainText('NA');
-    await expect(tile).not.toHaveAttribute('aria-haspopup', 'dialog');   // nothing behind it, nothing to open
-  }
+  const roughing = mimic.locator('.rm-zone', { hasText: 'Roughing group' });
+  await expect(roughing).toContainText('NA');
+  await expect(roughing).not.toHaveAttribute('aria-haspopup', 'dialog');   // nothing behind it, nothing to open
+  await expect(mimic.getByRole('button', { name: /Finished exit/ })).toBeVisible();
   await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-dot')).toHaveCount(14);   // L1 S1–S8 + L2 S1–S6
   await expect(mimic.getByRole('button', { name: /Finishing group/ }).locator('.rm-dot')).toHaveCount(10);   // 5 per line
   // Production by shift: two shifts (08–20, 20–08), NA until the rolling plan; running rate NA until production.
@@ -358,7 +352,7 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   await expect(shifts.locator('.rm-foot')).toContainText(/Running rate\s*NA/);
   // Order allocation: on hold with the ERP.
   const alloc = page.locator('section.panel', { hasText: 'Order allocation' });
-  await expect(alloc.locator('.rm-alloc-total')).toHaveText(['NA', 'NA']);
+  await expect(alloc.locator('.rm-alloc-total')).toHaveText([/MT$|^NA$/, 'NA']);   // production from the ERP; stock NA
   // Material balance: only the billet count is live; billet input (MT), finished, yield, mass difference NA.
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
   await expect(balance.locator('.rm-mb-figure-v')).toHaveText(['NA', 'NA']);

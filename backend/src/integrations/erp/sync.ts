@@ -23,7 +23,7 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import oracledb from 'oracledb';
 import { loadEnv, type Env } from '../../config/env';
 import {
-  ERP_ENTITIES, LOG_FIELDS, cachePaths,
+  ERP_ENTITIES, LOG_FIELDS, RMD_LOG_FIELDS, cachePaths, type RmdLogField, type RmdProductionCache,
   type ErpCache, type ErpCommercialCache, type ErpDivisionRow, type ErpProductionCache,
   type ErpProductionRow, type ErpSyncAttempt, type LogField,
 } from './cache';
@@ -209,6 +209,8 @@ async function pull(env: Env, p: Paths, t0: number, log: (line: string) => void)
   writeAtomic(p.cache, census);
   writeAtomic(p.production, production);
   writeAtomic(p.commercial, commercial);
+  // RMD on its own connection and its own failure: a problem there never blocks HSM's caches.
+  await pullRmd(env, p, log);
   const last = production.rows.at(-1)?.date ?? 'none';
   record(p, t0, true, `Synced ${production.rows.length} log-sheet entries, ${commercial.sales.length} sale lines, ${commercial.orders.length} order lines`);
   log(`ERP sync ok in ${Date.now() - t0} ms · server time ${census.serverTime}`);
@@ -216,6 +218,47 @@ async function pull(env: Env, p: Paths, t0: number, log: (line: string) => void)
   log(`  production by item: ${commercial.prodLines.length} rows · sales: ${commercial.sales.length} lines · orders: ${commercial.orders.length} lines`);
   log(`  names: ${Object.keys(commercial.items).length} items, ${Object.keys(commercial.clients).length} clients`);
   log(`  stock: ${commercial.stock?.moves.length ?? 0} movement rows · openings for years ${[...new Set((commercial.stock?.openings ?? []).map((o) => o.year))].join(', ') || 'none'}`);
+}
+
+/**
+ * RMD Production Log Sheet, as the plant specified: ATTR_TRAN_DATA_BODY where USER_CODE =
+ * 'FA-SKJ', one row per entry (VRDATE, VRNO) with its RMD_LOG_FIELDS values (ATTR_VALUE).
+ * A failure is logged and the previous RMD cache stays in place.
+ */
+async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
+  let conn: oracledb.Connection | null = null;
+  try {
+    conn = await oracledb.getConnection({ user: env.erpUser!, password: env.erpPassword!, connectString: env.erpDsn! });
+    conn.callTimeout = 120_000;
+    await conn.execute('SET TRANSACTION READ ONLY');
+    const pivot = RMD_LOG_FIELDS.map((f) =>
+      `MAX(CASE WHEN b.ATTR_CODE = '${f}' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "${f}"`,
+    ).join(',\n             ');
+    const rows = ((await conn.execute<Record<string, unknown>>(`
+      SELECT TO_CHAR(b.VRDATE, 'YYYY-MM-DD') AS "D", b.VRNO AS "VRNO",
+             ${pivot}
+        FROM MSPV7ERP1.ATTR_TRAN_DATA_BODY b
+       WHERE b.USER_CODE = 'FA-SKJ'
+         AND b.ATTR_CODE IN (${RMD_LOG_FIELDS.map((f) => `'${f}'`).join(', ')})
+         AND b.VRDATE >= TO_DATE(:fromDate, 'YYYY-MM-DD')
+       GROUP BY b.VRDATE, b.VRNO
+       ORDER BY b.VRDATE, b.VRNO`, { fromDate: FROM }, { maxRows: 0 })).rows ?? []) as Record<string, unknown>[];
+    const cache: RmdProductionCache = {
+      syncedAt: new Date().toISOString(),
+      source: "ATTR_TRAN_DATA_BODY · USER_CODE = 'FA-SKJ'",
+      fromDate: FROM,
+      rows: rows.map((r) => ({
+        date: String(r.D), vrno: String(r.VRNO),
+        v: Object.fromEntries(RMD_LOG_FIELDS.map((f) => [f, num(r[f])])) as Record<RmdLogField, number | null>,
+      })),
+    };
+    writeAtomic(p.rmdProduction, cache);
+    log(`  RMD log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);
+  } catch (err) {
+    log(`  RMD log sheet not synced: ${(err as Error).message}`);
+  } finally {
+    await conn?.close();
+  }
 }
 
 export interface ErpSyncResult { ok: boolean; message: string; durationMs: number }

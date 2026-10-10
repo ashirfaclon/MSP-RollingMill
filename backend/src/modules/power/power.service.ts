@@ -10,8 +10,7 @@
  *        (tmt-electrical-department/power-reading-vcb-n): `actual-kwh-vcb-n` (kWh).
  *
  * Specific energy = that power ÷ the mill's production for the same period, kWh/MT — HSM's
- * Production card (the Influx counter); RMD's production is not wired yet, so its specific
- * energy is NA until it is. Power is summed by the form's date, production by the 06:00
+ * Production card (the Influx counter); RMD's ERP log sheet (PRODUCT_PRIME_SLENGTH_MT). Power is summed by the form's date, production by the 06:00
  * plant day — the same date, a few hours apart.
  *
  * The logbook engine ignores filters and returns every form's entries newest first, so ONE
@@ -24,6 +23,7 @@ import type { PowerDay, PowerEntry, PowerReport } from '../../contracts';
 import { fetchInsightPage, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
 import { dateRange, plantDayStart, productionComparison, round2 } from '../hsm/production.service';
+import { rmdProductionByDay } from '../rmd/production.service';
 
 export type PowerMill = 'hsm' | 'rmd';
 
@@ -185,9 +185,12 @@ export function powerReport(env: Env, from: string, to: string, nowMs = Date.now
   return report(env, 'hsm', from, to, nowMs, production);
 }
 
-/** RMD: the three VCB forms. Production is not wired yet (ERP on hold), so specific energy is NA. */
+/** RMD: the three VCB forms, over the ERP log sheet's production (PRODUCT_PRIME_SLENGTH_MT). */
 export function rmdPowerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
-  return report(env, 'rmd', from, to, nowMs, Promise.resolve(null));
+  const byDay = rmdProductionByDay(env, dateRange(from, to));
+  const vals = [...byDay.values()].filter((v): v is number => v !== null);
+  const production = Promise.resolve({ byDay, total: vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null });
+  return report(env, 'rmd', from, to, nowMs, production);
 }
 
 /**

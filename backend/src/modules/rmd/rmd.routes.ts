@@ -11,6 +11,7 @@ import { rmdPowerReport } from '../power/power.service';
 import { rmdBillets } from './billets.service';
 import { rmdLive, rmdStationTrend } from './live.service';
 import { rmdRunningRate } from './running-rate.service';
+import { rmdProduction } from './production.service';
 import { HttpError } from '../../shared/http-error';
 
 const ZONES = ['route', 'finishing'] as const;
@@ -49,5 +50,12 @@ export async function rmdRoutes(app: FastifyInstance) {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
     return rmdRunningRate(loadEnv(), from, to, parseGrain(q));
+  });
+
+  /** Production and losses: the ERP Production Log Sheet (FA-SKJ), per date / week / month. */
+  app.get('/production', { config: { errorCode: 'rmd_production_failed' } }, async (req) => {
+    const q = searchParams(req);
+    const { from, to } = parseRange(q);
+    return rmdProduction(loadEnv(), from, to, parseGrain(q));
   });
 }
