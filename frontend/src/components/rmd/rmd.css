@@ -50,7 +50,21 @@
 }
 
 /* NA reads the same muted grey everywhere — never in a series colour. */
-.rmd-figure .rm-mb-figure-v.v-na, .rm-mb-caption b.v-na { color: var(--muted-3); }
+.rmd-figure .rm-mb-figure-v.v-na, .rm-mb-caption b.v-na, .rm-mb-pieces-v.v-na { color: var(--muted-3); }
 
 /* Every zone the same height, whether or not it carries a row of dots. */
 .rmd-mimic { align-items: stretch; }
+
+/* Five headline cards (production as two cards; no order / stock cards on RMD): one row, two on a phone. */
+.rm-strip.rmd-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .rm-strip.rmd-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Stock by size: each size row is a button that opens its SKU breakdown. */
+.rmd-size-btn {
+  width: calc(100% + 12px); padding: 4px 6px; margin: -4px -6px; box-sizing: border-box;
+  background: none; border: 0; border-radius: 6px; color: inherit; font: inherit; text-align: inherit; cursor: pointer;
+}
+.rmd-size-btn:hover { background: var(--panel-3); }
+.rmd-size-btn:focus-visible { outline: 2px solid var(--focus, var(--s-prod)); outline-offset: 1px; }

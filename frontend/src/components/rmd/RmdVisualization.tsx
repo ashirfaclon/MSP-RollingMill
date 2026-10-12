@@ -4,20 +4,20 @@
  * RMD · Visualization — laid out like the HSM screen: KPI strip, mill mimic, then two rows of
  * paired panels. Only what the plant has confirmed is wired; everything else is NA, never a
  * sample figure:
- *   Production by shift   NA until the rolling plan arrives; running rate = ERP production ÷
- *                         running hours (billet counters).
- *   Order allocation      production total from the ERP log sheet; MTO / MTS and stock NA.
- *   Material balance      finished and the four losses from the ERP log sheet (FA-SKJ);
- *                         billets from Influx; billet input in MT has no source yet, so mass
- *                         difference and yield (computed in the backend) stay NA until it does.
- *   Finished stock by size  not wired yet: NA.
+ *   Production by shift   targets from the plant's month-wise FY plan (Prime + SL), half per
+ *                         shift; output per shift NA (not in the ERP); whole day = ERP Prime + SL
+ *                         vs plan. Running rate = ERP production ÷ running hours (billet counters).
+ *   Order allocation      production total from the ERP log sheet; finished stock = the total of
+ *                         Finished stock by size (ERP item ledger, FGYRDP, at the period end).
+ *   Material balance      billet input, finished and the four losses from the ERP log sheet
+ *                         (FA-SKJ); billets from Influx.
+ *   Finished stock by size  ERP item ledger, FGYRDP, to the period end; a size opens its SKUs.
  *
- * Names follow the HSM screen: production with / without an order is Made To Order / Made
- * To Stock; finished stock is Stock with order / Free stock.
+ * Unlike HSM there is no Made To Order / Made To Stock split, and no Stock with order / Free
+ * stock split: RMD's stock is all free stock, so stock is shown by size only (user, 12 Oct 2026).
  */
 import Panel from '@/components/Panel';
 import type { Series } from '@/components/visualization/KpiCard';
-import ShiftBars from '@/components/visualization/ShiftBars';
 import { fixed } from '@/lib/num';
 import { useState, type KeyboardEvent } from 'react';
 import { useSelection } from '@/services/hsmProduction';
@@ -25,10 +25,10 @@ import { rangeUrl, useApi, type RmdBilletsReport, type RmdRunningRateReport } fr
 import RmdKpiStrip from './RmdKpiStrip';
 import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
 import RmdMillMimic from './RmdMillMimic';
+import RmdShiftProduction from './RmdShiftProduction';
+import RmdStockBySize, { useRmdStock } from './RmdStockBySize';
 import '@/components/visualization/visualization.css';
 import './rmd.css';
-
-const NA_SHIFT = { planMt: null, outputMt: null, compliancePct: null };
 
 export default function RmdVisualization() {
   return (
@@ -36,21 +36,12 @@ export default function RmdVisualization() {
       <RmdKpiStrip />
       <RmdMillMimic />
       <div className="rm-row">
-        <ShiftBars
-          shifts={[{ name: 'Day', ...NA_SHIFT }, { name: 'Night', ...NA_SHIFT }]}
-          day={NA_SHIFT}
-          planMt={null}
-          planGapMt={null}
-          sub="Day 08:00–20:00 IST · Night 20:00–08:00 IST"
-          rate={<RunningRateFoot />}
-        />
+        <RmdShiftProduction rate={<RunningRateFoot />} />
         <OrderAllocation />
       </div>
       <div className="rm-row">
         <MaterialBalance />
-        <Panel title="Finished stock by size" className="rm-panel" bodyClass="rm-body">
-          <p className="rm-empty">NA</p>
-        </Panel>
+        <RmdStockBySize />
       </div>
     </div>
   );
@@ -80,6 +71,9 @@ function RunningRateFoot() {
 function OrderAllocation() {
   const { dates } = useSelection();
   const prod = useRmdProduction(dates).data?.totals.productionMt ?? null;
+  // Finished stock: every SKU in FGYRDP at the end of the period — the total of Finished stock by size.
+  const stock = useRmdStock().data;
+  const stockMt = stock && stock.erp.connection === 'up' ? stock.totalMt : null;
   return (
     <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
       <div className="rm-alloc-block">
@@ -87,15 +81,11 @@ function OrderAllocation() {
           <span className="rm-k">Production</span>
           <span className={`rm-alloc-total num ${prod === null ? 'v-na' : 'v-val'}`}>{prod === null ? 'NA' : `${fixed(prod, 1)} MT`}</span>
         </div>
-        <div className="rm-legend">
-          <span className="rmd-legend-item rm-tone--order"><i className="rm-dot" aria-hidden />Made To Order <b className="num v-na">NA</b></span>
-          <span className="rmd-legend-item rm-tone--free"><i className="rm-dot" aria-hidden />Made To Stock <b className="num v-na">NA</b></span>
-        </div>
       </div>
       <div className="rm-alloc-block">
         <div className="rm-alloc-head">
           <span className="rm-k">Finished stock</span>
-          <span className="rm-alloc-total num v-na">NA</span>
+          <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{stockMt === null ? 'NA' : `${fixed(stockMt, 1)} MT`}</span>
         </div>
       </div>
     </Panel>
@@ -115,10 +105,9 @@ const mt = (v: number | null | undefined) => (v === null || v === undefined ? 'N
 
 /**
  * Drawn like the HSM panel: billet input split into finished | mass difference, to scale,
- * then the losses opened out, then the billet count. Finished and the losses come from the
- * ERP log sheet; billet input in MT has no source yet, so the input bar stays empty and mass
- * difference and yield read NA (computed in the backend the moment it exists). The whole
- * balance is one click: the drawer shows it per day.
+ * then the losses opened out, then the billet count. Billet input (INPUT_MT), finished
+ * (Prime + SL) and the losses come from the ERP log sheet; mass difference and yield are
+ * computed in the backend. The whole balance is one click: the drawer shows it per day.
  */
 function MaterialBalance() {
   const { dates } = useSelection();
@@ -130,7 +119,8 @@ function MaterialBalance() {
   const [open, setOpen] = useState(false);
   const openOnKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } };
 
-  const losses = LOSSES.map((l) => ({ ...l, value: t?.[l.key] ?? null }));
+  // A loss that is 0 for the period isn't there: no segment, no legend entry. No data stays NA.
+  const losses = LOSSES.map((l) => ({ ...l, value: t?.[l.key] ?? null })).filter((l) => l.value === null || l.value >= 0.05);
   const lossSum = losses.reduce((a, l) => a + (l.value ?? 0), 0);
   const finishedPct = t?.productionMt != null && t.billetInputMt ? (t.productionMt / t.billetInputMt) * 100 : 0;
 

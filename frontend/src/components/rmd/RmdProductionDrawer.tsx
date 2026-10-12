@@ -2,9 +2,10 @@
 
 /**
  * RMD production from the ERP Production Log Sheet, for the dashboard's period, per day /
- * week / month. Two views of the same data:
+ * week / month. Three views of the same data:
  *   production  production per period (Production card, Finished exit, Order allocation);
- *   balance     production and where the rest went — the four losses (Material balance).
+ *   yield       mass yield = production ÷ billet input (INPUT_MT) (Mass yield card);
+ *   balance     billet input, production and where the rest went — the four losses (Material balance).
  * Source, filters and codes exactly as the plant gave them (USER_CODE = 'FA-SKJ').
  */
 import { useMemo } from 'react';
@@ -15,7 +16,7 @@ import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdProductionPeriod, type RmdProductionReport } from '@/services/hsmApi';
 
-export type RmdProductionView = 'production' | 'balance';
+export type RmdProductionView = 'production' | 'yield' | 'balance';
 
 const f = (v: number | null) => (v === null ? '—' : fmtNum(v, 2));
 
@@ -34,18 +35,24 @@ export default function RmdProductionDrawer({ open, onClose, view }: { open: boo
     <DrillDrawer
       open={open}
       onClose={onClose}
-      title={view === 'production' ? 'Production · ERP log sheet' : 'Material balance · ERP log sheet'}
-      sub="RMD · MT"
+      title={TITLE[view]}
+      sub={view === 'yield' ? 'RMD · %' : 'RMD · MT'}
       controls={r.controls}
       loading={loading}
       stale={!!data && dataUrl !== url}
       error={error}
       hasData={!!data}
     >
-      {data && (view === 'production' ? <ProductionContent data={data} /> : <BalanceContent data={data} />)}
+      {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} /> : <BalanceContent data={data} />)}
     </DrillDrawer>
   );
 }
+
+const TITLE: Record<RmdProductionView, string> = {
+  production: 'Production · ERP log sheet',
+  yield: 'Mass yield · ERP log sheet',
+  balance: 'Material balance · ERP log sheet',
+};
 
 const label = (x: RmdProductionPeriod) => (
   <td><b>{x.label}</b>{x.days > 1 && x.key !== 'total' && <span className="pd-dim"> · {dm(x.fromDate)}–{dm(x.toDate)}</span>}</td>
@@ -56,28 +63,81 @@ function ProductionContent({ data }: { data: RmdProductionReport }) {
   const t = data.totals;
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const series = useMemo<DrillSeries[]>(() => [
-    { id: 'prod', name: 'Production', token: '--s-prod', type: 'column', data: rows.map((x) => x.productionMt), dp: 2 },
+    { id: 'prod', name: 'Prime + SL', token: '--s-prod', type: 'column', data: rows.map((x) => x.productionMt), dp: 2 },
+    { id: 'prime', name: 'Prime', token: '--s-alt', type: 'column', data: rows.map((x) => x.primeMt), dp: 2 },
   ], [rows]);
   const axes = useMemo(() => [{ title: 'MT', unit: 'MT' }], []);
 
   return (
     <>
       <Stats items={[
-        { label: 'Production', value: f(t.productionMt), unit: 'MT' },
+        { label: 'Prime + SL', value: f(t.productionMt), unit: 'MT' },
+        { label: 'Prime', value: f(t.primeMt), unit: 'MT' },
         { label: 'Days entered', value: String(t.entryDays), unit: `of ${t.days} · to ${dm(data.erp.lastDate)}` },
       ]} />
       <DrillChart series={series} categories={categories} axes={axes}
-        ariaLabel={`Production by period: ${rows.map((x) => `${x.label} ${f(x.productionMt)} MT`).join('; ')}`} />
+        ariaLabel={`Production by period: ${rows.map((x) => `${x.label} prime + SL ${f(x.productionMt)} MT, prime ${f(x.primeMt)} MT`).join('; ')}`} />
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Production by period">
-          <thead><tr><th>Period</th><th className="r">Production (MT)</th></tr></thead>
-          <tbody>{rows.map((x) => <tr key={x.key}>{label(x)}<td className="num r v-val">{f(x.productionMt)}</td></tr>)}</tbody>
-          <tfoot><tr>{label(t)}<td className="num r">{f(t.productionMt)}</td></tr></tfoot>
+          <thead><tr><th>Period</th><th className="r">Prime + SL (MT)</th><th className="r">Prime (MT)</th></tr></thead>
+          <tbody>{rows.map((x) => <tr key={x.key}>{label(x)}<td className="num r v-val">{f(x.productionMt)}</td><td className="num r v-val">{f(x.primeMt)}</td></tr>)}</tbody>
+          <tfoot><tr>{label(t)}<td className="num r">{f(t.productionMt)}</td><td className="num r">{f(t.primeMt)}</td></tr></tfoot>
         </table>
       </div>
-      <SourceBox sources={sources(['PRODUCT_PRIME_SLENGTH_MT'])} formula={["Production = Σ PRODUCT_PRIME_SLENGTH_MT of the date's entries"]} />
+      <SourceBox
+        sources={sources(['PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT'])}
+        formula={[
+          "Prime + SL = Σ PRODUCT_PRIME_SLENGTH_MT of the date's entries",
+          "Prime = Σ FINISH_PRODUCT_PRIME_MT of the date's entries",
+        ]}
+      />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
     </>
+  );
+}
+
+function YieldContent({ data }: { data: RmdProductionReport }) {
+  const rows = data.rows;
+  const t = data.totals;
+  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
+  const series = useMemo<DrillSeries[]>(() => [
+    { id: 'yield', name: 'Mass yield', token: '--s-order', type: 'line', data: rows.map((x) => x.massYieldPct), dp: 2 },
+  ], [rows]);
+  const axes = useMemo(() => [{ title: '%', unit: '%' }], []);
+
+  return (
+    <>
+      <Stats items={[
+        { label: 'Mass yield', value: f(t.massYieldPct), unit: '%' },
+        { label: 'Billet input', value: f(t.billetInputMt), unit: 'MT' },
+        { label: 'Prime + SL', value: f(t.productionMt), unit: 'MT' },
+      ]} />
+      <DrillChart series={series} categories={categories} axes={axes}
+        ariaLabel={`Mass yield by period: ${rows.map((x) => `${x.label} ${f(x.massYieldPct)}%`).join('; ')}`} />
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label="Mass yield by period">
+          <thead><tr><th>Period</th><th className="r">Billet input (MT)</th><th className="r">Prime + SL (MT)</th><th className="r">Mass yield (%)</th></tr></thead>
+          <tbody>{rows.map((x) => <YieldRow key={x.key} x={x} />)}</tbody>
+          <tfoot><YieldRow x={t} /></tfoot>
+        </table>
+      </div>
+      <SourceBox
+        sources={sources(['INPUT_MT', 'PRODUCT_PRIME_SLENGTH_MT'])}
+        formula={['Mass yield = PRODUCT_PRIME_SLENGTH_MT ÷ INPUT_MT × 100']}
+      />
+      {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
+    </>
+  );
+}
+
+function YieldRow({ x }: { x: RmdProductionPeriod }) {
+  return (
+    <tr>
+      {label(x)}
+      <td className="num r">{f(x.billetInputMt)}</td>
+      <td className="num r">{f(x.productionMt)}</td>
+      <td className="num r v-val"><b>{f(x.massYieldPct)}</b></td>
+    </tr>
   );
 }
 
@@ -100,25 +160,25 @@ function BalanceContent({ data }: { data: RmdProductionReport }) {
   return (
     <>
       <Stats items={[
+        { label: 'Billet input', value: f(t.billetInputMt), unit: 'MT' },
         { label: 'Finished', value: f(t.productionMt), unit: 'MT' },
+        { label: 'Mass difference', value: f(t.massDiffMt), unit: 'MT' },
         { label: 'Losses', value: f(t.lossesMt), unit: 'MT' },
-        { label: 'Billet input', value: 'NA', unit: 'MT · pending', tone: 'v-na' },
       ]} />
       <DrillChart series={series} categories={categories} axes={axes}
         ariaLabel={`Losses by period: ${rows.map((x) => `${x.label} ${f(x.lossesMt)} MT`).join('; ')}`} />
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Material balance by period">
-          <thead><tr><th>Period</th><th className="r">Finished</th><th className="r">Burning loss</th><th className="r">End cut</th><th className="r">Miss-roll</th><th className="r">Chip off</th><th className="r">Losses</th></tr></thead>
+          <thead><tr><th>Period</th><th className="r">Billet input</th><th className="r">Finished</th><th className="r">Burning loss</th><th className="r">End cut</th><th className="r">Miss-roll</th><th className="r">Chip off</th><th className="r">Losses</th></tr></thead>
           <tbody>{rows.map((x) => <BalanceRow key={x.key} x={x} />)}</tbody>
           <tfoot><BalanceRow x={t} /></tfoot>
         </table>
       </div>
       <SourceBox
-        sources={sources(['PRODUCT_PRIME_SLENGTH_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT'])}
+        sources={sources(['INPUT_MT', 'PRODUCT_PRIME_SLENGTH_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT'])}
         formula={[
+          'Mass difference = INPUT_MT − PRODUCT_PRIME_SLENGTH_MT',
           'Losses = BLOSS_MT + ENDCUT_MT + MISROLL_MT + CHIP_OFF_MT',
-          'Mass difference = billet input − finished   (billet input MT pending)',
-          'Mass yield = finished ÷ billet input × 100   (billet input MT pending)',
         ]}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
@@ -130,6 +190,7 @@ function BalanceRow({ x }: { x: RmdProductionPeriod }) {
   return (
     <tr>
       {label(x)}
+      <td className="num r">{f(x.billetInputMt)}</td>
       <td className="num r v-val">{f(x.productionMt)}</td>
       <td className="num r">{f(x.burningLossMt)}</td>
       <td className="num r">{f(x.endCutMt)}</td>

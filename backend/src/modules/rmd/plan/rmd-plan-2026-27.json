@@ -1,0 +1,78 @@
+{
+  "source": "RMD Month Wise production plan FY 26-27 (1).xlsx, sheet Production Plan, row 26 \"Total production \u2014 Prime + Short length (MT)\", on line + off line",
+  "note": "Shutdown: 'Mill will be S/D for 12 hrs twice in a month for 20\" R/Stand roll change and 5 day full shutdown (April-2 day, Oct-2 day & Nov-1 day)' \u2014 dates not given.",
+  "months": [
+    {
+      "month": "2026-04",
+      "workingDays": 28,
+      "calendarDays": 30,
+      "primeSlMt": 11638.368
+    },
+    {
+      "month": "2026-05",
+      "workingDays": 31,
+      "calendarDays": 31,
+      "primeSlMt": 13349.875
+    },
+    {
+      "month": "2026-06",
+      "workingDays": 30,
+      "calendarDays": 30,
+      "primeSlMt": 13309.24
+    },
+    {
+      "month": "2026-07",
+      "workingDays": 31,
+      "calendarDays": 31,
+      "primeSlMt": 9491.025
+    },
+    {
+      "month": "2026-08",
+      "workingDays": 31,
+      "calendarDays": 31,
+      "primeSlMt": 9017.775
+    },
+    {
+      "month": "2026-09",
+      "workingDays": 30,
+      "calendarDays": 30,
+      "primeSlMt": 9349.05
+    },
+    {
+      "month": "2026-10",
+      "workingDays": 29,
+      "calendarDays": 31,
+      "primeSlMt": 8220.638
+    },
+    {
+      "month": "2026-11",
+      "workingDays": 29,
+      "calendarDays": 30,
+      "primeSlMt": 12572.006
+    },
+    {
+      "month": "2026-12",
+      "workingDays": 31,
+      "calendarDays": 31,
+      "primeSlMt": 14805.963
+    },
+    {
+      "month": "2027-01",
+      "workingDays": 31,
+      "calendarDays": 31,
+      "primeSlMt": 14176.121
+    },
+    {
+      "month": "2027-02",
+      "workingDays": 28,
+      "calendarDays": 28,
+      "primeSlMt": 12635.86
+    },
+    {
+      "month": "2027-03",
+      "workingDays": 31,
+      "calendarDays": 31,
+      "primeSlMt": 13674.956
+    }
+  ]
+}

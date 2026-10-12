@@ -10,9 +10,10 @@
  */
 import type { Env } from '../../config/env';
 import type { PlanDay, PlanReport } from '../../contracts';
-// TODO(plan-feature): HARDCODED — the October 2026 plan (1–6 Oct, 36 rows, 1,203 MT) from the
-// plant's Excel. Remove this import, plan/rolling-plan-2026-10.json and
-// scripts/import-rolling-plan.py once the plan-import feature supplies the plan.
+// TODO(plan-feature): HARDCODED — the October 2026 plan (1–14 Oct, 80 rows, 2,600 MT) from the
+// plant's Excel (Daily_Rolling_Tracker_Oct2026 (4).xlsx, shared 12 Oct 2026). Remove this
+// import, plan/rolling-plan-2026-10.json and scripts/import-rolling-plan.py once the
+// plan-import feature supplies the plan.
 import october2026 from './plan/rolling-plan-2026-10.json';
 import { dateRange, productionComparison, round2 } from './production.service';
 import { SHIFTS, productionTicks, splitByShift } from './shift-split';

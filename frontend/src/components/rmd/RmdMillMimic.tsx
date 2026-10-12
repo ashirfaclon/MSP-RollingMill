@@ -12,7 +12,7 @@ import Panel from '@/components/Panel';
 import FlowArrow from '@/components/visualization/FlowArrow';
 import { hhmm } from '@/components/drill/CounterDrawer';
 import { useApi, type RmdLive, type RmdStationNow, type RmdZoneId, type RmdZoneNow } from '@/services/hsmApi';
-import RmdYieldDrawer from './RmdYieldDrawer';
+import RmdBilletsDrawer from './RmdBilletsDrawer';
 import RmdStationsDrawer from './RmdStationsDrawer';
 import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
 import { useSelection } from '@/services/hsmProduction';
@@ -76,7 +76,7 @@ export default function RmdMillMimic() {
           ))}
         </ol>
       )}
-      <RmdYieldDrawer view="infeed" open={open === 'infeed'} onClose={() => setOpen(null)} />
+      <RmdBilletsDrawer open={open === 'infeed'} onClose={() => setOpen(null)} />
       <RmdStationsDrawer zone={zone} open={open === 'route' || open === 'finishing'} onClose={() => setOpen(null)} />
       <RmdProductionDrawer view="production" open={open === 'exit'} onClose={() => setOpen(null)} />
     </Panel>

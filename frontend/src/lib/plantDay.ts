@@ -9,8 +9,12 @@
  */
 
 export const PLANT_DAY_START_HOUR = 6;
-/** Where each mill's day starts, IST hour. */
-export const DAY_START_HOUR = { hsm: 6, rmd: 8 } as const;
+/**
+ * Where each mill's day starts, IST hour (9.5 = 09:30). Each mill runs a 24-hour cycle of
+ * two 12-hour shifts that begin at its day start: RMD 08:00 (plant, 9 Oct 2026), LSM 09:00
+ * and RMS 09:30 (plant, 12 Oct 2026). HSM's 06:00 is the project's original day.
+ */
+export const DAY_START_HOUR = { hsm: 6, rmd: 8, lsm: 9, rms: 9.5 } as const;
 /** "06:00" — the cycle boundary as shown on screen. */
 export const PLANT_DAY_START = `${String(PLANT_DAY_START_HOUR).padStart(2, '0')}:00`;
 
@@ -33,7 +37,16 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export const dm = (d: string | null | undefined) => (d ? `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]}` : '—');
 
 /** "06:00 IST" — every time on screen names its zone. */
-export const dayStartIst = (hour: number = PLANT_DAY_START_HOUR) => `${String(hour).padStart(2, '0')}:00 IST`;
+/** "09:30" from 9.5 — an hour of the day as HH:MM. */
+export const hhmmOf = (hour: number) => {
+  const h = ((Math.floor(hour) % 24) + 24) % 24;
+  const m = Math.round((hour - Math.floor(hour)) * 60);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+export const dayStartIst = (hour: number = PLANT_DAY_START_HOUR) => `${hhmmOf(hour)} IST`;
+/** "Day 09:30–21:30 IST · Night 21:30–09:30 IST" — the two 12-hour shifts from the day start. */
+export const shiftsLabel = (hour: number) =>
+  `Day ${hhmmOf(hour)}–${hhmmOf(hour + 12)} IST · Night ${hhmmOf(hour + 12)}–${hhmmOf(hour)} IST`;
 export const PLANT_DAY_START_IST = dayStartIst();
 
 /** The cycle a range of plant dates covers: "24 Sep 06:00 IST → 25 Sep 06:00 IST". */

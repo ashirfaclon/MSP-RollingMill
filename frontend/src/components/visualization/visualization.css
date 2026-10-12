@@ -79,13 +79,16 @@
 /* Two figures of one KPI as two sections: a title over each figure, a divider between. The
    figure scales with its half of the card, so four-digit values fit on narrow screens. */
 .rm-card-pair { display: grid; grid-template-columns: 1fr 1fr; letter-spacing: -0.5px; }
-.rm-card-pair-item { display: flex; flex-direction: column; gap: 4px; min-width: 0; container-type: inline-size; }
+/* Title on top, figure at the foot: the two figures stay level when one title wraps. */
+.rm-card-pair-item { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-width: 0; container-type: inline-size; }
 .rm-card-pair-item + .rm-card-pair-item { border-left: 1px solid var(--border); padding-left: 10px; }
 .rm-card-pair-item:first-child { padding-right: 8px; }
 .rm-card-pair-v { font-size: clamp(15px, 25cqi, 24px); white-space: nowrap; }
 .rm-card-label-unit { flex: none; margin-left: -3px; white-space: nowrap; color: var(--muted-3); letter-spacing: 0.4px; }
 .rm-card-src {
   font-size: 9px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted-2);
+  /* A long section name wraps inside its half rather than running into the next. */
+  white-space: normal; line-height: 1.25;
 }
 .rm-card-note {
   font-size: 10px; font-weight: 600; color: var(--muted-2);

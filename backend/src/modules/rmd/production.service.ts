@@ -3,11 +3,12 @@
  * (RMD - ERP Data Filled.xlsx): ATTR_TRAN_DATA_BODY, USER_CODE = 'FA-SKJ', ATTR_CODE →
  * ATTR_VALUE, dated by VRDATE. A date's figure is the sum of its entries (often two a day).
  *
- *   production  PRODUCT_PRIME_SLENGTH_MT
+ *   production  PRODUCT_PRIME_SLENGTH_MT (prime + short length) — what every other figure uses
+ *   prime       FINISH_PRODUCT_PRIME_MT (prime only) — the second daily declaration, shown beside it
  *   losses      BLOSS_MT (burning loss), ENDCUT_MT, MISROLL_MT, CHIP_OFF_MT (rejection)
+ *   input       INPUT_MT (billet input)
  *
- * Mass yield and mass difference need billet input in MT, which has no source yet: their
- * logic is here and they stay null until it is wired.
+ * Mass yield = production ÷ billet input × 100; mass difference = billet input − production.
  */
 import type { Env } from '../../config/env';
 import type { Grain, RmdProductionPeriod, RmdProductionReport } from '../../contracts';
@@ -31,11 +32,12 @@ export function summarise(key: string, label: string, dates: string[], rows: Rmd
   const mine = rows.filter((r) => r.date >= dates[0] && r.date <= dates[dates.length - 1]);
   const losses = [sumOf(mine, 'BLOSS_MT'), sumOf(mine, 'ENDCUT_MT'), sumOf(mine, 'MISROLL_MT'), sumOf(mine, 'CHIP_OFF_MT')];
   const productionMt = sumOf(mine, 'PRODUCT_PRIME_SLENGTH_MT');
-  const billetInputMt: number | null = null;   // no source yet
+  const billetInputMt = sumOf(mine, 'INPUT_MT');
   return {
     key, label, fromDate: dates[0], toDate: dates[dates.length - 1], days: dates.length,
     entryDays: new Set(mine.map((r) => r.date)).size,
     productionMt,
+    primeMt: sumOf(mine, 'FINISH_PRODUCT_PRIME_MT'),
     burningLossMt: losses[0], endCutMt: losses[1], missRollMt: losses[2], chipOffMt: losses[3],
     lossesMt: losses.every((l) => l === null) ? null : round2(losses.reduce<number>((a, l) => a + (l ?? 0), 0)),
     billetInputMt,

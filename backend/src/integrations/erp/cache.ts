@@ -37,6 +37,7 @@ export const cachePaths = (env: Env) => {
     production: path.join(dir, 'erp-hsm-production.json'),
     commercial: path.join(dir, 'erp-hsm-commercial.json'),
     rmdProduction: path.join(dir, 'erp-rmd-production.json'),
+    rmdStock: path.join(dir, 'erp-rmd-stock.json'),
   };
 };
 
@@ -47,13 +48,21 @@ export const cachePaths = (env: Env) => {
  * CHIP_OFF_MT): the sheet's spelling returned no rows; these are the codes in the table,
  * confirmed with the user. Chip off is the plant's rejection.
  */
-export const RMD_LOG_FIELDS = ['PRODUCT_PRIME_SLENGTH_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT'] as const;
+export const RMD_LOG_FIELDS = ['INPUT_MT', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT'] as const;
 export type RmdLogField = (typeof RMD_LOG_FIELDS)[number];
 export interface RmdLogRow { date: string; vrno: string; v: Record<RmdLogField, number | null> }
 export interface RmdProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmdLogRow[] }
 
 export function readErpRmdProduction(env: Env): RmdProductionCache | null {
   return readJson<RmdProductionCache>(cachePaths(env).rmdProduction);
+}
+
+/** RMD finished stock: each item's net movement (received − issued, MT) per date in its godown. */
+export interface RmdStockMove { date: string; item: string; netMt: number }
+export interface RmdStockCache { syncedAt: string; source: string; godown: string; moves: RmdStockMove[] }
+
+export function readErpRmdStock(env: Env): RmdStockCache | null {
+  return readJson<RmdStockCache>(cachePaths(env).rmdStock);
 }
 
 /**

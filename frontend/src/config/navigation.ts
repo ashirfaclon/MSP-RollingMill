@@ -8,6 +8,8 @@ import type { IconId } from '@/components/Icon';
 export const MILLS = [
   { id: 'hsm', code: 'HSM' },
   { id: 'rmd', code: 'RMD' },
+  { id: 'lsm', code: 'LSM' },
+  { id: 'rms', code: 'RMS' },
 ] as const;
 
 export type MillId = (typeof MILLS)[number]['id'];

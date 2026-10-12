@@ -91,9 +91,9 @@ describe('rolling plan', async () => {
       { date: '2026-10-03', planMt: null, byShift: {} },
     ]);
   });
-  test('the imported October plan: 1–6 Oct, 1,203 MT, as in the tracker', () => {
+  test('the imported October plan: 1–14 Oct, as in the tracker of 12 Oct', () => {
     const days = planDays(['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07']);
-    expect(days.map((d) => d.planMt)).toEqual([203, 145, 198, 202, 230, 225, null]);
+    expect(days.map((d) => d.planMt)).toEqual([140, 225, 225, 225, 225, 184, 184]);
   });
 });
 

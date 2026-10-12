@@ -50,7 +50,9 @@ export default function MaterialBalance() {
 
   // Loss bar: the difference opened out. Scaled to whichever is larger, the four losses
   // or the difference, so a day where they don't add up shows the gap instead of hiding it.
-  const losses = LOSSES.map((l) => ({ ...l, value: has ? (t![l.key] as number | null) ?? 0 : 0 }));
+  // A loss that is 0 for the period isn't there: no segment, no legend entry.
+  const losses = LOSSES.map((l) => ({ ...l, value: has ? (t![l.key] as number | null) ?? 0 : 0 }))
+    .filter((l) => !has || l.value >= MIN_MT);
   const lossSum = losses.reduce((a, l) => a + l.value, 0);
   const diff = has ? t!.massDiffMt ?? 0 : 0;
   const unaccounted = diff - lossSum;

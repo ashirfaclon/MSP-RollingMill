@@ -154,7 +154,7 @@ test('the sidebar has Visualization only — Condition Analytics and Asset Healt
   }
 });
 
-test('mill picker offers HSM and RMD, switches mill, keeps the screen, and drives by keyboard', async ({ page }) => {
+test('mill picker offers HSM, RMD, LSM and RMS, switches mill, keeps the screen, and drives by keyboard', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const trigger = page.getByRole('button', { name: /^Rolling mill:/ });
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -166,7 +166,7 @@ test('mill picker offers HSM and RMD, switches mill, keeps the screen, and drive
     await trigger.click();
     await expect(list).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 15_000 });
-  await expect(list.getByRole('option')).toHaveText(['HSM', 'RMD']);
+  await expect(list.getByRole('option')).toHaveText(['HSM', 'RMD', 'LSM', 'RMS']);
   await expect(list.getByRole('option', { name: 'HSM' })).toHaveAttribute('aria-selected', 'true');
   await page.screenshot({ path: `${SHOTS}/mill-picker-open.png`, clip: { x: 1100, y: 0, width: 500, height: 260 } });
 
@@ -295,8 +295,6 @@ test('unknown mill or screen is a 404', async ({ page }) => {
   expect(res.status()).toBe(404);
   const res2 = await page.request.get('/hsm/overview');
   expect(res2.status()).toBe(404);
-  // LSM and RMS are no longer mills of this app.
-  for (const gone of ['/lsm/visualization', '/rms/visualization']) expect((await page.request.get(gone)).status()).toBe(404);
 });
 
 test.describe('narrow viewports', () => {
@@ -318,20 +316,12 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   // Nothing on the RMD screen is sample data any more, so there is no illustrative banner.
   await expect(page.getByText('Illustrative data')).toHaveCount(0);
   const strip = page.getByRole('region', { name: 'Headline KPIs' });
-  // The same seven cards as HSM, in the same order.
-  await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/, /^Made To Stock/, /^Stock with order/, /^Free stock/]);
-  // Not sourced yet: NA, and nothing to open.
-  const card = (name: string) => strip.getByRole('article', { name, exact: true });
-  for (const name of ['Made To Stock', 'Stock with order', 'Free stock']) {
-    await expect(card(name).locator('.rm-card-value')).toContainText('NA');
-    await expect(card(name).locator('.rm-card-note')).toHaveText('');
-  }
-  // Wired: production (ERP), power (forms), specific energy (power ÷ ERP production) open their drawers;
-  // mass yield opens its billets-in drawer and stays NA until billet input in MT has a source.
-  for (const name of ['Production', 'Power consumption', 'Specific energy']) await expect(strip.getByRole('button', { name, exact: true })).toBeVisible();
-  const yieldCard = strip.getByRole('button', { name: 'Mass yield', exact: true });
-  await expect(yieldCard.locator('.rm-card-value')).toContainText('NA');
-  await expect(yieldCard.locator('.rm-card-note')).toHaveText('Billet input MT pending');
+  // Production as two cards (Production · Prime + SL, Production · Prime), then HSM's next three; no Made To Stock / Stock with order / Free stock.
+  await expect(strip.locator('.rm-card-label')).toHaveText(['Production · Prime + SL', 'Production · Prime', 'Mass yield', 'Power consumption', 'Specific energy']);
+  // Wired: production and mass yield (ERP), power (forms), specific energy (power ÷ ERP production) open their drawers.
+  for (const name of ['Production · Prime + SL', 'Production · Prime', 'Mass yield', 'Power consumption', 'Specific energy']) await expect(strip.getByRole('button', { name, exact: true })).toBeVisible();
+  // No "pending" or coverage notes on the ERP cards (today's entry comes a day late, so NA).
+  await expect(strip.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-note')).toHaveText('');
   // Mill flow, live: infeed, the two status zones and the exit (ERP production) wired; roughing not sourced yet.
   const mimic = page.getByRole('list', { name: 'Mill process flow' });
   await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit']);
@@ -342,23 +332,50 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   await expect(mimic.getByRole('button', { name: /Finished exit/ })).toBeVisible();
   await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-dot')).toHaveCount(14);   // L1 S1–S8 + L2 S1–S6
   await expect(mimic.getByRole('button', { name: /Finishing group/ }).locator('.rm-dot')).toHaveCount(10);   // 5 per line
-  // Production by shift: two shifts (08–20, 20–08), NA until the rolling plan; running rate NA until production.
+  // Production by shift: two shifts (08–20, 20–08); targets from the FY plan, output per shift NA (not in the ERP).
   const shifts = page.locator('.rm-flip-face--front section.panel');
   await expect(shifts.locator('.rm-shift-name')).toHaveText(['Day', 'Night']);
   await expect(shifts.locator('.panel-sub')).toHaveText('Day 08:00–20:00 IST · Night 20:00–08:00 IST');
   await expect(shifts.locator('.rm-shift-val')).toHaveText(['NA', 'NA']);
   await expect(shifts.locator('.rm-shift-comp')).toHaveText(['NA', 'NA']);
-  await expect(shifts).toContainText('Plan NA');
+  await expect(shifts.locator('.chip')).toHaveText(/^Plan \d/);
   await expect(shifts.locator('.rm-foot')).toContainText(/Running rate\s*NA/);
-  // Order allocation: on hold with the ERP.
+  // Order allocation: production from the ERP log sheet, finished stock from the item ledger; no MTO / MTS split.
   const alloc = page.locator('section.panel', { hasText: 'Order allocation' });
-  await expect(alloc.locator('.rm-alloc-total')).toHaveText([/MT$|^NA$/, 'NA']);   // production from the ERP; stock NA
+  await expect(alloc.locator('.rm-alloc-total')).toHaveText([/MT$|^NA$/, /\d MT$/]);
+  await expect(alloc).not.toContainText('Made To');
   // Material balance: only the billet count is live; billet input (MT), finished, yield, mass difference NA.
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
   await expect(balance.locator('.rm-mb-figure-v')).toHaveText(['NA', 'NA']);
   await expect(balance).toContainText('Mass difference NA');
   await expect(balance.locator('.rmd-mb-pieces')).toContainText(/\d+ in|NA/);
-  // Finished stock by size: not wired yet.
-  await expect(page.locator('section.panel', { hasText: 'Finished stock by size' }).locator('.rm-empty')).toHaveText('NA');
+  // Finished stock by size: the ERP item ledger (FGYRDP), one row per bar size, smallest first.
+  await expect(page.locator('section.panel', { hasText: 'Finished stock by size' }).locator('.rm-size-name').first()).toHaveText('8 mm');
   await page.screenshot({ path: `${SHOTS}/rmd-visualization.png`, fullPage: true });
 });
+
+for (const mill of ['lsm', 'rms'] as const) {
+  test(`${mill.toUpperCase()} visualization: the same screen as HSM / RMD, every figure NA until its source is confirmed`, async ({ page }) => {
+    await page.goto(`/${mill}/visualization`);
+    await expect(page.locator('.tb-mark--mill')).toHaveText(mill.toUpperCase());
+    // Each mill's own day and shifts (plant, 12 Oct 2026): LSM 09:00, RMS 09:30.
+    const start = mill === 'lsm' ? '09:00' : '09:30';
+    const mid = mill === 'lsm' ? '21:00' : '21:30';
+    await expect(page.getByRole('button', { name: /Duration/ })).toContainText(new RegExp(`${start} IST → \\d{1,2} \\w{3} ${start} IST`));
+    await expect(page.locator('.rm-flip-face--front .panel-sub')).toHaveText(`Day ${start}–${mid} IST · Night ${mid}–${start} IST`);
+    const strip = page.getByRole('region', { name: 'Headline KPIs' });
+    await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/, /^Made To Stock/, /^Stock with order/, /^Free stock/]);
+    await expect(strip.locator('.rm-card-value')).toHaveText(Array(7).fill(/^NA/));
+    // Nothing is wired, so nothing opens.
+    await expect(strip.getByRole('button')).toHaveCount(0);
+    const mimic = page.getByRole('list', { name: 'Mill process flow' });
+    await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet delivery rate', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finish exit']);
+    await expect(mimic.locator('.rm-zone-value')).toHaveText(Array(5).fill('NA'));
+    for (const title of ['Production by shift', 'Order allocation', 'Material & operating balance', 'Finished stock by size']) {
+      await expect(page.locator('section.panel', { hasText: title }).first()).toBeVisible();
+    }
+    // No sample figures anywhere.
+    await expect(page.getByText('Illustrative data')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/${mill}-visualization.png`, fullPage: true });
+  });
+}

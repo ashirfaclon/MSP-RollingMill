@@ -113,8 +113,11 @@ export interface RmdProductionPeriod {
   days: number;
   /** Days with at least one log-sheet entry. */
   entryDays: number;
-  /** PRODUCT_PRIME_SLENGTH_MT, Σ over the period's entries; null with no entry. */
+  /** PRODUCT_PRIME_SLENGTH_MT (prime + short length), Σ over the period's entries; null with no entry.
+   *  The production figure everything else uses. */
   productionMt: number | null;
+  /** FINISH_PRODUCT_PRIME_MT (prime only) — the second daily declaration, shown beside it. */
+  primeMt: number | null;
   burningLossMt: number | null;
   endCutMt: number | null;
   missRollMt: number | null;
@@ -122,11 +125,11 @@ export interface RmdProductionPeriod {
   chipOffMt: number | null;
   /** burning loss + end cut + miss roll + chip off. */
   lossesMt: number | null;
-  /** Billet input in MT — not available yet (no source): null. */
+  /** INPUT_MT — billet input, Σ over the period's entries; null with no entry. */
   billetInputMt: number | null;
-  /** billetInputMt − productionMt; null until billet input MT exists. */
+  /** billetInputMt − productionMt; null without both. */
   massDiffMt: number | null;
-  /** productionMt ÷ billetInputMt × 100; null until billet input MT exists. */
+  /** productionMt ÷ billetInputMt × 100; null without both. */
   massYieldPct: number | null;
 }
 
@@ -137,4 +140,49 @@ export interface RmdProductionReport {
   erp: { connection: 'up' | 'down'; message: string; syncedAt: string | null; lastDate: string | null };
   rows: RmdProductionPeriod[];
   totals: RmdProductionPeriod;
+}
+
+/** GET /api/rmd/stock — finished stock by bar size in FGYRDP at the end of a date (ERP item ledger), every SKU of the plant's list. */
+export interface RmdStockReport {
+  asOf: string;
+  erp: { connection: 'up' | 'down'; message: string; syncedAt: string | null; lastDate: string | null };
+  /** One row per bar size, smallest first, then 'Other' (the plant's items with no bar size). Every
+   *  item of the plant's list in stock is in exactly one row (largest first); items and rows at 0 are left out. */
+  sizes: { key: string; label: string; sizeMm: number | null; stockMt: number; items: { code: string; name: string; stockMt: number }[] }[];
+  totalMt: number;
+}
+
+/** GET /api/rmd/plan — the month-wise plan spread to days and shifts, against ERP Prime + SL. */
+export interface RmdPlanDay {
+  date: string;
+  /** Plan for the day, MT (Prime + SL); null when the plan has no month for it. */
+  planMt: number | null;
+  /** Day / Night → half the day's plan each. */
+  byShift: Record<string, number>;
+  /** ERP Prime + SL (PRODUCT_PRIME_SLENGTH_MT) for the date; null until it is entered. */
+  actualMt: number | null;
+}
+
+export interface RmdPlanReport {
+  from: string;
+  to: string;
+  source: string;
+  days: RmdPlanDay[];
+  totals: {
+    /** Σ plan over the period's planned days; null when none is planned. */
+    planMt: number | null;
+    /** Σ plan per shift over the planned days. */
+    byShift: Record<string, number | null>;
+    plannedDays: number;
+    days: number;
+    /** Planned days that also have ERP production — the days plan gap and compliance compare. */
+    comparedDays: number;
+    comparedPlanMt: number | null;
+    /** ERP Prime + SL over the compared days. */
+    actualMt: number | null;
+    /** comparedPlanMt − actualMt: positive = short of plan. */
+    gapMt: number | null;
+    /** actualMt ÷ comparedPlanMt × 100. */
+    compliancePct: number | null;
+  };
 }

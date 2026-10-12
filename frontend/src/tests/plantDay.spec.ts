@@ -2,7 +2,7 @@
  * The plant day: a date is 06:00 IST → 06:00 IST next day, never midnight to midnight.
  */
 import { test, expect } from '@playwright/test';
-import { cycleLabel, dayCount, plantDate, plantDayStartMs } from '@/lib/plantDay';
+import { cycleLabel, dayCount, plantDate, plantDayStartMs, shiftsLabel } from '@/lib/plantDay';
 import { presetDates } from '@/state/globalSel';
 
 const at = (d: string, hhmm: string) => Date.parse(`${d}T${hhmm}:00+05:30`);
@@ -33,4 +33,13 @@ test('presets resolve to whole plant days, counted from the plant date running n
   expect(presetDates('current_month', noon)).toEqual({ from: '2026-10-01', to: '2026-10-01' });
   expect(presetDates('previous_month', noon)).toEqual({ from: '2026-09-01', to: '2026-09-30' });
   expect(presetDates('previous_year', noon)).toEqual({ from: '2025-01-01', to: '2025-12-31' });
+});
+
+test('a mill day can start on the half hour (RMS 09:30), and shifts follow it', () => {
+  expect(cycleLabel('2026-10-12', '2026-10-12', 9.5)).toBe('12 Oct 09:30 IST → 13 Oct 09:30 IST');
+  // 09:20 IST on 12 Oct is still RMS's 11 Oct; 09:40 is 12 Oct.
+  expect(plantDate(Date.parse('2026-10-12T03:50:00Z'), 9.5)).toBe('2026-10-11');
+  expect(plantDate(Date.parse('2026-10-12T04:10:00Z'), 9.5)).toBe('2026-10-12');
+  expect(shiftsLabel(9)).toBe('Day 09:00–21:00 IST · Night 21:00–09:00 IST');
+  expect(shiftsLabel(9.5)).toBe('Day 09:30–21:30 IST · Night 21:30–09:30 IST');
 });

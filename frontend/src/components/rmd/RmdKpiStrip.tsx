@@ -1,14 +1,16 @@
 'use client';
 
 /**
- * RMD headline cards — the same seven as HSM, in the same order and anatomy. Only what the
- * plant has confirmed is wired:
- *   Production          ERP Production Log Sheet (FA-SKJ, PRODUCT_PRIME_SLENGTH_MT);
- *   Mass yield          production ÷ billet input — billet input in MT has no source yet,
- *                       so NA; its drawer shows the billets counted (Influx);
+ * RMD headline cards — HSM's first four, in the same order and anatomy, with production as
+ * two cards (one per ERP declaration). RMD has no Made To
+ * Stock / Made To Order split and its stock is all free stock, so the three order/stock cards
+ * are not shown (user, 12 Oct 2026). Only what the plant has confirmed is wired:
+ *   Prime + SL, Prime   ERP Production Log Sheet (FA-SKJ), the two daily production declarations:
+ *                       PRODUCT_PRIME_SLENGTH_MT (Prime + SL, SL = short length, which every other
+ *                       figure uses) and FINISH_PRODUCT_PRIME_MT (Prime); both open one drawer;
+ *   Mass yield          Prime + SL ÷ billet input (INPUT_MT), both from the ERP log sheet;
  *   Power consumption   the logbook forms Power Reading VCB 1 / 2 / 3 (live, as filled);
- *   Specific energy     power ÷ ERP production (backend power report);
- *   Made To Stock, Stock with order, Free stock   nothing yet (plan / ERP to come).
+ *   Specific energy     power ÷ ERP production (backend power report).
  * A card with nothing behind it opens nothing.
  */
 import { useState } from 'react';
@@ -16,9 +18,10 @@ import KpiCard from '@/components/visualization/KpiCard';
 import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import { fixed } from '@/lib/num';
-import { dm, useSelection } from '@/services/hsmProduction';
-import RmdYieldDrawer from './RmdYieldDrawer';
+import { useSelection } from '@/services/hsmProduction';
 import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
+
+const mt1 = (v: number | null | undefined) => (v == null ? 'NA' : fixed(v, 1));
 
 export default function RmdKpiStrip() {
   const [yieldOpen, setYieldOpen] = useState(false);
@@ -26,42 +29,47 @@ export default function RmdKpiStrip() {
   const { dates } = useSelection();
   const { data, error } = useRmdProduction(dates);
   const t = data?.totals;
-  // The ERP is entered a day or two late: say how far, so a part-period figure is not read as the whole.
+  // Only a connection problem is noted on the card.
   const note = error ? 'ERP data unavailable'
-    : !t ? ''
-    : data!.erp.connection === 'down' ? data!.erp.message
-    : t.entryDays === 0 ? `Not entered yet · entered to ${dm(data!.erp.lastDate)}`
-    : t.entryDays < t.days ? `ERP entered to ${dm(data!.erp.lastDate)}`
+    : data?.erp.connection === 'down' ? data.erp.message
     : '';
 
   return (
-    <section className="rm-strip" aria-label="Headline KPIs">
+    <section className="rm-strip rmd-strip" aria-label="Headline KPIs">
       <KpiCard
-        label="Production"
-        value={t?.productionMt == null ? 'NA' : fixed(t.productionMt, 1)}
+        label="Production · Prime + SL"
+        value={mt1(t?.productionMt)}
         unit="MT"
         note={note}
         series="prod"
         loading={!data && !error}
         onOpen={() => setProdOpen(true)}
-        openLabel="Production per day, from the ERP log sheet"
+        openLabel="Production per day, prime + SL and prime, from the ERP log sheet"
+      />
+      <KpiCard
+        label="Production · Prime"
+        value={mt1(t?.primeMt)}
+        unit="MT"
+        note={note}
+        series="prod"
+        loading={!data && !error}
+        onOpen={() => setProdOpen(true)}
+        openLabel="Production per day, prime + SL and prime, from the ERP log sheet"
       />
       <RmdProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
       <KpiCard
         label="Mass yield"
-        value="NA"
+        value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
         unit="%"
-        note="Billet input MT pending"
+        note={note}
         series="order"
+        loading={!data && !error}
         onOpen={() => setYieldOpen(true)}
-        openLabel="Billets in per day, the wired part of the yield"
+        openLabel="Mass yield per day, from the ERP log sheet"
       />
-      <RmdYieldDrawer open={yieldOpen} onClose={() => setYieldOpen(false)} />
+      <RmdProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
       <PowerKpiCard mill="rmd" />
       <SpecificEnergyCard mill="rmd" />
-      <KpiCard label="Made To Stock" value="NA" unit="MT" note="" series="free" />
-      <KpiCard label="Stock with order" value="NA" unit="MT" note="" series="order" />
-      <KpiCard label="Free stock" value="NA" unit="MT" note="" series="free" />
     </section>
   );
 }

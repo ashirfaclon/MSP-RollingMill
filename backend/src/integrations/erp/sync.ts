@@ -22,8 +22,9 @@
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import oracledb from 'oracledb';
 import { loadEnv, type Env } from '../../config/env';
+import { RMD_STOCK_GODOWN, RMD_STOCK_ITEMS } from '../../modules/rmd/stock-items';
 import {
-  ERP_ENTITIES, LOG_FIELDS, RMD_LOG_FIELDS, cachePaths, type RmdLogField, type RmdProductionCache,
+  ERP_ENTITIES, LOG_FIELDS, RMD_LOG_FIELDS, cachePaths, type RmdLogField, type RmdProductionCache, type RmdStockCache,
   type ErpCache, type ErpCommercialCache, type ErpDivisionRow, type ErpProductionCache,
   type ErpProductionRow, type ErpSyncAttempt, type LogField,
 } from './cache';
@@ -256,6 +257,44 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
     log(`  RMD log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);
   } catch (err) {
     log(`  RMD log sheet not synced: ${(err as Error).message}`);
+  } finally {
+    await conn?.close();
+  }
+  await pullRmdStock(env, p, log);
+}
+
+/**
+ * RMD finished stock: the plant's item list in godown FGYRDP, from the ERP item ledger
+ * (VG_ITEM_LEDGER — every movement of every kind, from the 31 Mar 2023 opening), netted per
+ * item per date. Stock at the end of a date = Σ net up to it. The ERP's own stock figure
+ * (VF_ITEM_KPIS.CLQTY) is the same Σ received − issued over this ledger. Its own failure.
+ */
+async function pullRmdStock(env: Env, p: Paths, log: (line: string) => void) {
+  let conn: oracledb.Connection | null = null;
+  try {
+    conn = await oracledb.getConnection({ user: env.erpUser!, password: env.erpPassword!, connectString: env.erpDsn! });
+    conn.callTimeout = 120_000;
+    await conn.execute('SET TRANSACTION READ ONLY');
+    const codes = RMD_STOCK_ITEMS.map((i) => i.code);
+    const binds = Object.fromEntries(codes.map((c, i) => [`i${i}`, c]));
+    const rows = ((await conn.execute<{ D: string; ITEM: string; NET: number }>(`
+      SELECT TO_CHAR(TRUNC(l.VRDATE), 'YYYY-MM-DD') AS "D", l.ITEM_CODE AS "ITEM",
+             NVL(SUM(l.QTYRECD), 0) - NVL(SUM(l.QTYISSUED), 0) AS "NET"
+        FROM MSPV7ERP1.VG_ITEM_LEDGER l
+       WHERE l.ENTITY_CODE = 'MP' AND l.GODOWN_CODE = :godown
+         AND l.ITEM_CODE IN (${codes.map((_, i) => `:i${i}`).join(', ')})
+       GROUP BY TRUNC(l.VRDATE), l.ITEM_CODE
+       ORDER BY 1, 2`, { godown: RMD_STOCK_GODOWN, ...binds }, { maxRows: 0 })).rows ?? []);
+    const cache: RmdStockCache = {
+      syncedAt: new Date().toISOString(),
+      source: `VG_ITEM_LEDGER · GODOWN_CODE = '${RMD_STOCK_GODOWN}'`,
+      godown: RMD_STOCK_GODOWN,
+      moves: rows.filter((r) => Number(r.NET) !== 0).map((r) => ({ date: String(r.D), item: String(r.ITEM), netMt: Number(r.NET) })),
+    };
+    writeAtomic(p.rmdStock, cache);
+    log(`  RMD stock: ${cache.moves.length} item-days, ${cache.moves[0]?.date ?? 'none'} → ${cache.moves.at(-1)?.date ?? 'none'}`);
+  } catch (err) {
+    log(`  RMD stock not synced: ${(err as Error).message}`);
   } finally {
     await conn?.close();
   }

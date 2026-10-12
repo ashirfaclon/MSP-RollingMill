@@ -12,6 +12,9 @@ import { rmdBillets } from './billets.service';
 import { rmdLive, rmdStationTrend } from './live.service';
 import { rmdRunningRate } from './running-rate.service';
 import { rmdProduction } from './production.service';
+import { rmdStock } from './stock.service';
+import { rmdPlan } from './plan.service';
+import { isDate } from '../hsm/production.service';
 import { HttpError } from '../../shared/http-error';
 
 const ZONES = ['route', 'finishing'] as const;
@@ -50,6 +53,19 @@ export async function rmdRoutes(app: FastifyInstance) {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
     return rmdRunningRate(loadEnv(), from, to, parseGrain(q));
+  });
+
+  /** Production plan (month-wise FY plan spread to days and shifts) against ERP Prime + SL. */
+  app.get('/plan', { config: { errorCode: 'rmd_plan_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return rmdPlan(loadEnv(), from, to);
+  });
+
+  /** Finished stock by bar size in FGYRDP at the end of date `to` (ERP item ledger). */
+  app.get('/stock', { config: { errorCode: 'rmd_stock_failed' } }, async (req) => {
+    const to = searchParams(req).get('to') ?? '';
+    if (!isDate(to)) throw new HttpError(400, 'bad_range', 'to must be a date (YYYY-MM-DD)');
+    return rmdStock(loadEnv(), to);
   });
 
   /** Production and losses: the ERP Production Log Sheet (FA-SKJ), per date / week / month. */
