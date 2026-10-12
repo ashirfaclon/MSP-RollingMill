@@ -17,7 +17,7 @@ import { useState, type ReactNode } from 'react';
 import KpiCard from '@/components/visualization/KpiCard';
 import MassYieldDrawer, { yieldDelta } from '@/components/drill/MassYieldDrawer';
 import { fixed } from '@/lib/num';
-import { dm, useSelection } from '@/services/hsmProduction';
+import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type YieldComparison } from '@/services/hsmApi';
 
 export function useYield() {
@@ -34,13 +34,9 @@ export default function YieldKpiCard() {
 
   let note: ReactNode = error ? 'Data unavailable' : 'Loading…';
   if (t && current) {
-    // ERP lag first (it is the one a reader compares against), then the Influx side's.
-    if (!t.erpDays) note = `ERP not entered yet · entered to ${dm(current.erp.lastDate)}`;
-    else if (t.erpDays < t.days) note = `ERP entered to ${dm(current.erp.lastDate)}`;
-    else if (!t.influxDays) note = 'No counter data';
-    else if (!t.netDays) note = `Influx awaits ERP losses (booked to ${dm(current.byProductsLastDate)})`;
-    else if (t.netDays < t.influxDays) note = `Influx: losses booked to ${dm(current.byProductsLastDate)}`;
-    else if (yieldDelta(t) !== null) {
+    // No coverage notes ("entered to …"); the delta only when both cover the whole period.
+    if (!t.influxDays) note = 'No counter data';
+    else if (t.erpDays === t.days && t.netDays === t.influxDays && yieldDelta(t) !== null) {
       // Both cover the whole period: Influx − ERP, highlighted like the Production card's delta.
       const d = yieldDelta(t)!;
       note = (

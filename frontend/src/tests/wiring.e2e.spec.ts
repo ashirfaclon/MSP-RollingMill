@@ -41,10 +41,10 @@ async function pickWeek(page: Page) {
 test('mass yield card and the material balance show the ERP log sheet for the period', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const yieldCard = page.getByRole('button', { name: 'Mass yield', exact: true });
-  // Today: the ERP is entered 1–2 days late — stated, not guessed.
+  // Today: the ERP is entered 1–2 days late — no note about it.
   await expect(yieldCard.locator('.rm-card-pair-item').nth(0)).toContainText('ERP');
   await expect(yieldCard.locator('.rm-card-pair-item').nth(1)).toContainText('Influx');
-  await expect(yieldCard.locator('.rm-card-note')).toContainText('ERP');
+  await expect(yieldCard.locator('.rm-card-note')).toHaveText('');
 
   await pickWeek(page);
   // Before rejection, both sides. ERP: PRODUCTION_MT 1,076.51 ÷ INPUT_MT 1,121.34 = 96.00 %.

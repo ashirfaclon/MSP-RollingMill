@@ -3,8 +3,7 @@
 /**
  * The Production headline card: two figures for the period chosen in the Duration filter,
  * side by side —
- *   ERP    — the production log sheet (PRODUCTION_MT), entered 1–2 days late; the note says
- *            how far it has been entered when it does not cover the whole period;
+ *   ERP    — the production log sheet (PRODUCTION_MT), entered 1–2 days late (no note about it);
  *   INFLUX — the mill counter Total_Production_Ton, reset events less noise, per 06:00
  *            plant day. Live — today counts up as the mill rolls. Publishes from 21 Sep 2026.
  * Clicking it opens the ERP-vs-Influx drawer, where the two are compared day by day.
@@ -31,11 +30,8 @@ export default function ProductionKpiCard() {
     influx = t.influxMt;
     if (current.influx.connection === 'down') note = current.influx.message;
     else if (t.influxMt === null) note = `No counter data · starts ${dm(COUNTER_START_DATE)}`;
-    // The ERP is entered 1–2 days late: say how far, so a part-period figure is not read as the whole.
-    else if (!t.erpDays) note = `ERP not entered yet · entered to ${dm(current.erp.lastDate)}`;
-    else if (t.erpDays < t.days) note = `ERP entered to ${dm(current.erp.lastDate)}`;
-    // Both cover the whole period: the line under the two figures is Influx − ERP.
-    else if (t.varianceMt !== null) {
+    // No coverage notes ("entered to …"). Both cover the whole period: the line under the two figures is Influx − ERP.
+    else if (t.erpDays === t.days && t.varianceMt !== null) {
       // Highlighted like the shift panel's plan gap: amber when the two disagree, green when they match.
       note = (
         <span className="rm-card-delta">

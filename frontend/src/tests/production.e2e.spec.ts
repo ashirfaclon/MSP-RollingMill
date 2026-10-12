@@ -39,11 +39,11 @@ async function pickCustom(page: Page) {
 test('the Production card shows ERP and Influx production for the Duration filter period', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const card = page.getByRole('button', { name: 'Production', exact: true });
-  // Default period is Today — Influx is live; the ERP is entered 1–2 days late, and the note says so.
+  // Default period is Today — Influx is live; the ERP is entered 1–2 days late, with no note about it.
   await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('ERP');
   await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('Influx');
   await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText(/\d[\d,]*\.\d/);
-  await expect(card.locator('.rm-card-note')).toContainText('ERP');
+  await expect(card.locator('.rm-card-note')).toHaveText('');
 
   await pickCustom(page);
   // 22–28 Sep. ERP log sheet PRODUCTION_MT: 1,076.51.
