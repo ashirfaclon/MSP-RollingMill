@@ -21,7 +21,7 @@ export function useFinishedStock() {
     error: s.error,
     /** The plant date the stock is counted to. */
     asOf: dates?.to ?? null,
-    /** No opening balance in the ERP for the year: the figure is the change since go-live. */
+    /** No opening in the count (an old cache): the figure is the change since go-live. */
     fromLedger: data?.basis.kind === 'ledger-start',
   };
 }

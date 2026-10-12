@@ -136,12 +136,11 @@ export interface StockReport {
   asOf: string;
   erp: ErpMeta;
   /**
-   * Where the count starts. `opening`: the ERP's opening stock for the financial year of
-   * `asOf`, plus movements since 1 April. `ledger-start`: that opening is not in the ERP
-   * yet, so the count starts at 0 on the ERP go-live date — the figure is the change since
-   * then, and switches to the true stock by itself once the opening is entered.
+   * Where the count starts. `ledger`: the plant's stock rule — every entry since the ledger's
+   * first one, which carries the opening (the true stock). `opening` / `ledger-start`: the
+   * earlier count from a year's opening, or from 0 at go-live (caches synced before 12 Oct 2026).
    */
-  basis: { kind: 'opening' | 'ledger-start'; year: string; from: string };
+  basis: { kind: 'ledger' | 'opening' | 'ledger-start'; year: string; from: string };
   totals: { openingMt: number; inMt: number; outMt: number; stockMt: number };
   byType: { type: string; label: string; inMt: number; outMt: number }[];
   sizes: StockSize[];

@@ -57,6 +57,14 @@ export function readErpRmdProduction(env: Env): RmdProductionCache | null {
   return readJson<RmdProductionCache>(cachePaths(env).rmdProduction);
 }
 
+/**
+ * The plant's stock rule (their stock-balance query, 12 Oct 2026): ITEMTRAN_BODY, every entry
+ * since the ledger starts, without these voucher types (TCODE) — stock = Σ QTYRECD − Σ QTYISSUED.
+ */
+export const STOCK_EXCLUDED_TCODES = ['MC', 'FS', 'ME', 'NG', 'NP', 'QJ', 'ZH', 'ZP', 'ZW', 'ZF', 'MR', 'ZM', 'ES', 'NT', 'ZS', 'ZA', 'MD', 'NI', 'Z8'] as const;
+/** Divisions the plant's stock query covers. */
+export const STOCK_DIVISIONS = ['RM', 'RS', 'LS', 'PL', 'SI', 'SM', 'S1'] as const;
+
 /** RMD finished stock: each item's net movement (received − issued, MT) per date in its godown. */
 export interface RmdStockMove { date: string; item: string; netMt: number }
 export interface RmdStockCache { syncedAt: string; source: string; godown: string; moves: RmdStockMove[] }
@@ -128,9 +136,10 @@ export interface ErpCommercialCache {
     qty: number; executed: number; cancelled: number; due: string | null;
   }[];
   /**
-   * Finished-strip stock in the FG yard: daily movements per item and type (PROD in, SALE
-   * out, M2M item-to-item transfer, SRET returns — loading advices left out) and each
-   * financial year's opening stock. Absent in caches synced before stock was pulled.
+   * Finished-strip stock, by the plant's stock rule (STOCK_EXCLUDED_TCODES): every S1
+   * finished-goods (FG) movement since the ledger starts, in every godown but STOR1P, per
+   * day, item and type. `openings` is no longer pulled (the ledger carries the opening).
+   * Absent in caches synced before stock was pulled.
    */
   stock?: {
     godown: string;

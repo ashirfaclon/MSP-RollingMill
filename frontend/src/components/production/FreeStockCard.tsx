@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * "Free stock": finished strip in the FG yard at the end of the Duration period, from the
- * ERP stock ledger. The ERP does not link yard stock to sales orders, so all of it counts
+ * "Free stock": finished strip at the end of the Duration period, by the plant's stock query
+ * (ERP stock ledger, every entry since it starts). The ERP does not link yard stock to sales orders, so all of it counts
  * as free (Stock with order stays 0) — the same figure as the Order allocation block and
  * the stock-by-size panel, so the three always agree. Opens the stock drawer.
  */

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * RMD finished stock by size, from the ERP item ledger (godown FGYRDP) counted to the end of
+ * RMD finished stock by size, by the plant's stock query (ERP ITEMTRAN_BODY, godown FGYRDP) counted to the end of
  * the Duration period. Overview: one row per bar size, every SKU of that size summed, then
  * 'Other' (the plant's items with no bar size). All of it is free stock, so there is no
  * with-order / free split. Clicking a row opens its breakdown by SKU: every SKU of the plant's
@@ -100,8 +100,8 @@ function SizeBreakdown({ size, asOf }: { size: Size; asOf: string }) {
         sources={[{
           name: 'ERP',
           rows: [
-            ['Table', 'VG_ITEM_LEDGER'],
-            ['Filter', "ENTITY_CODE = 'MP', GODOWN_CODE = 'FGYRDP'"],
+            ['Table', 'ITEMTRAN_BODY (the plant\'s stock query)'],
+            ['Filter', "ENTITY_CODE = 'MP', GODOWN_CODE = 'FGYRDP', DIV_CODE in RM, RS, LS, PL, SI, SM, S1; TCODE not in (MC, FS, ME, NG, NP, QJ, ZH, ZP, ZW, ZF, MR, ZM, ES, NT, ZS, ZA, MD, NI, Z8)"],
             ['Field', `ITEM_CODE = the ${size.label} SKUs of the plant's item list; QTYRECD, QTYISSUED`],
             ['Date', `VRDATE up to ${dm(asOf)}`],
           ],

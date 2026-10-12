@@ -305,10 +305,14 @@ export function stockReport(env: Env, asOf: string): StockReport {
   const stock = com?.stock;
   const names = com?.items ?? {};
   const fy = financialYear(asOf);
+  // The plant's stock rule: the whole ledger, from its first entry — the opening is in it.
+  const first = (stock?.moves ?? []).reduce<string | null>((m, x) => (m === null || x.date < m ? x.date : m), null);
   const openingRows = (stock?.openings ?? []).filter((o) => o.year === fy.label);
-  const basis: StockReport['basis'] = openingRows.length
-    ? { kind: 'opening', year: fy.label, from: fy.start }
-    : { kind: 'ledger-start', year: fy.label, from: STOCK_LEDGER_START };
+  const basis: StockReport['basis'] = first && !openingRows.length
+    ? { kind: 'ledger', year: fy.label, from: first }
+    : openingRows.length
+      ? { kind: 'opening', year: fy.label, from: fy.start }
+      : { kind: 'ledger-start', year: fy.label, from: STOCK_LEDGER_START };
 
   const sizes = new Map<string, { opening: number; inMt: number; outMt: number }>();
   const at = (item: string) => {

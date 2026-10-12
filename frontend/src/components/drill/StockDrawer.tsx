@@ -33,7 +33,7 @@ export default function StockDrawer(props: {
       open={props.open}
       onClose={props.onClose}
       title="Finished stock · ERP"
-      sub="HSM · finished-goods yard · MT"
+      sub="HSM · finished goods · MT"
       controls={r.controls}
       loading={props.loading}
       error={props.error}
@@ -101,27 +101,18 @@ function Content({ data, from, to, grain }: { data: StockReport; from: string; t
 
 const SOURCES: SourceSystem[] = [
   {
-    name: 'ERP · stock ledger',
+    name: 'ERP · stock ledger (the plant\'s stock query)',
     rows: [
-      ['Table', 'ITEMTRAN_BODY'],
-      ['Filter', "ENTITY_CODE = 'MP', GODOWN_CODE = 'FGYRDP', STOCK_FLAG ≠ '4', strip-mill items (received by DIV_CODE = 'S1' in PROD_TRAN)"],
-      ['Field', 'QTYRECD, QTYISSUED by TNATURE (PROD, SALE, M2M, SRET), per VRDATE'],
-    ],
-  },
-  {
-    name: 'ERP · opening stock',
-    rows: [
-      ['Table', 'ITEMOPBAL_MAST'],
-      ['Filter', "GODOWN_CODE = 'FGYRDP', ACC_YEAR = year of the period end"],
-      ['Field', 'YROPQTY'],
+      ['Table', 'ITEMTRAN_BODY, ITEM_MAST'],
+      ['Filter', "ENTITY_CODE = 'MP', DIV_CODE = 'S1', ITEM_NATURE = 'FG', item not closed, GODOWN_CODE ≠ 'STOR1P', billets left out"],
+      ['Field', 'QTYRECD, QTYISSUED, per VRDATE — TCODE not in (MC, FS, ME, NG, NP, QJ, ZH, ZP, ZW, ZF, MR, ZM, ES, NT, ZS, ZA, MD, NI, Z8)'],
     ],
   },
 ];
 
 const formula = (data: StockReport) => [
-  'Stock = opening + received − issued, up to the end of the day',
-  'Received = PROD + SRET + M2M in;  Issued = SALE + M2M out',
-  data.basis.kind === 'ledger-start'
-    ? `Opening = YROPQTY; not in ERP for ${data.basis.year}, so counted from 0 on ${dm(data.basis.from)} 2025`
-    : `Opening = YROPQTY for ${data.basis.year}, on 1 April`,
+  'Stock = Σ QTYRECD − Σ QTYISSUED of every ledger entry up to the end of the day',
+  data.basis.kind === 'ledger'
+    ? `Counted from the ledger's first entry (${dm(data.basis.from)} 2025), which carries the opening stock`
+    : `Counted from ${dm(data.basis.from)} 2025`,
 ];

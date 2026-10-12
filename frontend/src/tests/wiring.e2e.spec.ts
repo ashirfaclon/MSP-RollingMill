@@ -192,32 +192,32 @@ test('mill mimic is live: billets today, stand groups, and the stands drawer', a
   await expect(rough.getByRole('region', { name: 'Data source' })).toContainText('Motor_Curren5');
 });
 
-test('finished stock by size: the ERP stock ledger per size — a plain view, no drill-down', async ({ page }) => {
+test('finished stock by size: the plant\'s stock query per size — a plain view, no drill-down', async ({ page }) => {
   await pickWeek(page);
   const panel = page.locator('section.panel', { hasText: 'Finished stock by size' });
   const first = panel.locator('.rm-size--stock').first();
   await expect(first).toContainText('358–360 × 2.80');
-  await expect(first).toContainText('103.5 MT');
-  // Counted to the period end; no opening stock in the ERP, so it is the change since go-live.
-  await expect(panel.locator('.panel-sub')).toHaveText('ERP · at end of 28 Sep · since 30 Nov ’25');
+  await expect(first).toContainText('113.8 MT');
+  // Counted to the period end over the whole ledger (it carries the opening): true stock, no "since" caveat.
+  await expect(panel.locator('.panel-sub')).toHaveText('ERP · at end of 28 Sep');
   await expect(panel.getByText('With order')).toHaveCount(0);   // no series chips
-  // Prime strip by default: 30 sizes in stock, drawn to one scale; the 25 below zero are counted, not drawn.
+  // Prime strip by default: 49 sizes in stock, drawn to one scale; none below zero.
   const tabs = panel.getByRole('group', { name: 'Stock grade' });
-  await expect(tabs.getByRole('button', { name: 'Prime · 30' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.rm-size--stock')).toHaveCount(30);
+  await expect(tabs.getByRole('button', { name: 'Prime · 49' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel.locator('.rm-size--stock')).toHaveCount(49);
   const bars = await panel.locator('.rm-size-stack > i:nth-child(2)').evaluateAll((els) =>
     els.map((e) => e.getBoundingClientRect().width / e.parentElement!.getBoundingClientRect().width));
   expect(bars[0]).toBeCloseTo(1, 2);
-  expect(bars[1]).toBeCloseTo(59.4 / 103.5, 1);
+  expect(bars[1]).toBeCloseTo(76.2 / 113.8, 1);
   await expect(panel.locator('.rm-sizes-foot')).toHaveCount(0);   // no summary line
-  // Defective strip on its own tab: 15 sizes, 18.2 MT. Prime 119.1 + defective 18.2 = 137.3, the Free stock card.
-  await tabs.getByRole('button', { name: 'Defective · 15' }).click();
-  await expect(panel.locator('.rm-size--stock')).toHaveCount(15);
-  await expect(panel.locator('.rm-size--stock').first()).toContainText('358–360 × 2.20');
-  await tabs.getByRole('button', { name: 'Prime · 30' }).click();
+  // Defective strip on its own tab: 17 sizes, 48.1 MT. Prime 749.4 + defective 48.1 = 797.5, the Free stock card.
+  await tabs.getByRole('button', { name: 'Defective · 17' }).click();
+  await expect(panel.locator('.rm-size--stock')).toHaveCount(17);
+  await expect(panel.locator('.rm-size--stock').first()).toContainText('358–360');
+  await tabs.getByRole('button', { name: 'Prime · 49' }).click();
   // Agrees with the Free stock card and the Order allocation block.
-  await expect(page.getByRole('button', { name: 'Free stock', exact: true })).toContainText('137.3');
-  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').nth(1)).toContainText('137.3 MT');
+  await expect(page.getByRole('button', { name: 'Free stock', exact: true })).toContainText('797.5');
+  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').nth(1)).toContainText('797.5 MT');
   // The list scrolls inside the panel instead of stretching the row past the balance panel beside it.
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
   const [hSizes, hBalance] = await Promise.all([panel.evaluate((e) => e.getBoundingClientRect().height), balance.evaluate((e) => e.getBoundingClientRect().height)]);
@@ -265,8 +265,9 @@ test('finished stock: ERP stock ledger to the period end — one drawer, from Fr
   // The old tables are gone.
   for (const n of ['Stock movements by type', 'Finished stock by size', 'ERP data source']) await expect(drawer.getByRole('table', { name: n })).toHaveCount(0);
   const src = drawer.getByRole('region', { name: 'Data source' });
-  for (const t of ['ITEMTRAN_BODY', 'QTYRECD', 'QTYISSUED', 'FGYRDP', 'ITEMOPBAL_MAST', 'YROPQTY']) await expect(src).toContainText(t);
-  await expect(drawer.getByRole('region', { name: 'Formula' })).toContainText('Stock = opening + received − issued');
+  for (const t of ['ITEMTRAN_BODY', 'QTYRECD', 'QTYISSUED', "DIV_CODE = 'S1'", "ITEM_NATURE = 'FG'", 'STOR1P', 'Z8']) await expect(src).toContainText(t);
+  await expect(drawer.getByRole('region', { name: 'Formula' })).toContainText('Stock = Σ QTYRECD − Σ QTYISSUED of every ledger entry');
+  await expect(drawer.getByRole('region', { name: 'Formula' })).toContainText('first entry (1 Apr 2025)');
   await page.waitForTimeout(700);
   await drawer.screenshot({ path: `${SHOTS}/drill-stock.png` });
 });
@@ -587,6 +588,7 @@ test('RMD: finished stock by size from the ERP item ledger (FGYRDP), and a size 
   await expect(t.getByRole('row', { name: /MISS ROLL TMT BAR 8 MM/ })).toContainText('14.75');
   await expect(t.locator('tfoot')).toContainText('303.63');
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText("GODOWN_CODE = 'FGYRDP'");
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('ITEMTRAN_BODY');
   await expect(d.getByRole('region', { name: 'Formula' })).toContainText('Stock = Σ QTYRECD − Σ QTYISSUED');
   await page.waitForTimeout(700);
   await d.screenshot({ path: `${SHOTS}/rmd-stock-size-drill.png` });

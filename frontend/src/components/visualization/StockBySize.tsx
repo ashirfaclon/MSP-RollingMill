@@ -2,14 +2,13 @@
 
 /**
  * Finished stock by size — one bar per strip size, split into stock with an order against
- * it and free stock, from the ERP stock ledger (FG yard FGYRDP) counted to the end of the
- * Duration period. The ERP does not link yard stock to sales orders (loading advices only
+ * it and free stock, by the plant's stock query (ERP stock ledger, S1 finished goods, every
+ * godown but STOR1P) counted to the end of the Duration period. The ERP does not link yard stock to sales orders (loading advices only
  * reserve it, and stale ones stay open), so nothing can be shown as with order: every bar
  * is free stock — the same rule as production, which is all Made To Stock.
  *
- * The ledger has no opening balance for this year, so each size is the CHANGE since the ERP
- * go-live (30 Nov 2025): a size dispatched from stock held before then comes out below
- * zero. Those are counted in the footer and listed in the drawer, not drawn as bars.
+ * The count runs over the whole ledger, which carries the opening, so a size is its true
+ * stock; one that still comes out below zero is not drawn.
  * Plain, "Direct" and defective variants of one size are separate ERP items; the plain and
  * Direct ones are summed. Defective strip is shown on its own tab, never mixed with prime stock.
  *

@@ -24,7 +24,8 @@ import oracledb from 'oracledb';
 import { loadEnv, type Env } from '../../config/env';
 import { RMD_STOCK_GODOWN, RMD_STOCK_ITEMS } from '../../modules/rmd/stock-items';
 import {
-  ERP_ENTITIES, LOG_FIELDS, RMD_LOG_FIELDS, cachePaths, type RmdLogField, type RmdProductionCache, type RmdStockCache,
+  ERP_ENTITIES, LOG_FIELDS, RMD_LOG_FIELDS, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
+  type RmdLogField, type RmdProductionCache, type RmdStockCache,
   type ErpCache, type ErpCommercialCache, type ErpDivisionRow, type ErpProductionCache,
   type ErpProductionRow, type ErpSyncAttempt, type LogField,
 } from './cache';
@@ -148,23 +149,23 @@ async function pull(env: Env, p: Paths, t0: number, log: (line: string) => void)
                                      AND x.SERIES = b.SERIES AND x.VRNO = b.VRNO AND x.SLNO = b.SLNO)
        ORDER BY b.VRDATE, b.VRNO, b.SLNO`, { fromDate: FROM });
 
-    /* ---- finished-strip stock: every movement in the FG yard, and each year's opening ---- */
-    // Movements that change stock: production in, sale out, item-to-item transfer (M2M) and
-    // sales returns. Loading advices (LADV, stock flag 4) only reserve stock — left out.
+    /* ---- finished-strip stock, by the plant's stock rule ---- */
+    // Their stock-balance query (12 Oct 2026) for division S1: finished goods (ITEM_NATURE FG,
+    // item not closed), every godown but STOR1P, without the excluded voucher types, from the
+    // start of the ledger. Billets are SM (semi-finished) and stay out; so does the one billet
+    // item filed as FG. The ledger carries the opening, so no ITEMOPBAL openings are added.
     const stockMoves = await q<{ D: string; ITEM: string; TN: string; RECD: number; ISS: number }>(`
       SELECT TO_CHAR(TRUNC(t.VRDATE), 'YYYY-MM-DD') AS "D", t.ITEM_CODE AS "ITEM", t.TNATURE AS "TN",
-             ROUND(SUM(NVL(t.QTYRECD, 0)), 3) AS "RECD", ROUND(SUM(NVL(t.QTYISSUED, 0)), 3) AS "ISS"
-        FROM MSPV7ERP1.ITEMTRAN_BODY t
-       WHERE t.ENTITY_CODE = 'MP' AND t.GODOWN_CODE = :godown AND t.VRDATE >= TO_DATE(:fromDate, 'YYYY-MM-DD')
-         AND t.TNATURE IN ('PROD', 'SALE', 'M2M', 'SRET') AND NVL(t.STOCK_FLAG, '1') <> '4'
-         AND t.ITEM_CODE IN (${S1_ITEMS})
-       GROUP BY TRUNC(t.VRDATE), t.ITEM_CODE, t.TNATURE ORDER BY 1, 2, 3`, { fromDate: FROM, godown: FG_GODOWN });
-    // Opening stock per financial year (1 April). Empty for 25-26 and 26-27 at the time of writing.
-    const openings = await q<{ Y: string; ITEM: string; QTY: number }>(`
-      SELECT o.ACC_YEAR AS "Y", o.ITEM_CODE AS "ITEM", ROUND(SUM(NVL(o.YROPQTY, 0)), 3) AS "QTY"
-        FROM MSPV7ERP1.ITEMOPBAL_MAST o
-       WHERE o.ENTITY_CODE = 'MP' AND o.GODOWN_CODE = :godown AND o.ITEM_CODE IN (${S1_ITEMS})
-       GROUP BY o.ACC_YEAR, o.ITEM_CODE ORDER BY 1, 2`, { fromDate: FROM, godown: FG_GODOWN });
+             SUM(NVL(t.QTYRECD, 0)) AS "RECD", SUM(NVL(t.QTYISSUED, 0)) AS "ISS"
+        FROM MSPV7ERP1.ITEMTRAN_BODY t, MSPV7ERP1.ITEM_MAST m
+       WHERE t.ITEM_CODE = m.ITEM_CODE AND m.ITEM_NATURE = 'FG' AND m.CLOSEDDATE IS NULL
+         AND UPPER(m.ITEM_NAME) NOT LIKE '%BILLET%'
+         AND t.ENTITY_CODE = 'MP' AND t.DIV_CODE = 'S1' AND t.GODOWN_CODE <> 'STOR1P'
+         AND t.TCODE NOT IN (${STOCK_EXCLUDED_TCODES.map((c) => `'${c}'`).join(', ')})
+       GROUP BY TRUNC(t.VRDATE), t.ITEM_CODE, t.TNATURE
+      HAVING SUM(NVL(t.QTYRECD, 0)) <> 0 OR SUM(NVL(t.QTYISSUED, 0)) <> 0
+       ORDER BY 1, 2, 3`);
+    const openings: { Y: string; ITEM: string; QTY: number }[] = [];
 
     /* ---- names ---- */
     const itemCodes = [...new Set([...lines.map((r) => r.ITEM), ...sales.map((r) => r.ITEM), ...orders.map((r) => r.ITEM), ...stockMoves.map((r) => r.ITEM), ...openings.map((r) => r.ITEM)])];
@@ -198,7 +199,7 @@ async function pull(env: Env, p: Paths, t0: number, log: (line: string) => void)
           qty: Number(r.QTY), executed: num(r.EXEC) ?? 0, cancelled: num(r.CANC) ?? 0, due: r.DUE,
         })),
       stock: {
-        godown: FG_GODOWN,
+        godown: 'all but STOR1P',
         moves: stockMoves.map((r) => ({ date: r.D, item: r.ITEM, type: r.TN, inMt: Number(r.RECD), outMt: Number(r.ISS) })),
         openings: openings.map((r) => ({ year: r.Y, item: r.ITEM, mt: Number(r.QTY) })),
       },
@@ -264,10 +265,10 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
 }
 
 /**
- * RMD finished stock: the plant's item list in godown FGYRDP, from the ERP item ledger
- * (VG_ITEM_LEDGER — every movement of every kind, from the 31 Mar 2023 opening), netted per
- * item per date. Stock at the end of a date = Σ net up to it. The ERP's own stock figure
- * (VF_ITEM_KPIS.CLQTY) is the same Σ received − issued over this ledger. Its own failure.
+ * RMD finished stock: the plant's item list in godown FGYRDP, by the plant's stock rule
+ * (their stock-balance query): ITEMTRAN_BODY in their divisions, without the excluded voucher
+ * types, every entry since the ledger starts — netted per item per date. Stock at the end of
+ * a date = Σ net up to it. Its own failure.
  */
 async function pullRmdStock(env: Env, p: Paths, log: (line: string) => void) {
   let conn: oracledb.Connection | null = null;
@@ -278,16 +279,18 @@ async function pullRmdStock(env: Env, p: Paths, log: (line: string) => void) {
     const codes = RMD_STOCK_ITEMS.map((i) => i.code);
     const binds = Object.fromEntries(codes.map((c, i) => [`i${i}`, c]));
     const rows = ((await conn.execute<{ D: string; ITEM: string; NET: number }>(`
-      SELECT TO_CHAR(TRUNC(l.VRDATE), 'YYYY-MM-DD') AS "D", l.ITEM_CODE AS "ITEM",
-             NVL(SUM(l.QTYRECD), 0) - NVL(SUM(l.QTYISSUED), 0) AS "NET"
-        FROM MSPV7ERP1.VG_ITEM_LEDGER l
-       WHERE l.ENTITY_CODE = 'MP' AND l.GODOWN_CODE = :godown
-         AND l.ITEM_CODE IN (${codes.map((_, i) => `:i${i}`).join(', ')})
-       GROUP BY TRUNC(l.VRDATE), l.ITEM_CODE
+      SELECT TO_CHAR(TRUNC(t.VRDATE), 'YYYY-MM-DD') AS "D", t.ITEM_CODE AS "ITEM",
+             SUM(NVL(t.QTYRECD, 0)) - SUM(NVL(t.QTYISSUED, 0)) AS "NET"
+        FROM MSPV7ERP1.ITEMTRAN_BODY t
+       WHERE t.ENTITY_CODE = 'MP' AND t.GODOWN_CODE = :godown
+         AND t.DIV_CODE IN (${STOCK_DIVISIONS.map((d) => `'${d}'`).join(', ')})
+         AND t.TCODE NOT IN (${STOCK_EXCLUDED_TCODES.map((c) => `'${c}'`).join(', ')})
+         AND t.ITEM_CODE IN (${codes.map((_, i) => `:i${i}`).join(', ')})
+       GROUP BY TRUNC(t.VRDATE), t.ITEM_CODE
        ORDER BY 1, 2`, { godown: RMD_STOCK_GODOWN, ...binds }, { maxRows: 0 })).rows ?? []);
     const cache: RmdStockCache = {
       syncedAt: new Date().toISOString(),
-      source: `VG_ITEM_LEDGER · GODOWN_CODE = '${RMD_STOCK_GODOWN}'`,
+      source: `ITEMTRAN_BODY · GODOWN_CODE = '${RMD_STOCK_GODOWN}' · the plant's stock rule`,
       godown: RMD_STOCK_GODOWN,
       moves: rows.filter((r) => Number(r.NET) !== 0).map((r) => ({ date: String(r.D), item: String(r.ITEM), netMt: Number(r.NET) })),
     };
