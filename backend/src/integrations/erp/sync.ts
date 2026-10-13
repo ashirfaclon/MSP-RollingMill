@@ -24,8 +24,8 @@ import oracledb from 'oracledb';
 import { loadEnv, type Env } from '../../config/env';
 import { RMD_STOCK_GODOWN, RMD_STOCK_ITEMS } from '../../modules/rmd/stock-items';
 import {
-  ERP_ENTITIES, LOG_FIELDS, RMD_LOG_FIELDS, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
-  type RmdLogField, type RmdProductionCache, type RmdStockCache,
+  ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, RMD_LOG_FIELDS, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
+  type LsmLogField, type LsmProductionCache, type RmdLogField, type RmdProductionCache, type RmdStockCache,
   type ErpCache, type ErpCommercialCache, type ErpDivisionRow, type ErpProductionCache,
   type ErpProductionRow, type ErpSyncAttempt, type LogField,
 } from './cache';
@@ -262,6 +262,47 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
     await conn?.close();
   }
   await pullRmdStock(env, p, log);
+  await pullLsm(env, p, log);
+}
+
+/**
+ * LSM Production Log Sheet, as the plant specified: ATTR_TRAN_DATA_BODY where USER_CODE =
+ * 'FA-LP-P', one row per entry with its LSM_LOG_FIELDS values. Its own failure.
+ */
+async function pullLsm(env: Env, p: Paths, log: (line: string) => void) {
+  let conn: oracledb.Connection | null = null;
+  try {
+    conn = await oracledb.getConnection({ user: env.erpUser!, password: env.erpPassword!, connectString: env.erpDsn! });
+    conn.callTimeout = 120_000;
+    await conn.execute('SET TRANSACTION READ ONLY');
+    const pivot = LSM_LOG_FIELDS.map((f) =>
+      `MAX(CASE WHEN b.ATTR_CODE = '${f}' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "${f}"`,
+    ).join(',\n             ');
+    const rows = ((await conn.execute<Record<string, unknown>>(`
+      SELECT TO_CHAR(b.VRDATE, 'YYYY-MM-DD') AS "D", b.VRNO AS "VRNO",
+             ${pivot}
+        FROM MSPV7ERP1.ATTR_TRAN_DATA_BODY b
+       WHERE b.USER_CODE = 'FA-LP-P'
+         AND b.ATTR_CODE IN (${LSM_LOG_FIELDS.map((f) => `'${f}'`).join(', ')})
+         AND b.VRDATE >= TO_DATE(:fromDate, 'YYYY-MM-DD')
+       GROUP BY b.VRDATE, b.VRNO
+       ORDER BY b.VRDATE, b.VRNO`, { fromDate: FROM }, { maxRows: 0 })).rows ?? []) as Record<string, unknown>[];
+    const cache: LsmProductionCache = {
+      syncedAt: new Date().toISOString(),
+      source: "ATTR_TRAN_DATA_BODY · USER_CODE = 'FA-LP-P'",
+      fromDate: FROM,
+      rows: rows.map((r) => ({
+        date: String(r.D), vrno: String(r.VRNO),
+        v: Object.fromEntries(LSM_LOG_FIELDS.map((f) => [f, num(r[f])])) as Record<LsmLogField, number | null>,
+      })),
+    };
+    writeAtomic(p.lsmProduction, cache);
+    log(`  LSM log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);
+  } catch (err) {
+    log(`  LSM log sheet not synced: ${(err as Error).message}`);
+  } finally {
+    await conn?.close();
+  }
 }
 
 /**

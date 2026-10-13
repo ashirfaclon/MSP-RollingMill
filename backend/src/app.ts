@@ -11,6 +11,7 @@ import auth from './plugins/auth';
 import { authRoutes } from './modules/auth/auth.routes';
 import { hsmRoutes } from './modules/hsm/hsm.routes';
 import { rmdRoutes } from './modules/rmd/rmd.routes';
+import { lsmRoutes } from './modules/lsm/lsm.routes';
 import { sourcesRoutes } from './modules/sources/sources.routes';
 import { systemRoutes, type Lifecycle } from './modules/system/system.routes';
 
@@ -52,6 +53,7 @@ export async function buildApp({ config, lifecycle = { shuttingDown: false } }: 
     await api.register(sourcesRoutes);
     await api.register(hsmRoutes, { prefix: '/hsm' });
     await api.register(rmdRoutes, { prefix: '/rmd' });
+    await api.register(lsmRoutes, { prefix: '/lsm' });
   }, { prefix: '/api' });
 
   return app;

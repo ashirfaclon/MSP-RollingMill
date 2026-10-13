@@ -659,3 +659,40 @@ test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, a
   await page.waitForTimeout(700);
   await ds.screenshot({ path: `${SHOTS}/rmd-drill-plan-shift.png` });
 });
+
+test('LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant gave the codes', async ({ page }) => {
+  await page.goto('/lsm/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+
+  // Σ PRODUTION_MT, 1–8 Oct = 2,106.12 MT (each entry counted once — the ERP repeats some).
+  const card = page.getByRole('button', { name: 'Production', exact: true });
+  await expect(card.locator('.rm-card-value')).toContainText('2,106.1');
+  await expect(card.locator('.rm-card-note')).toHaveText('');
+  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('2,106.1 MT');
+
+  // Material balance: finished and the losses; cold is 0 so it isn't shown; billet input not given → NA.
+  const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
+  await expect(balance).toContainText('Finished 2,106.1 MT');
+  await expect(balance).toContainText('Mass difference NA');
+  await expect(balance.locator('.rm-mb-link')).toHaveText([/^Burning loss 24\.6 MT/, /^End cut 68\.5 MT/, /^Miss-roll 9\.1 MT/, /^Reject 5\.3 MT/]);
+  await balance.screenshot({ path: `${SHOTS}/lsm-material-balance.png` });
+
+  await card.click();
+  const prod = page.getByRole('dialog', { name: 'Production · ERP log sheet' });
+  await expect(prod.getByRole('table', { name: 'Production by period' }).locator('tfoot')).toContainText('2,106.12');
+  await expect(prod.getByRole('region', { name: 'Data source' })).toContainText("USER_CODE = 'FA-LP-P'");
+  await expect(prod.getByRole('region', { name: 'Formula' })).toContainText('PRODUTION_MT');
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Material balance, per day' }).click();
+  const bal = page.getByRole('dialog', { name: 'Material balance · ERP log sheet' });
+  const bt = bal.getByRole('table', { name: 'Material balance by period' });
+  await expect(bt.locator('thead th')).toHaveText(['Period', 'Finished', 'Burning loss', 'End cut', 'Miss-roll', 'Reject', 'Losses']);
+  await expect(bt.locator('tfoot')).toContainText('107.53');
+  await page.waitForTimeout(700);
+  await bal.screenshot({ path: `${SHOTS}/lsm-drill-balance.png` });
+});

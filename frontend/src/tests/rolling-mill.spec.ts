@@ -365,9 +365,11 @@ for (const mill of ['lsm', 'rms'] as const) {
     await expect(page.locator('.rm-flip-face--front .panel-sub')).toHaveText(`Day ${start}–${mid} IST · Night ${mid}–${start} IST`);
     const strip = page.getByRole('region', { name: 'Headline KPIs' });
     await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/, /^Made To Stock/, /^Stock with order/, /^Free stock/]);
-    await expect(strip.locator('.rm-card-value')).toHaveText(Array(7).fill(/^NA/));
-    // Nothing is wired, so nothing opens.
-    await expect(strip.getByRole('button')).toHaveCount(0);
+    // LSM: Production is wired (ERP log sheet FA-LP-P) and opens its drawer; Today's entry comes a day late, so NA.
+    // Everything else NA, and nothing else opens.
+    await expect(strip.locator('.rm-card-value').nth(0)).toHaveText(mill === 'lsm' ? /^(NA|[\d,]+\.\d)/ : /^NA/);
+    for (let i = 1; i < 7; i++) await expect(strip.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+    await expect(strip.getByRole('button')).toHaveCount(mill === 'lsm' ? 1 : 0);
     const mimic = page.getByRole('list', { name: 'Mill process flow' });
     await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet delivery rate', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finish exit']);
     await expect(mimic.locator('.rm-zone-value')).toHaveText(Array(5).fill('NA'));

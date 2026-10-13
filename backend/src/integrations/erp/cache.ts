@@ -38,6 +38,7 @@ export const cachePaths = (env: Env) => {
     commercial: path.join(dir, 'erp-hsm-commercial.json'),
     rmdProduction: path.join(dir, 'erp-rmd-production.json'),
     rmdStock: path.join(dir, 'erp-rmd-stock.json'),
+    lsmProduction: path.join(dir, 'erp-lsm-production.json'),
   };
 };
 
@@ -64,6 +65,24 @@ export function readErpRmdProduction(env: Env): RmdProductionCache | null {
 export const STOCK_EXCLUDED_TCODES = ['MC', 'FS', 'ME', 'NG', 'NP', 'QJ', 'ZH', 'ZP', 'ZW', 'ZF', 'MR', 'ZM', 'ES', 'NT', 'ZS', 'ZA', 'MD', 'NI', 'Z8'] as const;
 /** Divisions the plant's stock query covers. */
 export const STOCK_DIVISIONS = ['RM', 'RS', 'LS', 'PL', 'SI', 'SM', 'S1'] as const;
+
+/**
+ * LSM log-sheet codes, as the plant gave them (lsm ERP DATA (1).xlsx, 13 Oct 2026): table
+ * ATTR_TRAN_DATA_BODY, USER_CODE = 'FA-LP-P' (every entry is division LS), ATTR_CODE →
+ * ATTR_VALUE, dated by VRDATE. Production: the sheet says PRODUCTION_MT, which the table does
+ * not have; it is spelt PRODUTION_MT there (confirmed with the user).
+ */
+export const LSM_LOG_FIELDS = [
+  'PRODUTION_MT', 'B_LOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'COLD_MT', 'REJECT_MT',
+  'LSM_BY_PASS_MT', 'CCM_BY_PASS_MT', 'END_CRACK_BY_PASS_CCM_MT',
+] as const;
+export type LsmLogField = (typeof LSM_LOG_FIELDS)[number];
+export interface LsmLogRow { date: string; vrno: string; v: Record<LsmLogField, number | null> }
+export interface LsmProductionCache { syncedAt: string; source: string; fromDate: string; rows: LsmLogRow[] }
+
+export function readErpLsmProduction(env: Env): LsmProductionCache | null {
+  return readJson<LsmProductionCache>(cachePaths(env).lsmProduction);
+}
 
 /** RMD finished stock: each item's net movement (received − issued, MT) per date in its godown. */
 export interface RmdStockMove { date: string; item: string; netMt: number }
