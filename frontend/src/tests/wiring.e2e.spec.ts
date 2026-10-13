@@ -674,11 +674,18 @@ test('LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant 
   await expect(card.locator('.rm-card-note')).toHaveText('');
   await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('2,106.1 MT');
 
-  // Material balance: finished and the losses; cold is 0 so it isn't shown; billet input not given → NA.
+  // Mass yield: PRODUTION_MT 2,106.12 ÷ INPUT_MT 2,226.89 = 94.58 %.
+  await expect(page.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-value')).toContainText('94.6');
+  // Material balance: input 2,226.9, finished 2,106.1, difference 120.8; cold is 0 so it isn't shown.
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
+  await expect(balance).toContainText('Billet input2,226.9 MT');
+  await expect(balance).toContainText('Yield94.6%');
   await expect(balance).toContainText('Finished 2,106.1 MT');
-  await expect(balance).toContainText('Mass difference NA');
-  await expect(balance.locator('.rm-mb-link')).toHaveText([/^Burning loss 24\.6 MT/, /^End cut 68\.5 MT/, /^Miss-roll 9\.1 MT/, /^Reject 5\.3 MT/]);
+  await expect(balance).toContainText('Mass difference 120.8 MT');
+  // Billets in: Σ INPUT_PCS, 1–8 Oct = 8,429.
+  await expect(balance.locator('.rmd-mb-pieces')).toContainText('8,429 in');
+  // The six losses add up to the mass difference: 24.6 + 68.5 + 9.1 + 5.3 + 13.2 = 120.8.
+  await expect(balance.locator('.rm-mb-link')).toHaveText([/^Burning loss 24\.6 MT/, /^End cut 68\.5 MT/, /^Miss-roll 9\.1 MT/, /^Reject 5\.3 MT/, /^Short length 13\.2 MT/]);
   await balance.screenshot({ path: `${SHOTS}/lsm-material-balance.png` });
 
   await card.click();
@@ -691,8 +698,9 @@ test('LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant 
   await page.getByRole('button', { name: 'Material balance, per day' }).click();
   const bal = page.getByRole('dialog', { name: 'Material balance · ERP log sheet' });
   const bt = bal.getByRole('table', { name: 'Material balance by period' });
-  await expect(bt.locator('thead th')).toHaveText(['Period', 'Finished', 'Burning loss', 'End cut', 'Miss-roll', 'Reject', 'Losses']);
-  await expect(bt.locator('tfoot')).toContainText('107.53');
+  await expect(bt.locator('thead th')).toHaveText(['Period', 'Billets (pcs)', 'Billet input', 'Finished', 'Burning loss', 'End cut', 'Miss-roll', 'Reject', 'Short length', 'Losses']);
+  await expect(bt.locator('tfoot')).toContainText('2,226.89');
+  await expect(bt.locator('tfoot')).toContainText('120.77');
   await page.waitForTimeout(700);
   await bal.screenshot({ path: `${SHOTS}/lsm-drill-balance.png` });
 });

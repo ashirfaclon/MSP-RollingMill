@@ -4,16 +4,19 @@
  * dated by VRDATE. A date's figure is the sum of its entries.
  *
  *   production  PRODUTION_MT (the sheet's PRODUCTION_MT, as the table spells it)
- *   losses      B_LOSS_MT, ENDCUT_MT, MISROLL_MT, COLD_MT, REJECT_MT
- *   bypasses    LSM_BY_PASS_MT, CCM_BY_PASS_MT, END_CRACK_BY_PASS_CCM_MT
+ *   losses      B_LOSS_MT, ENDCUT_MT, MISROLL_MT, COLD_MT, REJECT_MT, SHORTLENGTH_MT
+ *   bypasses    LSM_BY_PASS_MT, CCM_BY_PASS_MT, END_CRACK_BY_PASS_CCM_MT — taken out before
+ *               billet input (TOTAL_CAST_QTY = INPUT_MT + the three), so not losses
+ *   input       INPUT_MT (billet input), INPUT_PCS (billets in, pieces) — the user, 13 Oct 2026
  *
- * Billet input in MT is not among the codes given, so mass yield and mass difference are NA.
+ * Mass yield = production ÷ billet input × 100; mass difference = billet input − production.
  */
 import type { Env } from '../../config/env';
 import type { Grain, LsmProductionPeriod, LsmProductionReport } from '../../contracts';
 import { readErpLsmProduction, type LsmLogField, type LsmLogRow } from '../../integrations/erp/cache';
 import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, round2 } from '../hsm/production.service';
+import { massDifference, massYield } from '../rmd/production.service';
 
 const sumOf = (rows: LsmLogRow[], f: LsmLogField) => {
   const v = rows.map((r) => r.v[f]).filter((x): x is number => x !== null);
@@ -22,13 +25,19 @@ const sumOf = (rows: LsmLogRow[], f: LsmLogField) => {
 
 export function summariseLsm(key: string, label: string, dates: string[], rows: LsmLogRow[]): LsmProductionPeriod {
   const mine = rows.filter((r) => r.date >= dates[0] && r.date <= dates[dates.length - 1]);
-  const losses = (['B_LOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'COLD_MT', 'REJECT_MT'] as const).map((f) => sumOf(mine, f));
+  const losses = (['B_LOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'COLD_MT', 'REJECT_MT', 'SHORTLENGTH_MT'] as const).map((f) => sumOf(mine, f));
+  const productionMt = sumOf(mine, 'PRODUTION_MT');
+  const billetInputMt = sumOf(mine, 'INPUT_MT');
   return {
     key, label, fromDate: dates[0], toDate: dates[dates.length - 1], days: dates.length,
     entryDays: new Set(mine.map((r) => r.date)).size,
-    productionMt: sumOf(mine, 'PRODUTION_MT'),
-    burningLossMt: losses[0], endCutMt: losses[1], missRollMt: losses[2], coldMt: losses[3], rejectMt: losses[4],
+    productionMt,
+    burningLossMt: losses[0], endCutMt: losses[1], missRollMt: losses[2], coldMt: losses[3], rejectMt: losses[4], shortLengthMt: losses[5],
     lossesMt: losses.every((l) => l === null) ? null : round2(losses.reduce<number>((a, l) => a + (l ?? 0), 0)),
+    billetsPcs: sumOf(mine, 'INPUT_PCS'),
+    billetInputMt,
+    massDiffMt: massDifference(billetInputMt, productionMt),
+    massYieldPct: massYield(productionMt, billetInputMt),
     lsmBypassMt: sumOf(mine, 'LSM_BY_PASS_MT'),
     ccmBypassMt: sumOf(mine, 'CCM_BY_PASS_MT'),
     endCrackBypassMt: sumOf(mine, 'END_CRACK_BY_PASS_CCM_MT'),

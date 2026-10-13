@@ -5,9 +5,10 @@
  * source (lsm ERP DATA (1).xlsx, ERP Production Log Sheet FA-LP-P); NA everywhere else, never
  * a sample figure:
  *   Production            PRODUTION_MT (card, Order allocation, the balance's Finished);
- *   Material balance      finished and the five losses (B_LOSS_MT, ENDCUT_MT, MISROLL_MT,
- *                         COLD_MT, REJECT_MT); billet input in MT not given, so input, mass
- *                         difference and yield are NA.
+ *   Mass yield            PRODUTION_MT ÷ INPUT_MT (billet input).
+ *   Billets               INPUT_PCS (billets in, pieces).
+ *   Material balance      billet input, finished and the six losses (B_LOSS_MT, ENDCUT_MT,
+ *                         MISROLL_MT, COLD_MT, REJECT_MT, SHORTLENGTH_MT), mass difference and yield.
  */
 import { Fragment, useState, type KeyboardEvent } from 'react';
 import Panel from '@/components/Panel';
@@ -22,7 +23,6 @@ import LsmProductionDrawer, { useLsmProduction } from './LsmProductionDrawer';
 import '@/components/rmd/rmd.css';
 
 const NA_CARDS: { label: string; unit: string; series: Series }[] = [
-  { label: 'Mass yield', unit: '%', series: 'order' },
   { label: 'Power consumption', unit: 'MWh', series: 'prod' },
   { label: 'Specific energy', unit: 'kWh/MT', series: 'prod' },
   { label: 'Made To Stock', unit: 'MT', series: 'free' },
@@ -39,6 +39,7 @@ export default function LsmVisualization() {
   const { data, error } = useLsmProduction(dates);
   const t = data?.totals ?? null;
   const [prodOpen, setProdOpen] = useState(false);
+  const [yieldOpen, setYieldOpen] = useState(false);
   const note = error ? 'ERP data unavailable' : data?.erp.connection === 'down' ? data.erp.message : '';
 
   return (
@@ -54,9 +55,20 @@ export default function LsmVisualization() {
           onOpen={() => setProdOpen(true)}
           openLabel="Production per day, from the ERP log sheet"
         />
+        <KpiCard
+          label="Mass yield"
+          value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
+          unit="%"
+          note={note}
+          series="order"
+          loading={!data && !error}
+          onOpen={() => setYieldOpen(true)}
+          openLabel="Mass yield per day, from the ERP log sheet"
+        />
         {NA_CARDS.map((c) => <KpiCard key={c.label} label={c.label} value="NA" unit={c.unit} note="" series={c.series} />)}
       </section>
       <LsmProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
+      <LsmProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
 
       <Panel title="Mill mimic">
         <ol className="rm-mimic rmd-mimic" aria-label="Mill process flow">
@@ -119,16 +131,17 @@ export default function LsmVisualization() {
   );
 }
 
-/** The five losses the LSM log sheet books (codes as the plant gave them). */
-const LOSSES: { key: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'rejectMt'; label: string; series: Series }[] = [
+/** The losses the LSM log sheet books — the plant's five, plus short length. Together they are input − production. */
+const LOSSES: { key: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'rejectMt' | 'shortLengthMt'; label: string; series: Series }[] = [
   { key: 'burningLossMt', label: 'Burning loss', series: 'bloss' },
   { key: 'endCutMt', label: 'End cut', series: 'endcut' },
   { key: 'missRollMt', label: 'Miss-roll', series: 'missroll' },
   { key: 'coldMt', label: 'Cold', series: 'hold' },
   { key: 'rejectMt', label: 'Reject', series: 'reject' },
+  { key: 'shortLengthMt', label: 'Short length', series: 'inline' },
 ];
 
-/** Drawn like RMD's: billet input (NA — not given), finished, then the losses opened out. One click: the drawer per day. */
+/** Drawn like RMD's: billet input split into finished | mass difference, then the losses opened out. One click: the drawer per day. */
 function MaterialBalance() {
   const { dates } = useSelection();
   const t = useLsmProduction(dates).data?.totals ?? null;
@@ -137,6 +150,7 @@ function MaterialBalance() {
   // A loss that is 0 for the period isn't there: no segment, no legend entry. No data stays NA.
   const losses = LOSSES.map((l) => ({ ...l, value: t?.[l.key] ?? null })).filter((l) => l.value === null || l.value >= 0.05);
   const lossSum = losses.reduce((a, l) => a + (l.value ?? 0), 0);
+  const finishedPct = t?.productionMt != null && t.billetInputMt ? (t.productionMt / t.billetInputMt) * 100 : 0;
 
   return (
     <Panel title="Material & operating balance" className="rm-panel" bodyClass="rm-body">
@@ -151,13 +165,15 @@ function MaterialBalance() {
         onKeyDown={openOnKey}
       >
         <div className="rm-mb-head">
-          <Figure label="Billet input" value="NA" />
-          <Figure label="Yield" value="NA" tone="order" end />
+          <Figure label="Billet input" value={mt(t?.billetInputMt)} />
+          <Figure label="Yield" value={t?.massYieldPct == null ? 'NA' : `${fixed(t.massYieldPct, 1)}%`} tone="order" end />
         </div>
-        <span className="rm-mb-bar rm-mb-bar--input" role="img" aria-label="Billet input: not available" />
+        <span className="rm-mb-bar rm-mb-bar--input" role="img" aria-label={t?.billetInputMt == null ? 'Billet input: not available' : `Finished ${fixed(finishedPct, 1)}% of billet input`}>
+          {t?.billetInputMt != null && <i className="rm-mb-seg rm-tone--order" style={{ width: `${finishedPct}%` }} />}
+        </span>
         <div className="rm-mb-labels">
           <span className="rm-mb-caption rm-tone--order">Finished <b className={`num ${t?.productionMt == null ? 'v-na' : ''}`}>{mt(t?.productionMt)}</b></span>
-          <span className="rm-mb-caption rm-tone--diff">Mass difference <b className="num v-na">NA</b></span>
+          <span className="rm-mb-caption rm-tone--diff">Mass difference <b className={`num ${t?.massDiffMt == null ? 'v-na' : ''}`}>{mt(t?.massDiffMt)}</b></span>
         </div>
         <div className="rm-mb-losses">
           <span className="rm-mb-bar rm-mb-bar--loss" role="img" aria-label={`Losses ${mt(t?.lossesMt)}: ${losses.map((l) => `${l.label.toLowerCase()} ${mt(l.value)}`).join(', ')}`}>
@@ -176,7 +192,9 @@ function MaterialBalance() {
         </div>
         <div className="rmd-mb-pieces">
           <span className="rm-k">Billets</span>
-          <span className="rm-mb-pieces-v num v-na">NA</span>
+          {t?.billetsPcs == null
+            ? <span className="rm-mb-pieces-v num v-na">NA</span>
+            : <span className="rm-mb-pieces-v num"><b>{t.billetsPcs.toLocaleString('en-IN')}</b>{' '}in</span>}
         </div>
       </div>
       <LsmProductionDrawer view="balance" open={open} onClose={() => setOpen(false)} />

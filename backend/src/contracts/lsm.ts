@@ -16,8 +16,18 @@ export interface LsmProductionPeriod {
   missRollMt: number | null;
   coldMt: number | null;
   rejectMt: number | null;
-  /** burning loss + end cut + miss roll + cold + reject. */
+  /** SHORTLENGTH_MT. */
+  shortLengthMt: number | null;
+  /** burning loss + end cut + miss roll + cold + reject + short length (= billet input − production). */
   lossesMt: number | null;
+  /** INPUT_PCS — billets in, pieces, Σ over the period's entries; null with no entry. */
+  billetsPcs: number | null;
+  /** INPUT_MT — billet input, Σ over the period's entries; null with no entry. */
+  billetInputMt: number | null;
+  /** billetInputMt − productionMt; null without both. */
+  massDiffMt: number | null;
+  /** productionMt ÷ billetInputMt × 100; null without both. */
+  massYieldPct: number | null;
   lsmBypassMt: number | null;
   ccmBypassMt: number | null;
   endCrackBypassMt: number | null;
