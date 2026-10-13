@@ -696,3 +696,25 @@ test('LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant 
   await page.waitForTimeout(700);
   await bal.screenshot({ path: `${SHOTS}/lsm-drill-balance.png` });
 });
+
+test('RMD: running rate opens its drill-down — Prime + SL ÷ running hours from the billet counters', async ({ page }) => {
+  await page.goto('/rmd/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const foot = page.locator('.rm-flip-face--front .rm-foot').getByRole('button', { name: /Running rate/ });
+  await expect(foot).toContainText(/\d+\.\d{2} TPH/);
+  const shown = (await foot.locator('.rm-foot-v').innerText()).replace(' TPH', '');
+  await foot.click();
+  const d = page.getByRole('dialog', { name: 'Running rate' });
+  const t = d.getByRole('table', { name: 'Running rate by period' });
+  await expect(t.locator('thead th')).toHaveText(['Period', 'Prime + SL (MT)', 'Running hours', 'Rate (TPH)']);
+  await expect(t.locator('tbody tr')).toHaveCount(8);
+  await expect(t.locator('tfoot')).toContainText('1,689.86');
+  await expect(t.locator('tfoot')).toContainText(shown);
+  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('10 min or less apart');
+  await page.waitForTimeout(700);
+  await d.screenshot({ path: `${SHOTS}/rmd-drill-running-rate.png` });
+});

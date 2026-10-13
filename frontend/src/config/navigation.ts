@@ -23,13 +23,21 @@ export const SCREENS = [
     blurb: 'Production, yield, energy, order-linked stock and mill flow',
   },
   {
+    id: 'asset-health',
+    label: 'Asset Health',
+    sub: 'Condition · Maintenance',
+    icon: 'gear',
+    blurb: 'Selected drive group · condition, inspection, maintenance and process impact',
+    mills: ['hsm'],
+  },
+  {
     id: 'data-model',
     label: 'Data Model',
     sub: 'Flow · Ledgers · Checks',
     icon: 'database',
     blurb: 'Material flow, run time, stock and orders behind every KPI — and whether they balance',
   },
-] as const satisfies readonly { id: string; label: string; sub: string; icon: IconId; blurb: string }[];
+] as const satisfies readonly { id: string; label: string; sub: string; icon: IconId; blurb: string; mills?: readonly MillId[] }[];
 
 export type ScreenId = (typeof SCREENS)[number]['id'];
 
@@ -41,6 +49,15 @@ export const HIDDEN_SCREENS: readonly ScreenId[] = ['data-model'];
 
 /** The screens the sidebar lists. */
 export const NAV_SCREENS = SCREENS.filter((s) => !HIDDEN_SCREENS.includes(s.id));
+
+/** Whether a mill has this screen (a screen with `mills` exists only for those, e.g. Asset Health for HSM). */
+export const hasScreen = (mill: MillId, screen: ScreenId) => {
+  const s = screenOf(screen);
+  return !('mills' in s) || (s.mills as readonly MillId[]).includes(mill);
+};
+
+/** The sidebar's screens for one mill. */
+export const navScreens = (mill: MillId) => NAV_SCREENS.filter((s) => hasScreen(mill, s.id));
 
 export const DEFAULT_MILL: MillId = 'hsm';
 export const DEFAULT_SCREEN: ScreenId = 'visualization';

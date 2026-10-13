@@ -1,0 +1,42 @@
+/* HSM · Asset Health — on top of visualization.css (strip, mimic, rows, panels). */
+
+.ah-asset-body { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 24px; }
+.ah-asset-id { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ah-asset-name { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text); }
+.ah-asset-path { font-size: 11px; color: var(--muted-2); }
+.ah-asset-facts { display: grid; grid-template-columns: repeat(4, auto); gap: 8px 32px; margin: 0; }
+.ah-fact { display: flex; flex-direction: column; gap: 6px; }
+.ah-fact dd { margin: 0; font-size: 18px; font-weight: 800; }
+
+/* Eight condition cards in one row. */
+.rm-strip.ah-strip { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+
+/* Mimic zones are buttons that select the drive group. */
+.ah-zone { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.ah-zone.is-selected { outline: 2px solid var(--s-prod); outline-offset: -2px; }
+.ah-zone:focus-visible { outline: 2px solid var(--focus, var(--s-prod)); }
+
+.ah-trends { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.ah-trend { display: flex; flex-direction: column; gap: 10px; }
+.ah-trend-head { display: flex; justify-content: space-between; align-items: baseline; }
+.ah-trend-plot { height: 64px; border-bottom: 1px solid var(--border); background: repeating-linear-gradient(90deg, transparent 0 6px, var(--panel-3) 6px 7px) bottom / 100% 1px no-repeat; }
+
+.ah-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.ah-figure { display: flex; flex-direction: column; gap: 6px; }
+.ah-figure-v { font-size: 24px; font-weight: 800; }
+.ah-figure-sub { font-size: 11px; color: var(--muted-2); }
+
+.ah-list { display: flex; flex-direction: column; }
+.ah-row { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.ah-row:last-child { border-bottom: 0; }
+.ah-row .num { font-size: 13px; font-weight: 800; }
+
+@media (max-width: 1180px) {
+  .ah-asset-body { grid-template-columns: minmax(0, 1fr); }
+  .ah-asset-facts { grid-template-columns: repeat(2, auto); }
+  .rm-strip.ah-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .rm-strip.ah-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ah-trends, .ah-pair { grid-template-columns: minmax(0, 1fr); }
+}

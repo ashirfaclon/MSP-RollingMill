@@ -26,6 +26,7 @@ import RmdKpiStrip from './RmdKpiStrip';
 import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
 import RmdMillMimic from './RmdMillMimic';
 import RmdShiftProduction from './RmdShiftProduction';
+import RmdRunningRateDrawer from './RmdRunningRateDrawer';
 import RmdStockBySize, { useRmdStock } from './RmdStockBySize';
 import '@/components/visualization/visualization.css';
 import './rmd.css';
@@ -56,13 +57,17 @@ function RunningRateFoot() {
   const { data, dataUrl, error } = useApi<RmdRunningRateReport>(url);
   const current = data && dataUrl === url ? data : null;
   const rate = current?.totals.rateTph ?? null;
+  const [open, setOpen] = useState(false);
   return (
-    <span className="rm-foot-item" title="Production ÷ running hours (billets no more than 10 min apart, either line)">
-      <span className="rm-k">Running rate</span>
-      {!current && !error
-        ? <span className="skel skel--num" role="status" aria-label="Loading" />
-        : <span className={`rm-foot-v num ${rate === null ? 'v-na' : 'v-val'}`}>{rate === null ? 'NA' : `${fixed(rate, 2)} TPH`}</span>}
-    </span>
+    <>
+      <button type="button" className="rm-foot-item rm-foot-btn" onClick={() => setOpen(true)} aria-haspopup="dialog" title="Running rate per day">
+        <span className="rm-k">Running rate</span>
+        {!current && !error
+          ? <span className="skel skel--num" role="status" aria-label="Loading" />
+          : <span className={`rm-foot-v num ${rate === null ? 'v-na' : 'v-val'}`}>{rate === null ? 'NA' : `${fixed(rate, 2)} TPH`}</span>}
+      </button>
+      <RmdRunningRateDrawer open={open} onClose={() => setOpen(false)} />
+    </>
   );
 }
 

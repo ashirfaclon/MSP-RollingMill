@@ -7,7 +7,7 @@
  */
 import Link from 'next/link';
 import Icon from '@/components/Icon';
-import { NAV_SCREENS, millOf, pathFor, type MillId, type ScreenId } from '@/config/navigation';
+import { millOf, navScreens, pathFor, type MillId, type ScreenId } from '@/config/navigation';
 import { setGlobalSel, useGlobalSel } from '@/state/globalSel';
 import './sidebar.css';
 
@@ -25,7 +25,7 @@ export default function Sidebar({ mill, screen }: { mill: MillId; screen: Screen
 
       <nav className="sb-nav" aria-label="Dashboard screens">
         <div className="sb-label">Dashboards</div>
-        {NAV_SCREENS.map((s) => {
+        {navScreens(mill).map((s) => {
           const on = s.id === screen;
           return (
             <Link

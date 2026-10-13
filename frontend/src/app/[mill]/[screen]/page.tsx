@@ -6,13 +6,15 @@ import HsmDataModel from '@/components/datamodel/HsmDataModel';
 import RmdVisualization from '@/components/rmd/RmdVisualization';
 import PendingMillVisualization from '@/components/mills/PendingMillVisualization';
 import LsmVisualization from '@/components/lsm/LsmVisualization';
+import AssetHealth from '@/components/asset/AssetHealth';
 import ScreenPlaceholder from '@/components/ScreenPlaceholder';
-import { MILLS, SCREENS, isMill, isScreen, millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
+import { MILLS, SCREENS, hasScreen, isMill, isScreen, millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
 
 /** Screens that exist so far; everything else shows a placeholder. */
 function screenFor(mill: MillId, screen: ScreenId) {
   if (mill === 'hsm' && screen === 'visualization') return <HsmVisualization />;
   if (mill === 'hsm' && screen === 'data-model') return <HsmDataModel />;
+  if (mill === 'hsm' && screen === 'asset-health') return <AssetHealth />;
   if (mill === 'rmd' && screen === 'visualization') return <RmdVisualization />;
   // LSM and RMS: the same screen, every figure NA until their sources are confirmed.
   if (mill === 'lsm' && screen === 'visualization') return <LsmVisualization />;
@@ -24,7 +26,7 @@ function screenFor(mill: MillId, screen: ScreenId) {
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return MILLS.flatMap((m) => SCREENS.map((s) => ({ mill: m.id, screen: s.id })));
+  return MILLS.flatMap((m) => SCREENS.filter((s) => hasScreen(m.id, s.id)).map((s) => ({ mill: m.id, screen: s.id })));
 }
 
 export async function generateMetadata(props: PageProps<'/[mill]/[screen]'>): Promise<Metadata> {
@@ -35,7 +37,7 @@ export async function generateMetadata(props: PageProps<'/[mill]/[screen]'>): Pr
 
 export default async function Page(props: PageProps<'/[mill]/[screen]'>) {
   const { mill, screen } = await props.params;
-  if (!isMill(mill) || !isScreen(screen)) notFound();
+  if (!isMill(mill) || !isScreen(screen) || !hasScreen(mill, screen)) notFound();
 
   return (
     <AppShell mill={mill} screen={screen}>{screenFor(mill, screen)}</AppShell>

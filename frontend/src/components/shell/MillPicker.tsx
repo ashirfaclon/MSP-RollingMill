@@ -9,7 +9,7 @@
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MILLS, millOf, pathFor, type MillId, type ScreenId } from '@/config/navigation';
+import { DEFAULT_SCREEN, MILLS, hasScreen, millOf, pathFor, type MillId, type ScreenId } from '@/config/navigation';
 import './millpicker.css';
 
 export default function MillPicker({ mill, screen }: { mill: MillId; screen: ScreenId }) {
@@ -34,7 +34,8 @@ export default function MillPicker({ mill, screen }: { mill: MillId; screen: Scr
   const choose = (i: number) => {
     close();
     const next = MILLS[i].id;
-    if (next !== mill) router.push(pathFor(next, screen));
+    // Keeps the screen when the other mill has it (Asset Health is HSM only), else Visualization.
+    if (next !== mill) router.push(pathFor(next, hasScreen(next, screen) ? screen : DEFAULT_SCREEN));
   };
 
   // Focus the list when it opens, so the keyboard drives it straight away.
