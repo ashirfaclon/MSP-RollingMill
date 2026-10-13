@@ -14,6 +14,7 @@ import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmsProductionPeriod, type RmsProductionReport } from '@/services/hsmApi';
 
 const f = (v: number | null) => (v === null ? '—' : fmtNum(v, 2));
+const pcs = (v: number | null) => (v === null ? '—' : v.toLocaleString('en-IN'));
 
 /** The Duration period's RMS production report (day grain) — shared by the card and Order allocation. */
 export function useRmsProduction(dates: { from: string; to: string } | null) {
@@ -50,22 +51,23 @@ function Content({ data }: { data: RmsProductionReport }) {
     <>
       <Stats items={[
         { label: 'Production', value: f(t.productionMt), unit: 'MT' },
+        { label: 'Billets in', value: t.billetsPcs === null ? '—' : t.billetsPcs.toLocaleString('en-IN'), unit: 'pcs' },
         { label: 'Days entered', value: String(t.entryDays), unit: `of ${t.days}` },
       ]} />
       <DrillChart series={series} categories={categories} axes={axes}
         ariaLabel={`Production by period: ${rows.map((x) => `${x.label} ${f(x.productionMt)} MT`).join('; ')}`} />
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Production by period">
-          <thead><tr><th>Period</th><th className="r">Production (MT)</th></tr></thead>
-          <tbody>{rows.map((x) => <tr key={x.key}>{label(x)}<td className="num r v-val">{f(x.productionMt)}</td></tr>)}</tbody>
-          <tfoot><tr>{label(t)}<td className="num r">{f(t.productionMt)}</td></tr></tfoot>
+          <thead><tr><th>Period</th><th className="r">Billets in (pcs)</th><th className="r">Production (MT)</th></tr></thead>
+          <tbody>{rows.map((x) => <tr key={x.key}>{label(x)}<td className="num r">{pcs(x.billetsPcs)}</td><td className="num r v-val">{f(x.productionMt)}</td></tr>)}</tbody>
+          <tfoot><tr>{label(t)}<td className="num r">{pcs(t.billetsPcs)}</td><td className="num r">{f(t.productionMt)}</td></tr></tfoot>
         </table>
       </div>
       <SourceBox
         sources={[{ name: 'ERP', rows: [
           ['Table', 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],
           ['Filter', "ENTITY_CODE = 'MP', DIV_CODE = 'RS', TNATURE = 'PRLOG', SERIES = 'L5P'"],
-          ['Field', "ATTR_CODE = 'PRODUCTION_MT' (value in ATTR_VALUE), by VRDATE"],
+          ['Field', "ATTR_CODE = 'PRODUCTION_MT', 'INPUT_PCS' (value in ATTR_VALUE), by VRDATE"],
         ] }]}
         formula={[
           "Production = Σ PRODUCTION_MT of the date's entries",

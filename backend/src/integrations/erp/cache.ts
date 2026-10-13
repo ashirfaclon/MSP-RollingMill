@@ -97,7 +97,7 @@ export function readErpLsmStock(env: Env): LsmStockCache | null {
 }
 
 /** RMS Production Log Sheet: one row per entry (division RS, series L5P). */
-export interface RmsLogRow { date: string; vrno: string; productionMt: number | null; productionPcs: number | null }
+export interface RmsLogRow { date: string; vrno: string; productionMt: number | null; productionPcs: number | null; inputPcs?: number | null }
 export interface RmsProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmsLogRow[] }
 
 export function readErpRmsProduction(env: Env): RmsProductionCache | null {

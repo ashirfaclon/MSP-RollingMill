@@ -44,6 +44,8 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
   const { dates } = useSelection();
   const prod = useRmsProduction(mill === 'rms' ? dates : null);
   const prodMt = prod.data?.totals.productionMt ?? null;
+  // Billets in (pieces): INPUT_PCS of the same log sheet.
+  const billetsPcs = prod.data?.totals.billetsPcs ?? null;
   const prodNote = prod.error ? 'ERP data unavailable' : prod.data?.erp.connection === 'down' ? prod.data.erp.message : '';
   const [prodOpen, setProdOpen] = useState(false);
   return (
@@ -132,7 +134,9 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
             </div>
             <div className="rmd-mb-pieces">
               <span className="rm-k">Billets</span>
-              <span className="rm-mb-pieces-v num v-na">NA</span>
+              {billetsPcs === null
+                ? <span className="rm-mb-pieces-v num v-na">NA</span>
+                : <span className="rm-mb-pieces-v num"><b>{billetsPcs.toLocaleString('en-IN')}</b>{' '}in</span>}
             </div>
           </div>
         </Panel>

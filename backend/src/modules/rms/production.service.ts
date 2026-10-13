@@ -1,7 +1,8 @@
 /**
  * RMS production from the ERP Production Log Sheet — the same sheet and field as HSM, with RMS's
  * division (the user, 13 Oct 2026): ATTR_TRAN_DATA_HEAD + BODY, ENTITY_CODE = 'MP',
- * TNATURE = 'PRLOG', DIV_CODE = 'RS', SERIES = 'L5P' (HSM: S1, L6P), field PRODUCTION_MT.
+ * TNATURE = 'PRLOG', DIV_CODE = 'RS', SERIES = 'L5P' (HSM: S1, L6P), field PRODUCTION_MT; billets
+ * in (pieces) INPUT_PCS. Billet input in MT waits for the user (INPUT_MT is almost never filled).
  *
  * The same day is sometimes entered twice with identical figures (1, 3 and 10 Oct 2026): an
  * entry repeating another of its date — same PRODUCTION_MT and PRODUCTION_PCS — is counted once.
@@ -29,11 +30,13 @@ export function distinctEntries(rows: RmsLogRow[]): RmsLogRow[] {
 export function summariseRms(key: string, label: string, dates: string[], rows: RmsLogRow[]): RmsProductionPeriod {
   const mine = rows.filter((r) => r.date >= dates[0] && r.date <= dates[dates.length - 1]);
   const v = mine.map((r) => r.productionMt).filter((x): x is number => x !== null);
+  const pcs = mine.map((r) => r.inputPcs ?? null).filter((x): x is number => x !== null);
   return {
     key, label, fromDate: dates[0], toDate: dates[dates.length - 1], days: dates.length,
     entryDays: new Set(mine.map((r) => r.date)).size,
     entries: mine.length,
     productionMt: v.length ? round2(v.reduce((a, b) => a + b, 0)) : null,
+    billetsPcs: pcs.length ? pcs.reduce((a, b) => a + b, 0) : null,
   };
 }
 

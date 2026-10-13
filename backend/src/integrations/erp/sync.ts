@@ -271,7 +271,7 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
 /**
  * RMS Production Log Sheet — HSM's sheet with RMS's division: ATTR_TRAN_DATA_HEAD + BODY,
  * ENTITY_CODE = 'MP', TNATURE = 'PRLOG', DIV_CODE = 'RS', SERIES = 'L5P'; one row per entry
- * with PRODUCTION_MT and PRODUCTION_PCS. Its own failure.
+ * with PRODUCTION_MT, PRODUCTION_PCS and INPUT_PCS (billets in). Its own failure.
  */
 async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
   let conn: oracledb.Connection | null = null;
@@ -279,14 +279,15 @@ async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
     conn = await oracledb.getConnection({ user: env.erpUser!, password: env.erpPassword!, connectString: env.erpDsn! });
     conn.callTimeout = 120_000;
     await conn.execute('SET TRANSACTION READ ONLY');
-    const rows = ((await conn.execute<{ D: string; VRNO: string; MT: number | null; PCS: number | null }>(`
+    const rows = ((await conn.execute<{ D: string; VRNO: string; MT: number | null; PCS: number | null; IN_PCS: number | null }>(`
       SELECT TO_CHAR(h.VRDATE, 'YYYY-MM-DD') AS "D", h.VRNO AS "VRNO",
              MAX(CASE WHEN b.ATTR_CODE = 'PRODUCTION_MT' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "MT",
-             MAX(CASE WHEN b.ATTR_CODE = 'PRODUCTION_PCS' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "PCS"
+             MAX(CASE WHEN b.ATTR_CODE = 'PRODUCTION_PCS' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "PCS",
+             MAX(CASE WHEN b.ATTR_CODE = 'INPUT_PCS' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "IN_PCS"
         FROM MSPV7ERP1.ATTR_TRAN_DATA_HEAD h
         JOIN MSPV7ERP1.ATTR_TRAN_DATA_BODY b ON b.VRNO = h.VRNO AND b.ENTITY_CODE = h.ENTITY_CODE
        WHERE h.ENTITY_CODE = 'MP' AND h.TNATURE = 'PRLOG' AND h.DIV_CODE = 'RS' AND h.SERIES = 'L5P'
-         AND b.ATTR_CODE IN ('PRODUCTION_MT', 'PRODUCTION_PCS')
+         AND b.ATTR_CODE IN ('PRODUCTION_MT', 'PRODUCTION_PCS', 'INPUT_PCS')
          AND h.VRDATE >= TO_DATE(:fromDate, 'YYYY-MM-DD')
        GROUP BY h.VRDATE, h.VRNO
        ORDER BY h.VRDATE, h.VRNO`, { fromDate: FROM }, { maxRows: 0 })).rows ?? []);
@@ -294,7 +295,7 @@ async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
       syncedAt: new Date().toISOString(),
       source: "ATTR_TRAN_DATA_HEAD/BODY · DIV_CODE = 'RS' · SERIES = 'L5P' · PRLOG",
       fromDate: FROM,
-      rows: rows.map((r) => ({ date: String(r.D), vrno: String(r.VRNO), productionMt: num(r.MT), productionPcs: num(r.PCS) })),
+      rows: rows.map((r) => ({ date: String(r.D), vrno: String(r.VRNO), productionMt: num(r.MT), productionPcs: num(r.PCS), inputPcs: num(r.IN_PCS) })),
     };
     writeAtomic(p.rmsProduction, cache);
     log(`  RMS log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);

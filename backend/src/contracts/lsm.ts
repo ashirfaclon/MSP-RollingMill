@@ -68,6 +68,8 @@ export interface RmsProductionPeriod {
   entries: number;
   /** Σ PRODUCTION_MT; null with no entry. */
   productionMt: number | null;
+  /** Σ INPUT_PCS — billets in, pieces; null with no entry. */
+  billetsPcs: number | null;
 }
 
 export interface RmsProductionReport {

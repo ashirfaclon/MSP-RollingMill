@@ -815,11 +815,14 @@ test('RMS: production from the ERP log sheet (division RS, series L5P) — a day
   const card = page.getByRole('button', { name: 'Production', exact: true });
   await expect(card.locator('.rm-card-value')).toContainText('6,244.8');
   await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('6,244.8 MT');
+  // Billets in: Σ INPUT_PCS (repeated entries once).
+  await expect(page.locator('section.panel', { hasText: 'Material & operating balance' }).locator('.rmd-mb-pieces')).toContainText(/[\d,]+ in/);
   await card.click();
   const d = page.getByRole('dialog', { name: 'Production · ERP log sheet' });
   const t = d.getByRole('table', { name: 'Production by period' });
   await expect(t.getByRole('row', { name: /^1 Oct/ })).toContainText('577.45');
   await expect(t.getByRole('row', { name: /^4 Oct/ })).toContainText('568.45');
+  await expect(t.locator('thead th')).toHaveText(['Period', 'Billets in (pcs)', 'Production (MT)']);
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'RS', TNATURE = 'PRLOG', SERIES = 'L5P'");
   await page.waitForTimeout(700);
   await d.screenshot({ path: `${SHOTS}/rms-drill-production.png` });
