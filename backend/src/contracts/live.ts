@@ -56,3 +56,31 @@ export interface StandTrend {
   /** Roughing mill speed on the same time base, for context. */
   speed: [number, number | null][];
 }
+
+/** GET /api/hsm/electrical-delays — the logbook's Electrical Delays form, faults only. */
+export interface ElectricalDelay {
+  date: string;
+  shift: string;
+  section: string;
+  timeFrom: string | null;
+  timeTo: string | null;
+  /** From the form's duration (HH:MM:SS); null when not filled. */
+  minutes: number | null;
+  details: string;
+  /** Stands the fault names, e.g. ["F1", "F2", "F5"]. */
+  stands: string[];
+  /** roughing (R stands), finishing (F stands), both, or null when it names none. */
+  group: 'roughing' | 'finishing' | 'both' | null;
+}
+
+export interface DelayTotals { faults: number; minutes: number; mttrMin: number | null }
+
+export interface ElectricalDelaysReport {
+  from: string;
+  to: string;
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  /** Newest first. */
+  delays: ElectricalDelay[];
+  totals: { all: DelayTotals; roughing: DelayTotals; finishing: DelayTotals };
+}

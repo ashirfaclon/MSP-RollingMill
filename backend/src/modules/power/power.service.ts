@@ -8,9 +8,15 @@
  *        one entry per meter, `power-consumed` (kWh), the meter in `equipment`.
  *   RMD  one form per meter, "TMT Electrical Department → Power Reading VCB 1 / 2 / 3"
  *        (tmt-electrical-department/power-reading-vcb-n): `actual-kwh-vcb-n` (kWh).
+ *   LSM  "Electrical Logbook → Daily Power Consumption Record", filled hourly
+ *        (electrical-logbook/daily-power-consumption-record): `actual-kwh-vcb-1-1250amp`
+ *        (kWh) = present − previous reading, as the plant gave it (13 Oct 2026).
+ *
+ * An entry whose remark says "test entry" is left out.
  *
  * Specific energy = that power ÷ the mill's production for the same period, kWh/MT — HSM's
- * Production card (the Influx counter); RMD's ERP log sheet (PRODUCT_PRIME_SLENGTH_MT). Power is summed by the form's date, production by the 06:00
+ * Production card (the Influx counter); RMD's ERP log sheet (PRODUCT_PRIME_SLENGTH_MT); LSM's
+ * (PRODUTION_MT). Power is summed by the form's date, production by the 06:00
  * plant day — the same date, a few hours apart.
  *
  * The logbook engine ignores filters and returns every form's entries newest first, so ONE
@@ -24,8 +30,9 @@ import { fetchInsightPage, num, type InsightEntry } from '../../integrations/log
 import { MSG } from '../../shared/messages';
 import { dateRange, plantDayStart, productionComparison, round2 } from '../hsm/production.service';
 import { rmdProductionByDay } from '../rmd/production.service';
+import { lsmProductionByDay } from '../lsm/production.service';
 
-export type PowerMill = 'hsm' | 'rmd';
+export type PowerMill = 'hsm' | 'rmd' | 'lsm';
 
 /** How one logbook form becomes power entries: its mill, and the meter and kWh of a result. */
 interface PowerForm {
@@ -55,6 +62,15 @@ const FORMS = new Map<string, PowerForm>([
     }),
   }],
   vcb(1), vcb(2), vcb(3),
+  ['electrical-logbook/daily-power-consumption-record', {
+    mill: 'lsm',
+    read: (res) => ({
+      equipment: 'VCB-1 (1250 A)',
+      previousReading: num(res['previous-kwh-vcb-1-1250amp']),
+      presentReading: num(res['present-kwh-vcb-1-1250amp']),
+      kwh: num(res['actual-kwh-vcb-1-1250amp']),
+    }),
+  }],
 ]);
 const formsOf = (mill: PowerMill) => [...FORMS].filter(([, f]) => f.mill === mill).map(([tag]) => tag);
 
@@ -85,6 +101,8 @@ function keep(r: InsightEntry) {
   const form = FORMS.get(tag) ?? FORMS.get(String(r.resultName ?? ''));
   if (!form) return;
   const res = r.result ?? {};
+  // A test entry is not a reading.
+  if (/test\s*entry/i.test(String(res['remarks'] ?? ''))) return;
   const createdMs = Date.parse(r.createdAt ?? r.invocationTime ?? '');
   const read = form.read(res);
   const id = r._id ?? `${tag}|${r.createdAt}|${read.equipment}|${read.previousReading}`;
@@ -191,6 +209,14 @@ export function rmdPowerReport(env: Env, from: string, to: string, nowMs = Date.
   const vals = [...byDay.values()].filter((v): v is number => v !== null);
   const production = Promise.resolve({ byDay, total: vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null });
   return report(env, 'rmd', from, to, nowMs, production);
+}
+
+/** LSM: the daily power consumption record, over the ERP log sheet's production (PRODUTION_MT). */
+export function lsmPowerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
+  const byDay = lsmProductionByDay(env, dateRange(from, to));
+  const vals = [...byDay.values()].filter((v): v is number => v !== null);
+  const production = Promise.resolve({ byDay, total: vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null });
+  return report(env, 'lsm', from, to, nowMs, production);
 }
 
 /**

@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * Visualization for a mill whose sources are not confirmed yet (LSM, RMS): the same screen as
- * HSM and RMD — KPI strip, mill flow, then two rows of paired panels — with every figure NA.
+ * Visualization for a mill whose sources are not confirmed yet (RMS): the same screen as
+ * HSM and RMD — KPI strip, mill flow, then two rows of paired panels — every figure NA except
+ * finished stock (by size, and Order allocation's total): the ERP's stock rule for division RS.
  * Never a sample number. The KPI list follows the plant's Visualisation sheet for the mill
  * (LSM.xlsx / R.M.S.xlsx); each card and panel is wired once its source is confirmed.
  */
@@ -14,6 +15,8 @@ import ShiftBars from '@/components/visualization/ShiftBars';
 import '@/components/visualization/visualization.css';
 import { DAY_START_HOUR, shiftsLabel } from '@/lib/plantDay';
 import '@/components/rmd/rmd.css';
+import RmdStockBySize, { useRmdStock } from '@/components/rmd/RmdStockBySize';
+import { fixed } from '@/lib/num';
 
 const CARDS: { label: string; unit: string; series: Series }[] = [
   { label: 'Production', unit: 'MT', series: 'prod' },
@@ -31,6 +34,9 @@ const ZONES = ['Billet delivery rate', 'Roughing group', 'Intermediate group', '
 const NA_SHIFT = { planMt: null, outputMt: null, compliancePct: null };
 
 export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms' }) {
+  // RMS finished stock: the total of Finished stock by size (the ERP's Stock Sheet Engine, division RS).
+  const stock = useRmdStock(mill === 'rms' ? 'rms' : 'lsm').data;
+  const stockMt = mill === 'rms' && stock && stock.erp.connection === 'up' ? stock.totalMt : null;
   return (
     <div className="rm-viz">
       <section className="rm-strip" aria-label="Headline KPIs">
@@ -82,7 +88,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
           <div className="rm-alloc-block">
             <div className="rm-alloc-head">
               <span className="rm-k">Finished stock</span>
-              <span className="rm-alloc-total num v-na">NA</span>
+              <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{stockMt === null ? 'NA' : `${fixed(stockMt, 1)} MT`}</span>
             </div>
           </div>
         </Panel>
@@ -106,9 +112,11 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
             </div>
           </div>
         </Panel>
-        <Panel title="Finished stock by size" className="rm-panel" bodyClass="rm-body">
-          <p className="rm-empty">NA</p>
-        </Panel>
+        {mill === 'rms' ? <RmdStockBySize mill="rms" /> : (
+          <Panel title="Finished stock by size" className="rm-panel" bodyClass="rm-body">
+            <p className="rm-empty">NA</p>
+          </Panel>
+        )}
       </div>
     </div>
   );

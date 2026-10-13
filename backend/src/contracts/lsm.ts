@@ -41,3 +41,17 @@ export interface LsmProductionReport {
   rows: LsmProductionPeriod[];
   totals: LsmProductionPeriod;
 }
+
+/** GET /api/lsm/stock — finished stock by section at the end of a date (the plant's stock rule, division LS). */
+export interface LsmStockReport {
+  asOf: string;
+  erp: { connection: 'up' | 'down'; message: string; syncedAt: string | null; lastDate: string | null };
+  /** One row per section of every finished item under LS: the plant's 19 first (A 65×65×8, MC 75×40,
+   *  MB 125×70 …) in their order, then the rest (A 40×40×5, MC 150, Round 32 …), Other last;
+   *  every item in stock listed (largest first). Items and sections at 0 are left out. */
+  sizes: { key: string; label: string; stockMt: number; items: { code: string; name: string; stockMt: number }[] }[];
+  totalMt: number;
+}
+
+/** GET /api/rms/stock — the same shape, division RS. */
+export type RmsStockReport = LsmStockReport;

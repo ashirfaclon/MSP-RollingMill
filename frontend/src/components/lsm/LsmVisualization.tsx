@@ -7,6 +7,10 @@
  *   Production            PRODUTION_MT (card, Order allocation, the balance's Finished);
  *   Mass yield            PRODUTION_MT ÷ INPUT_MT (billet input).
  *   Billets               INPUT_PCS (billets in, pieces).
+ *   Finished stock        by section (Angle 65×8, Channel 75×40 …), the ERP's Stock Sheet Engine
+ *                         for division LS; Order allocation's Finished stock is its total.
+ *   Power, specific energy  the logbook's Daily Power Consumption Record (actual kWh, VCB-1)
+ *                         ÷ PRODUTION_MT.
  *   Material balance      billet input, finished and the six losses (B_LOSS_MT, ENDCUT_MT,
  *                         MISROLL_MT, COLD_MT, REJECT_MT, SHORTLENGTH_MT), mass difference and yield.
  */
@@ -20,11 +24,12 @@ import { DAY_START_HOUR, shiftsLabel } from '@/lib/plantDay';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
 import LsmProductionDrawer, { useLsmProduction } from './LsmProductionDrawer';
+import RmdStockBySize, { useRmdStock } from '@/components/rmd/RmdStockBySize';
+import PowerKpiCard from '@/components/production/PowerKpiCard';
+import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import '@/components/rmd/rmd.css';
 
 const NA_CARDS: { label: string; unit: string; series: Series }[] = [
-  { label: 'Power consumption', unit: 'MWh', series: 'prod' },
-  { label: 'Specific energy', unit: 'kWh/MT', series: 'prod' },
   { label: 'Made To Stock', unit: 'MT', series: 'free' },
   { label: 'Stock with order', unit: 'MT', series: 'order' },
   { label: 'Free stock', unit: 'MT', series: 'free' },
@@ -41,6 +46,9 @@ export default function LsmVisualization() {
   const [prodOpen, setProdOpen] = useState(false);
   const [yieldOpen, setYieldOpen] = useState(false);
   const note = error ? 'ERP data unavailable' : data?.erp.connection === 'down' ? data.erp.message : '';
+  // Finished stock: the total of Finished stock by size (the ERP's Stock Sheet Engine, division LS).
+  const stock = useRmdStock('lsm').data;
+  const stockMt = stock && stock.erp.connection === 'up' ? stock.totalMt : null;
 
   return (
     <div className="rm-viz">
@@ -65,6 +73,8 @@ export default function LsmVisualization() {
           onOpen={() => setYieldOpen(true)}
           openLabel="Mass yield per day, from the ERP log sheet"
         />
+        <PowerKpiCard mill="lsm" />
+        <SpecificEnergyCard mill="lsm" />
         {NA_CARDS.map((c) => <KpiCard key={c.label} label={c.label} value="NA" unit={c.unit} note="" series={c.series} />)}
       </section>
       <LsmProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
@@ -115,7 +125,7 @@ export default function LsmVisualization() {
           <div className="rm-alloc-block">
             <div className="rm-alloc-head">
               <span className="rm-k">Finished stock</span>
-              <span className="rm-alloc-total num v-na">NA</span>
+              <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{mt(stockMt)}</span>
             </div>
           </div>
         </Panel>
@@ -123,9 +133,7 @@ export default function LsmVisualization() {
 
       <div className="rm-row">
         <MaterialBalance />
-        <Panel title="Finished stock by size" className="rm-panel" bodyClass="rm-body">
-          <p className="rm-empty">NA</p>
-        </Panel>
+        <RmdStockBySize mill="lsm" />
       </div>
     </div>
   );

@@ -163,14 +163,20 @@ test('HSM asset health: the mock-up layout, every figure NA; a zone selects its 
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Finishing drive group');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
   await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Alignment/, /^Gearbox oil/, /^VFD trips/, /^Run hours/, /^PM on time/]);
-  await expect(cards.locator('.rm-card-value')).toHaveText(Array(8).fill(/^NA/));
+  // Wired: motor current (live, A) and run hours; the rest NA.
+  for (const i of [0, 1, 3, 4, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
+  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
   for (const t of ['Grouped asset mimic', 'Condition trends', 'Laser alignment · Machine inspection', 'ERP PM & work-order history', 'Diagnosis & process impact']) {
     await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
   }
-  // No sample figures: every value on the screen is NA.
-  const values = await main.locator('.num').allInnerTexts();
-  expect(values.length).toBeGreaterThan(20);
-  expect(values.every((v) => v.trim().startsWith("NA"))).toBe(true);
+  // Never a sample figure: the NA blocks stay NA.
+  for (const t of ['Condition trends', 'Laser alignment · Machine inspection']) {
+    const vals = await main.locator('section.panel', { hasText: t }).locator('.num').allInnerTexts();
+    expect(vals.every((v) => v.trim().startsWith('NA'))).toBe(true);
+  }
+  // Roughing / finishing zones show their live stands (or NA without a live reading).
+  await expect(main.getByRole('button', { name: /Finishing group/ }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 6 on)$/);
   // A zone selects its drive group.
   await main.getByRole('button', { name: /Roughing group/ }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Roughing drive group');
@@ -398,8 +404,8 @@ for (const mill of ['lsm', 'rms'] as const) {
     // LSM: Production is wired (ERP log sheet FA-LP-P) and opens its drawer; Today's entry comes a day late, so NA.
     // Everything else NA, and nothing else opens.
     await expect(strip.locator('.rm-card-value').nth(0)).toHaveText(mill === 'lsm' ? /^(NA|[\d,]+\.\d)/ : /^NA/);
-    for (let i = mill === 'lsm' ? 2 : 1; i < 7; i++) await expect(strip.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
-    await expect(strip.getByRole('button')).toHaveCount(mill === 'lsm' ? 2 : 0);
+    for (let i = mill === 'lsm' ? 4 : 1; i < 7; i++) await expect(strip.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+    await expect(strip.getByRole('button')).toHaveCount(mill === 'lsm' ? 4 : 0);
     const mimic = page.getByRole('list', { name: 'Mill process flow' });
     await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet delivery rate', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finish exit']);
     await expect(mimic.locator('.rm-zone-value')).toHaveText(Array(5).fill('NA'));

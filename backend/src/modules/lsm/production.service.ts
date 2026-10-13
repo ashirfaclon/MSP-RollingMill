@@ -67,3 +67,9 @@ export function lsmProduction(env: Env, from: string, to: string, grain: Grain):
     totals: summariseLsm('total', 'Total', dates, rows),
   };
 }
+
+/** Production per date, MT (for specific energy); null where none is entered. */
+export function lsmProductionByDay(env: Env, dates: string[]): Map<string, number | null> {
+  const rows = readErpLsmProduction(env)?.rows ?? [];
+  return new Map(dates.map((d) => [d, sumOf(rows.filter((r) => r.date === d), 'PRODUTION_MT')]));
+}

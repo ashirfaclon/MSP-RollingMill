@@ -726,3 +726,79 @@ test('RMD: running rate opens its drill-down — Prime + SL ÷ running hours fro
   await page.waitForTimeout(700);
   await d.screenshot({ path: `${SHOTS}/rmd-drill-running-rate.png` });
 });
+
+test('HSM asset health: electrical faults from the logbook — MTTR per group, the latest fault, and the list', async ({ page }) => {
+  await page.goto('/hsm/asset-health');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-09-01');
+  await dialog.getByLabel('End Date').fill('2026-10-12');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  // Finishing (selected by default): 17 faults naming F stands (or "finishing mill"), MTTR from their durations.
+  const pm = main.locator('section.panel', { hasText: 'ERP PM & work-order history' });
+  // The first logbook read pages back a few weeks: allow it time.
+  await expect(pm.getByRole('button', { name: /MTTR/ })).toContainText(/\d+\.\d min/, { timeout: 90_000 });
+  await expect(main.locator('section.panel', { hasText: 'Diagnosis & process impact' })).toContainText('F4&F6 DUMP');
+  await pm.getByRole('button', { name: /MTTR/ }).click();
+  const d = page.getByRole('dialog', { name: 'Finishing · electrical faults' });
+  const t = d.getByRole('table', { name: 'Electrical faults' });
+  await expect(t.locator('thead th')).toHaveText(['Date', 'Shift', 'Stands', 'Minutes', 'Fault details']);
+  await expect(t.locator('tbody tr').first()).toContainText('F4, F6');
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('Electrical HSM → Electrical Delays');
+  await page.waitForTimeout(700);
+  await d.screenshot({ path: `${SHOTS}/hsm-asset-faults.png` });
+  await page.keyboard.press('Escape');
+  // Roughing: R-stand faults (R5 on 14 Sep, R1 on 28 Sep …).
+  await main.getByRole('button', { name: /Roughing group/ }).click();
+  await expect(main.locator('section.panel', { hasText: 'Diagnosis & process impact' })).toContainText('R1 DRIVE TRIPPED');
+  await page.screenshot({ path: `${SHOTS}/hsm-asset-health-wired.png`, fullPage: true });
+});
+
+test('LSM: finished stock by section, as the ERP Stock Sheet Engine for division LS', async ({ page }) => {
+  await page.goto('/lsm/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-13');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const panel = page.locator('section.panel', { hasText: 'Finished stock by size' });
+  // Every finished item under LS: the plant's 19 sections first, in their names and order, then the rest.
+  // The Stock Sheet Engine's closing for 13 Oct: A 50×50×6 622.42, MC 75×40 590.20, Round 40 128.42.
+  await expect(panel.locator('.rm-size-name')).toHaveCount(24);
+  await expect(panel.locator('.rm-size-name').first()).toHaveText('A 50×50×6');
+  await expect(panel.locator('.rm-size-name').nth(18)).toHaveText('MB 125×70');
+  await expect(panel.locator('.rm-size-name').last()).toHaveText('Round 40');
+  await expect(panel.locator('.rm-size', { hasText: 'Round 40' })).toContainText('128.4 MT');
+  await expect(panel.locator('.rm-size', { hasText: 'A 50×50×6' })).toContainText('622.4 MT');
+  await expect(panel.locator('.rm-size', { hasText: 'MC 75×40' })).toContainText('590.2 MT');
+  await panel.screenshot({ path: `${SHOTS}/lsm-stock-by-section.png` });
+  // Order allocation's Finished stock is the total (billets left out).
+  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').nth(1)).toHaveText('5,690.9 MT');
+  // MC 75×40 opens its lengths and defective item.
+  await panel.getByRole('button', { name: /^MC 75×40:/ }).click();
+  const d = page.getByRole('dialog', { name: 'MC 75×40 · finished stock by SKU' });
+  const t = d.getByRole('table', { name: 'MC 75×40 stock by SKU' });
+  await expect(t.locator('tbody tr')).toHaveCount(4);
+  await expect(t.locator('tbody tr').first()).toContainText('MS Channel 75X40 6 mtr');
+  await expect(t.locator('tbody tr').first()).toContainText('299.70');
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'LS'");
+  await page.waitForTimeout(700);
+  await d.screenshot({ path: `${SHOTS}/lsm-stock-section-drill.png` });
+});
+
+test('RMS: finished stock by section, by the ERP stock rule for division RS', async ({ page }) => {
+  await page.goto('/rms/visualization');
+  const panel = page.locator('section.panel', { hasText: 'Finished stock by size' });
+  // Angles → channels → beams → H beams, by size; MC 200 is the largest (6 m 512.6 + 12 m + …).
+  await expect(panel.locator('.rm-size-name').first()).toHaveText(/^A 130×130×/);
+  await expect(panel.locator('.rm-size-name')).toContainText(['MC 200']);
+  await expect(panel.locator('.rm-size', { hasText: 'MC 200' })).toContainText(/\d MT$/);
+  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').nth(1)).toHaveText(/^[\d,]+\.\d MT$/);
+  await panel.getByRole('button', { name: /^MC 200:/ }).click();
+  const d = page.getByRole('dialog', { name: 'MC 200 · finished stock by SKU' });
+  await expect(d.getByRole('table', { name: 'MC 200 stock by SKU' })).toContainText('MS CHANNEL 200 MM 6 mtr');
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'RS'");
+  await page.keyboard.press('Escape');
+  await panel.screenshot({ path: `${SHOTS}/rms-stock-by-section.png` });
+});

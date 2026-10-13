@@ -10,6 +10,7 @@ import { HSM_DISCHARGED_BILLET } from '../../integrations/historian/tags';
 import { parseGrain, parseRange } from './params';
 import { PLANT_DAY_START_HOUR, counterComparison, isDate, istDate, productionComparison, type CounterSpec } from './production.service';
 import { logSheetReport, ordersReport, sizeReport, stockReport } from './erp-kpis.service';
+import { electricalDelays } from './electrical-delays.service';
 import { STAND_METRICS, hsmLive, standTrend, type StandMetric } from './live.service';
 import { yieldComparison } from './yield.service';
 import { runningRate } from './running-rate.service';
@@ -80,6 +81,12 @@ export async function hsmRoutes(app: FastifyInstance) {
     const { from, to } = parseRange(q);
     const today = istDate(Date.now() - PLANT_DAY_START_HOUR * 3_600_000);
     return ordersReport(loadEnv(), from, to, parseGrain(q), today);
+  });
+
+  /** Electrical faults from the logbook's Electrical Delays form, by the form's date. */
+  app.get('/electrical-delays', { config: { errorCode: 'hsm_electrical_delays_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return electricalDelays(loadEnv(), from, to);
   });
 
   /** Finished-strip stock in the FG yard at the end of plant date `to`. */

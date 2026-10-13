@@ -54,7 +54,7 @@ function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill:
       <Stats items={[
         { label: 'Specific energy', value: n(t.kwhPerMt), unit: 'kWh/MT' },
         { label: 'Power', value: n(t.kwh), unit: 'kWh' },
-        { label: mill === 'rmd' ? 'Production (ERP)' : 'Production (Influx)', value: n(t.productionMt), unit: 'MT' },
+        { label: mill === 'hsm' ? 'Production (Influx)' : 'Production (ERP)', value: n(t.productionMt), unit: 'MT' },
       ]} />
 
       {t.entries > 0 ? (
@@ -124,10 +124,27 @@ const SOURCES: Record<PowerMill, SourceSystem[]> = {
         ['Field', "ATTR_CODE = 'PRODUCT_PRIME_SLENGTH_MT' (value in ATTR_VALUE), by VRDATE"],
       ],
     },
+  ],  lsm: [
+    {
+      name: 'Logbook',
+      rows: [
+        ['Form', 'Electrical Logbook → Daily Power Consumption Record'],
+        ['Field', 'ACTUAL_KWH_VCB_1_1250AMP (kWh), by the form\'s date'],
+      ],
+    },
+    {
+      name: 'ERP',
+      rows: [
+        ['Table', 'ATTR_TRAN_DATA_BODY'],
+        ['Filter', "USER_CODE = 'FA-LP-P'"],
+        ['Field', "ATTR_CODE = 'PRODUTION_MT' (value in ATTR_VALUE), by VRDATE"],
+      ],
+    },
   ],
 };
 
 const FORMULA: Record<PowerMill, string[]> = {
   hsm: ['Specific energy = Power (kWh) ÷ Influx production (MT)'],
   rmd: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
+  lsm: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
 };

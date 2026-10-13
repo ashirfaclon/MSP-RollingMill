@@ -6,6 +6,9 @@
  * 'Other' (the plant's items with no bar size). All of it is free stock, so there is no
  * with-order / free split. Clicking a row opens its breakdown by SKU: every SKU of the plant's
  * list (Rolling_Mill_TMT_Items.xlsx) in stock is in one row; a SKU or row at 0 isn't shown.
+ *
+ * LSM uses the same panel (mill="lsm"): one row per LSM section, in the plant's names (A 65×65×8,
+ * MC 75×40, MB 125×70 …), its lengths and defective item inside — the ERP's Stock Sheet Engine.
  */
 import { useState } from 'react';
 import Panel from '@/components/Panel';
@@ -14,20 +17,40 @@ import SourceBox from '@/components/drill/SourceBox';
 import { fmtNum } from '@/components/drill/DrillChart';
 import { fixed } from '@/lib/num';
 import { dm, useSelection } from '@/services/hsmProduction';
-import { useApi, type RmdStockReport } from '@/services/hsmApi';
+import { useApi, type LsmStockReport, type RmdStockReport } from '@/services/hsmApi';
 
-type Size = RmdStockReport['sizes'][number];
+type StockMill = 'rmd' | 'lsm' | 'rms';
+type Report = RmdStockReport | LsmStockReport;
+type Size = Report['sizes'][number];
 
 /** Finished stock at the end of the Duration period — shared by this panel and Order allocation (useApi dedupes the URL). */
-export function useRmdStock() {
+export function useRmdStock(mill: StockMill = 'rmd') {
   const { dates } = useSelection();
-  const url = dates ? `/api/rmd/stock?to=${dates.to}` : null;
-  const s = useApi<RmdStockReport>(url);
+  const url = dates ? `/api/${mill}/stock?to=${dates.to}` : null;
+  const s = useApi<Report>(url);
   return { data: s.data && s.dataUrl === url ? s.data : null, error: s.error };
 }
 
-export default function RmdStockBySize() {
-  const s = useRmdStock();
+const SOURCE: Record<StockMill, (label: string) => [string, string][]> = {
+  rmd: (label) => [
+    ['Table', 'ITEMTRAN_BODY (the plant\'s stock query)'],
+    ['Filter', "ENTITY_CODE = 'MP', GODOWN_CODE = 'FGYRDP', DIV_CODE in RM, RS, LS, PL, SI, SM, S1; TCODE not in (MC, FS, ME, NG, NP, QJ, ZH, ZP, ZW, ZF, MR, ZM, ES, NT, ZS, ZA, MD, NI, Z8)"],
+    ['Field', `ITEM_CODE = the ${label} SKUs of the plant's item list; QTYRECD, QTYISSUED`],
+  ],
+  lsm: (label) => [
+    ['Table', 'ITEMTRAN_BODY + ITEM_MAST (the ERP\'s Stock Sheet Engine, division LS)'],
+    ['Filter', "ENTITY_CODE = 'MP', DIV_CODE = 'LS', ITEM_NATURE in FG, SM (not closed, billets left out), GODOWN_CODE ≠ 'STOR1P'; TCODE not in (MC, FS, ME, NG, NP, QJ, ZH, ZP, ZW, ZF, MR, ZM, ES, NT, ZS, ZA, MD, NI, Z8)"],
+    ['Field', `the ${label} items (section read from ITEM_NAME; LSM's 19 sections); QTYRECD, QTYISSUED`],
+  ],
+  rms: (label) => [
+    ['Table', 'ITEMTRAN_BODY + ITEM_MAST (the ERP\'s Stock Sheet Engine, division RS)'],
+    ['Filter', "ENTITY_CODE = 'MP', DIV_CODE = 'RS', ITEM_NATURE in FG, SM (not closed, billets left out), GODOWN_CODE ≠ 'STOR1P'; TCODE not in (MC, FS, ME, NG, NP, QJ, ZH, ZP, ZW, ZF, MR, ZM, ES, NT, ZS, ZA, MD, NI, Z8)"],
+    ['Field', `the ${label} items (section read from ITEM_NAME); QTYRECD, QTYISSUED`],
+  ],
+};
+
+export default function RmdStockBySize({ mill = 'rmd' }: { mill?: StockMill }) {
+  const s = useRmdStock(mill);
   const data = s.data;
   const [open, setOpen] = useState<Size | null>(null);
   const max = Math.max(...(data?.sizes.map((x) => x.stockMt) ?? []), 0.01);
@@ -72,13 +95,13 @@ export default function RmdStockBySize() {
         error={null}
         hasData={open !== null}
       >
-        {open && data && <SizeBreakdown size={open} asOf={data.asOf} />}
+        {open && data && <SizeBreakdown size={open} asOf={data.asOf} mill={mill} />}
       </DrillDrawer>
     </Panel>
   );
 }
 
-function SizeBreakdown({ size, asOf }: { size: Size; asOf: string }) {
+function SizeBreakdown({ size, asOf, mill }: { size: Size; asOf: string; mill: StockMill }) {
   return (
     <>
       <Stats items={[
@@ -99,12 +122,7 @@ function SizeBreakdown({ size, asOf }: { size: Size; asOf: string }) {
       <SourceBox
         sources={[{
           name: 'ERP',
-          rows: [
-            ['Table', 'ITEMTRAN_BODY (the plant\'s stock query)'],
-            ['Filter', "ENTITY_CODE = 'MP', GODOWN_CODE = 'FGYRDP', DIV_CODE in RM, RS, LS, PL, SI, SM, S1; TCODE not in (MC, FS, ME, NG, NP, QJ, ZH, ZP, ZW, ZF, MR, ZM, ES, NT, ZS, ZA, MD, NI, Z8)"],
-            ['Field', `ITEM_CODE = the ${size.label} SKUs of the plant's item list; QTYRECD, QTYISSUED`],
-            ['Date', `VRDATE up to ${dm(asOf)}`],
-          ],
+          rows: [...SOURCE[mill](size.label), ['Date', `VRDATE up to ${dm(asOf)}`]],
         }]}
         formula={[
           'Stock = Σ QTYRECD − Σ QTYISSUED of every ledger entry up to the date',

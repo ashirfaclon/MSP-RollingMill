@@ -19,9 +19,9 @@ import { API_BASE } from './apiBase';
 /** Response types come from the backend's API contract (type-only — no backend code is bundled). */
 export type {
   Grain, LogPeriod, LogSheetReport, SizeReport, SizeRow, OrdersReport, OrderPeriod, OpenLine, ErpMeta, StockReport,
-  HsmLive, StandNow, GroupNow, StandTrend, StandMetric, YieldComparison, YieldPeriod, RunningRateReport, RatePeriod, RateDay,
+  HsmLive, StandNow, GroupNow, ElectricalDelaysReport, ElectricalDelay, StandTrend, StandMetric, YieldComparison, YieldPeriod, RunningRateReport, RatePeriod, RateDay,
   PowerReport, PowerDay, PowerEntry, PlanReport, PlanDay, RmdBilletsReport, RmdBilletPeriod,
-  RmdLive, RmdStationNow, RmdZoneNow, RmdZoneId, RmdStationTrend, RmdRunningRateReport, RmdRatePeriod, RmdProductionReport, RmdProductionPeriod, RmdStockReport, RmdPlanReport, RmdPlanDay, LsmProductionReport, LsmProductionPeriod,
+  RmdLive, RmdStationNow, RmdZoneNow, RmdZoneId, RmdStationTrend, RmdRunningRateReport, RmdRatePeriod, RmdProductionReport, RmdProductionPeriod, RmdStockReport, RmdPlanReport, RmdPlanDay, LsmProductionReport, LsmProductionPeriod, LsmStockReport, RmsStockReport,
 } from '@contracts';
 
 

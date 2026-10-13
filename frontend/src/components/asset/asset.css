@@ -29,6 +29,9 @@
 .ah-list { display: flex; flex-direction: column; }
 .ah-row { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .ah-row:last-child { border-bottom: 0; }
+.ah-row--button { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.ah-row--button:hover { background: var(--panel-3); }
+.ah-diag { max-width: 70%; text-align: right; font-size: 12px; font-weight: 700; color: var(--text); }
 .ah-row .num { font-size: 13px; font-weight: 800; }
 
 @media (max-width: 1180px) {

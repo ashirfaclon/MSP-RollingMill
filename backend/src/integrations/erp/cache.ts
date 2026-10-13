@@ -39,6 +39,8 @@ export const cachePaths = (env: Env) => {
     rmdProduction: path.join(dir, 'erp-rmd-production.json'),
     rmdStock: path.join(dir, 'erp-rmd-stock.json'),
     lsmProduction: path.join(dir, 'erp-lsm-production.json'),
+    lsmStock: path.join(dir, 'erp-lsm-stock.json'),
+    rmsStock: path.join(dir, 'erp-rms-stock.json'),
   };
 };
 
@@ -84,6 +86,17 @@ export interface LsmProductionCache { syncedAt: string; source: string; fromDate
 
 export function readErpLsmProduction(env: Env): LsmProductionCache | null {
   return readJson<LsmProductionCache>(cachePaths(env).lsmProduction);
+}
+
+/** A division's finished stock (LSM: LS, RMS: RS): each item's net movement per date (all godowns but STOR1P), and item names. */
+export interface LsmStockCache { syncedAt: string; source: string; moves: { date: string; item: string; netMt: number }[]; items: Record<string, string> }
+
+export function readErpLsmStock(env: Env): LsmStockCache | null {
+  return readJson<LsmStockCache>(cachePaths(env).lsmStock);
+}
+
+export function readErpRmsStock(env: Env): LsmStockCache | null {
+  return readJson<LsmStockCache>(cachePaths(env).rmsStock);
 }
 
 /** RMD finished stock: each item's net movement (received − issued, MT) per date in its godown. */
