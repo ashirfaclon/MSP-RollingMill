@@ -41,6 +41,7 @@ export const cachePaths = (env: Env) => {
     lsmProduction: path.join(dir, 'erp-lsm-production.json'),
     lsmStock: path.join(dir, 'erp-lsm-stock.json'),
     rmsStock: path.join(dir, 'erp-rms-stock.json'),
+    rmsProduction: path.join(dir, 'erp-rms-production.json'),
   };
 };
 
@@ -93,6 +94,14 @@ export interface LsmStockCache { syncedAt: string; source: string; moves: { date
 
 export function readErpLsmStock(env: Env): LsmStockCache | null {
   return readJson<LsmStockCache>(cachePaths(env).lsmStock);
+}
+
+/** RMS Production Log Sheet: one row per entry (division RS, series L5P). */
+export interface RmsLogRow { date: string; vrno: string; productionMt: number | null; productionPcs: number | null }
+export interface RmsProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmsLogRow[] }
+
+export function readErpRmsProduction(env: Env): RmsProductionCache | null {
+  return readJson<RmsProductionCache>(cachePaths(env).rmsProduction);
 }
 
 export function readErpRmsStock(env: Env): LsmStockCache | null {

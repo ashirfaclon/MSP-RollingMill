@@ -3,11 +3,12 @@
 /**
  * Visualization for a mill whose sources are not confirmed yet (RMS): the same screen as
  * HSM and RMD — KPI strip, mill flow, then two rows of paired panels — every figure NA except
- * finished stock (by size, and Order allocation's total): the ERP's stock rule for division RS.
+ * finished stock (by size, and Order allocation's total): the ERP's stock rule for division RS —
+ * and production: the ERP log sheet (division RS, series L5P, PRODUCTION_MT), card and Order allocation.
  * Never a sample number. The KPI list follows the plant's Visualisation sheet for the mill
  * (LSM.xlsx / R.M.S.xlsx); each card and panel is wired once its source is confirmed.
  */
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import FlowArrow from '@/components/visualization/FlowArrow';
@@ -16,6 +17,8 @@ import '@/components/visualization/visualization.css';
 import { DAY_START_HOUR, shiftsLabel } from '@/lib/plantDay';
 import '@/components/rmd/rmd.css';
 import RmdStockBySize, { useRmdStock } from '@/components/rmd/RmdStockBySize';
+import RmsProductionDrawer, { useRmsProduction } from '@/components/rms/RmsProductionDrawer';
+import { useSelection } from '@/services/hsmProduction';
 import { fixed } from '@/lib/num';
 
 const CARDS: { label: string; unit: string; series: Series }[] = [
@@ -37,11 +40,32 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
   // RMS finished stock: the total of Finished stock by size (the ERP's Stock Sheet Engine, division RS).
   const stock = useRmdStock(mill === 'rms' ? 'rms' : 'lsm').data;
   const stockMt = mill === 'rms' && stock && stock.erp.connection === 'up' ? stock.totalMt : null;
+  // RMS production: the ERP log sheet (division RS, series L5P).
+  const { dates } = useSelection();
+  const prod = useRmsProduction(mill === 'rms' ? dates : null);
+  const prodMt = prod.data?.totals.productionMt ?? null;
+  const prodNote = prod.error ? 'ERP data unavailable' : prod.data?.erp.connection === 'down' ? prod.data.erp.message : '';
+  const [prodOpen, setProdOpen] = useState(false);
   return (
     <div className="rm-viz">
       <section className="rm-strip" aria-label="Headline KPIs">
-        {CARDS.map((c) => <KpiCard key={c.label} label={c.label} value="NA" unit={c.unit} note="" series={c.series} />)}
+        {CARDS.map((c) => c.label === 'Production' && mill === 'rms'
+          ? (
+            <KpiCard
+              key={c.label}
+              label="Production"
+              value={prodMt === null ? 'NA' : fixed(prodMt, 1)}
+              unit="MT"
+              note={prodNote}
+              series="prod"
+              loading={!prod.data && !prod.error}
+              onOpen={() => setProdOpen(true)}
+              openLabel="Production per day, from the ERP log sheet"
+            />
+          )
+          : <KpiCard key={c.label} label={c.label} value="NA" unit={c.unit} note="" series={c.series} />)}
       </section>
+      {mill === 'rms' && <RmsProductionDrawer open={prodOpen} onClose={() => setProdOpen(false)} />}
 
       <Panel title="Mill mimic">
         <ol className="rm-mimic rmd-mimic" aria-label="Mill process flow">
@@ -78,7 +102,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
           <div className="rm-alloc-block">
             <div className="rm-alloc-head">
               <span className="rm-k">Production</span>
-              <span className="rm-alloc-total num v-na">NA</span>
+              <span className={`rm-alloc-total num ${prodMt === null ? 'v-na' : 'v-val'}`}>{prodMt === null ? 'NA' : `${fixed(prodMt, 1)} MT`}</span>
             </div>
             <div className="rm-legend">
               <span className="rmd-legend-item rm-tone--order"><i className="rm-dot" aria-hidden />Made To Order <b className="num v-na">NA</b></span>

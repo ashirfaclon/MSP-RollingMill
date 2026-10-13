@@ -760,28 +760,29 @@ test('LSM: finished stock by section, as the ERP Stock Sheet Engine for division
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
   await dialog.getByLabel('Start Date').fill('2026-10-01');
-  await dialog.getByLabel('End Date').fill('2026-10-13');
+  await dialog.getByLabel('End Date').fill('2026-10-12');
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const panel = page.locator('section.panel', { hasText: 'Finished stock by size' });
   // Every finished item under LS: the plant's 19 sections first, in their names and order, then the rest.
-  // The Stock Sheet Engine's closing for 13 Oct: A 50×50×6 622.42, MC 75×40 590.20, Round 40 128.42.
+  // At the end of 12 Oct (a closed day): A 50×50×6 627.32, MC 75×40 642.34, Round 40 128.42.
+  // (13 Oct was checked against the ERP's Stock Sheet Engine: 5,759.51 vs 5,759.49 MT with billets.)
   await expect(panel.locator('.rm-size-name')).toHaveCount(24);
   await expect(panel.locator('.rm-size-name').first()).toHaveText('A 50×50×6');
   await expect(panel.locator('.rm-size-name').nth(18)).toHaveText('MB 125×70');
   await expect(panel.locator('.rm-size-name').last()).toHaveText('Round 40');
   await expect(panel.locator('.rm-size', { hasText: 'Round 40' })).toContainText('128.4 MT');
-  await expect(panel.locator('.rm-size', { hasText: 'A 50×50×6' })).toContainText('622.4 MT');
-  await expect(panel.locator('.rm-size', { hasText: 'MC 75×40' })).toContainText('590.2 MT');
+  await expect(panel.locator('.rm-size', { hasText: 'A 50×50×6' })).toContainText('627.3 MT');
+  await expect(panel.locator('.rm-size', { hasText: 'MC 75×40' })).toContainText('642.3 MT');
   await panel.screenshot({ path: `${SHOTS}/lsm-stock-by-section.png` });
   // Order allocation's Finished stock is the total (billets left out).
-  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').nth(1)).toHaveText('5,690.9 MT');
+  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').nth(1)).toHaveText('5,821.3 MT');
   // MC 75×40 opens its lengths and defective item.
   await panel.getByRole('button', { name: /^MC 75×40:/ }).click();
   const d = page.getByRole('dialog', { name: 'MC 75×40 · finished stock by SKU' });
   const t = d.getByRole('table', { name: 'MC 75×40 stock by SKU' });
   await expect(t.locator('tbody tr')).toHaveCount(4);
   await expect(t.locator('tbody tr').first()).toContainText('MS Channel 75X40 6 mtr');
-  await expect(t.locator('tbody tr').first()).toContainText('299.70');
+  await expect(t.locator('tbody tr').first()).toContainText('315.86');
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'LS'");
   await page.waitForTimeout(700);
   await d.screenshot({ path: `${SHOTS}/lsm-stock-section-drill.png` });
@@ -801,4 +802,25 @@ test('RMS: finished stock by section, by the ERP stock rule for division RS', as
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'RS'");
   await page.keyboard.press('Escape');
   await panel.screenshot({ path: `${SHOTS}/rms-stock-by-section.png` });
+});
+
+test('RMS: production from the ERP log sheet (division RS, series L5P) — a day entered twice counts once', async ({ page }) => {
+  await page.goto('/rms/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-12');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  // Σ PRODUCTION_MT 1–12 Oct, 1 / 3 / 10 Oct once each = the finished goods the ERP received: 6,244.75 MT.
+  const card = page.getByRole('button', { name: 'Production', exact: true });
+  await expect(card.locator('.rm-card-value')).toContainText('6,244.8');
+  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('6,244.8 MT');
+  await card.click();
+  const d = page.getByRole('dialog', { name: 'Production · ERP log sheet' });
+  const t = d.getByRole('table', { name: 'Production by period' });
+  await expect(t.getByRole('row', { name: /^1 Oct/ })).toContainText('577.45');
+  await expect(t.getByRole('row', { name: /^4 Oct/ })).toContainText('568.45');
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'RS', TNATURE = 'PRLOG', SERIES = 'L5P'");
+  await page.waitForTimeout(700);
+  await d.screenshot({ path: `${SHOTS}/rms-drill-production.png` });
 });

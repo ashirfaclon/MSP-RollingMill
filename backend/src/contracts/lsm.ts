@@ -55,3 +55,26 @@ export interface LsmStockReport {
 
 /** GET /api/rms/stock — the same shape, division RS. */
 export type RmsStockReport = LsmStockReport;
+
+/** GET /api/rms/production — the RMS Production Log Sheet (ERP, division RS), per date / week / month. */
+export interface RmsProductionPeriod {
+  key: string;
+  label: string;
+  fromDate: string;
+  toDate: string;
+  days: number;
+  entryDays: number;
+  /** Entries counted (a repeated identical entry counts once). */
+  entries: number;
+  /** Σ PRODUCTION_MT; null with no entry. */
+  productionMt: number | null;
+}
+
+export interface RmsProductionReport {
+  from: string;
+  to: string;
+  grain: Grain;
+  erp: { connection: 'up' | 'down'; message: string; syncedAt: string | null; lastDate: string | null };
+  rows: RmsProductionPeriod[];
+  totals: RmsProductionPeriod;
+}

@@ -25,7 +25,7 @@ import { loadEnv, type Env } from '../../config/env';
 import { RMD_STOCK_GODOWN, RMD_STOCK_ITEMS } from '../../modules/rmd/stock-items';
 import {
   ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, RMD_LOG_FIELDS, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
-  type LsmLogField, type LsmProductionCache, type LsmStockCache, type RmdLogField, type RmdProductionCache, type RmdStockCache,
+  type LsmLogField, type LsmProductionCache, type LsmStockCache, type RmsProductionCache, type RmdLogField, type RmdProductionCache, type RmdStockCache,
   type ErpCache, type ErpCommercialCache, type ErpDivisionRow, type ErpProductionCache,
   type ErpProductionRow, type ErpSyncAttempt, type LogField,
 } from './cache';
@@ -265,6 +265,44 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
   await pullLsm(env, p, log);
   await pullDivisionStock(env, p.lsmStock, 'LS', 'LSM', log);
   await pullDivisionStock(env, p.rmsStock, 'RS', 'RMS', log);
+  await pullRmsLog(env, p, log);
+}
+
+/**
+ * RMS Production Log Sheet — HSM's sheet with RMS's division: ATTR_TRAN_DATA_HEAD + BODY,
+ * ENTITY_CODE = 'MP', TNATURE = 'PRLOG', DIV_CODE = 'RS', SERIES = 'L5P'; one row per entry
+ * with PRODUCTION_MT and PRODUCTION_PCS. Its own failure.
+ */
+async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
+  let conn: oracledb.Connection | null = null;
+  try {
+    conn = await oracledb.getConnection({ user: env.erpUser!, password: env.erpPassword!, connectString: env.erpDsn! });
+    conn.callTimeout = 120_000;
+    await conn.execute('SET TRANSACTION READ ONLY');
+    const rows = ((await conn.execute<{ D: string; VRNO: string; MT: number | null; PCS: number | null }>(`
+      SELECT TO_CHAR(h.VRDATE, 'YYYY-MM-DD') AS "D", h.VRNO AS "VRNO",
+             MAX(CASE WHEN b.ATTR_CODE = 'PRODUCTION_MT' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "MT",
+             MAX(CASE WHEN b.ATTR_CODE = 'PRODUCTION_PCS' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "PCS"
+        FROM MSPV7ERP1.ATTR_TRAN_DATA_HEAD h
+        JOIN MSPV7ERP1.ATTR_TRAN_DATA_BODY b ON b.VRNO = h.VRNO AND b.ENTITY_CODE = h.ENTITY_CODE
+       WHERE h.ENTITY_CODE = 'MP' AND h.TNATURE = 'PRLOG' AND h.DIV_CODE = 'RS' AND h.SERIES = 'L5P'
+         AND b.ATTR_CODE IN ('PRODUCTION_MT', 'PRODUCTION_PCS')
+         AND h.VRDATE >= TO_DATE(:fromDate, 'YYYY-MM-DD')
+       GROUP BY h.VRDATE, h.VRNO
+       ORDER BY h.VRDATE, h.VRNO`, { fromDate: FROM }, { maxRows: 0 })).rows ?? []);
+    const cache: RmsProductionCache = {
+      syncedAt: new Date().toISOString(),
+      source: "ATTR_TRAN_DATA_HEAD/BODY · DIV_CODE = 'RS' · SERIES = 'L5P' · PRLOG",
+      fromDate: FROM,
+      rows: rows.map((r) => ({ date: String(r.D), vrno: String(r.VRNO), productionMt: num(r.MT), productionPcs: num(r.PCS) })),
+    };
+    writeAtomic(p.rmsProduction, cache);
+    log(`  RMS log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);
+  } catch (err) {
+    log(`  RMS log sheet not synced: ${(err as Error).message}`);
+  } finally {
+    await conn?.close();
+  }
 }
 
 /**
