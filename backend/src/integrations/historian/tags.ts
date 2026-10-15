@@ -153,21 +153,27 @@ export const RMD_BILLET_COUNT = { M1: rmdBillets('M1'), M2: rmdBillets('M2') } a
  * them in Group "General" (seen 9 Oct 2026). Labels are the tag codes, not guessed names.
  */
 export type RmdZone = 'route' | 'finishing';
-export interface RmdStationDef { id: string; zone: RmdZone; line: 1 | 2; label: string; unitTag: string; group: string; field: string }
+export interface RmdStationDef {
+  id: string; zone: RmdZone; line: 1 | 2; label: string; unitTag: string; group: string; field: string;
+  /** The drive's current feedback (A), as RMD FACLON persona - 3 names it. */
+  currentField: string;
+}
 
 const routeStation = (line: 1 | 2, n: number): RmdStationDef => ({
   id: `L${line}_S${n}`, zone: 'route', line, label: `S${n}`, unitTag: 'CR Mill1/2', group: line === 1 ? 'M1' : 'M2', field: `RUNNING_STATUS_S${n}`,
+  currentField: `CURRENT_FB_S${n}`,
 });
 export const RMD_STATIONS: RmdStationDef[] = [
   ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => routeStation(1, n)),
   ...[1, 2, 3, 4, 5, 6].map((n) => routeStation(2, n)),
-  ...(['FS', 'PRI', 'PR2', 'TB1', 'TB2'] as const).map((c): RmdStationDef => ({
-    id: `L1_${c}`, zone: 'finishing', line: 1, label: c, unitTag: 'Line-1', group: 'M1', field: `RUNNING_STATUS_${c}`,
+  ...([['FS', 'CUR_FB_FS'], ['PRI', 'CUR_FB_PR1'], ['PR2', 'CUR_FB_PR2'], ['TB1', 'CUR_FB_TB1'], ['TB2', 'CUR_FB_TB2']] as const).map(([c, cur]): RmdStationDef => ({
+    id: `L1_${c}`, zone: 'finishing', line: 1, label: c, unitTag: 'Line-1', group: 'M1', field: `RUNNING_STATUS_${c}`, currentField: cur,
   })),
   ...([
-    ['CS', 'CS_On_Off'], ['PR pre', 'Pinch_Roll_Pre_On_Off'], ['PR post', 'Pinch_Roll_Post_On_Off'],
-    ['TB 1', 'Tail_Breaker_01_On_Off'], ['TB 2', 'Tail_Breaker_02_On_Off'],
-  ] as const).map(([label, field]): RmdStationDef => ({
-    id: `L2_${field}`, zone: 'finishing', line: 2, label, unitTag: 'Line-2', group: 'General', field,
+    ['CS', 'CS_On_Off', 'CS_Current'], ['PR pre', 'Pinch_Roll_Pre_On_Off', 'Pinch_Roll_Pre_Current'],
+    ['PR post', 'Pinch_Roll_Post_On_Off', 'Pinch_Roll_Post_Current'],
+    ['TB 1', 'Tail_Breaker_01_On_Off', 'Tail_Break_01_Current'], ['TB 2', 'Tail_Breaker_02_On_Off', 'Tail_Break_02_Current'],
+  ] as const).map(([label, field, cur]): RmdStationDef => ({
+    id: `L2_${field}`, zone: 'finishing', line: 2, label, unitTag: 'Line-2', group: 'General', field, currentField: cur,
   })),
 ];

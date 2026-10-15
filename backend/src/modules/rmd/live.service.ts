@@ -47,7 +47,7 @@ export async function rmdLive(env: Env, nowMs = Date.now()): Promise<RmdLive> {
   const dayStart = rmdDayStart(plantDay);
   const base = { now: new Date(nowMs).toISOString(), plantDay, plantDayStart: new Date(dayStart).toISOString() };
   const empty = (connection: 'up' | 'down', message: string): RmdLive => {
-    const stations = RMD_STATIONS.map((s) => ({ id: s.id, zone: s.zone, line: s.line, label: s.label, on: null, at: null, fresh: false }));
+    const stations = RMD_STATIONS.map((s) => ({ id: s.id, zone: s.zone, line: s.line, label: s.label, on: null, currentA: null, at: null, fresh: false }));
     return {
       connection, message, ...base, billetsToday: null, lastReadingAt: null, fresh: false,
       stations, zones: [zoneState(stations, 'route'), zoneState(stations, 'finishing')],
@@ -61,7 +61,7 @@ export async function rmdLive(env: Env, nowMs = Date.now()): Promise<RmdLive> {
 from(bucket: "${esc(env.influxBucket!)}")
   |> range(start: -6h)
   |> filter(fn: (r) => r._measurement == "TMT-RMD")
-  |> filter(fn: (r) => ${pointFilter(RMD_STATIONS)})
+  |> filter(fn: (r) => ${pointFilter(RMD_STATIONS)} or ${pointFilter(RMD_STATIONS.map((s) => ({ ...s, field: s.currentField })))})
   |> last()
   |> keep(columns: ["Unit", "Group", "_field", "_value", "_time"])`),
       readCounter(env, RMD_BILLET_COUNT.M1, dayStart, nowMs),
@@ -74,9 +74,12 @@ from(bucket: "${esc(env.influxBucket!)}")
       const t = p?.t ?? NaN;
       if (Number.isFinite(t)) last = Math.max(last ?? t, t);
       const fresh = Number.isFinite(t) && nowMs - t <= FRESH_MS;
+      const c = at.get(`${s.unitTag}|${s.group}|${s.currentField}`);
+      const cFresh = c && Number.isFinite(c.t) && nowMs - c.t <= FRESH_MS && Number.isFinite(c.v);
       return {
         id: s.id, zone: s.zone, line: s.line, label: s.label,
         on: fresh && p && Number.isFinite(p.v) ? p.v >= 0.5 : null,
+        currentA: cFresh ? round2(c!.v) : null,
         at: Number.isFinite(t) ? new Date(t).toISOString() : null,
         fresh,
       };

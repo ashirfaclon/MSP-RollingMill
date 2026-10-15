@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { massDifference, massYield, summarise } from '../../src/modules/rmd/production.service';
 
 const entry = (date: string, vrno: string, input: number, prod: number, prime: number, bloss: number, endcut: number, misroll: number, chip: number) => ({
-  date, vrno, v: { INPUT_MT: input, PRODUCT_PRIME_SLENGTH_MT: prod, FINISH_PRODUCT_PRIME_MT: prime, BLOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, CHIP_OFF_MT: chip },
+  date, vrno, v: { INPUT_MT: input, ACTUAL_RUNNING_HRS: 5, PRODUCT_PRIME_SLENGTH_MT: prod, FINISH_PRODUCT_PRIME_MT: prime, BLOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, CHIP_OFF_MT: chip },
 });
 // 7 Oct 2026 as the ERP holds it: two entries.
 const ROWS = [
@@ -15,7 +15,7 @@ const ROWS = [
 describe('RMD production from the log sheet', () => {
   test('a date is the sum of its entries — both production declarations and each loss', () => {
     const p = summarise('d', '7 Oct', ['2026-10-07'], ROWS);
-    expect(p).toMatchObject({ entryDays: 1, productionMt: 200.12, primeMt: 196.84, burningLossMt: 3.27, endCutMt: 4.25, missRollMt: 1.12, chipOffMt: 1, lossesMt: 9.64 });
+    expect(p).toMatchObject({ entryDays: 1, productionMt: 200.12, runningHrs: 10, primeMt: 196.84, burningLossMt: 3.27, endCutMt: 4.25, missRollMt: 1.12, chipOffMt: 1, lossesMt: 9.64 });
   });
 
   test('a date with no entry is null, not 0', () => {

@@ -38,6 +38,8 @@ export interface RmdStationNow {
   label: string;
   /** Running (status 1); null when there is no reading in the last 15 min. */
   on: boolean | null;
+  /** The drive's current feedback (A), live; null without a fresh reading. */
+  currentA: number | null;
   at: string | null;
   fresh: boolean;
 }
@@ -113,6 +115,8 @@ export interface RmdProductionPeriod {
   days: number;
   /** Days with at least one log-sheet entry. */
   entryDays: number;
+  /** ACTUAL_RUNNING_HRS, Σ over the period's entries (the user, 14 Oct 2026); null with no entry. */
+  runningHrs: number | null;
   /** PRODUCT_PRIME_SLENGTH_MT (prime + short length), Σ over the period's entries; null with no entry.
    *  The production figure everything else uses. */
   productionMt: number | null;
@@ -185,4 +189,42 @@ export interface RmdPlanReport {
     /** actualMt ÷ comparedPlanMt × 100. */
     compliancePct: number | null;
   };
+}
+
+/** GET /api/rmd/asset-forms — the logbook's Mill Bearing Temperature and Oil Tank forms (tmt-mechanical). */
+export interface RmdReading {
+  /** e.g. "20\" R stand", "OC stand 3", "NC stand 1–2". */
+  equipment: string;
+  /** e.g. "Pinion gear D side", "Level", "Temperature". */
+  point: string;
+  value: number;
+  /** The entry's time (or date). */
+  at: string;
+}
+
+export interface RmdBearingGroup {
+  /** Every bearing at its form's latest entry in the period. */
+  latest: RmdReading[];
+  /** The hottest of those. */
+  max: RmdReading | null;
+  /** The hottest bearing of each entry, oldest first. */
+  trend: { at: string; equipment: string; maxC: number }[];
+  entries: number;
+}
+
+export interface RmdOilGroup {
+  /** Each tank's level (inches) at the latest Oil Tank Level entry in the period. */
+  level: RmdReading[];
+  /** Each tank's temperature (°C) at the latest Oil Tank Temperature entry. */
+  temperature: RmdReading[];
+  /** The lowest level. */
+  minLevel: RmdReading | null;
+}
+
+export interface RmdAssetForms {
+  from: string;
+  to: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  bearing: { roughing: RmdBearingGroup; route: RmdBearingGroup };
+  oil: { roughing: RmdOilGroup; route: RmdOilGroup };
 }

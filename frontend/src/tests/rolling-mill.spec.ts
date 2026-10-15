@@ -144,14 +144,16 @@ test('material flow shows every stage, exit and bucket, and the balance closes',
   await panel.screenshot({ path: `${SHOTS}/material-flow-narrow.png` });
 });
 
-test('the sidebar: HSM has Visualization and Asset Health; the other mills Visualization only', async ({ page }) => {
+test('the sidebar: HSM and RMD have Visualization and Asset Health; LSM and RMS Visualization only', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const nav = page.getByRole('navigation', { name: 'Dashboard screens' });
   await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/]);
   await expect(nav.getByRole('link', { name: /Visualization/ })).toHaveAttribute('aria-current', 'page');
   await page.goto('/rmd/visualization');
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/]);
+  await page.goto('/lsm/visualization');
   await expect(nav.getByRole('link')).toHaveText([/Visualization/]);
-  for (const gone of ['/hsm/condition-analytics', '/rmd/asset-health', '/lsm/asset-health', '/rms/asset-health']) {
+  for (const gone of ['/hsm/condition-analytics', '/lsm/asset-health', '/rms/asset-health']) {
     expect((await page.request.get(gone)).status()).toBe(404);
   }
 });
@@ -186,8 +188,8 @@ test('HSM asset health: the mock-up layout, every figure NA; a zone selects its 
   const trigger = page.getByRole('button', { name: /^Rolling mill:/ });
   const list = page.getByRole('listbox', { name: 'Rolling mill' });
   await expect(async () => { await trigger.click(); await expect(list).toBeVisible({ timeout: 1000 }); }).toPass({ timeout: 15_000 });
-  await list.getByRole('option', { name: 'RMD' }).click();
-  await expect(page).toHaveURL(/\/rmd\/visualization$/);
+  await list.getByRole('option', { name: 'LSM' }).click();
+  await expect(page).toHaveURL(/\/lsm\/visualization$/);
 });
 
 test('mill picker offers HSM, RMD, LSM and RMS, switches mill, keeps the screen, and drives by keyboard', async ({ page }) => {

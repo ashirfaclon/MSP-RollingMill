@@ -827,3 +827,29 @@ test('RMS: production from the ERP log sheet (division RS, series L5P) — a day
   await page.waitForTimeout(700);
   await d.screenshot({ path: `${SHOTS}/rms-drill-production.png` });
 });
+
+test('RMD asset health: route drive group by default; motor current live, run hours from ACTUAL_RUNNING_HRS, forms NA until real entries', async ({ page }) => {
+  await page.goto('/rmd/asset-health');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Route drive group');
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Alignment/, /^Gearbox oil/, /^VFD trips/, /^Run hours/, /^PM on time/]);
+  // Run hours: Σ ACTUAL_RUNNING_HRS 1–8 Oct = 87.75 h.
+  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^87\.8h$/);
+  // Motor current: live; NA while no route drive runs.
+  await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
+  // The bearing and oil forms have only test entries in this period: NA.
+  await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^NA/);
+  const mimic = main.getByRole('list', { name: 'Drive groups' });
+  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit']);
+  await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);
+  await mimic.getByRole('button', { name: /Roughing group/ }).click();
+  await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Roughing drive group');
+  await page.screenshot({ path: `${SHOTS}/rmd-asset-health.png`, fullPage: true });
+});

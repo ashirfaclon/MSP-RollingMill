@@ -14,6 +14,7 @@ import { rmdRunningRate } from './running-rate.service';
 import { rmdProduction } from './production.service';
 import { rmdStock } from './stock.service';
 import { rmdPlan } from './plan.service';
+import { rmdAssetForms } from './asset.service';
 import { isDate } from '../hsm/production.service';
 import { HttpError } from '../../shared/http-error';
 
@@ -53,6 +54,12 @@ export async function rmdRoutes(app: FastifyInstance) {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
     return rmdRunningRate(loadEnv(), from, to, parseGrain(q));
+  });
+
+  /** Asset health: the logbook's Mill Bearing Temperature and Oil Tank forms, latest in the period. */
+  app.get('/asset-forms', { config: { errorCode: 'rmd_asset_forms_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return rmdAssetForms(loadEnv(), from, to);
   });
 
   /** Production plan (month-wise FY plan spread to days and shifts) against ERP Prime + SL. */

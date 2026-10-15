@@ -37,6 +37,7 @@ export function summarise(key: string, label: string, dates: string[], rows: Rmd
     key, label, fromDate: dates[0], toDate: dates[dates.length - 1], days: dates.length,
     entryDays: new Set(mine.map((r) => r.date)).size,
     productionMt,
+    runningHrs: sumOf(mine, 'ACTUAL_RUNNING_HRS'),
     primeMt: sumOf(mine, 'FINISH_PRODUCT_PRIME_MT'),
     burningLossMt: losses[0], endCutMt: losses[1], missRollMt: losses[2], chipOffMt: losses[3],
     lossesMt: losses.every((l) => l === null) ? null : round2(losses.reduce<number>((a, l) => a + (l ?? 0), 0)),

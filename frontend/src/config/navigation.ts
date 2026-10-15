@@ -28,7 +28,7 @@ export const SCREENS = [
     sub: 'Condition · Maintenance',
     icon: 'gear',
     blurb: 'Selected drive group · condition, inspection, maintenance and process impact',
-    mills: ['hsm'],
+    mills: ['hsm', 'rmd'],
   },
   {
     id: 'data-model',

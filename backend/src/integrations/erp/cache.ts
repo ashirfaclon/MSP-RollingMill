@@ -52,7 +52,7 @@ export const cachePaths = (env: Env) => {
  * CHIP_OFF_MT): the sheet's spelling returned no rows; these are the codes in the table,
  * confirmed with the user. Chip off is the plant's rejection.
  */
-export const RMD_LOG_FIELDS = ['INPUT_MT', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT'] as const;
+export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT'] as const;
 export type RmdLogField = (typeof RMD_LOG_FIELDS)[number];
 export interface RmdLogRow { date: string; vrno: string; v: Record<RmdLogField, number | null> }
 export interface RmdProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmdLogRow[] }
