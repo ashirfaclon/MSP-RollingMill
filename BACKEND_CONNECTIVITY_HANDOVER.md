@@ -386,9 +386,10 @@ Required headers on every call: `Authorization`, `organisation: <IOSENSE_ORG>`,
 ```
 PUT {BASE}/api/account/bruce/insightResult/fetch/paginated/{insight_id}
 body: { insightID, pagination: { page, count: 500 },
-        filters: { startDate: ISO, endDate: ISO } }
+        filter: { startDate: ISO, endDate: ISO } }
 ```
-Date filtering is pushed **down to the API**. Paginated at 500, capped at 20 pages. Rows
+Date filtering is pushed **down to the API** — with `filter` (singular); the documented `filters`
+is ignored (see iosense.md). Paginated at 500, capped at 20 pages. Rows
 named `__accessControl` / `browser-write-test` are bookkeeping, never lab entries.
 
 ### 5.3 Caching — containment lookup + stale-while-revalidate

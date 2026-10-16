@@ -13,6 +13,11 @@
  *   validateSSOToken    GET  /api/retrieve-sso-token/{token}
  *   findUserDevices     PUT  /api/account/devices/1/1          — session probe only
  *   insightResult fetch PUT  /api/account/bruce/insightResult/fetch/paginated/{id}
+ *
+ * The engine filters with `filter: { tags: [form], startDate, endDate }` — singular `filter`.
+ * The documented `filters` is ignored (every entry of every form comes back); tested 16 Oct
+ * 2026. One tag per call (two return nothing); the dates are the submission time, not a
+ * form's Date field.
  */
 import { loadEnv, type Env } from '../../config/env';
 import { MSG } from '../../shared/messages';
@@ -44,6 +49,7 @@ function dropSession(reason: string) {
   bearer = null;
   droppedReason = reason;
   cache.length = 0;
+  forms.clear();
 }
 
 const headers = (env: Env, auth?: string): Record<string, string> => ({
@@ -81,6 +87,7 @@ export async function exchangeSsoToken(ssoToken: string, env = loadEnv()): Promi
     droppedReason = null;
     // A new session invalidates everything fetched under the old one.
     cache.length = 0;
+    forms.clear();
     return { ok: true, message: MSG.LOGBOOK_UP, user: { userId: String(body.userId ?? ''), organisation: String(body.organisation ?? '') } };
   } catch {
     return { ok: false, message: MSG.LOGBOOK_UNREACHABLE };
@@ -184,7 +191,7 @@ function remember(from: number, to: number, nowMs: number, win: LogbookWindow) {
   if (cache.length > CACHE_MAX) cache.length = CACHE_MAX;
 }
 
-/** Entries for a window. Date filtering is pushed down to the API. */
+/** Entries for a window (by submission time). Date filtering is pushed down to the API. */
 export async function fetchLogbookWindow(
   fromMs: number, toMs: number, nowMs = Date.now(), env = loadEnv(),
   /** Internal: a background revalidation must not re-enter the cache branches. */
@@ -230,7 +237,7 @@ export async function fetchLogbookWindow(
           body: JSON.stringify({
             insightID: insightId,
             pagination: { page, count: PAGE },
-            filters: { startDate: new Date(from).toISOString(), endDate: new Date(to).toISOString() },
+            filter: { startDate: new Date(from).toISOString(), endDate: new Date(to).toISOString() },
           }),
           signal: AbortSignal.timeout(TIMEOUT_MS),
         },
@@ -321,48 +328,84 @@ export function resetLogbookSession() {
   droppedReason = null;
   cache.length = 0;
   inflight.length = 0;
+  forms.clear();
 }
 
-/* ---------------------------- raw insight pages ---------------------------- */
+/* ---------------------------- one form's entries ---------------------------- */
 
 /** One logbook entry with its id and timestamps, as the engine returns it. */
 export interface InsightEntry extends InsightRow { _id?: string; updatedAt?: string }
 
-export type InsightPage =
-  | { ok: true; rows: InsightEntry[]; total: number }
+export type FormRead =
+  | { ok: true; rows: InsightEntry[] }
   | { ok: false; message: string };
 
+/** One read of a form is shared this long — many viewers refreshing at once make one call. */
+const FORM_FRESH_MS = 30_000;
+const forms = new Map<string, { at: number; p: Promise<FormRead> }>();
+
 /**
- * One page of the insight, NEWEST FIRST. The engine ignores every filter (dates, form) and
- * always returns all entries in this order, so a reader pages from the top until it is past
- * the time it needs. A rejected session is dropped, as everywhere in this client.
+ * Every entry of one form submitted since `sinceMs`, newest first. Read fresh from the
+ * logbook (nothing kept beyond 30 s), so an entry deleted or edited there is gone or changed
+ * on the next read.
  */
-export async function fetchInsightPage(page: number, env = loadEnv(), count = PAGE): Promise<InsightPage> {
+export function fetchFormEntries(tag: string, sinceMs: number, env = loadEnv(), nowMs = Date.now()): Promise<FormRead> {
   const auth = currentBearer(env);
-  if (!auth) return { ok: false, message: droppedReason ?? MSG.LOGBOOK_NO_SESSION };
+  if (!auth) return Promise.resolve({ ok: false, message: droppedReason ?? MSG.LOGBOOK_NO_SESSION });
   const insightId = env.logbookInsightId;
-  if (!insightId) return { ok: false, message: MSG.LOGBOOK_NOT_MAPPED };
+  if (!insightId) return Promise.resolve({ ok: false, message: MSG.LOGBOOK_NOT_MAPPED });
+  // From the start of that day, so periods starting the same day share one read.
+  const since = Math.floor(sinceMs / 86_400_000) * 86_400_000;
+  const key = `${tag}|${since}`;
+  const hit = forms.get(key);
+  if (hit && nowMs - hit.at < FORM_FRESH_MS) return hit.p;
+  const p = readForm(env, auth, insightId, tag, since);
+  forms.set(key, { at: nowMs, p });
+  // A failed read is not shared: the next request tries again.
+  void p.then((r) => { if (!r.ok && forms.get(key)?.p === p) forms.delete(key); });
+  return p;
+}
+
+async function readForm(env: Env, auth: string, insightId: string, tag: string, since: number): Promise<FormRead> {
+  const rows: InsightEntry[] = [];
   try {
-    const res = await fetch(
-      `${env.iosenseBase}/api/account/bruce/insightResult/fetch/paginated/${encodeURIComponent(insightId)}`,
-      {
-        method: 'PUT',
-        headers: headers(env, auth),
-        body: JSON.stringify({ insightID: insightId, pagination: { page, count } }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      },
-    );
-    const body = (await res.json().catch(() => ({}))) as {
-      success?: boolean; errors?: unknown; data?: { data?: InsightEntry[]; totalCount?: number } | InsightEntry[];
-    };
-    if (!body.success) {
-      const authFail = isAuthFailure(res.status, body.errors);
-      if (authFail) dropSession(MSG.LOGBOOK_SESSION_EXPIRED);
-      return { ok: false, message: authFail ? MSG.LOGBOOK_SESSION_EXPIRED : MSG.LOGBOOK_UNREACHABLE };
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const res = await fetch(
+        `${env.iosenseBase}/api/account/bruce/insightResult/fetch/paginated/${encodeURIComponent(insightId)}`,
+        {
+          method: 'PUT',
+          headers: headers(env, auth),
+          body: JSON.stringify({
+            insightID: insightId,
+            pagination: { page, count: PAGE },
+            filter: { tags: [tag], startDate: new Date(since).toISOString(), endDate: new Date(Date.now() + 86_400_000).toISOString() },
+          }),
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        },
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        success?: boolean; errors?: unknown; data?: { data?: InsightEntry[]; totalCount?: number } | InsightEntry[];
+      };
+      if (!body.success) {
+        const authFail = isAuthFailure(res.status, body.errors);
+        if (authFail) dropSession(MSG.LOGBOOK_SESSION_EXPIRED);
+        return { ok: false, message: authFail ? MSG.LOGBOOK_SESSION_EXPIRED : MSG.LOGBOOK_UNREACHABLE };
+      }
+      const payload = Array.isArray(body.data) ? { data: body.data, totalCount: body.data.length } : (body.data ?? {});
+      const batch = payload.data ?? [];
+      // Only this form's entries, whatever the engine sends.
+      rows.push(...batch.filter((r) => String((r.tags ?? [])[0] ?? r.resultName ?? '') === tag));
+      if (batch.length < PAGE || page * PAGE >= (payload.totalCount ?? 0)) break;
     }
-    const payload = Array.isArray(body.data) ? { data: body.data, totalCount: body.data.length } : (body.data ?? {});
-    return { ok: true, rows: payload.data ?? [], total: payload.totalCount ?? 0 };
+    return { ok: true, rows };
   } catch {
     return { ok: false, message: MSG.LOGBOOK_UNREACHABLE };
   }
+}
+
+/** Several forms at once (one call each); down if any is. */
+export async function fetchFormsEntries(tags: string[], sinceMs: number, env = loadEnv(), nowMs = Date.now()): Promise<FormRead> {
+  const reads = await Promise.all(tags.map((t) => fetchFormEntries(t, sinceMs, env, nowMs)));
+  const failed = reads.find((r): r is Extract<FormRead, { ok: false }> => !r.ok);
+  return failed ?? { ok: true, rows: reads.flatMap((r) => (r.ok ? r.rows : [])) };
 }

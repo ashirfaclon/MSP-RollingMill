@@ -8,21 +8,19 @@
  * place it in a group; one naming none goes by "finishing / roughing mill" in its text, else
  * (billet heater, conveyor) has no group.
  *
- * The logbook engine returns every form's entries newest first, so the reader pages from the
- * top until it is a week before the period (entries are typed days late), and keeps what it
- * read for a few minutes.
+ * Each request reads the form fresh from the logbook (shared for 30 s), so an entry deleted or
+ * corrected there is gone or changed on the next refresh. Entries are typed days late, so the
+ * read takes everything submitted from a month before the period.
  */
 import type { Env } from '../../config/env';
 import type { ElectricalDelay, ElectricalDelaysReport } from '../../contracts';
-import { fetchInsightPage } from '../../integrations/logbook/client';
+import { fetchFormEntries, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
 import { round2 } from './production.service';
 
 export const DELAYS_FORM = 'electrical-hsm/electrical-delays';
 const DAY_MS = 86_400_000;
-const ENTRY_LAG_MS = 7 * DAY_MS;
-const FRESH_MS = 3 * 60_000;
-const MAX_PAGES = 200;
+const LOOK_BACK_MS = 31 * DAY_MS;
 
 /** "00:20:00" → 20 (minutes); null when empty or unreadable. */
 export function minutesOf(duration: unknown): number | null {
@@ -43,50 +41,32 @@ export function groupOf(stands: string[], details = ''): ElectricalDelay['group'
   return r && f ? 'both' : r ? 'roughing' : f ? 'finishing' : null;
 }
 
-const read: { rows: (ElectricalDelay & { createdMs: number })[]; reachedMs: number; at: number; up: boolean; message: string } = {
-  rows: [], reachedMs: Infinity, at: 0, up: false, message: MSG.LOGBOOK_NOT_MAPPED,
-};
+type Row = ElectricalDelay & { createdMs: number };
 
-async function ensure(env: Env, sinceMs: number) {
-  if (read.reachedMs <= sinceMs && Date.now() - read.at < FRESH_MS) return;
-  const rows: typeof read.rows = [];
-  let reached = Infinity;
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const p = await fetchInsightPage(page, env);
-    if (!p.ok) { read.up = false; read.message = p.message; return; }
-    read.up = true; read.message = MSG.LOGBOOK_UP;
-    for (const r of p.rows) {
-      const tag = String((r.tags ?? [])[0] ?? r.resultName ?? '');
-      const createdMs = Date.parse(r.createdAt ?? r.invocationTime ?? '');
-      if (Number.isFinite(createdMs)) reached = Math.min(reached, createdMs);
-      if (tag !== DELAYS_FORM) continue;
-      const res = r.result ?? {};
-      const details = String(res['fault-details'] ?? '').trim();
-      if (!details) continue;   // a day entered as "no breakdown"
-      const stands = standsOf(details);
-      rows.push({
-        date: String(res['date'] ?? '').slice(0, 10),
-        shift: String(res['shift'] ?? ''),
-        section: String(res['section'] ?? ''),
-        timeFrom: String(res['time-from'] ?? '') || null,
-        timeTo: String(res['time-to'] ?? '') || null,
-        minutes: minutesOf(res['duration']),
-        details,
-        stands,
-        group: groupOf(stands, details),
-        createdMs: Number.isFinite(createdMs) ? createdMs : 0,
-      });
-    }
-    if (p.rows.length === 0 || reached < sinceMs) break;
-  }
-  read.rows = rows;
-  read.reachedMs = reached;
-  read.at = Date.now();
+function toRow(r: InsightEntry): Row | null {
+  const res = r.result ?? {};
+  const details = String(res['fault-details'] ?? '').trim();
+  if (!details) return null;   // a day entered as "no breakdown"
+  const stands = standsOf(details);
+  const createdMs = Date.parse(r.createdAt ?? r.invocationTime ?? '');
+  return {
+    date: String(res['date'] ?? '').slice(0, 10),
+    shift: String(res['shift'] ?? ''),
+    section: String(res['section'] ?? ''),
+    timeFrom: String(res['time-from'] ?? '') || null,
+    timeTo: String(res['time-to'] ?? '') || null,
+    minutes: minutesOf(res['duration']),
+    details,
+    stands,
+    group: groupOf(stands, details),
+    createdMs: Number.isFinite(createdMs) ? createdMs : 0,
+  };
 }
 
 export async function electricalDelays(env: Env, from: string, to: string): Promise<ElectricalDelaysReport> {
-  await ensure(env, Date.parse(`${from}T00:00:00+05:30`) - ENTRY_LAG_MS);
-  const delays = read.rows.filter((d) => d.date >= from && d.date <= to)
+  const read = await fetchFormEntries(DELAYS_FORM, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
+  const rows = read.ok ? read.rows.map(toRow).filter((r): r is Row => r !== null) : [];
+  const delays = rows.filter((d) => d.date >= from && d.date <= to)
     .map(({ createdMs: _c, ...d }) => d)
     .sort((a, b) => b.date.localeCompare(a.date) || String(b.timeFrom).localeCompare(String(a.timeFrom)));
   const totals = (g: ElectricalDelay['group'] | 'all') => {
@@ -97,7 +77,7 @@ export async function electricalDelays(env: Env, from: string, to: string): Prom
   };
   return {
     from, to, form: DELAYS_FORM,
-    logbook: { connection: read.up ? 'up' : 'down', message: read.message },
+    logbook: { connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
     delays,
     totals: { all: totals('all'), roughing: totals('roughing'), finishing: totals('finishing') },
   };

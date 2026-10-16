@@ -19,14 +19,14 @@
  * (PRODUTION_MT). Power is summed by the form's date, production by the 06:00
  * plant day — the same date, a few hours apart.
  *
- * The logbook engine ignores filters and returns every form's entries newest first, so ONE
- * in-memory index holds the power forms of every mill: topped up from the newest page every
- * few minutes, and extended further back only when a period needs older entries. Entries
- * are often typed days after their date, so reading starts a week before the period.
+ * Each request reads the mill's forms fresh from the logbook (one call per form, shared for
+ * 30 s), so an entry the plant deletes or corrects there is gone or changed on the next
+ * refresh. Entries are often typed days after their date, so the read takes everything
+ * submitted from a month before the period.
  */
 import type { Env } from '../../config/env';
 import type { PowerDay, PowerEntry, PowerReport } from '../../contracts';
-import { fetchInsightPage, num, type InsightEntry } from '../../integrations/logbook/client';
+import { fetchFormsEntries, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
 import { dateRange, plantDayStart, productionComparison, round2 } from '../hsm/production.service';
 import { rmdProductionByDay } from '../rmd/production.service';
@@ -78,71 +78,26 @@ const DAY_MS = 86_400_000;
 
 /** kWh per tonne; null without both figures or without production. */
 export const specificEnergy = (kwh: number | null, mt: number | null) => (kwh === null || !mt ? null : round2(kwh / mt));
-/** Entries typed up to a week after their date are counted. */
-const ENTRY_LAG_MS = 7 * DAY_MS;
-const TOP_UP_MS = 3 * 60_000;
-const MAX_PAGES = 200;
+/** Entries typed up to a month after their date are counted. */
+const LOOK_BACK_MS = 31 * DAY_MS;
 
-type Row = PowerEntry & { mill: PowerMill; createdMs: number };
-interface Index {
-  rows: Map<string, Row>;
-  /** Oldest submission time the scan has reached. */
-  reachedMs: number;
-  newestMs: number;
-  toppedAt: number;
-  message: string;
-  up: boolean;
-}
-const idx: Index = { rows: new Map(), reachedMs: Infinity, newestMs: 0, toppedAt: 0, message: MSG.LOGBOOK_NOT_MAPPED, up: false };
-let pending: Promise<void> | null = null;
+type Row = PowerEntry & { createdMs: number };
 
-function keep(r: InsightEntry) {
+function toRow(r: InsightEntry): Row | null {
   const tag = String((r.tags ?? [])[0] ?? r.resultName ?? '');
-  const form = FORMS.get(tag) ?? FORMS.get(String(r.resultName ?? ''));
-  if (!form) return;
+  const form = FORMS.get(tag);
+  if (!form) return null;
   const res = r.result ?? {};
   // A test entry is not a reading.
-  if (/test\s*entry/i.test(String(res['remarks'] ?? ''))) return;
+  if (/test\s*entry/i.test(String(res['remarks'] ?? ''))) return null;
   const createdMs = Date.parse(r.createdAt ?? r.invocationTime ?? '');
-  const read = form.read(res);
-  const id = r._id ?? `${tag}|${r.createdAt}|${read.equipment}|${read.previousReading}`;
-  idx.rows.set(id, {
-    mill: form.mill,
+  return {
     date: String(res['date'] ?? '').slice(0, 10),
     shift: String(res['shift'] ?? ''),
-    ...read,
+    ...form.read(res),
     enteredAt: r.createdAt ?? r.invocationTime ?? null,
     createdMs: Number.isFinite(createdMs) ? createdMs : 0,
-  });
-}
-
-/** Page from the newest entry back until `stopMs` (submission time), indexing the power forms' rows. */
-async function scan(env: Env, stopMs: number, topUpOnly: boolean) {
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const p = await fetchInsightPage(page, env);
-    if (!p.ok) { idx.up = false; idx.message = p.message; return; }
-    idx.up = true; idx.message = MSG.LOGBOOK_UP;
-    for (const r of p.rows) keep(r);
-    const times = p.rows.map((r) => Date.parse(r.createdAt ?? r.invocationTime ?? '')).filter(Number.isFinite);
-    const oldest = times.length ? Math.min(...times) : -Infinity;
-    if (times.length) idx.newestMs = Math.max(idx.newestMs, ...times);
-    if (!topUpOnly) idx.reachedMs = Math.min(idx.reachedMs, oldest);
-    if (p.rows.length === 0 || oldest < stopMs) return;
-  }
-}
-
-/** Make sure the index covers submissions back to `sinceMs` and is recent. */
-async function ensure(env: Env, sinceMs: number, nowMs: number) {
-  while (pending) await pending;
-  const needBack = idx.reachedMs > sinceMs;
-  const stale = nowMs - idx.toppedAt > TOP_UP_MS;
-  if (!needBack && !stale) return;
-  pending = (async () => {
-    if (needBack) await scan(env, sinceMs, false);
-    else await scan(env, idx.newestMs - 6 * 3_600_000, true);   // re-read the last hours: late edits
-    idx.toppedAt = Date.now();
-  })();
-  try { await pending; } finally { pending = null; }
+  };
 }
 
 /** Production per plant date and in total, MT — what specific energy divides by. */
@@ -158,9 +113,11 @@ async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs
       totals: { kwh: null, entries: 0, byEquipment: {}, productionMt: null, kwhPerMt: null }, entries: [],
     };
   }
-  const [prod] = await Promise.all([production.catch(() => null), ensure(env, plantDayStart(from) - ENTRY_LAG_MS, nowMs)]);
+  const sinceMs = plantDayStart(from) - LOOK_BACK_MS;
+  const [prod, read] = await Promise.all([production.catch(() => null), fetchFormsEntries(formsOf(mill), sinceMs, env, nowMs)]);
 
-  const inRange = [...idx.rows.values()].filter((e) => e.mill === mill && e.date >= from && e.date <= to);
+  const rows = read.ok ? read.rows.map(toRow).filter((r): r is Row => r !== null) : [];
+  const inRange = rows.filter((e) => e.date >= from && e.date <= to);
   // The meters that have entries in this period — a blank meter name shows as its own column only if filled that way here.
   const equipment = [...new Set(inRange.map((e) => e.equipment))].sort();
   const days: PowerDay[] = dates.map((date) => {
@@ -178,8 +135,8 @@ async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs
   return {
     ...base,
     logbook: {
-      connection: idx.up ? 'up' : 'down', message: idx.message,
-      readSince: Number.isFinite(idx.reachedMs) ? new Date(idx.reachedMs).toISOString() : null,
+      connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message,
+      readSince: read.ok ? new Date(sinceMs).toISOString() : null,
     },
     equipment,
     days,
@@ -190,7 +147,7 @@ async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs
     })(),
     entries: inRange
       .sort((a, b) => (a.date === b.date ? b.createdMs - a.createdMs : b.date.localeCompare(a.date)))
-      .map(({ createdMs: _c, mill: _m, ...e }) => e),
+      .map(({ createdMs: _c, ...e }) => e),
   };
 }
 
@@ -217,18 +174,4 @@ export function lsmPowerReport(env: Env, from: string, to: string, nowMs = Date.
   const vals = [...byDay.values()].filter((v): v is number => v !== null);
   const production = Promise.resolve({ byDay, total: vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null });
   return report(env, 'lsm', from, to, nowMs, production);
-}
-
-/**
- * Read the last few weeks into the index at startup, so the first person to open the
- * dashboard does not wait for it. Fire and forget: a failure is retried on the next request.
- */
-export function warmPowerIndex(env: Env, days = 45): void {
-  if (!env.logbookInsightId) return;
-  void ensure(env, Date.now() - days * DAY_MS, Date.now()).catch(() => undefined);
-}
-
-/** Tests only. */
-export function resetPowerIndex() {
-  idx.rows.clear(); idx.reachedMs = Infinity; idx.newestMs = 0; idx.toppedAt = 0; idx.up = false; idx.message = MSG.LOGBOOK_NOT_MAPPED;
 }

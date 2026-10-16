@@ -31,9 +31,22 @@ and panels still render the sample model (`hsmSample.ts`).
 |---|---|---|---|
 | `validateSSOToken` | `GET /api/retrieve-sso-token/{token}` | `server/logbook/client.ts` → `POST /api/logbook-sso` | Exchange the one-time SSO token from the app URL for a session (held in server memory only) |
 | `findUserDevices` | `PUT /api/account/devices/1/1` | `server/logbook/client.ts` → `probeLogbook` | Session probe — proves the bearer is accepted; one device, nothing used from it |
-| insightResult fetch (paginated) | `PUT /api/account/bruce/insightResult/fetch/paginated/{insightId}` | `server/logbook/client.ts` → `fetchLogbookWindow` | Logbook form entries for a window. **Inactive until `IOSENSE_HSM_INSIGHT_ID` is set** |
+| `fetchInsightResult` | `PUT /api/account/bruce/insightResult/fetch/paginated/{insightId}` | `backend/src/integrations/logbook/client.ts` → `fetchFormEntries` (power HSM/RMD/LSM, HSM electrical delays, RMD asset forms) · `fetchLogbookWindow` (sources status) | One form's entries, read fresh on every request (shared 30 s). **Inactive until `IOSENSE_HSM_INSIGHT_ID` is set** |
 
 All calls send `Authorization`, `organisation`, `ngsw-bypass: true`, `Content-Type: application/json`.
+
+### fetchInsightResult — the filter that works (tested 16 Oct 2026)
+
+```
+body: { insightID, pagination: { page, count: 500 },
+        filter: { tags: ["<form tag>"], startDate: ISO, endDate: ISO } }
+```
+- **`filter` (singular).** The documented `filters` (plural) is ignored: every entry of every form
+  comes back (54,930 on 16 Oct 2026). Top-level `tags` / `startDate` are ignored too.
+- **One tag per call.** Two tags return nothing.
+- **Dates are the submission time** (`createdAt`), not a form's Date field — readers filter on the
+  Date themselves after the read, and read submissions from a month before the period (late entries).
+- A form read this way takes 0.06–0.6 s (largest: electrical-hsm/power-consumption, 412 entries).
 
 ## Resources
 

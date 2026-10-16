@@ -14,19 +14,18 @@
  * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
  * 45–65 °C. A reading outside them is "low" or "high". Oil tank level has no limits yet.
  *
- * The logbook engine returns every form's entries newest first: the reader pages from the top
- * until a week before the period (entries are typed late) and keeps what it read a few minutes.
+ * Each request reads the forms fresh from the logbook (one call per form, shared for 30 s), so
+ * an entry deleted or corrected there is gone or changed on the next refresh. Entries are typed
+ * late, so the read takes everything submitted from a month before the period.
  */
 import type { Env } from '../../config/env';
 import type { RmdAssetForms, RmdBearingGroup, RmdOilGroup, RmdReading } from '../../contracts';
-import { fetchInsightPage, num } from '../../integrations/logbook/client';
+import { fetchFormsEntries, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
 
 export type AssetGroup = 'roughing' | 'route';
 const DAY_MS = 86_400_000;
-const ENTRY_LAG_MS = 7 * DAY_MS;
-const FRESH_MS = 3 * 60_000;
-const MAX_PAGES = 200;
+const LOOK_BACK_MS = 31 * DAY_MS;
 const PREFIX = 'tmt-mechanical/';
 
 /** Bearing forms → equipment, group and how each field reads as "equipment · point". */
@@ -72,35 +71,20 @@ export function withLimits(r: Omit<RmdReading, 'min' | 'max' | 'status'>, limits
 const bearingLimits = (point: string) => (point.startsWith('Flywheel') ? LIMITS.flywheel : LIMITS.bearing);
 
 interface Entry { form: string; date: string; time: string | null; createdMs: number; res: Record<string, unknown> }
-const read: { rows: Entry[]; reachedMs: number; at: number; up: boolean; message: string } = {
-  rows: [], reachedMs: Infinity, at: 0, up: false, message: MSG.LOGBOOK_NOT_MAPPED,
-};
 
-async function ensure(env: Env, sinceMs: number) {
-  if (read.reachedMs <= sinceMs && Date.now() - read.at < FRESH_MS) return;
-  const rows: Entry[] = [];
-  let reached = Infinity;
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const p = await fetchInsightPage(page, env);
-    if (!p.ok) { read.up = false; read.message = p.message; return; }
-    read.up = true; read.message = MSG.LOGBOOK_UP;
-    for (const r of p.rows) {
-      const tag = String((r.tags ?? [])[0] ?? r.resultName ?? '');
-      const createdMs = Date.parse(r.createdAt ?? r.invocationTime ?? '');
-      if (Number.isFinite(createdMs)) reached = Math.min(reached, createdMs);
-      if (!tag.startsWith(PREFIX)) continue;
-      const res = r.result ?? {};
-      if (/\btest\b/i.test(String(res['remarks'] ?? ''))) continue;   // a test entry is not a reading
-      rows.push({
-        form: tag.slice(PREFIX.length), date: String(res['date'] ?? '').slice(0, 10),
-        time: res['time'] ? String(res['time']) : null, createdMs: Number.isFinite(createdMs) ? createdMs : 0, res,
-      });
-    }
-    if (p.rows.length === 0 || reached < sinceMs) break;
-  }
-  read.rows = rows;
-  read.reachedMs = reached;
-  read.at = Date.now();
+/** Every mechanical form this screen reads, by its logbook tag. */
+const TAGS = [...Object.keys(BEARING_FORMS), 'oil-tank-level', 'oil-tank-temperature'].map((f) => PREFIX + f);
+
+function toEntry(r: InsightEntry): Entry | null {
+  const tag = String((r.tags ?? [])[0] ?? r.resultName ?? '');
+  if (!tag.startsWith(PREFIX)) return null;
+  const res = r.result ?? {};
+  if (/\btest\b/i.test(String(res['remarks'] ?? ''))) return null;   // a test entry is not a reading
+  const createdMs = Date.parse(r.createdAt ?? r.invocationTime ?? '');
+  return {
+    form: tag.slice(PREFIX.length), date: String(res['date'] ?? '').slice(0, 10),
+    time: res['time'] ? String(res['time']) : null, createdMs: Number.isFinite(createdMs) ? createdMs : 0, res,
+  };
 }
 
 /** Later entry first by its Date (the day the readings are for), then by when it was filled. */
@@ -151,11 +135,12 @@ export function oilGroup(entries: Entry[], group: AssetGroup): RmdOilGroup {
 }
 
 export async function rmdAssetForms(env: Env, from: string, to: string): Promise<RmdAssetForms> {
-  await ensure(env, Date.parse(`${from}T00:00:00+05:30`) - ENTRY_LAG_MS);
-  const inPeriod = read.rows.filter((e) => e.date >= from && e.date <= to);
+  const read = await fetchFormsEntries(TAGS, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
+  const rows = read.ok ? read.rows.map(toEntry).filter((e): e is Entry => e !== null) : [];
+  const inPeriod = rows.filter((e) => e.date >= from && e.date <= to);
   return {
     from, to,
-    logbook: { connection: read.up ? 'up' : 'down', message: read.message },
+    logbook: { connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
     bearing: { roughing: bearingGroup(inPeriod, 'roughing'), route: bearingGroup(inPeriod, 'route') },
     oil: { roughing: oilGroup(inPeriod, 'roughing'), route: oilGroup(inPeriod, 'route') },
   };

@@ -1,11 +1,12 @@
 /**
  * HSM power from the logbook form — summed by the date the plant entered, all meters, nothing
- * corrected. A stand-in logbook serves pages newest first and ignores filters, like the real one.
+ * corrected. A stand-in logbook serves pages newest first and honours `filter` (one form tag,
+ * submission dates) and nothing else, like the real one.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { Env } from '../../src/config/env';
-import { powerReport, resetPowerIndex, rmdPowerReport, specificEnergy, POWER_FORM } from '../../src/modules/power/power.service';
+import { powerReport, rmdPowerReport, specificEnergy, POWER_FORM } from '../../src/modules/power/power.service';
 import { resetLogbookSession } from '../../src/integrations/logbook/client';
 
 const entry = (id: string, date: string, equipment: string, kwh: number | string, created: string, form = POWER_FORM) => ({
@@ -22,7 +23,7 @@ const vcbEntry = (id: string, n: number, date: string, kwh: number, created: str
 };
 // Newest first, as the engine returns them; one row of another form; one wrongly dated row;
 // two RMD readings mixed in (they belong to RMD only).
-const ROWS = [
+const ALL = [
   vcbEntry('r1', 1, '2026-10-07', 18022.303, '2026-10-08T15:07:00Z'),
   vcbEntry('r2', 3, '2026-10-07', 4441.558, '2026-10-08T15:06:30Z'),
   entry('a', '2026-10-07', 'ROUGHING VCB-01', 240.204, '2026-10-08T15:06:00Z'),
@@ -32,6 +33,7 @@ const ROWS = [
   entry('d', '2026-10-06', 'ROUGHING VCB-01', '', '2026-10-06T17:12:00Z'),
   entry('e', '2026-10-13', 'FINISHING VCB-02', 495.184, '2026-10-01T10:00:00Z'),
 ];
+let ROWS = [...ALL];
 
 let server: Server;
 let base = '';
@@ -42,17 +44,21 @@ beforeAll(async () => {
     req.on('data', (c) => { body += c; });
     req.on('end', () => {
       pages += 1;
-      const { pagination } = JSON.parse(body || '{}') as { pagination: { page: number; count: number } };
+      const { pagination, filter } = JSON.parse(body || '{}') as {
+        pagination: { page: number; count: number }; filter?: { tags?: string[]; startDate?: string; endDate?: string };
+      };
+      const rows = ROWS.filter((r) => (!filter?.tags || (filter.tags.length === 1 && r.tags[0] === filter.tags[0]))
+        && (!filter?.startDate || r.createdAt >= filter.startDate) && (!filter?.endDate || r.createdAt <= filter.endDate));
       const start = (pagination.page - 1) * pagination.count;
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, data: { data: ROWS.slice(start, start + pagination.count), totalCount: ROWS.length } }));
+      res.end(JSON.stringify({ success: true, data: { data: rows.slice(start, start + pagination.count), totalCount: rows.length } }));
     });
   });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 });
 afterAll(() => server.close());
-beforeEach(() => { resetPowerIndex(); resetLogbookSession(); pages = 0; });
+beforeEach(() => { ROWS = [...ALL]; resetLogbookSession(); pages = 0; });
 
 const env = (patch: Partial<Env> = {}): Env => ({
   influxUrl: null, influxOrg: null, influxBucket: null, influxToken: null, influxUser: null, influxPassword: null,
@@ -85,12 +91,22 @@ describe('power consumption from the logbook', () => {
     expect(r.entries[0]).toMatchObject({ kwh: null, equipment: 'ROUGHING VCB-01' });
   });
 
-  test('read once, then served from the index', async () => {
+  test('one call per form; a second request within 30 s shares it', async () => {
     const now = Date.parse('2026-10-09T08:00:00Z');
     await powerReport(env(), '2026-10-07', '2026-10-07', now);
-    const after = pages;
-    await powerReport(env(), '2026-10-06', '2026-10-07', now);
-    expect(pages).toBe(after);
+    expect(pages).toBe(1);
+    await powerReport(env(), '2026-10-07', '2026-10-07', now + 20_000);
+    expect(pages).toBe(1);
+    await rmdPowerReport(env(), '2026-10-07', '2026-10-07', now);
+    expect(pages).toBe(4);   // VCB 1, 2, 3
+  });
+
+  test('an entry deleted in the logbook is gone on the next read', async () => {
+    const now = Date.parse('2026-10-09T08:00:00Z');
+    expect((await powerReport(env(), '2026-10-07', '2026-10-07', now)).totals.entries).toBe(3);
+    ROWS = ROWS.filter((r) => r._id !== 'b');
+    const r = await powerReport(env(), '2026-10-07', '2026-10-07', now + 31_000);
+    expect(r.totals).toMatchObject({ entries: 2, kwh: 451.82 });
   });
 
   test('no insight configured, or no session: down and stated, never a made-up figure', async () => {
