@@ -409,8 +409,14 @@ for (const mill of ['lsm', 'rms'] as const) {
     for (let i = mill === 'lsm' ? 4 : 1; i < 7; i++) await expect(strip.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
     await expect(strip.getByRole('button')).toHaveCount(mill === 'lsm' ? 4 : 1);
     const mimic = page.getByRole('list', { name: 'Mill process flow' });
-    await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet delivery rate', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finish exit']);
-    await expect(mimic.locator('.rm-zone-value')).toHaveText(Array(5).fill('NA'));
+    if (mill === 'lsm') {
+      // No mill mimic on LSM.
+      await expect(mimic).toHaveCount(0);
+      await expect(page.locator('section.panel', { hasText: 'Mill mimic' })).toHaveCount(0);
+    } else {
+      await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet delivery rate', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finish exit']);
+      await expect(mimic.locator('.rm-zone-value')).toHaveText(Array(5).fill('NA'));
+    }
     for (const title of ['Production by shift', 'Order allocation', 'Material & operating balance', 'Finished stock by size']) {
       await expect(page.locator('section.panel', { hasText: title }).first()).toBeVisible();
     }

@@ -566,27 +566,28 @@ test('RMD: finished stock by size from the ERP item ledger (FGYRDP), and a size 
   await dialog.getByRole('button', { name: 'Apply' }).click();
 
   // Stock at the end of 8 Oct: Σ QTYRECD − Σ QTYISSUED in FGYRDP since the 2023 opening, every SKU of a size summed.
+  // No 'Other' row and no miss-roll bars (the plant, 16 Oct 2026).
   const panel = page.locator('section.panel', { hasText: 'Finished stock by size' });
-  await expect(panel.locator('.rm-size-name')).toHaveText(['8 mm', '10 mm', '12 mm', '16 mm', '20 mm', '25 mm', '32 mm', 'Other']);
-  await expect(panel.locator('.rm-size-total').first()).toHaveText('303.6 MT');
-  await expect(panel.locator('.rm-size-total').nth(2)).toHaveText('821.0 MT');
+  await expect(panel.locator('.rm-size-name')).toHaveText(['8 mm', '10 mm', '12 mm', '16 mm', '20 mm', '25 mm', '32 mm']);
+  await expect(panel.locator('.rm-size-total').first()).toHaveText('288.9 MT');
+  await expect(panel.locator('.rm-size-total').nth(2)).toHaveText('793.0 MT');
   // No with-order / free split, no MTO / MTS anywhere on RMD.
-  await expect(panel.locator('.rm-size-stack > i')).toHaveCount(8);
+  await expect(panel.locator('.rm-size-stack > i')).toHaveCount(7);
   await panel.screenshot({ path: `${SHOTS}/rmd-stock-by-size.png` });
 
-  // Order allocation's Finished stock is the same stock, all rows: 2,854.5 MT at the end of 8 Oct.
-  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').nth(1)).toHaveText('2,854.5 MT');
+  // Order allocation's Finished stock is the same stock, all rows: 2,689.0 MT at the end of 8 Oct.
+  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').nth(1)).toHaveText('2,689.0 MT');
 
-  // 8 mm opens its SKUs: Premium 151.11 + 550 D 86.46 + SL 42.22 + Miss roll 14.75 + M.Bundle 6.92 + U-bend 2.18 = 303.63.
+  // 8 mm opens its SKUs: Premium 151.11 + 550 D 86.46 + SL 42.22 + M.Bundle 6.92 + U-bend 2.18 = 288.89.
   await panel.getByRole('button', { name: /^8 mm:/ }).click();
   const d = page.getByRole('dialog', { name: '8 mm · finished stock by SKU' });
   const t = d.getByRole('table', { name: '8 mm stock by SKU' });
   await expect(t.locator('thead th')).toHaveText(['SKU', 'Item code', 'Stock (MT)']);
-  await expect(t.locator('tbody tr')).toHaveCount(6);
+  await expect(t.locator('tbody tr')).toHaveCount(5);
   await expect(t.locator('tbody tr').first()).toContainText('MS PREMIUM TMT BARS 8 MM');
   await expect(t.locator('tbody tr').first()).toContainText('151.11');
-  await expect(t.getByRole('row', { name: /MISS ROLL TMT BAR 8 MM/ })).toContainText('14.75');
-  await expect(t.locator('tfoot')).toContainText('303.63');
+  await expect(t.getByRole('row', { name: /MISS ROLL/ })).toHaveCount(0);
+  await expect(t.locator('tfoot')).toContainText('288.89');
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText("GODOWN_CODE = 'FGYRDP'");
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText('ITEMTRAN_BODY');
   await expect(d.getByRole('region', { name: 'Formula' })).toContainText('Stock = Σ QTYRECD − Σ QTYISSUED');
@@ -594,19 +595,20 @@ test('RMD: finished stock by size from the ERP item ledger (FGYRDP), and a size 
   await d.screenshot({ path: `${SHOTS}/rmd-stock-size-drill.png` });
   await page.keyboard.press('Escape');
 
-  // Every SKU of the plant's list in stock is on the dashboard: at the end of 8 Oct that is 43 of the 44
-  // (MS RINGS 6 X 6 is at 0, so it isn't shown — nor is any other 0).
+  // Every sized, non-miss-roll SKU of the plant's list in stock is on the dashboard: 32 at the end of 8 Oct
+  // (a 0 isn't shown), and no miss roll anywhere.
   let skus = 0;
-  for (const label of ['8 mm', '10 mm', '12 mm', '16 mm', '20 mm', '25 mm', '32 mm', 'Other']) {
+  for (const label of ['8 mm', '10 mm', '12 mm', '16 mm', '20 mm', '25 mm', '32 mm']) {
     await panel.getByRole('button', { name: new RegExp(`^${label}:`) }).click();
     const dd = page.getByRole('dialog', { name: `${label} · finished stock by SKU` });
     const rows = dd.getByRole('table', { name: `${label} stock by SKU` }).locator('tbody tr');
     skus += await rows.count();
     await expect(rows.filter({ hasText: /\b0\.00$/ })).toHaveCount(0);
+    await expect(rows.filter({ hasText: 'MISS ROLL' })).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(dd).toBeHidden();
   }
-  expect(skus).toBe(43);
+  expect(skus).toBe(32);
 });
 
 test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, against ERP Prime + SL', async ({ page }) => {

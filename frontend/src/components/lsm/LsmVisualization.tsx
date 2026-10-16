@@ -13,11 +13,11 @@
  *                         ÷ PRODUTION_MT.
  *   Material balance      billet input, finished and the six losses (B_LOSS_MT, ENDCUT_MT,
  *                         MISROLL_MT, COLD_MT, REJECT_MT, SHORTLENGTH_MT), mass difference and yield.
+ * No mill mimic on LSM (the user, 16 Oct 2026).
  */
-import { Fragment, useState, type KeyboardEvent } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import FlowArrow from '@/components/visualization/FlowArrow';
 import ShiftBars from '@/components/visualization/ShiftBars';
 import '@/components/visualization/visualization.css';
 import { DAY_START_HOUR, shiftsLabel } from '@/lib/plantDay';
@@ -35,7 +35,6 @@ const NA_CARDS: { label: string; unit: string; series: Series }[] = [
   { label: 'Free stock', unit: 'MT', series: 'free' },
 ];
 
-const ZONES = ['Billet delivery rate', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finish exit'];
 const NA_SHIFT = { planMt: null, outputMt: null, compliancePct: null };
 const mt = (v: number | null | undefined) => (v === null || v === undefined ? 'NA' : `${fixed(v, 1)} MT`);
 
@@ -79,23 +78,6 @@ export default function LsmVisualization() {
       </section>
       <LsmProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
       <LsmProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
-
-      <Panel title="Mill mimic">
-        <ol className="rm-mimic rmd-mimic" aria-label="Mill process flow">
-          {ZONES.map((z, i) => (
-            <Fragment key={z}>
-              {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
-              <li className="rm-mimic-cell">
-                <div className="rm-zone rm-zone--flow">
-                  <span className="rm-zone-title">{z}</span>
-                  <span className="rm-zone-body"><span className="rm-zone-value num v-na">NA</span></span>
-                  <span className="rm-zone-foot">{' '}</span>
-                </div>
-              </li>
-            </Fragment>
-          ))}
-        </ol>
-      </Panel>
 
       <div className="rm-row">
         <ShiftBars

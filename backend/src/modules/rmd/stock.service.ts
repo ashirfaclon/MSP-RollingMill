@@ -2,7 +2,8 @@
  * RMD finished stock by size: the plant's item list (stock-items.ts) in godown FGYRDP, from
  * the ERP item ledger — stock at the end of a date is every movement up to it, from the
  * 2023 opening. All of it is free stock (no order link); every item of one bar size is
- * summed; the items with no bar size are one 'Other' row. Every item of the list is shown.
+ * summed. Left out, as the plant asked (16 Oct 2026): the items with no bar size (the former
+ * 'Other' row) and every MISS ROLL TMT BAR — they are in neither a size nor the total.
  */
 import type { Env } from '../../config/env';
 import type { RmdStockReport } from '../../contracts';
@@ -10,7 +11,9 @@ import { readErpRmdStock, type RmdStockMove } from '../../integrations/erp/cache
 import { MSG } from '../../shared/messages';
 import { RMD_STOCK_ITEMS } from './stock-items';
 
-const ITEM = new Map(RMD_STOCK_ITEMS.map((i) => [i.code, i]));
+/** The items shown: a sized bar that is not a miss roll. */
+const SHOWN = RMD_STOCK_ITEMS.filter((i) => i.sizeMm !== null && !/^MISS ROLL/i.test(i.name));
+const ITEM = new Map(SHOWN.map((i) => [i.code, i]));
 /** Below this an item is nil, not stock (the ERP's own rounding): it isn't shown. */
 const MIN_MT = 0.05;
 /** Summed in kg (the ERP's 3 decimals of MT) so 50.205 rounds to 50.21 as the ERP does, not 50.20. */
@@ -18,25 +21,25 @@ const kg = (mt: number) => Math.round(mt * 1000);
 const mtOf = (kgs: number) => Math.round(kgs / 10) / 100;
 
 /**
- * Every item of the plant's list, in its bar-size row (smallest first) or 'Other' (no bar
- * size) last; each item's stock = Σ net movement up to asOf. An item or row at 0 isn't shown.
+ * Every shown item, in its bar-size row (smallest first); each item's stock = Σ net movement
+ * up to asOf. An item or row at 0 isn't shown.
  */
 export function stockBySize(moves: RmdStockMove[], asOf: string): RmdStockReport['sizes'] {
-  const byItem = new Map<string, number>(RMD_STOCK_ITEMS.map((i) => [i.code, 0]));
+  const byItem = new Map<string, number>(SHOWN.map((i) => [i.code, 0]));
   for (const m of moves) {
     if (!ITEM.has(m.item) || m.date > asOf) continue;
     byItem.set(m.item, byItem.get(m.item)! + kg(m.netMt));
   }
   const groups = new Map<string, { sizeMm: number | null; items: { code: string; name: string; kg: number }[] }>();
-  for (const i of RMD_STOCK_ITEMS) {
-    const key = i.sizeMm === null ? 'other' : String(i.sizeMm);
+  for (const i of SHOWN) {
+    const key = String(i.sizeMm);
     const g = groups.get(key) ?? { sizeMm: i.sizeMm, items: [] };
     g.items.push({ code: i.code, name: i.name, kg: byItem.get(i.code)! });
     groups.set(key, g);
   }
   return [...groups].map(([key, g]) => ({
     key,
-    label: g.sizeMm === null ? 'Other' : `${g.sizeMm} mm`,
+    label: `${g.sizeMm} mm`,
     sizeMm: g.sizeMm,
     stockMt: mtOf(g.items.reduce((a, i) => a + i.kg, 0)),
     items: g.items.map((i) => ({ code: i.code, name: i.name, stockMt: mtOf(i.kg) }))

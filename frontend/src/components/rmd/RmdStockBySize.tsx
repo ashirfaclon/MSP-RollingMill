@@ -2,10 +2,10 @@
 
 /**
  * RMD finished stock by size, by the plant's stock query (ERP ITEMTRAN_BODY, godown FGYRDP) counted to the end of
- * the Duration period. Overview: one row per bar size, every SKU of that size summed, then
- * 'Other' (the plant's items with no bar size). All of it is free stock, so there is no
- * with-order / free split. Clicking a row opens its breakdown by SKU: every SKU of the plant's
- * list (Rolling_Mill_TMT_Items.xlsx) in stock is in one row; a SKU or row at 0 isn't shown.
+ * the Duration period. Overview: one row per bar size, every SKU of that size summed. Items with
+ * no bar size and miss-roll bars are left out (the plant, 16 Oct 2026). All of it is free stock,
+ * so there is no with-order / free split. Clicking a row opens its breakdown by SKU; a SKU or row
+ * at 0 isn't shown.
  *
  * LSM uses the same panel (mill="lsm"): one row per LSM section, in the plant's names (A 65×65×8,
  * MC 75×40, MB 125×70 …), its lengths and defective item inside — the ERP's Stock Sheet Engine.
