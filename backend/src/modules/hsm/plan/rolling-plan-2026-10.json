@@ -1,7 +1,7 @@
 {
  "month": "2026-10",
- "source": "Daily_Rolling_Tracker_Oct2026 (4).xlsx \u00b7 sheet Daily Log (static import \u2014 to be replaced by the plan-import feature)",
- "importedAt": "2026-10-12T07:27:02+00:00",
+ "source": "Daily_Rolling_Tracker_Oct2026 updated new.xlsx \u00b7 sheet Daily Log (static import \u2014 to be replaced by the plan-import feature)",
+ "importedAt": "2026-10-16T06:20:16+00:00",
  "rows": [
   {
    "date": "2026-10-01",
@@ -722,6 +722,222 @@
    "mt": 25.0,
    "remarks": "",
    "excelRow": 180
+  },
+  {
+   "date": "2026-10-15",
+   "shift": "Day",
+   "thicknessMm": 1.6,
+   "widthMm": 200,
+   "mt": 13.0,
+   "remarks": "",
+   "excelRow": 187
+  },
+  {
+   "date": "2026-10-15",
+   "shift": "Day",
+   "thicknessMm": 1.8,
+   "widthMm": 200,
+   "mt": 13.0,
+   "remarks": "",
+   "excelRow": 188
+  },
+  {
+   "date": "2026-10-15",
+   "shift": "Day",
+   "thicknessMm": 2,
+   "widthMm": 200,
+   "mt": 50.0,
+   "remarks": "",
+   "excelRow": 189
+  },
+  {
+   "date": "2026-10-15",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 200,
+   "mt": 60.0,
+   "remarks": "",
+   "excelRow": 190
+  },
+  {
+   "date": "2026-10-15",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 200,
+   "mt": 35.0,
+   "remarks": "",
+   "excelRow": 191
+  },
+  {
+   "date": "2026-10-15",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 200,
+   "mt": 35.0,
+   "remarks": "",
+   "excelRow": 192
+  },
+  {
+   "date": "2026-10-16",
+   "shift": "Day",
+   "thicknessMm": 1.6,
+   "widthMm": 200,
+   "mt": 12.0,
+   "remarks": "",
+   "excelRow": 199
+  },
+  {
+   "date": "2026-10-16",
+   "shift": "Day",
+   "thicknessMm": 1.8,
+   "widthMm": 200,
+   "mt": 12.0,
+   "remarks": "",
+   "excelRow": 200
+  },
+  {
+   "date": "2026-10-16",
+   "shift": "Day",
+   "thicknessMm": 2,
+   "widthMm": 200,
+   "mt": 50.0,
+   "remarks": "",
+   "excelRow": 201
+  },
+  {
+   "date": "2026-10-16",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 200,
+   "mt": 60.0,
+   "remarks": "",
+   "excelRow": 202
+  },
+  {
+   "date": "2026-10-16",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 200,
+   "mt": 35.0,
+   "remarks": "",
+   "excelRow": 203
+  },
+  {
+   "date": "2026-10-16",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 200,
+   "mt": 35.0,
+   "remarks": "",
+   "excelRow": 204
+  },
+  {
+   "date": "2026-10-17",
+   "shift": "Day",
+   "thicknessMm": 1.6,
+   "widthMm": 200,
+   "mt": 13.0,
+   "remarks": "",
+   "excelRow": 211
+  },
+  {
+   "date": "2026-10-17",
+   "shift": "Day",
+   "thicknessMm": 1.8,
+   "widthMm": 200,
+   "mt": 13.0,
+   "remarks": "",
+   "excelRow": 212
+  },
+  {
+   "date": "2026-10-17",
+   "shift": "Day",
+   "thicknessMm": 2,
+   "widthMm": 200,
+   "mt": 50.0,
+   "remarks": "",
+   "excelRow": 213
+  },
+  {
+   "date": "2026-10-17",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 200,
+   "mt": 60.0,
+   "remarks": "",
+   "excelRow": 214
+  },
+  {
+   "date": "2026-10-17",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 200,
+   "mt": 35.0,
+   "remarks": "",
+   "excelRow": 215
+  },
+  {
+   "date": "2026-10-17",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 200,
+   "mt": 35.0,
+   "remarks": "",
+   "excelRow": 216
+  },
+  {
+   "date": "2026-10-18",
+   "shift": "Day",
+   "thicknessMm": 1.6,
+   "widthMm": 200,
+   "mt": 12.0,
+   "remarks": "",
+   "excelRow": 223
+  },
+  {
+   "date": "2026-10-18",
+   "shift": "Day",
+   "thicknessMm": 1.8,
+   "widthMm": 200,
+   "mt": 12.0,
+   "remarks": "",
+   "excelRow": 224
+  },
+  {
+   "date": "2026-10-18",
+   "shift": "Day",
+   "thicknessMm": 2,
+   "widthMm": 200,
+   "mt": 50.0,
+   "remarks": "",
+   "excelRow": 225
+  },
+  {
+   "date": "2026-10-18",
+   "shift": "Day",
+   "thicknessMm": 2.2,
+   "widthMm": 200,
+   "mt": 60.0,
+   "remarks": "",
+   "excelRow": 226
+  },
+  {
+   "date": "2026-10-18",
+   "shift": "Day",
+   "thicknessMm": 2.5,
+   "widthMm": 200,
+   "mt": 35.0,
+   "remarks": "",
+   "excelRow": 227
+  },
+  {
+   "date": "2026-10-18",
+   "shift": "Day",
+   "thicknessMm": 2.8,
+   "widthMm": 200,
+   "mt": 35.0,
+   "remarks": "",
+   "excelRow": 228
   }
  ]
 }
