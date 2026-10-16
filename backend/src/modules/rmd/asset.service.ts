@@ -8,6 +8,11 @@
  *                             oil-tank-temperature (°C, twice a day), one value per tank.
  * Groups (the user): roughing = 20" and 16" R stands; route / diverter = intermill, NC stands
  * (line 1) and OC stands (line 2). An entry remarked "test" is left out.
+ * Each form has two dates (the user, 16 Oct 2026): "Date" is the day the readings are for — it
+ * places the entry; "Time" is when the form was filled — it only orders two entries of one day.
+ *
+ * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
+ * 45–65 °C. A reading outside them is "low" or "high". Oil tank level has no limits yet.
  *
  * The logbook engine returns every form's entries newest first: the reader pages from the top
  * until a week before the period (entries are typed late) and keeps what it read a few minutes.
@@ -55,6 +60,17 @@ const TANKS: [string, AssetGroup, string][] = [
   ['new-continuous-stand-5-6', 'route', 'NC stand 5–6'], ['new-continuous-stand-7-8', 'route', 'NC stand 7–8'],
 ];
 
+/** The plant's limits, °C. */
+export const LIMITS = { bearing: [45, 65], flywheel: [45, 80], oilTemp: [45, 65] } as const;
+
+/** A reading with its limits and where it falls. */
+export function withLimits(r: Omit<RmdReading, 'min' | 'max' | 'status'>, limits: readonly [number, number] | null): RmdReading {
+  if (!limits) return { ...r, min: null, max: null, status: null };
+  const [min, max] = limits;
+  return { ...r, min, max, status: r.value < min ? 'low' : r.value > max ? 'high' : 'ok' };
+}
+const bearingLimits = (point: string) => (point.startsWith('Flywheel') ? LIMITS.flywheel : LIMITS.bearing);
+
 interface Entry { form: string; date: string; time: string | null; createdMs: number; res: Record<string, unknown> }
 const read: { rows: Entry[]; reachedMs: number; at: number; up: boolean; message: string } = {
   rows: [], reachedMs: Infinity, at: 0, up: false, message: MSG.LOGBOOK_NOT_MAPPED,
@@ -87,8 +103,10 @@ async function ensure(env: Env, sinceMs: number) {
   read.at = Date.now();
 }
 
-/** When an entry was taken: its time, else its date. */
-const whenOf = (e: Entry) => e.time ?? e.date;
+/** Later entry first by its Date (the day the readings are for), then by when it was filled. */
+const later = (a: Entry, b: Entry) =>
+  a.date !== b.date ? a.date > b.date : (a.time ?? '') !== (b.time ?? '') ? (a.time ?? '') > (b.time ?? '') : a.createdMs > b.createdMs;
+const order = (a: Entry, b: Entry) => (later(a, b) ? 1 : later(b, a) ? -1 : 0);
 
 export function bearingGroup(entries: Entry[], group: AssetGroup): RmdBearingGroup {
   const mine = entries.filter((e) => BEARING_FORMS[e.form]?.group === group);
@@ -96,37 +114,37 @@ export function bearingGroup(entries: Entry[], group: AssetGroup): RmdBearingGro
   const latestByForm = new Map<string, Entry>();
   for (const e of mine) {
     const cur = latestByForm.get(e.form);
-    if (!cur || whenOf(e) > whenOf(cur) || (whenOf(e) === whenOf(cur) && e.createdMs > cur.createdMs)) latestByForm.set(e.form, e);
+    if (!cur || later(e, cur)) latestByForm.set(e.form, e);
   }
   const readingsOf = (e: Entry): RmdReading[] => Object.entries(e.res).flatMap(([field, v]) => {
     const b = bearingOf(e.form, field);
     const c = num(v);
-    return b && c !== null ? [{ ...b, value: c, at: whenOf(e) }] : [];
+    return b && c !== null ? [withLimits({ ...b, value: c, at: e.date }, bearingLimits(b.point))] : [];
   });
   const latest = [...latestByForm.values()].flatMap(readingsOf)
     .sort((a, b) => a.equipment.localeCompare(b.equipment, undefined, { numeric: true }) || a.point.localeCompare(b.point));
   const max = latest.reduce<RmdReading | null>((m, r) => (m === null || r.value > m.value ? r : m), null);
   // Trend: the hottest bearing of each entry, oldest first.
-  const trend = mine.map((e) => {
+  const trend = [...mine].sort(order).map((e) => {
     const rs = readingsOf(e);
-    return rs.length ? { at: whenOf(e), equipment: BEARING_FORMS[e.form].equipment, maxC: Math.max(...rs.map((r) => r.value)) } : null;
-  }).filter((x): x is NonNullable<typeof x> => x !== null).sort((a, b) => a.at.localeCompare(b.at));
+    return rs.length ? { at: e.date, equipment: BEARING_FORMS[e.form].equipment, maxC: Math.max(...rs.map((r) => r.value)) } : null;
+  }).filter((x): x is NonNullable<typeof x> => x !== null);
   return { latest, max, trend, entries: mine.length };
 }
 
 export function oilGroup(entries: Entry[], group: AssetGroup): RmdOilGroup {
   const tanks = TANKS.filter(([, g]) => g === group);
   const latest = (form: string) => entries.filter((e) => e.form === form)
-    .reduce<Entry | null>((m, e) => (m === null || whenOf(e) > whenOf(m) || (whenOf(e) === whenOf(m) && e.createdMs > m.createdMs) ? e : m), null);
+    .reduce<Entry | null>((m, e) => (m === null || later(e, m) ? e : m), null);
   const lv = latest('oil-tank-level');
   const tp = latest('oil-tank-temperature');
   const level = lv ? tanks.flatMap(([stem, , label]) => {
     const v = num(lv.res[stem]);
-    return v === null ? [] : [{ equipment: label, point: 'Level', value: v, at: whenOf(lv) }];
+    return v === null ? [] : [withLimits({ equipment: label, point: 'Level', value: v, at: lv.date }, null)];
   }) : [];
   const temperature = tp ? tanks.flatMap(([stem, , label]) => {
     const v = num(tp.res[`${stem}-c`]);
-    return v === null ? [] : [{ equipment: label, point: 'Temperature', value: v, at: whenOf(tp) }];
+    return v === null ? [] : [withLimits({ equipment: label, point: 'Temperature', value: v, at: tp.date }, LIMITS.oilTemp)];
   }) : [];
   const min = level.reduce<RmdReading | null>((m, r) => (m === null || r.value < m.value ? r : m), null);
   return { level, temperature, minLevel: min };

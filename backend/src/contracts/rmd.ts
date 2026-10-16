@@ -198,8 +198,13 @@ export interface RmdReading {
   /** e.g. "Pinion gear D side", "Level", "Temperature". */
   point: string;
   value: number;
-  /** The entry's time (or date). */
+  /** The entry's Date: the day the readings are for (YYYY-MM-DD). */
   at: string;
+  /** The plant's limits for this reading (°C); null where none is given (oil level). */
+  min: number | null;
+  max: number | null;
+  /** Inside the limits, below or above them; null without limits. */
+  status: 'ok' | 'low' | 'high' | null;
 }
 
 export interface RmdBearingGroup {
@@ -207,7 +212,7 @@ export interface RmdBearingGroup {
   latest: RmdReading[];
   /** The hottest of those. */
   max: RmdReading | null;
-  /** The hottest bearing of each entry, oldest first. */
+  /** The hottest bearing of each entry, oldest first (by Date, then when filled); at = the Date. */
   trend: { at: string; equipment: string; maxC: number }[];
   entries: number;
 }

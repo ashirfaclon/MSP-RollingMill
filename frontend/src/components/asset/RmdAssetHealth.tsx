@@ -12,6 +12,8 @@
  *   Run hours         ERP log sheet ACTUAL_RUNNING_HRS over the period (whole mill);
  *   Condition trends  bearing temperature: the hottest bearing of each entry.
  * Clicking a zone selects its drive group. Test entries are left out.
+ * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
+ * 45–65 °C — a card turns red when any of its readings is outside them, green when all are inside.
  */
 import { Fragment, useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
@@ -57,6 +59,8 @@ export default function RmdAssetHealth() {
   const currentA = running.length ? running.reduce((a, s) => a + s.currentA!, 0) / running.length : null;
   const bearing = fg && forms ? forms.bearing[fg] : null;
   const oil = fg && forms ? forms.oil[fg] : null;
+  const bearingTone = toneOf(bearing?.latest ?? []);
+  const oilTone = toneOf(oil?.temperature ?? []);
 
   return (
     <div className="rm-viz ah">
@@ -84,6 +88,7 @@ export default function RmdAssetHealth() {
           unit="°C"
           note=""
           series="hold"
+          tone={bearingTone}
           {...(bearing ? { onOpen: () => setOpen('bearing'), openLabel: 'Every bearing at the latest reading, and the trend' } : {})}
         />
         <KpiCard label="Motor current" value={currentA === null ? 'NA' : fixed(currentA, 0)} unit="A" note="" series="prod" />
@@ -94,6 +99,7 @@ export default function RmdAssetHealth() {
           unit="in"
           note=""
           series="hold"
+          tone={oilTone}
           {...(oil ? { onOpen: () => setOpen('oil'), openLabel: 'Each oil tank: level and temperature' } : {})}
         />
         {NA('VFD trips', 'per 100 run h', 'hold')}
@@ -155,7 +161,7 @@ export default function RmdAssetHealth() {
           ['Form', 'Rolling Mill Division (TMT) → Mechanical → Mill Bearing Temperature'],
           ['Forms', fg === 'roughing' ? '20 Inch R Stand, 16 Inch R Stand' : 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)'],
           ['Field', 'Flywheel / Reduction gear / Pinion gear, D and ND side (°C) — each form\'s latest entry in the period'],
-        ]} formula={['Bearing temp = the hottest of those readings']} />}
+        ]} formula={['Bearing temp = the hottest of those readings', 'Limits: bearings 45–65 °C, flywheel 45–80 °C (plant)']} />}
       </DrillDrawer>
       <DrillDrawer open={open === 'oil'} onClose={() => setOpen(null)} title={`${NAME[group]} · gearbox oil`} sub="RMD · oil tanks"
         loading={!forms} error={f.error} hasData={!!forms}>
@@ -165,7 +171,7 @@ export default function RmdAssetHealth() {
             <ReadingsTable rows={oil.temperature} unit="°C" label="Oil tank temperature" max={null} source={[
               ['Forms', 'Rolling Mill Division (TMT) → Mechanical → Oil Tank → Oil Tank Level (inches, every 15 days), Oil Tank Temperature (°C)'],
               ['Field', 'one value per tank — the latest entry in the period'],
-            ]} formula={['Gearbox oil = the lowest tank level of the group (inches)']} />
+            ]} formula={['Gearbox oil = the lowest tank level of the group (inches)', 'Limits: oil tank temperature 45–65 °C (plant); level — none yet']} />
           </>
         )}
       </DrillDrawer>
@@ -173,12 +179,20 @@ export default function RmdAssetHealth() {
   );
 }
 
+/** v-risk when any reading is outside its limits, v-ok when all with limits are inside; none without limits. */
+function toneOf(rows: RmdReading[]): 'v-ok' | 'v-risk' | undefined {
+  const judged = rows.filter((r) => r.status !== null);
+  if (!judged.length) return undefined;
+  return judged.some((r) => r.status !== 'ok') ? 'v-risk' : 'v-ok';
+}
+const LIMIT_TONE = { ok: 'v-ok', low: 'v-risk', high: 'v-risk' } as const;
+
 function Row({ k }: { k: string }) {
   return <div className="ah-row"><span className="rm-k">{k}</span><span className="num v-na">NA</span></div>;
 }
 
 function BearingTrend({ trend }: { trend: { at: string; maxC: number }[] }) {
-  const categories = useMemo(() => trend.map((t) => t.at.replace('T', ' ').slice(5, 16)), [trend]);
+  const categories = useMemo(() => trend.map((t) => t.at.slice(5)), [trend]);
   const series = useMemo<DrillSeries[]>(() => [{ id: 'bt', name: 'Hottest bearing', token: '--s-order', type: 'line', data: trend.map((t) => t.maxC), dp: 0 }], [trend]);
   const axes = useMemo(() => [{ title: '°C', unit: '°C' }], []);
   const last = trend.at(-1);
@@ -201,12 +215,17 @@ function ReadingsTable({ rows, unit, label, max, source, formula }: {
       {max && <Stats items={[{ label: 'Hottest', value: fixed(max.value, 0), unit: `${unit} · ${max.equipment} · ${max.point}` }]} />}
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label={label}>
-          <thead><tr><th>Equipment</th><th>Point</th><th className="r">{unit}</th><th>Reading</th></tr></thead>
+          <thead><tr><th>Equipment</th><th>Point</th><th className="r">{unit}</th><th className="r">Limits</th><th>Date</th></tr></thead>
           <tbody>
             {rows.length === 0
-              ? <tr><td colSpan={4} className="v-na">NA</td></tr>
+              ? <tr><td colSpan={5} className="v-na">NA</td></tr>
               : rows.map((r, i) => (
-                <tr key={i}><td><b>{r.equipment}</b></td><td>{r.point}</td><td className="num r v-val">{fixed(r.value, unit === 'in' ? 1 : 0)}</td><td>{r.at.replace('T', ' ').slice(0, 16)}</td></tr>
+                <tr key={i}>
+                  <td><b>{r.equipment}</b></td><td>{r.point}</td>
+                  <td className={`num r ${r.status ? LIMIT_TONE[r.status] : 'v-val'}`}>{fixed(r.value, unit === 'in' ? 1 : 0)}</td>
+                  <td className="num r">{r.min === null ? '—' : `${r.min}–${r.max}`}</td>
+                  <td>{r.at}</td>
+                </tr>
               ))}
           </tbody>
         </table>

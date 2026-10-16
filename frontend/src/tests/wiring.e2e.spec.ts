@@ -828,7 +828,7 @@ test('RMS: production from the ERP log sheet (division RS, series L5P) — a day
   await d.screenshot({ path: `${SHOTS}/rms-drill-production.png` });
 });
 
-test('RMD asset health: route drive group by default; motor current live, run hours from ACTUAL_RUNNING_HRS, forms NA until real entries', async ({ page }) => {
+test('RMD asset health: route drive group by default; motor current live, run hours from ACTUAL_RUNNING_HRS, bearing and oil from the forms with the plant limits', async ({ page }) => {
   await page.goto('/rmd/asset-health');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
@@ -843,9 +843,22 @@ test('RMD asset health: route drive group by default; motor current live, run ho
   await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^87\.8h$/);
   // Motor current: live; NA while no route drive runs.
   await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
-  // The bearing and oil forms have only test entries in this period: NA.
-  await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^NA/);
-  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^NA/);
+  // Bearing temp and gearbox oil from the mechanical forms: a reading, or NA without entries.
+  await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^(NA|\d+)°C$/);
+  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^(NA|\d+\.\d)in$/);
+  // Bearing drawer: each reading against the plant's limits (bearings 45–65 °C, flywheel 45–80 °C).
+  const bearingCard = cards.getByRole('button', { name: /Bearing temp/ });
+  if (await bearingCard.count()) {
+    await bearingCard.click();
+    const d = page.getByRole('dialog', { name: 'Route · bearing temperature' });
+    const t = d.getByRole('table', { name: 'Bearing temperatures' });
+    await expect(t.locator('thead th')).toHaveText(['Equipment', 'Point', '°C', 'Limits', 'Date']);
+    await expect(t.locator('tbody tr').first().locator('td').nth(3)).toHaveText(/^45–(65|80)$/);
+    await expect(d).toContainText('bearings 45–65 °C, flywheel 45–80 °C');
+    await page.waitForTimeout(700);
+    await d.screenshot({ path: `${SHOTS}/rmd-asset-bearing-limits.png` });
+    await d.getByRole('button', { name: /Close/ }).click();
+  }
   const mimic = main.getByRole('list', { name: 'Drive groups' });
   await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit']);
   await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);

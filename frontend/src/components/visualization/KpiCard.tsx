@@ -38,6 +38,8 @@ export default function KpiCard(props: {
   openLabel?: string;
   /** Two figures of one KPI from different sources, side by side, in place of `value`. */
   pair?: { source: string; value: string }[];
+  /** Colours the value against limits: v-ok inside, v-risk outside. */
+  tone?: 'v-ok' | 'v-warn' | 'v-risk';
 }) {
   const { meterPct } = props;
   const body = (
@@ -58,7 +60,7 @@ export default function KpiCard(props: {
           ))}
         </span>
       ) : (
-        <span className="rm-card-value num v-val">
+        <span className={`rm-card-value num ${props.tone ?? 'v-val'}`}>
           {props.loading
             ? <span className="skel skel--num-lg" role="status" aria-busy="true" aria-label="Loading" />
             : props.value}
