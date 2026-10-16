@@ -165,6 +165,11 @@ export interface RmdPlanDay {
   byShift: Record<string, number>;
   /** ERP Prime + SL (PRODUCT_PRIME_SLENGTH_MT) for the date; null until it is entered. */
   actualMt: number | null;
+  /**
+   * LSM only: the date's ERP production split between the shifts by their prime pieces (logbook
+   * LSM Production Sheet); null for both when the ERP or the form has nothing for the date.
+   */
+  actualByShift?: Record<string, number | null>;
 }
 
 export interface RmdPlanReport {
@@ -188,7 +193,11 @@ export interface RmdPlanReport {
     gapMt: number | null;
     /** actualMt ÷ comparedPlanMt × 100. */
     compliancePct: number | null;
+    /** LSM only, per shift, over the days that have a split: output, the plan of those days, compliance. */
+    shifts?: Record<string, { actualMt: number | null; comparedPlanMt: number | null; compliancePct: number | null }>;
   };
+  /** LSM only: the logbook form the shift split comes from. */
+  shiftSource?: { form: string; connection: 'up' | 'down'; message: string };
 }
 
 /** GET /api/rmd/asset-forms — the logbook's Mill Bearing Temperature and Oil Tank forms (tmt-mechanical). */

@@ -21,9 +21,12 @@ import { rmdProductionByDay } from './production.service';
 // once the plan-import feature supplies the plan.
 import fy2026 from './plan/rmd-plan-2026-27.json';
 
-interface PlanMonth { month: string; workingDays: number; calendarDays: number; primeSlMt: number }
+/** One month of a plant plan: its total and how many of its days are worked. Shared with LSM. */
+export interface PlanMonth { month: string; workingDays: number; calendarDays: number; planMt: number }
 
-const MONTHS = new Map((fy2026.months as PlanMonth[]).map((m) => [m.month, m]));
+const MONTHS = new Map<string, PlanMonth>(fy2026.months.map((m) => [m.month, {
+  month: m.month, workingDays: m.workingDays, calendarDays: m.calendarDays, planMt: m.primeSlMt,
+}]));
 export const RMD_PLAN_SOURCE = fy2026.source;
 
 /** Shutdown dates (YYYY-MM-DD) once the plant gives them; a month's are used only when they account for all its non-working days. */
@@ -38,12 +41,13 @@ export function planMtOn(date: string, months = MONTHS, shutdowns = SHUTDOWN_DAT
   const off = shutdowns.filter((d) => d.startsWith(m.month));
   const known = off.length === m.calendarDays - m.workingDays;
   if (known && off.includes(date)) return 0;
-  return m.primeSlMt / (known ? m.workingDays : m.calendarDays);
+  return m.planMt / (known ? m.workingDays : m.calendarDays);
 }
 
-export function rmdPlanDays(dates: string[], actual: Map<string, number | null>): RmdPlanDay[] {
+/** Each date's plan, halved per shift, beside its ERP production. */
+export function rmdPlanDays(dates: string[], actual: Map<string, number | null>, months: Map<string, PlanMonth> = MONTHS): RmdPlanDay[] {
   return dates.map((date) => {
-    const p = planMtOn(date);
+    const p = planMtOn(date, months, months === MONTHS ? SHUTDOWN_DATES : []);
     return {
       date,
       planMt: p === null ? null : round2(p),
@@ -59,7 +63,9 @@ export function summarisePlan(days: RmdPlanDay[]): RmdPlanReport['totals'] {
   const sum = (xs: number[]) => round2(xs.reduce((a, b) => a + b, 0));
   const planMt = planned.length ? sum(planned.map((d) => d.planMt!)) : null;
   const comparedPlanMt = compared.length ? sum(compared.map((d) => d.planMt!)) : null;
-  const actualMt = compared.length ? sum(compared.map((d) => d.actualMt!)) : null;
+  // No plan for any day (e.g. a mill without one): the output is the ERP over the days entered.
+  const counted = planned.length ? compared : days.filter((d) => d.actualMt !== null);
+  const actualMt = counted.length ? sum(counted.map((d) => d.actualMt!)) : null;
   return {
     planMt,
     byShift: Object.fromEntries(RMD_SHIFTS.map((s) => [s, planned.length ? sum(planned.map((d) => d.byShift[s] ?? 0)) : null])),

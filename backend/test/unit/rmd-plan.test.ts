@@ -3,8 +3,8 @@ import { describe, expect, test } from 'vitest';
 import { planMtOn, rmdPlanDays, summarisePlan } from '../../src/modules/rmd/plan.service';
 
 const MONTHS = new Map([
-  ['2026-09', { month: '2026-09', workingDays: 30, calendarDays: 30, primeSlMt: 9349.05 }],
-  ['2026-10', { month: '2026-10', workingDays: 29, calendarDays: 31, primeSlMt: 8220.638 }],
+  ['2026-09', { month: '2026-09', workingDays: 30, calendarDays: 30, planMt: 9349.05 }],
+  ['2026-10', { month: '2026-10', workingDays: 29, calendarDays: 31, planMt: 8220.638 }],
 ]);
 
 describe('RMD plan per day', () => {

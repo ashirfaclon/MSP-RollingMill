@@ -1,9 +1,11 @@
 'use client';
 
 /**
- * RMD · Production by shift, from /api/rmd/plan:
- *   – targets: the plant's month-wise FY plan (Prime + SL), spread to days, half per shift;
- *   – output per shift: not in the ERP (entries carry no shift) — NA for now;
+ * Production by shift (RMD, LSM), from /api/{mill}/plan:
+ *   – targets: the plant's plan (RMD: month-wise FY plan, Prime + SL; LSM: October 2026,
+ *     PRODUTION_MT), spread to days, half per shift;
+ *   – output per shift: RMD NA (the ERP has no shift); LSM the ERP day split by the shifts'
+ *     prime pieces in the logbook's LSM Production Sheet, against that shift's plan;
  *   – whole day: ERP Prime + SL against the plan, with compliance and plan gap over the days
  *     that have both (the ERP is entered a day or two late).
  * Running rate as before (ERP production ÷ running hours).
@@ -13,11 +15,11 @@ import ShiftBars from '@/components/visualization/ShiftBars';
 import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdPlanReport } from '@/services/hsmApi';
 import { DAY_START_HOUR, shiftsLabel } from '@/lib/plantDay';
-import RmdPlanDrawer, { type RmdShiftView } from './RmdPlanDrawer';
+import RmdPlanDrawer, { type PlanMill, type RmdShiftView } from './RmdPlanDrawer';
 
-export default function RmdShiftProduction({ rate }: { rate: ReactNode }) {
+export default function RmdShiftProduction({ rate, mill = 'rmd' }: { rate: ReactNode; mill?: PlanMill }) {
   const { dates } = useSelection();
-  const url = rangeUrl('/api/rmd/plan', dates);
+  const url = rangeUrl(`/api/${mill}/plan`, dates);
   const s = useApi<RmdPlanReport>(url);
   const plan = s.data && s.dataUrl === url ? s.data : null;
   const t = plan?.totals ?? null;
@@ -27,7 +29,11 @@ export default function RmdShiftProduction({ rate }: { rate: ReactNode }) {
   return (
     <>
       <ShiftBars
-        shifts={(['Day', 'Night'] as const).map((name) => ({ name, planMt: t?.byShift[name] ?? null, outputMt: null, compliancePct: null }))}
+        shifts={(['Day', 'Night'] as const).map((name) => {
+          const s = t?.shifts?.[name];
+          // Like the whole day: the target over the days that have the shift's output.
+          return { name, planMt: s?.comparedPlanMt ?? t?.byShift[name] ?? null, outputMt: s?.actualMt ?? null, compliancePct: s?.compliancePct ?? null };
+        })}
         day={{
           // The whole-day bar compares like with like: the plan over the days the ERP has entered.
           planMt: t ? (t.comparedDays ? t.comparedPlanMt : t.planMt) : null,
@@ -36,11 +42,11 @@ export default function RmdShiftProduction({ rate }: { rate: ReactNode }) {
         }}
         planMt={t?.planMt ?? null}
         planGapMt={t?.gapMt ?? null}
-        sub={shiftsLabel(DAY_START_HOUR.rmd)}
+        sub={shiftsLabel(DAY_START_HOUR[mill])}
         rate={rate}
         onOpen={(v) => { setLastView(v); setOpen(v); }}
       />
-      <RmdPlanDrawer open={open !== null} view={open ?? lastView} onClose={() => setOpen(null)} />
+      <RmdPlanDrawer open={open !== null} view={open ?? lastView} onClose={() => setOpen(null)} mill={mill} />
     </>
   );
 }

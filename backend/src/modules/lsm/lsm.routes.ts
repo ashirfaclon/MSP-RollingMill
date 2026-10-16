@@ -1,14 +1,17 @@
 /**
  * LSM KPIs, mounted at /api/lsm. Only the sources the plant has confirmed are wired: the ERP
- * Production Log Sheet (FA-LP-P) and the logbook's Daily Power Consumption Record.
+ * Production Log Sheet (FA-LP-P), the logbook's Daily Power Consumption Record and the
+ * plant's October 2026 production plan.
  */
 import type { FastifyInstance } from 'fastify';
 import { loadEnv } from '../../config/env';
 import { searchParams } from '../../shared/request';
 import { parseGrain, parseRange } from '../hsm/params';
-import { lsmProduction } from './production.service';
+import { lsmProduction, lsmProductionByDay } from './production.service';
 import { lsmPowerReport } from '../power/power.service';
 import { lsmStock } from './stock.service';
+import { lsmPlan, LSM_SHEET_FORM } from './plan.service';
+import { formRunningRate } from './running-rate.service';
 import { isDate } from '../hsm/production.service';
 import { HttpError } from '../../shared/http-error';
 
@@ -31,5 +34,19 @@ export async function lsmRoutes(app: FastifyInstance) {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
     return lsmProduction(loadEnv(), from, to, parseGrain(q));
+  });
+
+  /** Production plan (the October 2026 plan spread to days and shifts) against ERP PRODUTION_MT. */
+  app.get('/plan', { config: { errorCode: 'lsm_plan_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return lsmPlan(loadEnv(), from, to);
+  });
+
+  /** Running rate: PRODUTION_MT ÷ running hours calculated from the LSM Production Sheet's runs. */
+  app.get('/running-rate', { config: { errorCode: 'lsm_running_rate_failed' } }, async (req) => {
+    const q = searchParams(req);
+    const { from, to } = parseRange(q);
+    const env = loadEnv();
+    return formRunningRate(env, from, to, parseGrain(q), { form: LSM_SHEET_FORM, dayStartMin: 9 * 60, production: (dates) => lsmProductionByDay(env, dates) });
   });
 }

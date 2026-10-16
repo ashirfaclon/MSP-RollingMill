@@ -13,14 +13,17 @@
  *                         ÷ PRODUTION_MT.
  *   Material balance      billet input, finished and the six losses (B_LOSS_MT, ENDCUT_MT,
  *                         MISROLL_MT, COLD_MT, REJECT_MT, SHORTLENGTH_MT), mass difference and yield.
+ *   Production by shift   the plant's October 2026 plan (8,750 MT), spread to days, half per
+ *                         shift, as RMD's; whole day = PRODUTION_MT vs plan.
+ *   Running rate          PRODUTION_MT ÷ running hours calculated from the LSM Production Sheet's runs.
  * No mill mimic on LSM (the user, 16 Oct 2026).
  */
 import { useState, type KeyboardEvent } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import ShiftBars from '@/components/visualization/ShiftBars';
+import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
+import { FormRunningRateFoot } from '@/components/production/FormRunningRate';
 import '@/components/visualization/visualization.css';
-import { DAY_START_HOUR, shiftsLabel } from '@/lib/plantDay';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
 import LsmProductionDrawer, { useLsmProduction } from './LsmProductionDrawer';
@@ -35,7 +38,6 @@ const NA_CARDS: { label: string; unit: string; series: Series }[] = [
   { label: 'Free stock', unit: 'MT', series: 'free' },
 ];
 
-const NA_SHIFT = { planMt: null, outputMt: null, compliancePct: null };
 const mt = (v: number | null | undefined) => (v === null || v === undefined ? 'NA' : `${fixed(v, 1)} MT`);
 
 export default function LsmVisualization() {
@@ -80,18 +82,9 @@ export default function LsmVisualization() {
       <LsmProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
 
       <div className="rm-row">
-        <ShiftBars
-          shifts={[{ name: 'Day', ...NA_SHIFT }, { name: 'Night', ...NA_SHIFT }]}
-          day={NA_SHIFT}
-          planMt={null}
-          planGapMt={null}
-          sub={shiftsLabel(DAY_START_HOUR.lsm)}
-          rate={
-            <span className="rm-foot-item">
-              <span className="rm-k">Running rate</span>
-              <span className="rm-foot-v num v-na">NA</span>
-            </span>
-          }
+        <RmdShiftProduction
+          mill="lsm"
+          rate={<FormRunningRateFoot mill="lsm" />}
         />
         <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
           <div className="rm-alloc-block">

@@ -9,7 +9,9 @@ import { isDate } from '../hsm/production.service';
 import { HttpError } from '../../shared/http-error';
 import { rmsStock } from '../lsm/stock.service';
 import { parseGrain, parseRange } from '../hsm/params';
-import { rmsProduction } from './production.service';
+import { rmsProduction, rmsProductionByDay } from './production.service';
+import { formRunningRate } from '../lsm/running-rate.service';
+import { rmsPlan, RMS_SHEET_FORM } from './plan.service';
 
 export async function rmsRoutes(app: FastifyInstance) {
   /** Production: the ERP Production Log Sheet (division RS, series L5P), per date / week / month. */
@@ -24,5 +26,19 @@ export async function rmsRoutes(app: FastifyInstance) {
     const to = searchParams(req).get('to') ?? '';
     if (!isDate(to)) throw new HttpError(400, 'bad_range', 'to must be a date (YYYY-MM-DD)');
     return rmsStock(loadEnv(), to);
+  });
+
+  /** Production by shift: no plan yet; output per shift = the ERP day split by the RMS Production Sheet's prime pieces. */
+  app.get('/plan', { config: { errorCode: 'rms_plan_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return rmsPlan(loadEnv(), from, to);
+  });
+
+  /** Running rate: PRODUCTION_MT ÷ running hours calculated from the RMS Production Sheet's runs. */
+  app.get('/running-rate', { config: { errorCode: 'rms_running_rate_failed' } }, async (req) => {
+    const q = searchParams(req);
+    const { from, to } = parseRange(q);
+    const env = loadEnv();
+    return formRunningRate(env, from, to, parseGrain(q), { form: RMS_SHEET_FORM, dayStartMin: 9 * 60 + 30, production: (dates) => rmsProductionByDay(env, dates) });
   });
 }

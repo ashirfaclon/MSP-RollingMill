@@ -31,7 +31,7 @@ and panels still render the sample model (`hsmSample.ts`).
 |---|---|---|---|
 | `validateSSOToken` | `GET /api/retrieve-sso-token/{token}` | `server/logbook/client.ts` → `POST /api/logbook-sso` | Exchange the one-time SSO token from the app URL for a session (held in server memory only) |
 | `findUserDevices` | `PUT /api/account/devices/1/1` | `server/logbook/client.ts` → `probeLogbook` | Session probe — proves the bearer is accepted; one device, nothing used from it |
-| `fetchInsightResult` | `PUT /api/account/bruce/insightResult/fetch/paginated/{insightId}` | `backend/src/integrations/logbook/client.ts` → `fetchFormEntries` (power HSM/RMD/LSM, HSM electrical delays, RMD asset forms) · `fetchLogbookWindow` (sources status) | One form's entries, read fresh on every request (shared 30 s). **Inactive until `IOSENSE_HSM_INSIGHT_ID` is set** |
+| `fetchInsightResult` | `PUT /api/account/bruce/insightResult/fetch/paginated/{insightId}` | `backend/src/integrations/logbook/client.ts` → `fetchFormEntries` (power HSM/RMD/LSM, HSM electrical delays, RMD asset forms, LSM / RMS Production Sheets `lsm-production-sheet/production-sheet`, `rms-production-sheet/production-sheet` — prime pcs per shift for output per shift; start → end of each run for running hours) · `fetchLogbookWindow` (sources status) | One form's entries, read fresh on every request (shared 30 s). **Inactive until `IOSENSE_HSM_INSIGHT_ID` is set** |
 
 All calls send `Authorization`, `organisation`, `ngsw-bypass: true`, `Content-Type: application/json`.
 

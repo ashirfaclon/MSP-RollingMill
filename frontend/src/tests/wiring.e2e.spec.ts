@@ -818,13 +818,31 @@ test('RMS: production from the ERP log sheet (division RS, series L5P) — a day
   await expect(card.locator('.rm-card-value')).toContainText('6,244.8');
   await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('6,244.8 MT');
   // Billets in: Σ INPUT_PCS (repeated entries once).
-  await expect(page.locator('section.panel', { hasText: 'Material & operating balance' }).locator('.rmd-mb-pieces')).toContainText(/[\d,]+ in/);
+  const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
+  await expect(balance.locator('.rmd-mb-pieces')).toContainText(/[\d,]+ in/);
+  // Billet input Σ (INPUT_MT1 + INPUT_MT2) 6,648.09; mass yield 6,244.75 ÷ 6,648.09 = 93.9 %; mass difference 403.3.
+  await expect(page.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-value')).toContainText('93.9');
+  await expect(balance.locator('.rm-mb-figure-v')).toHaveText(['6,648.1 MT', '93.9%']);
+  await expect(balance).toContainText('Finished 6,244.8 MT');
+  await expect(balance).toContainText('Mass difference 403.3 MT');
+  // The mass difference opened out: burning 99.47 + end cut 258.44 + miss-roll 22.36 + reject 23.07 = 403.34; cold 0 — not shown.
+  await expect(balance.locator('.rm-mb-legend .rm-mb-link')).toHaveText([
+    'Burning loss 99.5 MT', 'End cut 258.4 MT', 'Miss-roll 22.4 MT', 'Reject 23.1 MT',
+  ]);
+  await expect(balance.locator('.rm-mb-bar--loss .rm-mb-seg')).toHaveCount(4);
+  await balance.screenshot({ path: `${SHOTS}/rms-material-balance.png` });
   await card.click();
   const d = page.getByRole('dialog', { name: 'Production · ERP log sheet' });
   const t = d.getByRole('table', { name: 'Production by period' });
-  await expect(t.getByRole('row', { name: /^1 Oct/ })).toContainText('577.45');
+  for (const v of ['627.37', '577.45', '92.0%', '49.92']) await expect(t.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
   await expect(t.getByRole('row', { name: /^4 Oct/ })).toContainText('568.45');
-  await expect(t.locator('thead th')).toHaveText(['Period', 'Billets in (pcs)', 'Production (MT)']);
+  await expect(t.locator('thead th')).toHaveText(['Period', 'Billets in (pcs)', 'Billet input (MT)', 'Production (MT)', 'Mass yield', 'Mass difference (MT)']);
+  for (const v of ['6,648.09', '6,244.75', '93.9%', '403.34']) await expect(t.locator('tfoot')).toContainText(v);
+  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('Billet input = Σ (INPUT_MT1 + INPUT_MT2)');
+  const lt = d.getByRole('table', { name: 'Losses by period' });
+  await expect(lt.locator('thead th')).toHaveText(['Period', 'Burning loss', 'End cut', 'Miss-roll', 'Cold', 'Reject', 'Losses (MT)']);
+  for (const v of ['12.55', '29.80', '1.75', '5.82', '49.92']) await expect(lt.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
+  await expect(lt.locator('tfoot')).toContainText('403.34');
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'RS', TNATURE = 'PRLOG', SERIES = 'L5P'");
   await page.waitForTimeout(700);
   await d.screenshot({ path: `${SHOTS}/rms-drill-production.png` });
@@ -868,3 +886,122 @@ test('RMD asset health: route drive group by default; motor current live, run ho
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Roughing drive group');
   await page.screenshot({ path: `${SHOTS}/rmd-asset-health.png`, fullPage: true });
 });
+
+test('LSM: production by shift — the October plan (8,750 MT) per day and shift; output per shift = ERP day split by the form\'s prime pieces', async ({ page }) => {
+  await page.goto('/lsm/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+
+  // 8,750 MT ÷ 31 days = 282.26 a day → 1–8 Oct 2,258.1 MT, 1,129.0 a shift (Day 09–21, Night 21–09).
+  const panel = page.locator('.rm-flip-face--front section.panel');
+  await expect(panel.locator('.chip')).toHaveText('Plan 2,258 MT');
+  await expect(panel.locator('.panel-sub')).toHaveText('Day 09:00–21:00 IST · Night 21:00–09:00 IST');
+  // Output per shift: each date's PRODUTION_MT split by the LSM Production Sheet's Day / Night prime pieces
+  // (1 Oct: 302.96 → Day 203.26, Night 99.70); 1–8 Oct Day 1,115.2 (98.8 %), Night 991.0 (87.8 %).
+  await expect(panel.locator('.rm-shift-val')).toHaveText(['1,115.2 MT', '991.0 MT']);
+  await expect(panel.locator('.rm-shift-comp')).toHaveText(['98.8%', '87.8%']);
+  await expect(panel.locator('.rm-shift-target-label')).toContainText('1,129 MT target');
+  // Plan gap: 2,258.08 − 2,106.12 = 151.96.
+  await expect(panel).toContainText('152.0 MT');
+  await panel.screenshot({ path: `${SHOTS}/lsm-shift-plan.png` });
+
+  // Whole day: PRODUTION_MT 2,106.12 ÷ 2,258.08 = 93.3 %.
+  await panel.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' }).click();
+  const back = page.locator('.rm-flip-face--back section.panel');
+  await expect(back.locator('.rm-shift-val')).toHaveText(['2,106.1 MT']);
+  await expect(back.locator('.rm-shift-comp')).toHaveText(['93.3%']);
+
+  await back.getByRole('button', { name: 'Whole-day production, plan vs actual per day' }).click();
+  const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
+  const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
+  await expect(dt.locator('thead th')).toHaveText(['Period', 'Production', 'Target', 'Compliance', 'Plan gap']);
+  // 7 Oct: 359.61 of 282.26 → 127.4 %, gap −77.4.
+  for (const v of ['359.6', '282.3', '127.4%']) await expect(dt.getByRole('row', { name: /^7 Oct/ })).toContainText(v);
+  for (const v of ['2,106.1', '2,258.1', '93.3%', '152.0']) await expect(dt.locator('tfoot')).toContainText(v);
+  await expect(dd.getByRole('region', { name: 'Data source' })).toContainText('PRODUCTION PLAN FOR LSM Oct-2026');
+  await expect(dd.getByRole('region', { name: 'Data source' })).toContainText("USER_CODE = 'FA-LP-P'");
+  await expect(dd.getByRole('region', { name: 'Formula' })).toContainText('Compliance = PRODUTION_MT ÷ plan × 100');
+  await page.waitForTimeout(700);
+  await dd.screenshot({ path: `${SHOTS}/lsm-drill-plan-day.png` });
+  await page.keyboard.press('Escape');
+  await back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'By shift' }).click();
+
+  // By shift: each shift's output beside its target, per day.
+  await panel.getByRole('button', { name: 'Production by shift, plan vs actual per day' }).click();
+  const ds = page.getByRole('dialog', { name: 'Production by shift · plan' });
+  const st = ds.getByRole('table', { name: 'Production by shift by period' });
+  await expect(st.locator('thead th')).toHaveText(['Period', 'Day output', 'Day target', 'Night output', 'Night target']);
+  for (const v of ['203.3', '141.1', '99.7']) await expect(st.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
+  for (const v of ['1,115.2', '1,129.0', '991.0']) await expect(st.locator('tfoot')).toContainText(v);
+  await expect(ds.getByRole('region', { name: 'Data source' })).toContainText('LSM Production Sheet');
+  await expect(ds.getByRole('region', { name: 'Formula' })).toContainText('Day output = PRODUTION_MT × Day prime pcs ÷ (Day + Night prime pcs)');
+  await page.waitForTimeout(700);
+  await ds.screenshot({ path: `${SHOTS}/lsm-drill-plan-shift.png` });
+});
+
+test('RMS: production by shift — the monthly plan (Oct 13,499 MT) per day and shift, against ERP PRODUCTION_MT', async ({ page }) => {
+  await page.goto('/rms/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-12');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+
+  // 13,499 MT ÷ 31 days (the shutdown day is not dated) = 435.45 a day → 1–12 Oct 5,225.4 MT, 2,612.8 a shift.
+  const panel = page.locator('.rm-flip-face--front section.panel');
+  await expect(panel.locator('.chip')).toHaveText('Plan 5,225 MT');
+  await expect(panel.locator('.panel-sub')).toHaveText('Day 09:30–21:30 IST · Night 21:30–09:30 IST');
+  // Ahead of plan: 6,244.75 − 5,225.4 → plan gap −1,019.4.
+  await expect(panel).toContainText('-1,019.4 MT');
+
+  // Whole day: PRODUCTION_MT 6,244.75 ÷ 5,225.4 = 119.5 %.
+  await panel.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' }).click();
+  const back = page.locator('.rm-flip-face--back section.panel');
+  await expect(back.locator('.rm-shift-val')).toHaveText(['6,244.8 MT']);
+  await expect(back.locator('.rm-shift-comp')).toHaveText(['119.5%']);
+  await page.waitForTimeout(700);
+  await back.screenshot({ path: `${SHOTS}/rms-shift-whole-day.png` });
+
+  await back.getByRole('button', { name: 'Whole-day production, plan vs actual per day' }).click();
+  const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
+  const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
+  await expect(dt.locator('thead th')).toHaveText(['Period', 'Production', 'Target', 'Compliance', 'Plan gap']);
+  for (const v of ['577.5', '435.5', '132.6%']) await expect(dt.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
+  for (const v of ['6,244.8', '5,225.4', '119.5%']) await expect(dt.locator('tfoot')).toContainText(v);
+  await expect(dd.getByRole('region', { name: 'Data source' })).toContainText('RMS_Production_Plan');
+  await expect(dd.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'RS'");
+  await expect(dd.getByRole('region', { name: 'Formula' })).toContainText('Compliance = PRODUCTION_MT ÷ plan × 100');
+  await page.waitForTimeout(700);
+  await dd.screenshot({ path: `${SHOTS}/rms-drill-plan-day.png` });
+});
+
+for (const c of [
+  // LSM 9–13 Oct: 1,505.73 MT ÷ 65.96 h of runs = 22.83 TPH; 9 Oct 319.47 ÷ 14.58 h = 21.91.
+  { mill: 'lsm', from: '2026-10-09', to: '2026-10-13', rate: '22.83', first: ['9 Oct', '319.47', '14.6', '21.91'], foot: ['1,505.73', '66.0', '22.83'], form: 'LSM Production Sheet' },
+  // RMS 1–12 Oct: the days with both (4 Oct has no runs) 5,676.30 MT ÷ 143.63 h = 39.52 TPH; 1 Oct 577.45 ÷ 14.08 h = 41.01.
+  { mill: 'rms', from: '2026-10-01', to: '2026-10-12', rate: '39.52', first: ['1 Oct', '577.45', '14.1', '41.01'], foot: ['6,244.75', '143.6', '39.52'], form: 'RMS Production Sheet' },
+] as const) {
+  test(`${c.mill.toUpperCase()}: running rate = ERP production ÷ running hours calculated from the Production Sheet's runs`, async ({ page }) => {
+    await page.goto(`/${c.mill}/visualization`);
+    await page.getByRole('button', { name: /Duration/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Select period' });
+    await dialog.getByLabel('Start Date').fill(c.from);
+    await dialog.getByLabel('End Date').fill(c.to);
+    await dialog.getByRole('button', { name: 'Apply' }).click();
+    const foot = page.locator('.rm-flip-face--front').getByRole('button', { name: /Running rate/ });
+    await expect(foot).toContainText(`${c.rate} TPH`);
+    await foot.click();
+    const d = page.getByRole('dialog', { name: 'Running rate' });
+    const t = d.getByRole('table', { name: 'Running rate by period' });
+    await expect(t.locator('thead th')).toHaveText(['Period', 'Production (MT)', 'Running hours', 'Rate (TPH)']);
+    for (const v of c.first.slice(1)) await expect(t.getByRole('row', { name: new RegExp(`^${c.first[0]}`) })).toContainText(v);
+    for (const v of c.foot) await expect(t.locator('tfoot')).toContainText(v);
+    await expect(d.getByRole('region', { name: 'Data source' })).toContainText(c.form);
+    await expect(d.getByRole('region', { name: 'Formula' })).toContainText('overlapping runs counted once');
+    await page.waitForTimeout(700);
+    await d.screenshot({ path: `${SHOTS}/${c.mill}-drill-running-rate.png` });
+  });
+}

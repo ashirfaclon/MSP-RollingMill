@@ -1,0 +1,7 @@
+{
+  "source": "PRODUCTION PLAN FOR LSM Oct-2026.xlsx, Sheet1 \"PRODUCTION PLAN – OCT - 2026 (LSM)\", TOTAL PRODUCTION (MT)",
+  "note": "31 working days, 0 shutdown, double stand. 110×110 billet 21 days × 12 h × 24 MT/h × 0.96 = 5,806 MT; 125×125 billet 10 days × 12 h × 25 MT/h × 0.96 = 2,880 MT; extra heat 64 MT. Which dates run which billet, and the day of the extra heat, are not given.",
+  "months": [
+    { "month": "2026-10", "workingDays": 31, "calendarDays": 31, "productionMt": 8750 }
+  ]
+}

@@ -70,6 +70,20 @@ export interface RmsProductionPeriod {
   productionMt: number | null;
   /** Σ INPUT_PCS — billets in, pieces; null with no entry. */
   billetsPcs: number | null;
+  /** Σ (INPUT_MT1 + INPUT_MT2) — billet input, MT; null with none filled. */
+  billetInputMt: number | null;
+  /** billetInputMt − productionMt. */
+  massDiffMt: number | null;
+  /** productionMt ÷ billetInputMt × 100. */
+  massYieldPct: number | null;
+  /** The losses that make up the mass difference, MT (…_MT1 + …_MT2 where split). */
+  burningLossMt: number | null;
+  endCutMt: number | null;
+  missRollMt: number | null;
+  coldMt: number | null;
+  rejectMt: number | null;
+  /** Σ of the five; null when none is filled. */
+  lossesMt: number | null;
 }
 
 export interface RmsProductionReport {
@@ -79,4 +93,25 @@ export interface RmsProductionReport {
   erp: { connection: 'up' | 'down'; message: string; syncedAt: string | null; lastDate: string | null };
   rows: RmsProductionPeriod[];
   totals: RmsProductionPeriod;
+}
+
+/**
+ * GET /api/lsm/plan — the same shape as RMD's plan: the plan per day and shift against ERP
+ * production (here PRODUTION_MT, the LSM Production card's figure).
+ */
+export type LsmPlanReport = import('./rmd').RmdPlanReport;
+
+/**
+ * GET /api/lsm/running-rate, /api/rms/running-rate — ERP production ÷ running hours calculated
+ * from the mill's Production Sheet form (each run's start → end, overlaps merged), per period.
+ */
+export interface FormRunningRateReport {
+  from: string;
+  to: string;
+  grain: Grain;
+  /** The logbook form the running hours come from. */
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  rows: import('./rmd').RmdRatePeriod[];
+  totals: import('./rmd').RmdRatePeriod;
 }

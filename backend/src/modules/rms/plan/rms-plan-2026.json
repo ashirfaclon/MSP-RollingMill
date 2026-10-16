@@ -1,0 +1,13 @@
+{
+  "source": "RMS_Production_Plan.zip (shared 16 Oct 2026): one workbook per month, \"RMS PRODUCTION PLAN – <month> 26\", TOTAL PRODUCTION (MT); Aug from RMS_Production_Plan.xlsx (titled AUG 26), Jun from RMS_Production_Plan_June_25.xlsx (titled JUNE 26)",
+  "note": "Rolling 13–14 h a day. Shutdown dates not given (Apr 4 days, Aug 1 day flywheel maintenance, Oct 1 day roughing stand 01 flywheel shaft). Each month split by billet size (160×200, 160×160, 125×125, 200×200) without dates.",
+  "months": [
+    { "month": "2026-04", "workingDays": 26, "calendarDays": 30, "productionMt": 12478 },
+    { "month": "2026-05", "workingDays": 31, "calendarDays": 31, "productionMt": 14354.55 },
+    { "month": "2026-06", "workingDays": 30, "calendarDays": 30, "productionMt": 13785.66 },
+    { "month": "2026-07", "workingDays": 31, "calendarDays": 31, "productionMt": 14923.4 },
+    { "month": "2026-08", "workingDays": 30, "calendarDays": 31, "productionMt": 14447.16 },
+    { "month": "2026-09", "workingDays": 30, "calendarDays": 30, "productionMt": 14447.16 },
+    { "month": "2026-10", "workingDays": 30, "calendarDays": 31, "productionMt": 13499 }
+  ]
+}
