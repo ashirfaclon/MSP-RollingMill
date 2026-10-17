@@ -240,9 +240,12 @@ test('order allocation: no open-orders chip', async ({ page }) => {
 test('finished stock: ERP stock ledger to the period end — one drawer, from Free stock and from Order allocation', async ({ page }) => {
   await pickWeek(page);
   const block = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').nth(1);
-  // The title and the total, no note; then the Stock with order / Free stock split, NA.
-  await expect(block).toHaveText(/^Finished stock-?\d[\d,]*\.\d MTStock with order NAFree stock NA$/);
+  // The title and the total, no note; then the split as the cards have it: with order 0, all of it free.
+  await expect(block).toHaveText(/^Finished stock-?\d[\d,]*\.\d MTStock with order\s*0\.0 MTFree stock\s*-?\d[\d,]*\.\d MT$/);
   const total = (await block.locator('.rm-alloc-total').innerText()).replace(' MT', '');
+  await expect(block.locator('.rm-legend')).toContainText(new RegExp(`Free stock\\s*${total.replace(/[.,]/g, '\\$&')} MT`));
+  // The bar, like Production's: all of it free.
+  await expect(block.getByRole('img', { name: /^Finished stock .* with order 0\.0 MT, free / })).toBeVisible();
   // Free stock and the Order allocation block open the same drawer, on the same figure.
   for (const open of [
     () => page.getByRole('button', { name: 'Free stock', exact: true }).click(),
@@ -1012,12 +1015,47 @@ for (const c of [
   });
 }
 
-for (const mill of ['hsm', 'rmd', 'lsm', 'rms'] as const) {
-  test(`${mill.toUpperCase()}: Order allocation's Finished stock shows Stock with order and Free stock as NA`, async ({ page }) => {
+test('RMD: Order allocation\'s Finished stock is the total only — no Stock with order / Free stock line', async ({ page }) => {
+  await page.goto('/rmd/visualization');
+  const block = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block', { hasText: 'Finished stock' });
+  await expect(block.locator('.rm-alloc-total')).toHaveText(/^(NA|[\d,]+\.\d MT)$/);
+  await expect(block.locator('.rm-legend')).toHaveCount(0);
+  await expect(block).not.toContainText('Free stock');
+});
+
+for (const mill of ['hsm', 'lsm', 'rms'] as const) {
+  test(`${mill.toUpperCase()}: Order allocation's Finished stock shows Stock with order and Free stock, as the cards`, async ({ page }) => {
     await page.goto(`/${mill}/visualization`);
     const alloc = page.locator('section.panel', { hasText: 'Order allocation' });
     const legend = alloc.locator('.rm-alloc-block', { hasText: 'Finished stock' }).locator('.rm-legend');
-    await expect(legend).toHaveText(/Stock with order\s*NA\s*Free stock\s*NA/);
+    await expect(legend).toHaveText(/Stock with order\s*0\.0 MT\s*Free stock\s*-?[\d,]+\.\d MT/);
     await alloc.screenshot({ path: `${SHOTS}/${mill}-order-allocation.png` });
   });
 }
+
+for (const c of [
+  { mill: 'lsm', prod: '2,106.1' },   // 1–8 Oct PRODUTION_MT 2,106.12
+  { mill: 'rms', prod: '4,114.3' },   // 1–8 Oct PRODUCTION_MT 4,114.29
+] as const) test(`${c.mill.toUpperCase()}: order split as HSM — Made To Stock = production, Stock with order 0, Free stock = all finished stock`, async ({ page }) => {
+  await page.goto(`/${c.mill}/visualization`);
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const strip = page.getByRole('region', { name: 'Headline KPIs' });
+  // All of the period's production is Made To Stock.
+  await expect(strip.locator('.rm-card', { hasText: 'Made To Stock' }).locator('.rm-card-value')).toContainText(c.prod);
+  await expect(strip.locator('.rm-card', { hasText: 'Stock with order' }).locator('.rm-card-value')).toHaveText(/^0\s*MT$/);
+  const alloc = page.locator('section.panel', { hasText: 'Order allocation' });
+  const prod = alloc.locator('.rm-alloc-block').nth(0);
+  await expect(prod.locator('.rm-legend')).toHaveText(new RegExp(`Made To Order\\s*0\\.0 MT\\s*Made To Stock\\s*${c.prod.replace(/[.,]/g, '\\$&')} MT`));
+  await expect(prod.getByRole('img', { name: new RegExp(`made to order 0\\.0 MT, made to stock ${c.prod.replace(/[.,]/g, '\\$&')} MT`) })).toBeVisible();
+  // Finished stock: the Free stock card, the Order allocation total and its free part are one figure.
+  const stock = alloc.locator('.rm-alloc-block').nth(1);
+  const total = (await stock.locator('.rm-alloc-total').innerText()).replace(' MT', '');
+  await expect(strip.locator('.rm-card', { hasText: 'Free stock' }).locator('.rm-card-value')).toContainText(total);
+  await expect(stock.locator('.rm-legend')).toHaveText(new RegExp(`Stock with order\\s*0\\.0 MT\\s*Free stock\\s*${total.replace(/[.,]/g, '\\$&')} MT`));
+  await expect(stock.getByRole('img', { name: /with order 0\.0 MT, free / })).toBeVisible();
+  await alloc.screenshot({ path: `${SHOTS}/${c.mill}-order-allocation-split.png` });
+});

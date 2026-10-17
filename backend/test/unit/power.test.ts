@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { Env } from '../../src/config/env';
-import { powerReport, rmdPowerReport, specificEnergy, POWER_FORM } from '../../src/modules/power/power.service';
+import { powerReport, rmdPowerReport, rmsPowerReport, specificEnergy, POWER_FORM } from '../../src/modules/power/power.service';
 import { resetLogbookSession } from '../../src/integrations/logbook/client';
 
 const entry = (id: string, date: string, equipment: string, kwh: number | string, created: string, form = POWER_FORM) => ({
@@ -23,6 +23,14 @@ const vcbEntry = (id: string, n: number, date: string, kwh: number, created: str
 };
 // Newest first, as the engine returns them; one row of another form; one wrongly dated row;
 // two RMD readings mixed in (they belong to RMD only).
+/** An RMS reading: the RMS Daily Power Consumption Record, VCB-1 (1250 A). */
+const rmsEntry = (id: string, date: string, kwh: number, remarks: string, created: string) => {
+  const form = 'rms-electrical-logbook/daily-power-consumption-record';
+  return {
+    _id: id, tags: [form], resultName: form, createdAt: created, invocationTime: created,
+    result: { date, shift: 'DAY', 'previous-kwh-vcb-1-1250amp': 1000, 'present-kwh-vcb-1-1250amp': 1000 + kwh, 'actual-kwh-vcb-1-1250amp': kwh, remarks },
+  };
+};
 const ALL = [
   vcbEntry('r1', 1, '2026-10-07', 18022.303, '2026-10-08T15:07:00Z'),
   vcbEntry('r2', 3, '2026-10-07', 4441.558, '2026-10-08T15:06:30Z'),
@@ -32,6 +40,8 @@ const ALL = [
   entry('x', '2026-10-07', 'SOMETHING', 9999, '2026-10-08T15:03:00Z', 'electrical-hsm/electrical-delays'),
   entry('d', '2026-10-06', 'ROUGHING VCB-01', '', '2026-10-06T17:12:00Z'),
   entry('e', '2026-10-13', 'FINISHING VCB-02', 495.184, '2026-10-01T10:00:00Z'),
+  rmsEntry('s1', '2026-10-07', 5120.5, '', '2026-10-08T05:00:00Z'),
+  rmsEntry('s2', '2026-10-07', 111, 'Test Entry', '2026-10-08T05:10:00Z'),
 ];
 let ROWS = [...ALL];
 
@@ -135,5 +145,14 @@ describe('specific energy', () => {
     expect(specificEnergy(null, 1141.08)).toBeNull();
     expect(specificEnergy(15221.3, 0)).toBeNull();
     expect(specificEnergy(15221.3, null)).toBeNull();
+  });
+});
+
+describe('RMS power from its Daily Power Consumption Record', () => {
+  test('a day is the sum of actual-kwh-vcb-1-1250amp; a test entry is left out; other mills\' forms stay out', async () => {
+    const r = await rmsPowerReport(env(), '2026-10-07', '2026-10-07', Date.parse('2026-10-09T08:00:00Z'));
+    expect(r.totals).toMatchObject({ kwh: 5120.5, entries: 1 });
+    expect(r.equipment).toEqual(['VCB-1 (1250 A)']);
+    expect((await powerReport(env(), '2026-10-07', '2026-10-07', Date.parse('2026-10-09T08:00:00Z'))).equipment).not.toContain('VCB-1 (1250 A)');
   });
 });

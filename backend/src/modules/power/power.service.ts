@@ -11,6 +11,9 @@
  *   LSM  "Electrical Logbook → Daily Power Consumption Record", filled hourly
  *        (electrical-logbook/daily-power-consumption-record): `actual-kwh-vcb-1-1250amp`
  *        (kWh) = present − previous reading, as the plant gave it (13 Oct 2026).
+ *   RMS  "Rolling Mill Structure (RMS) → RMS Electrical Logbook → Daily Power Consumption
+ *        Record" (rms-electrical-logbook/daily-power-consumption-record): the same fields as
+ *        LSM's, `actual-kwh-vcb-1-1250amp` (kWh) (the user, 17 Oct 2026).
  *
  * An entry whose remark says "test entry" is left out.
  *
@@ -31,8 +34,9 @@ import { MSG } from '../../shared/messages';
 import { dateRange, plantDayStart, productionComparison, round2 } from '../hsm/production.service';
 import { rmdProductionByDay } from '../rmd/production.service';
 import { lsmProductionByDay } from '../lsm/production.service';
+import { rmsProductionByDay } from '../rms/production.service';
 
-export type PowerMill = 'hsm' | 'rmd' | 'lsm';
+export type PowerMill = 'hsm' | 'rmd' | 'lsm' | 'rms';
 
 /** How one logbook form becomes power entries: its mill, and the meter and kWh of a result. */
 interface PowerForm {
@@ -50,6 +54,13 @@ const vcb = (n: number): [string, PowerForm] => [`tmt-electrical-department/powe
     kwh: num(res[`actual-kwh-vcb-${n}`]),
   }),
 }];
+/** LSM's and RMS's Daily Power Consumption Record: one meter, VCB-1 (1250 A). */
+const vcb1250: PowerForm['read'] = (res) => ({
+  equipment: 'VCB-1 (1250 A)',
+  previousReading: num(res['previous-kwh-vcb-1-1250amp']),
+  presentReading: num(res['present-kwh-vcb-1-1250amp']),
+  kwh: num(res['actual-kwh-vcb-1-1250amp']),
+});
 /** Every power form, by its logbook tag. */
 const FORMS = new Map<string, PowerForm>([
   [POWER_FORM, {
@@ -62,15 +73,8 @@ const FORMS = new Map<string, PowerForm>([
     }),
   }],
   vcb(1), vcb(2), vcb(3),
-  ['electrical-logbook/daily-power-consumption-record', {
-    mill: 'lsm',
-    read: (res) => ({
-      equipment: 'VCB-1 (1250 A)',
-      previousReading: num(res['previous-kwh-vcb-1-1250amp']),
-      presentReading: num(res['present-kwh-vcb-1-1250amp']),
-      kwh: num(res['actual-kwh-vcb-1-1250amp']),
-    }),
-  }],
+  ['electrical-logbook/daily-power-consumption-record', { mill: 'lsm', read: vcb1250 }],
+  ['rms-electrical-logbook/daily-power-consumption-record', { mill: 'rms', read: vcb1250 }],
 ]);
 const formsOf = (mill: PowerMill) => [...FORMS].filter(([, f]) => f.mill === mill).map(([tag]) => tag);
 
@@ -174,4 +178,12 @@ export function lsmPowerReport(env: Env, from: string, to: string, nowMs = Date.
   const vals = [...byDay.values()].filter((v): v is number => v !== null);
   const production = Promise.resolve({ byDay, total: vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null });
   return report(env, 'lsm', from, to, nowMs, production);
+}
+
+/** RMS: the RMS Daily Power Consumption Record, over the ERP log sheet's production (PRODUCTION_MT). */
+export function rmsPowerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
+  const byDay = rmsProductionByDay(env, dateRange(from, to));
+  const vals = [...byDay.values()].filter((v): v is number => v !== null);
+  const production = Promise.resolve({ byDay, total: vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null });
+  return report(env, 'rms', from, to, nowMs, production);
 }

@@ -11,6 +11,7 @@ import { rmsStock } from '../lsm/stock.service';
 import { parseGrain, parseRange } from '../hsm/params';
 import { rmsProduction, rmsProductionByDay } from './production.service';
 import { formRunningRate } from '../lsm/running-rate.service';
+import { rmsPowerReport } from '../power/power.service';
 import { rmsPlan, RMS_SHEET_FORM } from './plan.service';
 
 export async function rmsRoutes(app: FastifyInstance) {
@@ -32,6 +33,12 @@ export async function rmsRoutes(app: FastifyInstance) {
   app.get('/plan', { config: { errorCode: 'rms_plan_failed' } }, async (req) => {
     const { from, to } = parseRange(searchParams(req));
     return rmsPlan(loadEnv(), from, to);
+  });
+
+  /** Power consumption: Σ actual kWh of the RMS Daily Power Consumption Record (VCB-1), by the form's date. */
+  app.get('/power', { config: { errorCode: 'rms_power_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return rmsPowerReport(loadEnv(), from, to);
   });
 
   /** Running rate: PRODUCTION_MT ÷ running hours calculated from the RMS Production Sheet's runs. */

@@ -141,10 +141,28 @@ const SOURCES: Record<PowerMill, SourceSystem[]> = {
       ],
     },
   ],
+  rms: [
+    {
+      name: 'Logbook',
+      rows: [
+        ['Form', 'RMS Electrical Logbook → Daily Power Consumption Record'],
+        ['Field', 'ACTUAL_KWH_VCB_1_1250AMP (kWh), by the form\'s date'],
+      ],
+    },
+    {
+      name: 'ERP',
+      rows: [
+        ['Table', 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],
+        ['Filter', "ENTITY_CODE = 'MP', DIV_CODE = 'RS', TNATURE = 'PRLOG', SERIES = 'L5P'"],
+        ['Field', "ATTR_CODE = 'PRODUCTION_MT' (value in ATTR_VALUE), by VRDATE"],
+      ],
+    },
+  ],
 };
 
 const FORMULA: Record<PowerMill, string[]> = {
   hsm: ['Specific energy = Power (kWh) ÷ Influx production (MT)'],
   rmd: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
   lsm: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
+  rms: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
 };

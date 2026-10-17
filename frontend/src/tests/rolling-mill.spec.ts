@@ -406,8 +406,13 @@ for (const mill of ['lsm', 'rms'] as const) {
     // LSM: Production is wired (ERP log sheet FA-LP-P) and opens its drawer; Today's entry comes a day late, so NA.
     // Everything else NA, and nothing else opens.
     await expect(strip.locator('.rm-card-value').nth(0)).toHaveText(mill === 'lsm' ? /^(NA|[\d,]+\.\d)/ : /^NA/);
-    for (let i = mill === 'lsm' ? 4 : 1; i < 7; i++) await expect(strip.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
-    await expect(strip.getByRole('button')).toHaveCount(mill === 'lsm' ? 4 : 2);   // RMS: Production, Mass yield
+    // As HSM: Made To Stock = production (NA today, the ERP comes a day late), Stock with order 0, Free stock = all stock.
+    // Power and specific energy: each mill's Daily Power Consumption Record holds only a test entry so far — NA.
+    for (const i of [2, 3]) await expect(strip.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+    await expect(strip.locator('.rm-card-value').nth(4)).toHaveText(/^(NA|[\d,]+\.\d)/);
+    await expect(strip.locator('.rm-card-value').nth(5)).toHaveText(/^0\s*MT$/);
+    await expect(strip.locator('.rm-card-value').nth(6)).toHaveText(/^[\d,]+\.\d\s*MT$/);
+    await expect(strip.getByRole('button')).toHaveCount(4);   // Production, Mass yield, Power consumption, Specific energy
     // No mill mimic on LSM or RMS.
     await expect(page.getByRole('list', { name: 'Mill process flow' })).toHaveCount(0);
     await expect(page.locator('section.panel', { hasText: 'Mill mimic' })).toHaveCount(0);

@@ -21,7 +21,7 @@ const METER_TOKENS = ['--s-prod', '--s-order', '--s-alt', '--s-free', '--violet'
 
 const k = (v: number | null | undefined) => (v === null || v === undefined ? '—' : fmtNum(v, 1));
 
-export type PowerMill = 'hsm' | 'rmd' | 'lsm';
+export type PowerMill = 'hsm' | 'rmd' | 'lsm' | 'rms';
 
 export default function PowerDrawer(props: {
   open: boolean; onClose: () => void; data: PowerReport | null; loading: boolean; error: string | null;
@@ -165,6 +165,14 @@ const SOURCES: Record<PowerMill, SourceSystem[]> = {
       ['Date', "the form's date, as entered"],
     ],
   }],
+  rms: [{
+    name: 'Logbook',
+    rows: [
+      ['Form', 'Rolling Mill Structure (RMS) → RMS Electrical Logbook → Daily Power Consumption Record'],
+      ['Field', 'ACTUAL_KWH_VCB_1_1250AMP (kWh)'],
+      ['Date', "the form's date, as entered"],
+    ],
+  }],
 };
 
 const FORMULA: Record<PowerMill, string[]> = {
@@ -177,6 +185,11 @@ const FORMULA: Record<PowerMill, string[]> = {
     'Power (MWh) = Power (kWh) ÷ 1000',
   ],
   lsm: [
+    'Power (kWh) = Σ ACTUAL_KWH_VCB_1_1250AMP of every entry dated in the period',
+    'ACTUAL_KWH = PRESENT_KWH − PREVIOUS_KWH (VCB-1, 1250 A)',
+    'Power (MWh) = Power (kWh) ÷ 1000',
+  ],
+  rms: [
     'Power (kWh) = Σ ACTUAL_KWH_VCB_1_1250AMP of every entry dated in the period',
     'ACTUAL_KWH = PRESENT_KWH − PREVIOUS_KWH (VCB-1, 1250 A)',
     'Power (MWh) = Power (kWh) ÷ 1000',
