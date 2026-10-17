@@ -240,8 +240,8 @@ test('order allocation: no open-orders chip', async ({ page }) => {
 test('finished stock: ERP stock ledger to the period end — one drawer, from Free stock and from Order allocation', async ({ page }) => {
   await pickWeek(page);
   const block = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').nth(1);
-  // Only the title and the total, no note.
-  await expect(block).toHaveText(/^Finished stock-?\d[\d,]*\.\d MT$/);
+  // The title and the total, no note; then the Stock with order / Free stock split, NA.
+  await expect(block).toHaveText(/^Finished stock-?\d[\d,]*\.\d MTStock with order NAFree stock NA$/);
   const total = (await block.locator('.rm-alloc-total').innerText()).replace(' MT', '');
   // Free stock and the Order allocation block open the same drawer, on the same figure.
   for (const open of [
@@ -1009,5 +1009,15 @@ for (const c of [
     await expect(d.getByRole('region', { name: 'Formula' })).toContainText('overlapping runs counted once');
     await page.waitForTimeout(700);
     await d.screenshot({ path: `${SHOTS}/${c.mill}-drill-running-rate.png` });
+  });
+}
+
+for (const mill of ['hsm', 'rmd', 'lsm', 'rms'] as const) {
+  test(`${mill.toUpperCase()}: Order allocation's Finished stock shows Stock with order and Free stock as NA`, async ({ page }) => {
+    await page.goto(`/${mill}/visualization`);
+    const alloc = page.locator('section.panel', { hasText: 'Order allocation' });
+    const legend = alloc.locator('.rm-alloc-block', { hasText: 'Finished stock' }).locator('.rm-legend');
+    await expect(legend).toHaveText(/Stock with order\s*NA\s*Free stock\s*NA/);
+    await alloc.screenshot({ path: `${SHOTS}/${mill}-order-allocation.png` });
   });
 }

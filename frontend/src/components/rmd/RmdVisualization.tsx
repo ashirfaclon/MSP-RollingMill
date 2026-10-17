@@ -13,10 +13,11 @@
  *                         (FA-SKJ); billets from Influx.
  *   Finished stock by size  ERP item ledger, FGYRDP, to the period end; a size opens its SKUs.
  *
- * Unlike HSM there is no Made To Order / Made To Stock split, and no Stock with order / Free
- * stock split: RMD's stock is all free stock, so stock is shown by size only (user, 12 Oct 2026).
+ * Unlike HSM there is no Made To Order / Made To Stock split (user, 12 Oct 2026). Finished stock
+ * shows Stock with order / Free stock as NA, as on every mill (user, 17 Oct 2026).
  */
 import Panel from '@/components/Panel';
+import StockSplitLegend from '@/components/production/StockSplitLegend';
 import type { Series } from '@/components/visualization/KpiCard';
 import { fixed } from '@/lib/num';
 import { useState, type KeyboardEvent } from 'react';
@@ -92,6 +93,7 @@ function OrderAllocation() {
           <span className="rm-k">Finished stock</span>
           <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{stockMt === null ? 'NA' : `${fixed(stockMt, 1)} MT`}</span>
         </div>
+        <StockSplitLegend />
       </div>
     </Panel>
   );

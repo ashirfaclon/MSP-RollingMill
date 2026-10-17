@@ -9,6 +9,7 @@ import { useState } from 'react';
 import StockDrawer from '@/components/drill/StockDrawer';
 import { fixed } from '@/lib/num';
 import { useFinishedStock } from './useFinishedStock';
+import StockSplitLegend from './StockSplitLegend';
 
 export default function FinishedStockBlock() {
   const { data, loading, error } = useFinishedStock();
@@ -22,6 +23,7 @@ export default function FinishedStockBlock() {
           {data ? `${fixed(data.totals.stockMt, 1)} MT` : error ? 'NA' : <span className="skel skel--num" role="status" aria-label="Loading" />}
         </span>
       </button>
+      <StockSplitLegend />
       <StockDrawer open={open} onClose={() => setOpen(false)} data={data} loading={loading} error={error} />
     </div>
   );

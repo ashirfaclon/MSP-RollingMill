@@ -20,6 +20,7 @@
  */
 import { useState, type KeyboardEvent } from 'react';
 import Panel from '@/components/Panel';
+import StockSplitLegend from '@/components/production/StockSplitLegend';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
 import { FormRunningRateFoot } from '@/components/production/FormRunningRate';
@@ -102,6 +103,7 @@ export default function LsmVisualization() {
               <span className="rm-k">Finished stock</span>
               <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{mt(stockMt)}</span>
             </div>
+            <StockSplitLegend />
           </div>
         </Panel>
       </div>
