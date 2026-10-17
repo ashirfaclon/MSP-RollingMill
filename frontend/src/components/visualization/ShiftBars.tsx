@@ -145,12 +145,16 @@ function Bars({ rows, label, onOpen }: { rows: ShiftBar[]; label: string; onOpen
   );
 }
 
+/**
+ * Plan gap = production − plan. Ahead of plan: "+" and green; short of it: the number alone,
+ * no sign, amber (the user, 17 Oct 2026).
+ */
 function PlanGap({ v }: { v: number | null }) {
   return (
     <>
       <span className="rm-k">Plan gap</span>
-      <span className={`rm-foot-v num ${v === null ? 'v-na' : v > 0 ? 'v-warn' : 'v-ok'}`}>
-        {v === null ? 'NA' : `${fixed(v, 1)} MT`}
+      <span className={`rm-foot-v num ${v === null ? 'v-na' : v < 0 ? 'v-warn' : 'v-ok'}`}>
+        {v === null ? 'NA' : `${v > 0 ? '+' : ''}${fixed(Math.abs(v), 1)} MT`}
       </span>
     </>
   );

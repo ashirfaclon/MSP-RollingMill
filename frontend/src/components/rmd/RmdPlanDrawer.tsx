@@ -102,7 +102,9 @@ const SHIFTS = ['Day', 'Night'] as const;
 
 const f = (v: number | null | undefined) => (v === null || v === undefined ? '—' : fmtNum(v, 1));
 const pct = (v: number | null) => (v === null ? 'NA' : `${fmtNum(v, 1)}%`);
-const gapTone = (v: number | null) => (v === null ? 'v-na' : v > 0 ? 'v-warn' : 'v-ok');
+const gapTone = (v: number | null) => (v === null ? 'v-na' : v < 0 ? 'v-warn' : 'v-ok');
+/** Plan gap (production − plan): "+" when ahead of plan; short of it, the number alone (the user, 17 Oct 2026). */
+const g = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v > 0 ? '+' : ''}${fmtNum(Math.abs(v), 1)}`);
 const compTone = (v: number | null) => (v === null ? 'v-na' : v >= 100 ? 'v-ok' : 'v-warn');
 
 interface Period {
@@ -135,7 +137,7 @@ function periods(days: RmdPlanDay[], grain: Grain): Period[] {
         const split = g.days.filter((d) => d.actualByShift?.[s] != null);
         return [s, split.length ? sum(split.map((d) => d.actualByShift![s]!)) : null];
       })),
-      gap: cPlan !== null && cOut !== null ? cPlan - cOut : null,
+      gap: cPlan !== null && cOut !== null ? cOut - cPlan : null,
       compliance: cPlan && cOut !== null ? (cOut / cPlan) * 100 : null,
     };
   });
@@ -224,7 +226,7 @@ function DayContent({ data, grain, m }: { data: RmdPlanReport; grain: Grain; m: 
       <Stats items={[
         { label: m.measure, value: t.actualMt === null ? 'NA' : f(t.actualMt), unit: `MT · target ${f(t.comparedPlanMt ?? t.planMt)}`, tone: t.actualMt === null ? 'v-na' : undefined },
         { label: 'Compliance', value: pct(t.compliancePct), unit: '', tone: compTone(t.compliancePct) },
-        { label: 'Plan gap', value: f(t.gapMt), unit: 'MT', tone: gapTone(t.gapMt) },
+        { label: 'Plan gap', value: g(t.gapMt), unit: 'MT', tone: gapTone(t.gapMt) },
       ]} />
       <DrillChart series={series} categories={categories} axes={axes}
         ariaLabel={`Whole-day production: ${rows.map((x) => `${x.label} ${f(x.out)} of ${f(x.plan)}`).join('; ')}`} />
@@ -237,7 +239,7 @@ function DayContent({ data, grain, m }: { data: RmdPlanReport; grain: Grain; m: 
                 <td className={`num r ${x.out === null ? 'v-na' : 'v-val'}`}>{x.out === null ? 'NA' : f(x.out)}</td>
                 <td className="num r">{f(x.plan)}</td>
                 <td className={`num r ${compTone(x.compliance)}`}>{pct(x.compliance)}</td>
-                <td className={`num r ${gapTone(x.gap)}`}>{f(x.gap)}</td>
+                <td className={`num r ${gapTone(x.gap)}`}>{g(x.gap)}</td>
               </tr>
             ))}
           </tbody>
@@ -247,7 +249,7 @@ function DayContent({ data, grain, m }: { data: RmdPlanReport; grain: Grain; m: 
               <td className="num r">{t.actualMt === null ? 'NA' : f(t.actualMt)}</td>
               <td className="num r">{f(t.planMt)}</td>
               <td className={`num r ${compTone(t.compliancePct)}`}>{pct(t.compliancePct)}</td>
-              <td className={`num r ${gapTone(t.gapMt)}`}>{f(t.gapMt)}</td>
+              <td className={`num r ${gapTone(t.gapMt)}`}>{g(t.gapMt)}</td>
             </tr>
           </tfoot>
         </table>
@@ -255,7 +257,7 @@ function DayContent({ data, grain, m }: { data: RmdPlanReport; grain: Grain; m: 
       <SourceBox sources={[m.erp, m.plan]} formula={[
         m.dayPlan,
         `Compliance = ${m.field} ÷ plan × 100  (days with both)`,
-        `Plan gap = plan − ${m.field}  (days with both)`,
+        `Plan gap = ${m.field} − plan  (days with both); + = ahead of plan, no sign = short`,
       ]} />
     </>
   );

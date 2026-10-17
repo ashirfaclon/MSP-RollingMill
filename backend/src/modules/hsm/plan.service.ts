@@ -65,7 +65,7 @@ export async function planReport(env: Env, from: string, to: string, nowMs = Dat
     from, to, source: SOURCE, days,
     totals: {
       planMt, byShift, plannedDays: planned.length, days: days.length, actualMt,
-      gapMt: planMt !== null && actualMt !== null ? round2(planMt - actualMt) : null,
+      gapMt: planMt !== null && actualMt !== null ? round2(actualMt - planMt) : null,
       actualByShift,
     },
   };

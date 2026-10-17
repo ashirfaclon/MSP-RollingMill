@@ -358,8 +358,9 @@ test('production by shift: targets from the rolling plan as filled, plan gap ove
   await expect(panel.locator('.panel-sub')).toHaveCount(0);
   // Output: the Production card's 1–8 Oct figure split by where the counter ticked — mostly at night.
   await expect(panel.locator('.rm-shift-val')).toHaveText(['329.2 MT / 1,592', '1,143.3 MT / 0']);
-  // Gap = 1,592 − production on 1–8 Oct (1,472.47) = 119.53 → 119.5 MT short.
+  // Gap = production on 1–8 Oct (1,472.47) − 1,592 = −119.53: 119.5 MT short — shown without a sign.
   await expect(panel).toContainText('119.5 MT');
+  await expect(panel).not.toContainText('-119.5');
   // Compliance over the planned days: Day 329.2 ÷ 1,592 = 20.7 %; Night has a 0 target → NA.
   await expect(panel.locator('.rm-shift-comp')).toHaveText(['20.7%', 'NA']);
   await panel.screenshot({ path: `${SHOTS}/wired-shift-plan.png` });
@@ -382,13 +383,15 @@ test('production by shift: targets from the rolling plan as filled, plan gap ove
   await expect(dd).toBeVisible();
   const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
   await expect(dt.locator('thead th')).toHaveText(['Period', 'Output', 'Target', 'Compliance', 'Plan gap']);
-  // 1 Oct: 134.4 of 140 → 96.0 %, gap 5.6.
+  // 1 Oct: 134.4 of 140 → 96.0 %, gap −5.6.
   const d1 = dt.getByRole('row', { name: /^1 Oct/ });
   for (const v of ['134.4', '140.0', '96.0%', '5.6']) await expect(d1).toContainText(v);
+  await expect(d1).not.toContainText('-5.6');
   // 8 Oct: 203.3 of 184 → 110.5 %.
   const d8 = dt.getByRole('row', { name: /^8 Oct/ });
   for (const v of ['203.3', '184.0', '110.5%']) await expect(d8).toContainText(v);
   for (const v of ['1,472.5', '1,592.0', '92.5%', '119.5']) await expect(dt.locator('tfoot')).toContainText(v);
+  await expect(dt.locator('tfoot')).not.toContainText('-119.5');
   await expect(dd.getByRole('region', { name: 'Formula' })).toContainText('Compliance = production ÷ plan × 100');
   await page.waitForTimeout(700);
   await dd.screenshot({ path: `${SHOTS}/drill-shift-whole-day.png` });
@@ -412,13 +415,14 @@ test('production by shift: the bars open plan vs actual per shift, per day', asy
   const table = drawer.getByRole('table', { name: 'Production by shift by period' });
   await expect(table.locator('thead th')).toHaveText(['Period', 'Day output', 'Day target', 'Night output', 'Night target', 'Plan gap']);
   await expect(table.locator('tbody tr')).toHaveCount(6);
-  // 1 Oct: plan 140 MT, all on Day; production 134.4 → gap 5.6.
+  // 1 Oct: plan 140 MT, all on Day; production 134.4 → gap −5.6.
   const oct1 = table.getByRole('row', { name: /^1 Oct/ });
   await expect(oct1).toContainText('140.0');
   await expect(oct1).toContainText('5.6');
+  await expect(oct1).not.toContainText('-5.6');
   // Plan 1,224 over 1–6 Oct.
   await expect(table.locator('tfoot')).toContainText('1,224.0');
-  await expect(drawer.getByRole('region', { name: 'Formula' })).toContainText('Plan gap = plan − production');
+  await expect(drawer.getByRole('region', { name: 'Formula' })).toContainText('Plan gap = production − plan');
   await page.waitForTimeout(700);
   await drawer.screenshot({ path: `${SHOTS}/drill-shift-plan.png` });
   await page.keyboard.press('Escape');
@@ -625,8 +629,9 @@ test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, a
   await expect(panel.locator('.rm-shift-name')).toHaveText(['Day', 'Night']);
   await expect(panel.locator('.rm-shift-val')).toHaveText(['NA', 'NA']);   // output per shift is not in the ERP
   await expect(panel.locator('.rm-shift-target-label')).toContainText('1,061 MT target');
-  // Plan gap over the days with both: 2,121.44 − 1,689.86 = 431.58.
+  // Plan gap over the days with both: 1,689.86 − 2,121.44 = −431.58: short, shown without a sign.
   await expect(panel).toContainText('431.6 MT');
+  await expect(panel).not.toContainText('-431.6');
   await panel.screenshot({ path: `${SHOTS}/rmd-shift-plan.png` });
 
   // Whole day: ERP Prime + SL 1,689.86 ÷ 2,121.44 = 79.7 %.
@@ -641,7 +646,7 @@ test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, a
   const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
   const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
   await expect(dt.locator('thead th')).toHaveText(['Period', 'Prime + SL', 'Target', 'Compliance', 'Plan gap']);
-  // 7 Oct: 200.12 of 265.18 → 75.5 %, gap 65.1.
+  // 7 Oct: 200.12 of 265.18 → 75.5 %, gap −65.1.
   for (const v of ['200.1', '265.2', '75.5%', '65.1']) await expect(dt.getByRole('row', { name: /^7 Oct/ })).toContainText(v);
   for (const v of ['1,689.9', '2,121.4', '79.7%', '431.6']) await expect(dt.locator('tfoot')).toContainText(v);
   await expect(dd.getByRole('region', { name: 'Data source' })).toContainText('RMD Month Wise production plan FY 26-27');
@@ -904,8 +909,9 @@ test('LSM: production by shift — the October plan (8,750 MT) per day and shift
   await expect(panel.locator('.rm-shift-val')).toHaveText(['1,115.2 MT', '991.0 MT']);
   await expect(panel.locator('.rm-shift-comp')).toHaveText(['98.8%', '87.8%']);
   await expect(panel.locator('.rm-shift-target-label')).toContainText('1,129 MT target');
-  // Plan gap: 2,258.08 − 2,106.12 = 151.96.
+  // Plan gap: 2,106.12 − 2,258.08 = −151.96: short, shown without a sign.
   await expect(panel).toContainText('152.0 MT');
+  await expect(panel).not.toContainText('-152.0');
   await panel.screenshot({ path: `${SHOTS}/lsm-shift-plan.png` });
 
   // Whole day: PRODUTION_MT 2,106.12 ÷ 2,258.08 = 93.3 %.
@@ -918,8 +924,8 @@ test('LSM: production by shift — the October plan (8,750 MT) per day and shift
   const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
   const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
   await expect(dt.locator('thead th')).toHaveText(['Period', 'Production', 'Target', 'Compliance', 'Plan gap']);
-  // 7 Oct: 359.61 of 282.26 → 127.4 %, gap −77.4.
-  for (const v of ['359.6', '282.3', '127.4%']) await expect(dt.getByRole('row', { name: /^7 Oct/ })).toContainText(v);
+  // 7 Oct: 359.61 of 282.26 → 127.4 %, gap +77.4.
+  for (const v of ['359.6', '282.3', '127.4%', '+77.4']) await expect(dt.getByRole('row', { name: /^7 Oct/ })).toContainText(v);
   for (const v of ['2,106.1', '2,258.1', '93.3%', '152.0']) await expect(dt.locator('tfoot')).toContainText(v);
   await expect(dd.getByRole('region', { name: 'Data source' })).toContainText('PRODUCTION PLAN FOR LSM Oct-2026');
   await expect(dd.getByRole('region', { name: 'Data source' })).toContainText("USER_CODE = 'FA-LP-P'");
@@ -954,8 +960,8 @@ test('RMS: production by shift — the monthly plan (Oct 13,499 MT) per day and 
   const panel = page.locator('.rm-flip-face--front section.panel');
   await expect(panel.locator('.chip')).toHaveText('Plan 5,225 MT');
   await expect(panel.locator('.panel-sub')).toHaveText('Day 09:30–21:30 IST · Night 21:30–09:30 IST');
-  // Ahead of plan: 6,244.75 − 5,225.4 → plan gap −1,019.4.
-  await expect(panel).toContainText('-1,019.4 MT');
+  // Ahead of plan: 6,244.75 − 5,225.4 → plan gap +1,019.4.
+  await expect(panel).toContainText('+1,019.4 MT');
 
   // Whole day: PRODUCTION_MT 6,244.75 ÷ 5,225.4 = 119.5 %.
   await panel.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' }).click();

@@ -38,7 +38,7 @@ describe('RMD plan totals', () => {
   test('gap and compliance only over the days with both plan and ERP production', () => {
     const days = rmdPlanDays(['2026-10-07', '2026-10-08', '2026-10-12'], new Map([['2026-10-07', 200.12], ['2026-10-08', 214.79]]));
     const t = summarisePlan(days);
-    expect(t).toMatchObject({ plannedDays: 3, comparedDays: 2, planMt: 795.54, comparedPlanMt: 530.36, actualMt: 414.91, gapMt: 115.45 });
+    expect(t).toMatchObject({ plannedDays: 3, comparedDays: 2, planMt: 795.54, comparedPlanMt: 530.36, actualMt: 414.91, gapMt: -115.45 });
     expect(t.compliancePct).toBe(78.23);
     expect(t.byShift).toEqual({ Day: 397.77, Night: 397.77 });
   });

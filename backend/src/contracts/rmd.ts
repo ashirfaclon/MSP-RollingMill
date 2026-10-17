@@ -189,7 +189,7 @@ export interface RmdPlanReport {
     comparedPlanMt: number | null;
     /** ERP Prime + SL over the compared days. */
     actualMt: number | null;
-    /** comparedPlanMt − actualMt: positive = short of plan. */
+    /** actualMt − comparedPlanMt: positive = ahead of plan, negative = short (the plant, 17 Oct 2026). */
     gapMt: number | null;
     /** actualMt ÷ comparedPlanMt × 100. */
     compliancePct: number | null;

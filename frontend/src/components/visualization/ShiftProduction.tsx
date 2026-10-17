@@ -14,7 +14,7 @@ import ShiftBars from './ShiftBars';
  *     counter's ticks fell (Day + Night = the card);
  *   – targets: the rolling plan (today a static import of the plant's Excel), per shift
  *     exactly as written there; NA where the period has no plan;
- *   – plan gap: plan − production over the planned days only — the sub-line says how many;
+ *   – plan gap: production − plan over the planned days only ("+" ahead; short, no sign);
  *   – compliance: actual ÷ plan × 100 over those same planned days — per shift (NA where the
  *     shift's target is 0) and, on the card's back face, for the whole day.
  * Running rate is live (RunningRateFoot).

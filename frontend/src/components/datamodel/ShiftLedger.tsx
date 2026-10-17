@@ -9,7 +9,7 @@ import type { MillModel } from '@/models/millModel';
  */
 export default function ShiftLedger({ m }: { m: MillModel }) {
   const k = m.kpis;
-  const gapClass = (g: number | null) => (g === null ? 'v-na' : g > 0 ? 'v-warn' : 'v-ok');
+  const gapClass = (g: number | null) => (g === null ? 'v-na' : g < 0 ? 'v-warn' : 'v-ok');
   return (
     <Panel title="Shifts" sub="Material per shift · run hours from power" className="rm-panel" bodyClass="dm-body">
       <div className="dm-scroll">

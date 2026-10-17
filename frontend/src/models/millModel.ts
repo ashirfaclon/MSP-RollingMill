@@ -116,7 +116,7 @@ export function resolveMill(input: MillModelInput): MillModel {
       ...s,
       run: r,
       planPct: ratio(s.output.mt, s.planMt, 100),
-      planGap: round(s.planMt === null ? null : sum(s.planMt, s.output.mt === null ? null : -s.output.mt)),
+      planGap: round(s.planMt === null || s.output.mt === null ? null : s.output.mt - s.planMt),
       runningRateTph: ratio(s.output.mt, r.runH),
       yieldPct: ratio(s.output.mt, s.fed.mt, 100),
     };
@@ -130,7 +130,7 @@ export function resolveMill(input: MillModelInput): MillModel {
     productionMt: output,
     planMt,
     planPct: ratio(output, planMt, 100),
-    planGapMt: round(planMt === null || output === null ? null : planMt - output),
+    planGapMt: round(planMt === null || output === null ? null : output - planMt),
     yieldPct: ratio(output, fed, 100),
     billetsFed: flow.fed.count,
     billetInputMt: fed,

@@ -131,7 +131,7 @@ test.describe('whole model', () => {
     expect(k.productionMt).toBe(342);
     expect(k.planMt).toBe(360);
     expect(k.planPct).toBeCloseTo(95, 6);
-    expect(k.planGapMt).toBe(18);
+    expect(k.planGapMt).toBe(-18);   // production − plan: short by 18
     expect(k.yieldPct!.toFixed(1)).toBe('96.6');
     expect(k.massDiffMt).toBe(12);
     expect(k.runH!.toFixed(1)).toBe('21.6');

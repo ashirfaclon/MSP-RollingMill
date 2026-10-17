@@ -74,7 +74,7 @@ export function summarisePlan(days: RmdPlanDay[]): RmdPlanReport['totals'] {
     comparedDays: compared.length,
     comparedPlanMt,
     actualMt,
-    gapMt: comparedPlanMt !== null && actualMt !== null ? round2(comparedPlanMt - actualMt) : null,
+    gapMt: comparedPlanMt !== null && actualMt !== null ? round2(actualMt - comparedPlanMt) : null,
     compliancePct: comparedPlanMt && actualMt !== null ? round2((actualMt / comparedPlanMt) * 100) : null,
   };
 }

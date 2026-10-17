@@ -59,12 +59,14 @@ function shiftPeriods(days: PlanDay[], grain: Grain): ShiftPeriod[] {
       plan: planMt,
       compliance: planMt && actual !== null ? (actual / planMt) * 100 : null,
     };
-    return { key: g.key, label: g.label, fromDate: g.fromDate, toDate: g.toDate, out, plan, gap: planMt === null || actual === null ? null : planMt - actual, all };
+    return { key: g.key, label: g.label, fromDate: g.fromDate, toDate: g.toDate, out, plan, gap: planMt === null || actual === null ? null : actual - planMt, all };
   });
 }
 
 const f = (v: number | null | undefined) => (v === null || v === undefined ? '—' : fmtNum(v, 1));
-const gapTone = (v: number | null) => (v === null ? 'v-na' : v > 0 ? 'v-warn' : 'v-ok');
+const gapTone = (v: number | null) => (v === null ? 'v-na' : v < 0 ? 'v-warn' : 'v-ok');
+/** Plan gap (production − plan): "+" when ahead of plan; short of it, the number alone (the user, 17 Oct 2026). */
+const g = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v > 0 ? '+' : ''}${fmtNum(Math.abs(v), 1)}`);
 
 export default function ShiftPlanDrawer({ open, onClose, view }: { open: boolean; onClose: () => void; view: ShiftView }) {
   // The dashboard's period; only the grouping is chosen here.
@@ -108,7 +110,7 @@ function Content({ data, grain }: { data: PlanReport; grain: Grain }) {
           value: f(t.actualByShift[s] ?? 0),
           unit: planned ? `MT · target ${f(t.byShift[s] ?? 0)}` : 'MT · no plan',
         })),
-        { label: 'Plan gap', value: f(t.gapMt), unit: planned && t.plannedDays < t.days ? `MT · over ${t.plannedDays} of ${t.days} days` : 'MT', tone: gapTone(t.gapMt) },
+        { label: 'Plan gap', value: g(t.gapMt), unit: planned && t.plannedDays < t.days ? `MT · over ${t.plannedDays} of ${t.days} days` : 'MT', tone: gapTone(t.gapMt) },
       ]} />
 
       <DrillChart
@@ -138,7 +140,7 @@ function Content({ data, grain }: { data: PlanReport; grain: Grain }) {
                   <td key={`${s}-o`} className="num r v-val">{f(x.out[s])}</td>,
                   <td key={`${s}-p`} className="num r">{f(x.plan[s])}</td>,
                 ])}
-                <td className={`num r ${gapTone(x.gap)}`}>{f(x.gap)}</td>
+                <td className={`num r ${gapTone(x.gap)}`}>{g(x.gap)}</td>
               </tr>
             ))}
           </tbody>
@@ -149,7 +151,7 @@ function Content({ data, grain }: { data: PlanReport; grain: Grain }) {
                 <td key={`${s}-o`} className="num r">{f(t.actualByShift[s] ?? 0)}</td>,
                 <td key={`${s}-p`} className="num r">{planned ? f(t.byShift[s] ?? 0) : '—'}</td>,
               ])}
-              <td className={`num r ${gapTone(t.gapMt)}`}>{f(t.gapMt)}</td>
+              <td className={`num r ${gapTone(t.gapMt)}`}>{g(t.gapMt)}</td>
             </tr>
           </tfoot>
         </table>
@@ -182,7 +184,7 @@ function DayContent({ data, grain }: { data: PlanReport; grain: Grain }) {
       <Stats items={[
         { label: 'Output', value: f(totalOut), unit: planned ? `MT · target ${f(t.planMt)}` : 'MT · no plan' },
         { label: 'Compliance', value: pct(compliance), unit: planned && t.plannedDays < t.days ? `over ${t.plannedDays} of ${t.days} days` : '', tone: compTone(compliance) },
-        { label: 'Plan gap', value: f(t.gapMt), unit: 'MT', tone: gapTone(t.gapMt) },
+        { label: 'Plan gap', value: g(t.gapMt), unit: 'MT', tone: gapTone(t.gapMt) },
       ]} />
 
       <DrillChart
@@ -202,7 +204,7 @@ function DayContent({ data, grain }: { data: PlanReport; grain: Grain }) {
                 <td className="num r v-val">{f(x.all.out)}</td>
                 <td className="num r">{f(x.all.plan)}</td>
                 <td className={`num r ${compTone(x.all.compliance)}`}>{pct(x.all.compliance)}</td>
-                <td className={`num r ${gapTone(x.gap)}`}>{f(x.gap)}</td>
+                <td className={`num r ${gapTone(x.gap)}`}>{g(x.gap)}</td>
               </tr>
             ))}
           </tbody>
@@ -212,7 +214,7 @@ function DayContent({ data, grain }: { data: PlanReport; grain: Grain }) {
               <td className="num r">{f(totalOut)}</td>
               <td className="num r">{planned ? f(t.planMt) : '—'}</td>
               <td className={`num r ${compTone(compliance)}`}>{pct(compliance)}</td>
-              <td className={`num r ${gapTone(t.gapMt)}`}>{f(t.gapMt)}</td>
+              <td className={`num r ${gapTone(t.gapMt)}`}>{g(t.gapMt)}</td>
             </tr>
           </tfoot>
         </table>
@@ -243,11 +245,11 @@ const SOURCES: SourceSystem[] = [
 const FORMULA = [
   'Day = 06:00 IST → 18:00 IST, Night = 18:00 IST → 06:00 IST',
   "Shift output = counter increases in the shift's window, scaled so Day + Night = the day's production",
-  'Plan gap = plan − production  (days the plan covers)',
+  'Plan gap = production − plan  (days the plan covers); + = ahead of plan, no sign = short',
 ];
 
 const DAY_FORMULA = [
   'Output = Σ counter increases over the day (06:00 IST → 06:00 IST), all shifts',
   'Compliance = production ÷ plan × 100  (days the plan covers)',
-  'Plan gap = plan − production  (days the plan covers)',
+  'Plan gap = production − plan  (days the plan covers); + = ahead of plan, no sign = short',
 ];

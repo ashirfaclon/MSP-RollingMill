@@ -132,7 +132,7 @@ export interface PlanReport {
     days: number;
     /** Production over the same planned days only. */
     actualMt: number | null;
-    /** planMt − actualMt: positive = short of plan. */
+    /** actualMt − planMt: positive = ahead of plan, negative = short (the plant, 17 Oct 2026). */
     gapMt: number | null;
     /** Production per shift over the WHOLE period (planned or not). */
     actualByShift: Record<string, number>;
