@@ -81,6 +81,18 @@ export interface RmdStationTrend {
   series: { id: string; line: 1 | 2; label: string; points: [number, number | null][] }[];
 }
 
+/** GET /api/rmd/current — each drive's motor current (A) while running, over a period of RMD days. */
+export interface RmdCurrentTrend {
+  connection: 'up' | 'down';
+  message: string;
+  zone: RmdZoneId;
+  from: string;
+  to: string;
+  bucketSeconds: number;
+  /** Per drive: its mean over the period while running, and [interval start ms, mean A | null (not running)]. */
+  series: { id: string; line: 1 | 2; label: string; meanA: number | null; points: [number, number | null][] }[];
+}
+
 /** GET /api/rmd/running-rate — production ÷ running hours, per RMD day / week / month. */
 export interface RmdRatePeriod {
   key: string;

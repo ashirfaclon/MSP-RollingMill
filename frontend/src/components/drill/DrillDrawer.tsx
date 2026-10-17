@@ -101,13 +101,14 @@ export function Seg<T extends string>(props: {
 }
 
 /** A row of headline tiles above the chart. */
-export function Stats({ items }: { items: { label: string; value: string; unit?: string; tone?: string; title?: string }[] }) {
+export function Stats({ items }: { items: { label: string; value: string; unit?: string; tone?: string; title?: string; wrap?: boolean }[] }) {
   return (
     <dl className="pd-stats">
       {items.map((s) => (
         <div key={s.label} title={s.title}>
           <dt className="rm-k">{s.label}</dt>
-          <dd className={`num ${s.tone ?? 'v-val'}`}>{s.value}{s.unit ? <> <small>{s.unit}</small></> : null}</dd>
+          {/* `wrap`: a name rather than a figure (e.g. where a reading is) — may run onto a second line. */}
+          <dd className={`${s.wrap ? 'pd-stat-wrap' : 'num'} ${s.tone ?? 'v-val'}`}>{s.value}{s.unit ? <> <small>{s.unit}</small></> : null}</dd>
         </div>
       ))}
     </dl>

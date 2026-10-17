@@ -9,7 +9,7 @@
  * groups (all on / x of y on / all off / no live data).
  */
 import type { Env } from '../../config/env';
-import type { RmdLive, RmdStationNow, RmdStationTrend, RmdZoneId, RmdZoneNow } from '../../contracts';
+import type { RmdCurrentTrend, RmdLive, RmdStationNow, RmdStationTrend, RmdZoneId, RmdZoneNow } from '../../contracts';
 import { FRESH_MS, bucketSeconds, collect, esc, fluxTime, queryApi } from '../../integrations/influx';
 import { historianConfigured } from '../../integrations/historian/client';
 import { RMD_BILLET_COUNT, RMD_STATIONS, type RmdStationDef } from '../../integrations/historian/tags';
@@ -97,6 +97,65 @@ from(bucket: "${esc(env.influxBucket!)}")
     };
   } catch {
     return empty('down', MSG.HISTORIAN_UNREACHABLE);
+  }
+}
+
+/**
+ * Each drive's motor current (A) over a period of RMD days (08:00 → 08:00 IST), for the Asset
+ * Health drill-down: the mean of every interval while the drive runs, and over the whole period.
+ * "Running" is the drive's own running status (1), read at the same instant as its current — both
+ * are recorded together every 10 s. Current alone cannot tell: a stopped drive can read a few amps
+ * (L1 S5 ≈ 35 A with status 0, 17 Oct 2026). An interval with no running is a gap, not a dip to 0.
+ */
+export async function rmdCurrentTrend(env: Env, zone: RmdZoneId, from: string, to: string, nowMs = Date.now()): Promise<RmdCurrentTrend> {
+  const fromMs = rmdDayStart(from);
+  const toMs = Math.min(rmdDayStart(to) + 24 * H_MS, nowMs);
+  const every = bucketSeconds(fromMs, toMs);
+  const defs = RMD_STATIONS.filter((s) => s.zone === zone);
+  const base = { zone, from: new Date(fromMs).toISOString(), to: new Date(toMs).toISOString(), bucketSeconds: every };
+  const none = defs.map((s) => ({ id: s.id, line: s.line, label: s.label, meanA: null, points: [] as [number, number | null][] }));
+  if (!historianConfigured(env)) return { connection: 'down', message: MSG.HISTORIAN_NOT_CONFIGURED, ...base, series: none };
+  if (toMs <= fromMs) return { connection: 'up', message: MSG.HISTORIAN_UP, ...base, series: none };
+  // Per drive: its status and current side by side at each instant, the current kept where status is 1.
+  const streams = defs.map((s, i) => `d${i} = from(bucket: "${esc(env.influxBucket!)}")
+  |> range(start: ${fluxTime(fromMs)}, stop: ${fluxTime(toMs)})
+  |> filter(fn: (r) => r._measurement == "TMT-RMD" and r.Unit == "${esc(s.unitTag)}" and r.Group == "${esc(s.group)}"
+      and (r._field == "${esc(s.field)}" or r._field == "${esc(s.currentField)}"))
+  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> filter(fn: (r) => exists r["${esc(s.field)}"] and exists r["${esc(s.currentField)}"] and float(v: r["${esc(s.field)}"]) >= 0.5)
+  |> map(fn: (r) => ({ _start: r._start, _stop: r._stop, _time: r._time, _value: float(v: r["${esc(s.currentField)}"]), drive: "${esc(s.id)}" }))`).join('\n');
+  const running = `${streams}
+union(tables: [${defs.map((_, i) => `d${i}`).join(', ')}])
+  |> group(columns: ["drive"])`;
+  type R = { drive: string; _value: number | null; _time?: string };
+  try {
+    const [rows, means] = await Promise.all([
+      // Stamp each window with its START, so a point sits over the minutes it averages.
+      collect<R>(q(env, 120_000), `${running}
+  |> aggregateWindow(every: ${every}s, fn: mean, createEmpty: true, timeSrc: "_start")
+  |> keep(columns: ["drive", "_value", "_time"])`),
+      collect<R>(q(env, 120_000), `${running}
+  |> mean()
+  |> keep(columns: ["drive", "_value"])`),
+    ]);
+    const num = (v: number | null) => (v === null || !Number.isFinite(Number(v)) ? null : round2(Number(v)));
+    // A drive that never ran in the period has no rows: every interval a gap.
+    const grid = Array.from({ length: Math.ceil((toMs - fromMs) / (every * 1000)) }, (_, k) => fromMs + k * every * 1000);
+    return {
+      connection: 'up', message: MSG.HISTORIAN_UP, ...base,
+      series: defs.map((s) => {
+        const mine = rows.filter((r) => r.drive === s.id);
+        return {
+          id: s.id, line: s.line, label: s.label,
+          meanA: num(means.find((r) => r.drive === s.id)?._value ?? null),
+          points: mine.length
+            ? mine.map((r): [number, number | null] => [Date.parse(r._time!), num(r._value)])
+            : grid.map((t): [number, number | null] => [t, null]),
+        };
+      }),
+    };
+  } catch {
+    return { connection: 'down', message: MSG.HISTORIAN_UNREACHABLE, ...base, series: none };
   }
 }
 

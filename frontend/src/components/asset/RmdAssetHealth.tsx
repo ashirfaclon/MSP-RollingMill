@@ -7,9 +7,10 @@
  *   Bearing temp      the hottest bearing at the latest Mill Bearing Temperature entries of the
  *                     group (logbook tmt-mechanical; roughing = 20" and 16" R stands, route = intermill,
  *                     NC and OC stands); opens every bearing and the trend;
- *   Motor current     average live current feedback of the group's running drives, A;
+ *   Motor current     average live current feedback of the group's running drives, A; opens each
+ *                     drive's current now and its trend while running (status 1) over the period;
  *   Gearbox oil       the lowest oil-tank level of the group (inches), with the temperatures;
- *   Run hours         ERP log sheet ACTUAL_RUNNING_HRS over the period (whole mill);
+ *   Run hours         ERP log sheet ACTUAL_RUNNING_HRS over the period (whole mill); opens per day;
  *   Condition trends  bearing temperature: the hottest bearing of each entry.
  * Clicking a zone selects its drive group. Test entries are left out.
  * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
@@ -26,6 +27,8 @@ import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdAssetForms, type RmdLive, type RmdReading } from '@/services/hsmApi';
 import { useRmdProduction } from '@/components/rmd/RmdProductionDrawer';
+import RmdCurrentDrawer from './RmdCurrentDrawer';
+import RmdRunHoursDrawer from './RmdRunHoursDrawer';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import './asset.css';
@@ -43,7 +46,7 @@ const NA = (label: string, unit: string, series: Series) => <KpiCard key={label}
 
 export default function RmdAssetHealth() {
   const [group, setGroup] = useState<Group>('Route / diverter');
-  const [open, setOpen] = useState<'bearing' | 'oil' | null>(null);
+  const [open, setOpen] = useState<'bearing' | 'oil' | 'current' | 'run' | null>(null);
   const zone = LIVE[group] ?? null;
   const fg = FORMS[group] ?? null;
   const { dates } = useSelection();
@@ -91,7 +94,14 @@ export default function RmdAssetHealth() {
           tone={bearingTone}
           {...(bearing ? { onOpen: () => setOpen('bearing'), openLabel: 'Every bearing at the latest reading, and the trend' } : {})}
         />
-        <KpiCard label="Motor current" value={currentA === null ? 'NA' : fixed(currentA, 0)} unit="A" note="" series="prod" />
+        <KpiCard
+          label="Motor current"
+          value={currentA === null ? 'NA' : fixed(currentA, 0)}
+          unit="A"
+          note=""
+          series="prod"
+          {...(zone ? { onOpen: () => setOpen('current'), openLabel: 'Each drive\'s current now, and its trend while running' } : {})}
+        />
         {NA('Alignment', 'mm', 'order')}
         <KpiCard
           label="Gearbox oil"
@@ -103,7 +113,8 @@ export default function RmdAssetHealth() {
           {...(oil ? { onOpen: () => setOpen('oil'), openLabel: 'Each oil tank: level and temperature' } : {})}
         />
         {NA('VFD trips', 'per 100 run h', 'hold')}
-        <KpiCard label="Run hours" value={run === null ? 'NA' : fixed(run, 1)} unit="h" note="" series="prod" />
+        <KpiCard label="Run hours" value={run === null ? 'NA' : fixed(run, 1)} unit="h" note="" series="prod"
+          onOpen={() => setOpen('run')} openLabel="Run hours per day, from the ERP log sheet" />
         {NA('PM on time', '%', 'order')}
       </section>
 
@@ -154,6 +165,9 @@ export default function RmdAssetHealth() {
           {['Diagnosis', 'Asset stop', 'Output effect', 'Value'].map((k) => <Row key={k} k={k} />)}
         </Panel>
       </div>
+
+      {zone && <RmdCurrentDrawer open={open === 'current'} onClose={() => setOpen(null)} zone={zone} />}
+      <RmdRunHoursDrawer open={open === 'run'} onClose={() => setOpen(null)} />
 
       <DrillDrawer open={open === 'bearing'} onClose={() => setOpen(null)} title={`${NAME[group]} · bearing temperature`} sub="RMD · °C"
         loading={!forms} error={f.error} hasData={!!forms}>
@@ -212,7 +226,10 @@ function ReadingsTable({ rows, unit, label, max, source, formula }: {
 }) {
   return (
     <>
-      {max && <Stats items={[{ label: 'Hottest', value: fixed(max.value, 0), unit: `${unit} · ${max.equipment} · ${max.point}` }]} />}
+      {max && <Stats items={[
+        { label: 'Hottest', value: fixed(max.value, 0), unit, tone: max.status ? LIMIT_TONE[max.status] : undefined },
+        { label: 'At', value: max.equipment, unit: max.point, wrap: true },
+      ]} />}
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label={label}>
           <thead><tr><th>Equipment</th><th>Point</th><th className="r">{unit}</th><th className="r">Limits</th><th>Date</th></tr></thead>

@@ -1059,3 +1059,43 @@ for (const c of [
   await expect(stock.getByRole('img', { name: /with order 0\.0 MT, free / })).toBeVisible();
   await alloc.screenshot({ path: `${SHOTS}/${c.mill}-order-allocation-split.png` });
 });
+
+test('RMD asset health: motor current and run hours open their drill-downs with a trend', async ({ page }) => {
+  await page.goto('/rmd/asset-health');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-16');
+  await dialog.getByLabel('End Date').fill('2026-10-16');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const cards = page.getByRole('main').getByRole('region', { name: 'Condition KPIs' });
+
+  // Motor current (route group): every drive, its current while running (status 1); stopped drives have none.
+  await cards.getByRole('button', { name: 'Motor current', exact: true }).click();
+  const dc = page.getByRole('dialog', { name: 'Route · motor current' });
+  const tc = dc.getByRole('table', { name: 'Motor current per drive' });
+  await expect(tc.locator('thead th')).toHaveText(['Line', 'Drive', 'Now', 'Current now (A)', 'Average while running (A)']);
+  await expect(tc.locator('tbody tr')).toHaveCount(14, { timeout: 90_000 });
+  // 16 Oct: L1 S2 ran at 143.88 A on average; L1 S5 did not run (its ~35 A at status 0 is not counted).
+  await expect(tc.getByRole('row', { name: /^Line 1 S2 / })).toContainText('144');
+  await expect(tc.getByRole('row', { name: /^Line 1 S5 / }).locator('td').last()).toHaveText('—');
+  await expect(dc.getByRole('img', { name: /Motor current per drive while running/ })).toBeVisible();
+  await expect(dc.getByRole('region', { name: 'Formula' })).toContainText('running status is 1');
+  await page.waitForTimeout(700);
+  await dc.screenshot({ path: `${SHOTS}/rmd-asset-current.png` });
+  await page.keyboard.press('Escape');
+
+  // Run hours: ERP ACTUAL_RUNNING_HRS per day.
+  await page.getByRole('button', { name: /Duration/ }).click();
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  await cards.getByRole('button', { name: 'Run hours', exact: true }).click();
+  const dr = page.getByRole('dialog', { name: 'Run hours' });
+  const tr = dr.getByRole('table', { name: 'Run hours by period' });
+  await expect(tr.locator('thead th')).toHaveText(['Period', 'Run hours', 'Days entered']);
+  await expect(tr.getByRole('row', { name: /^1 Oct/ })).toContainText('7.4');
+  await expect(tr.locator('tfoot')).toContainText('87.8');
+  await expect(dr.getByRole('region', { name: 'Data source' })).toContainText('ACTUAL_RUNNING_HRS');
+  await page.waitForTimeout(700);
+  await dr.screenshot({ path: `${SHOTS}/rmd-asset-run-hours.png` });
+});

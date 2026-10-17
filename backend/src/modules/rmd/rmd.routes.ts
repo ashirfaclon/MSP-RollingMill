@@ -9,7 +9,7 @@ import { searchParams } from '../../shared/request';
 import { parseGrain, parseRange } from '../hsm/params';
 import { rmdPowerReport } from '../power/power.service';
 import { rmdBillets } from './billets.service';
-import { rmdLive, rmdStationTrend } from './live.service';
+import { rmdCurrentTrend, rmdLive, rmdStationTrend } from './live.service';
 import { rmdRunningRate } from './running-rate.service';
 import { rmdProduction } from './production.service';
 import { rmdStock } from './stock.service';
@@ -47,6 +47,15 @@ export async function rmdRoutes(app: FastifyInstance) {
     const hours = Number(q.get('hours') ?? 6);
     if (!HOURS.includes(hours)) throw new HttpError(400, 'bad_hours', `hours must be one of ${HOURS.join(', ')}`);
     return rmdStationTrend(loadEnv(), zone, hours);
+  });
+
+  /** One zone's drives: motor current (A) while running, per interval and over the period (RMD days). */
+  app.get('/current', { config: { errorCode: 'rmd_current_failed' } }, async (req) => {
+    const q = searchParams(req);
+    const zone = q.get('zone') as (typeof ZONES)[number];
+    if (!ZONES.includes(zone)) throw new HttpError(400, 'bad_zone', 'zone must be route or finishing');
+    const { from, to } = parseRange(q);
+    return rmdCurrentTrend(loadEnv(), zone, from, to);
   });
 
   /** Running rate: production ÷ running hours (billets ≤ 10 min apart, either line). Production pending → rate null. */
