@@ -226,6 +226,9 @@ export interface RmdReading {
   max: number | null;
   /** Inside the limits, below or above them; null without limits. */
   status: 'ok' | 'low' | 'high' | null;
+  /** Oil tank level only: the oil in the tank, L (level × inside length × width), and the tank's capacity, L. */
+  litres?: number;
+  capacityL?: number;
 }
 
 export interface RmdBearingGroup {
@@ -239,11 +242,11 @@ export interface RmdBearingGroup {
 }
 
 export interface RmdOilGroup {
-  /** Each tank's level (inches) at the latest Oil Tank Level entry in the period. */
+  /** Each tank's level at the latest Oil Tank Level entry in the period: value in inches, with litres and capacity. */
   level: RmdReading[];
   /** Each tank's temperature (°C) at the latest Oil Tank Temperature entry. */
   temperature: RmdReading[];
-  /** The lowest level. */
+  /** The tank lowest against its capacity (litres ÷ capacity). */
   minLevel: RmdReading | null;
 }
 

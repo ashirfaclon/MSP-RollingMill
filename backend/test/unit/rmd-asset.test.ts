@@ -1,6 +1,6 @@
 /** RMD asset health: the bearing and oil-tank form fields, read as equipment · point. */
 import { describe, expect, test } from 'vitest';
-import { bearingGroup, bearingOf, oilGroup, withLimits, type RmdFormEntry } from '../../src/modules/rmd/asset.service';
+import { bearingGroup, bearingOf, oilGroup, tankLitres, withLimits, type RmdFormEntry } from '../../src/modules/rmd/asset.service';
 
 describe('RMD bearing fields', () => {
   test.each([
@@ -32,11 +32,19 @@ describe('RMD bearing and oil groups', () => {
     expect(g.latest.map((r) => r.value)).toEqual([63, 55, 58]);   // 16" first; 20" from its 20:00 entry
     expect(g.trend.map((t) => t.maxC)).toEqual([61, 63, 58]);
   });
-  test('oil: roughing tanks only; the lowest level', () => {
+  test('oil: roughing tanks only; each level in litres; the lowest against its capacity', () => {
     const o = oilGroup(entries, 'roughing');
     expect(o.level.map((r) => [r.equipment, r.value])).toEqual([['20" R stand', 14], ['16" R stand', 11.5]]);
-    expect(o.minLevel).toMatchObject({ equipment: '16" R stand', value: 11.5 });
+    // 14 in × 0.0254 × 1.63 × 1.26 m = 0.730 m³ = 730 L of 2,670 L.
+    expect(o.level[0]).toMatchObject({ litres: 730, capacityL: 2670 });
+    expect(o.minLevel).toMatchObject({ equipment: '16" R stand', value: 11.5, litres: 600 });
     expect(o.temperature.map((r) => r.value)).toEqual([41, 43]);
+  });
+
+  test('tank sizes give the plant\'s capacities; a full tank (its depth in inches) is its capacity', () => {
+    expect(tankLitres('20-r-stand', 1.3 / 0.0254)).toEqual({ litres: 2670, capacityL: 2670 });
+    expect(tankLitres('intermill', 1.01 / 0.0254)).toEqual({ litres: 1275, capacityL: 1275 });
+    expect(tankLitres('new-continuous-stand-7-8', 1)).toEqual({ litres: 27, capacityL: 932 });   // 27.2 L an inch
   });
 
   test('limits: bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature 45–65 °C; level none', () => {

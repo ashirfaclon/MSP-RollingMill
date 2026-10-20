@@ -9,7 +9,8 @@
  *                     NC and OC stands); opens every bearing and the trend;
  *   Motor current     average live current feedback of the group's running drives, A; opens each
  *                     drive's current now and its trend while running (status 1) over the period;
- *   Gearbox oil       the lowest oil-tank level of the group (inches), with the temperatures;
+ *   Gearbox oil       the oil (litres) in the group's tank lowest against its capacity — the
+ *                     level (inches) × the tank's inside length × width — with the temperatures;
  *   Run hours         ERP log sheet ACTUAL_RUNNING_HRS over the period (whole mill); opens per day;
  *   Condition trends  bearing temperature: the hottest bearing of each entry.
  * Clicking a zone selects its drive group. Test entries are left out.
@@ -105,8 +106,8 @@ export default function RmdAssetHealth() {
         {NA('Alignment', 'mm', 'order')}
         <KpiCard
           label="Gearbox oil"
-          value={oil?.minLevel ? fixed(oil.minLevel.value, 1) : 'NA'}
-          unit="in"
+          value={oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA'}
+          unit="L"
           note=""
           series="hold"
           tone={oilTone}
@@ -181,11 +182,16 @@ export default function RmdAssetHealth() {
         loading={!forms} error={f.error} hasData={!!forms}>
         {oil && (
           <>
-            <ReadingsTable rows={oil.level} unit="in" label="Oil tank level" max={null} source={null} formula={null} />
+            <TankLevelTable rows={oil.level} />
             <ReadingsTable rows={oil.temperature} unit="°C" label="Oil tank temperature" max={null} source={[
               ['Forms', 'Rolling Mill Division (TMT) → Mechanical → Oil Tank → Oil Tank Level (inches, every 15 days), Oil Tank Temperature (°C)'],
               ['Field', 'one value per tank — the latest entry in the period'],
-            ]} formula={['Gearbox oil = the lowest tank level of the group (inches)', 'Limits: oil tank temperature 45–65 °C (plant); level — none yet']} />
+            ]} formula={[
+              'Oil (L) = level (inches) × 0.0254 × inside length × inside width (m) × 1000 — box tanks, flat bottom, level from the bottom',
+              'Tank size (L × W × D, m): 20" / 16" R stand 1.63 × 1.26 × 1.30 (2,670 L); Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)',
+              'Gearbox oil = the oil in the tank lowest against its capacity',
+              'Limits: oil tank temperature 45–65 °C (plant); level — none yet',
+            ]} />
           </>
         )}
       </DrillDrawer>
@@ -216,6 +222,31 @@ function BearingTrend({ trend }: { trend: { at: string; maxC: number }[] }) {
       {trend.length
         ? <DrillChart series={series} categories={categories} axes={axes} ariaLabel={`Hottest bearing per reading: ${trend.map((t) => `${t.at} ${t.maxC} °C`).join('; ')}`} />
         : <div className="ah-trend-plot" role="img" aria-label="Bearing temperature: no readings" />}
+    </div>
+  );
+}
+
+/** Oil tank level: the reading (inches), the oil in litres, the capacity and how full. */
+function TankLevelTable({ rows }: { rows: RmdReading[] }) {
+  return (
+    <div className="pd-table-wrap">
+      <table className="grid pd-table" aria-label="Oil tank level">
+        <thead><tr><th>Tank</th><th className="r">Level (in)</th><th className="r">Oil (L)</th><th className="r">Capacity (L)</th><th className="r">Full</th><th>Date</th></tr></thead>
+        <tbody>
+          {rows.length === 0
+            ? <tr><td colSpan={6} className="v-na">NA</td></tr>
+            : rows.map((r, i) => (
+              <tr key={i}>
+                <td><b>{r.equipment}</b></td>
+                <td className="num r">{fixed(r.value, 1)}</td>
+                <td className="num r v-val">{fixed(r.litres ?? null, 0)}</td>
+                <td className="num r">{fixed(r.capacityL ?? null, 0)}</td>
+                <td className="num r">{r.litres != null && r.capacityL ? `${fixed((r.litres / r.capacityL) * 100, 0)}%` : '—'}</td>
+                <td>{r.at}</td>
+              </tr>
+            ))}
+        </tbody>
+      </table>
     </div>
   );
 }

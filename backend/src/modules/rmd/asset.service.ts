@@ -5,7 +5,8 @@
  *                             old-continuous-stand (OC 1–6), new-continuous-stand (NC 1–8), °C;
  *                             filled twice a day;
  *   Oil Tank                  tmt-mechanical/oil-tank-level (inches, every 15 days) and
- *                             oil-tank-temperature (°C, twice a day), one value per tank.
+ *                             oil-tank-temperature (°C, twice a day), one value per tank. The level
+ *                             is shown in litres (the client, 16 Oct 2026), from each tank's size.
  * Groups (the user): roughing = 20" and 16" R stands; route / diverter = intermill, NC stands
  * (line 1) and OC stands (line 2). An entry remarked "test" is left out.
  * Each form has two dates (the user, 16 Oct 2026): "Date" is the day the readings are for — it
@@ -58,6 +59,26 @@ const TANKS: [string, AssetGroup, string][] = [
   ['new-continuous-stand-1-2', 'route', 'NC stand 1–2'], ['new-continuous-stand-3-4', 'route', 'NC stand 3–4'],
   ['new-continuous-stand-5-6', 'route', 'NC stand 5–6'], ['new-continuous-stand-7-8', 'route', 'NC stand 7–8'],
 ];
+
+/**
+ * Each tank's inside length × width × depth, m (Oil Tank Capacity.xlsx, the plant, 19 Oct 2026).
+ * The tanks are boxes with a flat bottom and the level is the oil depth from the bottom, so the
+ * oil is level × length × width; length × width × depth is the capacity the plant gave (2,670 /
+ * 1,275 / 932 L).
+ */
+const TANK_SIZE_M: Record<string, [number, number, number]> = {
+  '20-r-stand': [1.63, 1.26, 1.3], '16-r-stand': [1.63, 1.26, 1.3], intermill: [1.25, 1.01, 1.01],
+  'old-continuous-stand-1-2': [1.26, 0.85, 0.87], 'old-continuous-stand-3-4': [1.26, 0.85, 0.87], 'old-continuous-stand-5-6': [1.26, 0.85, 0.87],
+  'new-continuous-stand-1-2': [1.26, 0.85, 0.87], 'new-continuous-stand-3-4': [1.26, 0.85, 0.87],
+  'new-continuous-stand-5-6': [1.26, 0.85, 0.87], 'new-continuous-stand-7-8': [1.26, 0.85, 0.87],
+};
+const INCH_M = 0.0254;
+
+/** A level reading (inches) in litres, with the tank's capacity. */
+export function tankLitres(stem: string, inches: number): { litres: number; capacityL: number } {
+  const [l, w, d] = TANK_SIZE_M[stem];
+  return { litres: Math.round(inches * INCH_M * l * w * 1000), capacityL: Math.round(l * w * d * 1000) };
+}
 
 /** The plant's limits, °C. */
 export const LIMITS = { bearing: [45, 65], flywheel: [45, 80], oilTemp: [45, 65] } as const;
@@ -124,13 +145,15 @@ export function oilGroup(entries: Entry[], group: AssetGroup): RmdOilGroup {
   const tp = latest('oil-tank-temperature');
   const level = lv ? tanks.flatMap(([stem, , label]) => {
     const v = num(lv.res[stem]);
-    return v === null ? [] : [withLimits({ equipment: label, point: 'Level', value: v, at: lv.date }, null)];
+    return v === null ? [] : [{ ...withLimits({ equipment: label, point: 'Level', value: v, at: lv.date }, null), ...tankLitres(stem, v) }];
   }) : [];
   const temperature = tp ? tanks.flatMap(([stem, , label]) => {
     const v = num(tp.res[`${stem}-c`]);
     return v === null ? [] : [withLimits({ equipment: label, point: 'Temperature', value: v, at: tp.date }, LIMITS.oilTemp)];
   }) : [];
-  const min = level.reduce<RmdReading | null>((m, r) => (m === null || r.value < m.value ? r : m), null);
+  // Tanks differ in size: the lowest is the one with the least oil against its capacity.
+  const fill = (r: RmdReading) => r.litres! / r.capacityL!;
+  const min = level.reduce<RmdReading | null>((m, r) => (m === null || fill(r) < fill(m) ? r : m), null);
   return { level, temperature, minLevel: min };
 }
 

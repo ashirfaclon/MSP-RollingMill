@@ -873,7 +873,7 @@ test('RMD asset health: route drive group by default; motor current live, run ho
   await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
   // Bearing temp and gearbox oil from the mechanical forms: a reading, or NA without entries.
   await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^(NA|\d+)°C$/);
-  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^(NA|\d+\.\d)in$/);
+  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^(NA|[\d,]+)L$/);
   // Bearing drawer: each reading against the plant's limits (bearings 45–65 °C, flywheel 45–80 °C).
   const bearingCard = cards.getByRole('button', { name: /Bearing temp/ });
   if (await bearingCard.count()) {
@@ -1098,4 +1098,27 @@ test('RMD asset health: motor current and run hours open their drill-downs with 
   await expect(dr.getByRole('region', { name: 'Data source' })).toContainText('ACTUAL_RUNNING_HRS');
   await page.waitForTimeout(700);
   await dr.screenshot({ path: `${SHOTS}/rmd-asset-run-hours.png` });
+});
+
+test('RMD asset health: gearbox oil in litres — level × the tank\'s inside length × width', async ({ page }) => {
+  await page.goto('/rmd/asset-health');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-09-01');
+  await dialog.getByLabel('End Date').fill('2026-09-30');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const cards = page.getByRole('main').getByRole('region', { name: 'Condition KPIs' });
+  // 14 Sep, route tanks: OC stand 3–4 at 13.5 in = 13.5 × 0.0254 × 1.26 × 0.85 m = 367 L of 932 — the lowest against its capacity.
+  const card = cards.getByRole('button', { name: 'Gearbox oil', exact: true });
+  await expect(card.locator('.rm-card-value')).toHaveText(/^367\s*L$/, { timeout: 90_000 });
+  await card.click();
+  const d = page.getByRole('dialog', { name: 'Route · gearbox oil' });
+  const t = d.getByRole('table', { name: 'Oil tank level' });
+  await expect(t.locator('thead th')).toHaveText(['Tank', 'Level (in)', 'Oil (L)', 'Capacity (L)', 'Full', 'Date']);
+  for (const v of ['13.5', '367', '932', '39%']) await expect(t.getByRole('row', { name: /^OC stand 3–4/ })).toContainText(v);
+  // Intermill: 16 in → 513 L of 1,275.
+  for (const v of ['16.0', '513', '1,275']) await expect(t.getByRole('row', { name: /^Intermill/ })).toContainText(v);
+  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('Oil (L) = level (inches) × 0.0254 × inside length × inside width');
+  await page.waitForTimeout(700);
+  await d.screenshot({ path: `${SHOTS}/rmd-asset-oil-litres.png` });
 });
