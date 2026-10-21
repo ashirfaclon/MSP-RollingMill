@@ -10,6 +10,7 @@ import { parseGrain, parseRange } from '../hsm/params';
 import { rmdPowerReport } from '../power/power.service';
 import { rmdBillets } from './billets.service';
 import { rmdCurrentTrend, rmdLive, rmdStationTrend } from './live.service';
+import { rmdCondition } from './condition.service';
 import { rmdRunningRate } from './running-rate.service';
 import { rmdProduction } from './production.service';
 import { rmdStock } from './stock.service';
@@ -56,6 +57,12 @@ export async function rmdRoutes(app: FastifyInstance) {
     if (!ZONES.includes(zone)) throw new HttpError(400, 'bad_zone', 'zone must be route or finishing');
     const { from, to } = parseRange(q);
     return rmdCurrentTrend(loadEnv(), zone, from, to);
+  });
+
+  /** Condition Analytics mimic: each drive group's current and speed while running, over the period. */
+  app.get('/condition', { config: { errorCode: 'rmd_condition_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return rmdCondition(loadEnv(), from, to);
   });
 
   /** Running rate: production ÷ running hours (billets ≤ 10 min apart, either line). Production pending → rate null. */

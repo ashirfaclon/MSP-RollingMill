@@ -3,7 +3,6 @@
 .ah-asset-body { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 24px; }
 .ah-asset-id { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ah-asset-name { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text); }
-.ah-asset-path { font-size: 11px; color: var(--muted-2); }
 .ah-asset-facts { display: grid; grid-template-columns: repeat(4, auto); gap: 8px 32px; margin: 0; }
 .ah-fact { display: flex; flex-direction: column; gap: 6px; }
 .ah-fact dd { margin: 0; font-size: 18px; font-weight: 800; }
@@ -27,6 +26,8 @@
 .ah-figure-sub { font-size: 11px; color: var(--muted-2); }
 
 .ah-list { display: flex; flex-direction: column; }
+/* Rows from the top, not spread over a tall panel (Condition Analytics). */
+.rm-body.ah-list--top { justify-content: flex-start; gap: 0; }
 .ah-row { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .ah-row:last-child { border-bottom: 0; }
 .ah-row--button { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); font: inherit; color: inherit; text-align: left; cursor: pointer; }

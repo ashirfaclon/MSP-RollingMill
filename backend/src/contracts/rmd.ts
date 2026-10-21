@@ -257,3 +257,30 @@ export interface RmdAssetForms {
   bearing: { roughing: RmdBearingGroup; route: RmdBearingGroup };
   oil: { roughing: RmdOilGroup; route: RmdOilGroup };
 }
+
+/** GET /api/rmd/condition — Condition Analytics mimic: each drive's current and speed while running, over a period. */
+export interface RmdConditionDrive {
+  id: string;
+  line: 1 | 2;
+  label: string;
+  /** Mean current (A) / speed (RPM) while running (its running status 1); null when it never ran. */
+  meanA: number | null;
+  meanRpm: number | null;
+}
+export interface RmdConditionGroup {
+  drives: RmdConditionDrive[];
+  /** Drives that ran in the period. */
+  ran: number;
+  /** Mean current of the drives that ran (each drive weighs the same), A. */
+  meanA: number | null;
+  /** Mean speed of the drives that ran, per line (the lines read on different scales), RPM. */
+  meanRpmByLine: Record<string, number | null>;
+}
+export interface RmdConditionReport {
+  from: string;
+  to: string;
+  historian: { connection: 'up' | 'down'; message: string };
+  /** CR Mill1/2 · M1 S1–S8, M2 S1–S6. */
+  stands: RmdConditionGroup;
+  finishing: RmdConditionGroup;
+}

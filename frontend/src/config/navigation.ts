@@ -20,24 +20,28 @@ export const SCREENS = [
     label: 'Visualization',
     sub: 'Production · Flow',
     icon: 'bars',
-    blurb: 'Production, yield, energy, order-linked stock and mill flow',
   },
   {
     id: 'asset-health',
     label: 'Asset Health',
     sub: 'Condition · Maintenance',
     icon: 'gear',
-    blurb: 'Selected drive group · condition, inspection, maintenance and process impact',
     mills: ['hsm', 'rmd'],
+  },
+  {
+    id: 'condition-analytics',
+    label: 'Condition Analytics',
+    sub: 'Rate · Cost · Condition',
+    icon: 'trend',
+    mills: ['rmd'],
   },
   {
     id: 'data-model',
     label: 'Data Model',
     sub: 'Flow · Ledgers · Checks',
     icon: 'database',
-    blurb: 'Material flow, run time, stock and orders behind every KPI — and whether they balance',
   },
-] as const satisfies readonly { id: string; label: string; sub: string; icon: IconId; blurb: string; mills?: readonly MillId[] }[];
+] as const satisfies readonly { id: string; label: string; sub: string; icon: IconId; mills?: readonly MillId[] }[];
 
 export type ScreenId = (typeof SCREENS)[number]['id'];
 

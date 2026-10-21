@@ -21,7 +21,6 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
         <div className="tb-mark tb-mark--mill">{millOf(mill).code}</div>
         <div className="tb-brand-text">
           <h1 className="tb-title">Rolling Mill <span className="tb-title-sep">/</span> {s.label}</h1>
-          <div className="tb-sub">{s.blurb}</div>
         </div>
       </div>
 

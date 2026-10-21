@@ -1128,3 +1128,51 @@ test('RMD asset health: gearbox oil in litres — level × the tank\'s inside le
   await page.waitForTimeout(700);
   await d.screenshot({ path: `${SHOTS}/rmd-asset-oil-litres.png` });
 });
+
+test('RMD condition analytics: actual rate and specific energy live, the mimic from the historian, cost and benchmark items NA', async ({ page }) => {
+  await page.goto('/rmd/condition-analytics');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-16');
+  await dialog.getByLabel('End Date').fill('2026-10-16');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  await expect(cards.locator('.rm-card-label')).toHaveText([/^Actual rate/, /^Output opportunity/, /^Specific energy/, /^Conversion cost/, /^Cost variance/, /^Yield material loss/, /^Output margin/]);
+  // Actual rate = the Visualization running rate (Prime + SL ÷ billet-counter running hours): 16 Oct 16.15 TPH.
+  await expect(cards.getByRole('button', { name: 'Actual rate', exact: true }).locator('.rm-card-value')).toHaveText(/^16\.15\s*TPH$/, { timeout: 90_000 });
+  for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  for (const t of ['Matched-run performance', 'Costing & impact']) await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
+
+  const mimic = main.getByRole('list', { name: 'Condition groups' });
+  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit']);
+  // Billet infeed: 1,075 billets ÷ 15.92 running hours = 68 a running hour.
+  await expect(mimic.locator('.rm-zone', { hasText: 'Billet infeed' }).locator('.rm-zone-value')).toHaveText('68 billets/h');
+  // As the sheet: roughing = CR Mill M1 S1–S8 / M2 S1–S6 current and speed while running (16 Oct 100.12 A);
+  // route / diverter = those stands' running status now.
+  const rough = mimic.getByRole('button', { name: 'Roughing group' });
+  await expect(rough.locator('.rm-zone-value')).toHaveText('100 A', { timeout: 90_000 });
+  await expect(mimic.locator('.rm-zone', { hasText: 'Route / diverter' }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);
+  await expect(mimic.locator('.rm-zone', { hasText: 'Finished exit' }).locator('.rm-zone-value')).toHaveText('16.15 TPH');
+  // Finishing: mean current of the drives that ran, 16 Oct 22.44 A; opens each drive.
+  const fin = mimic.getByRole('button', { name: 'Finishing group' });
+  await expect(fin.locator('.rm-zone-value')).toHaveText('22 A', { timeout: 90_000 });
+  await page.screenshot({ path: `${SHOTS}/rmd-condition-analytics.png`, fullPage: true });
+  await fin.click();
+  const d = page.getByRole('dialog', { name: 'Finishing group · current and speed' });
+  const t = d.getByRole('table', { name: 'Drives: current and speed while running' });
+  await expect(t.locator('thead th')).toHaveText(['Line', 'Drive', 'Current (A)', 'Speed (RPM)']);
+  await expect(t.locator('tbody tr')).toHaveCount(10);
+  await expect(t.getByRole('row', { name: /^Line 2 CS / })).toContainText('810');
+  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('running status is 1');
+  await page.keyboard.press('Escape');
+  await rough.click();
+  const dr = page.getByRole('dialog', { name: 'Roughing group · current and speed' });
+  const tr = dr.getByRole('table', { name: 'Drives: current and speed while running' });
+  await expect(tr.locator('tbody tr')).toHaveCount(14);
+  // 16 Oct: L1 S2 143.88 A at 1,189 RPM; L1 S5 did not run.
+  await expect(tr.getByRole('row', { name: /^Line 1 S2 / })).toContainText('144');
+  await expect(tr.getByRole('row', { name: /^Line 1 S2 / })).toContainText('1,189');
+  await expect(tr.getByRole('row', { name: /^Line 1 S5 / })).toContainText('Not running');
+  await expect(dr.getByRole('region', { name: 'Data source' })).toContainText('SPEED_FB_S1');
+});

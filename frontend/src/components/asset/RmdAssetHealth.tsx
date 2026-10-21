@@ -72,7 +72,6 @@ export default function RmdAssetHealth() {
         <div className="ah-asset-id">
           <span className="rm-k">Selected asset</span>
           <h2 className="ah-asset-name">RMD · {NAME[group]} drive group</h2>
-          <span className="ah-asset-path">Motor → coupling → gearbox → rolling zone</span>
         </div>
         {zoneLive
           ? <span className={`chip ${zoneLive.state === 'no-data' ? 'chip--na' : 'chip--info'} ah-status`}>{zoneLive.stateLabel}</span>
@@ -119,7 +118,7 @@ export default function RmdAssetHealth() {
         {NA('PM on time', '%', 'order')}
       </section>
 
-      <Panel title="Grouped asset mimic" sub="Select a group to inspect its motor, coupling, gearbox, bearings and associated records">
+      <Panel title="Grouped asset mimic">
         <ol className="rm-mimic rmd-mimic" aria-label="Drive groups">
           {GROUPS.map((g, i) => {
             const zl = LIVE[g] && live ? live.zones.find((z) => z.id === LIVE[g]) ?? null : null;

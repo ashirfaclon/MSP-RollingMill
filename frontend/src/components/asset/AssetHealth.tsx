@@ -67,7 +67,6 @@ export default function AssetHealth() {
         <div className="ah-asset-id">
           <span className="rm-k">Selected asset</span>
           <h2 className="ah-asset-name">HSM · {drive} drive group</h2>
-          <span className="ah-asset-path">Motor → coupling → gearbox → rolling zone</span>
         </div>
         {groupLive
           ? <span className={`chip ${groupLive.state === 'no-data' ? 'chip--na' : 'chip--info'} ah-status`}>{groupLive.stateLabel}</span>
@@ -88,7 +87,7 @@ export default function AssetHealth() {
         <KpiCard label="PM on time" value="NA" unit="%" note="" series="order" />
       </section>
 
-      <Panel title="Grouped asset mimic" sub="Select a group to inspect its motor, coupling, gearbox, bearings and associated records">
+      <Panel title="Grouped asset mimic">
         <ol className="rm-mimic rmd-mimic" aria-label="Drive groups">
           {GROUPS.map((g, i) => {
             const gl = LIVE[g] && live ? live.groups.find((x) => x.id === LIVE[g]) ?? null : null;
