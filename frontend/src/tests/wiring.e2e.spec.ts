@@ -1078,7 +1078,13 @@ test('RMD asset health: motor current and run hours open their drill-downs with 
   // 16 Oct: L1 S2 ran at 143.88 A on average; L1 S5 did not run (its ~35 A at status 0 is not counted).
   await expect(tc.getByRole('row', { name: /^Line 1 S2 / })).toContainText('144');
   await expect(tc.getByRole('row', { name: /^Line 1 S5 / }).locator('td').last()).toHaveText('—');
-  await expect(dc.getByRole('img', { name: /Motor current per drive while running/ })).toBeVisible();
+  // One chart per stand, by line: line 1 stands 1–8, line 2 stands 1–6.
+  const l1 = dc.getByRole('region', { name: 'Line 1 motor current' });
+  const l2 = dc.getByRole('region', { name: 'Line 2 motor current' });
+  await expect(l1.locator('.ah-cur-head b')).toHaveText(['Stand 1', 'Stand 2', 'Stand 3', 'Stand 4', 'Stand 5', 'Stand 6', 'Stand 7', 'Stand 8']);
+  await expect(l2.locator('.ah-cur-head b')).toHaveText(['Stand 1', 'Stand 2', 'Stand 3', 'Stand 4', 'Stand 5', 'Stand 6']);
+  await expect(l1.getByRole('img', { name: /^Line 1 S2: motor current while running/ })).toBeVisible();
+  await expect(l1.locator('.ah-cur-cell', { hasText: 'Stand 5' })).toContainText('Not running');
   await expect(dc.getByRole('region', { name: 'Formula' })).toContainText('running status is 1');
   await page.waitForTimeout(700);
   await dc.screenshot({ path: `${SHOTS}/rmd-asset-current.png` });

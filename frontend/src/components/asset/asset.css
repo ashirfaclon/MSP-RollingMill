@@ -34,6 +34,17 @@
 .ah-diag { max-width: 70%; text-align: right; font-size: 12px; font-weight: 700; color: var(--text); }
 .ah-row .num { font-size: 13px; font-weight: 800; }
 
+/* Motor current drill-down: one small chart per drive, grouped by line. */
+.ah-cur-line { display: flex; flex-direction: column; gap: 8px; }
+.ah-cur-line > h3 { margin: 4px 0 0; }
+.ah-cur-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ah-cur-cell {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px 10px 4px;
+  background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+}
+.ah-cur-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; }
+.ah-cur-head .num { font-size: 11px; font-weight: 700; }
+
 @media (max-width: 1180px) {
   .ah-asset-body { grid-template-columns: minmax(0, 1fr); }
   .ah-asset-facts { grid-template-columns: repeat(2, auto); }
@@ -42,4 +53,5 @@
 @media (max-width: 760px) {
   .rm-strip.ah-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ah-trends, .ah-pair { grid-template-columns: minmax(0, 1fr); }
+  .ah-cur-grid { grid-template-columns: minmax(0, 1fr); }
 }
