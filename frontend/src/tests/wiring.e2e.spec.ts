@@ -1185,7 +1185,7 @@ test('RMD Mill MPS and chemical composition: MILL1_MPS / MILL2_MPS from Influx, 
   await page.keyboard.press('Escape');
   // Chemical composition: the form has only a test entry so far (left out) — NA, and the drawer says where it reads.
   const chem = strip.getByRole('button', { name: 'Chemical composition', exact: true });
-  await expect(chem.locator('.rm-card-value')).toHaveText(/^(NA|C.*Si.*)$/s, { timeout: 60_000 });
+  await expect(chem.locator('.rm-card-value')).toHaveText(/^(NA|C[\s\S]*Si[\s\S]*)$/, { timeout: 60_000 });
   await strip.screenshot({ path: `${SHOTS}/rmd-strip-mps-chemistry.png` });
   await chem.click();
   const c = page.getByRole('dialog', { name: 'Chemical composition' });
