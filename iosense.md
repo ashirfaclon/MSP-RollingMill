@@ -24,6 +24,9 @@ and panels still render the sample model (`hsmSample.ts`).
 | `GET /api/hsm/stands` | Same stand fields, 1-min+ means | Stands drawer trend |
 | `POST /api/auth/sso` | IOsense functionID **validateSSOToken** (`GET /api/retrieve-sso-token/{token}`) | Sign-in: the portal's one-time `?token=` → app session; every other route requires it |
 | `GET /api/hsm/running-rate` | Influx `HSM / Finishing Mill / General / Total_Production_Ton` + `Dicharged_Billet` (running hours: billets ≤ 10 min apart) · ERP log sheet PRODUCTION_MT, NET_RUNNING_HRS, DELAY_HRS | Running rate (Production by shift footer) and its drawer |
+| `GET /api/hsm/mill-load` | Logbook form `electrical-hsm/mill-load-log-sheet` (stand-name, load-in-amp, dc-motor-de-temp, dc-motor-nde-temp) | HSM Asset Health: bearing temp, motor current, bearing trend |
+| `GET /api/rmd/mill-speed` | Influx `TMT-RMD / CR Mill1/2 / General / MILL1_MPS, MILL2_MPS` (m/s) | RMD Visualization: Mill MPS card and its trend drawer |
+| `GET /api/rmd/chemistry` | Logbook form `sms/ccm-lolipop-sample` (mill = RMD; furnace-number, ccm, c-18, mn-19, s-20, p-21, si-22) | RMD Visualization: Chemical composition card and its samples drawer |
 
 ## Calls
 
@@ -31,7 +34,7 @@ and panels still render the sample model (`hsmSample.ts`).
 |---|---|---|---|
 | `validateSSOToken` | `GET /api/retrieve-sso-token/{token}` | `server/logbook/client.ts` → `POST /api/logbook-sso` | Exchange the one-time SSO token from the app URL for a session (held in server memory only) |
 | `findUserDevices` | `PUT /api/account/devices/1/1` | `server/logbook/client.ts` → `probeLogbook` | Session probe — proves the bearer is accepted; one device, nothing used from it |
-| `fetchInsightResult` | `PUT /api/account/bruce/insightResult/fetch/paginated/{insightId}` | `backend/src/integrations/logbook/client.ts` → `fetchFormEntries` (power HSM/RMD/LSM/RMS — RMS `rms-electrical-logbook/daily-power-consumption-record`, HSM electrical delays, RMD asset forms, LSM / RMS Production Sheets `lsm-production-sheet/production-sheet`, `rms-production-sheet/production-sheet` — prime pcs per shift for output per shift; start → end of each run for running hours) · `fetchLogbookWindow` (sources status) | One form's entries, read fresh on every request (shared 30 s). **Inactive until `IOSENSE_HSM_INSIGHT_ID` is set** |
+| `fetchInsightResult` | `PUT /api/account/bruce/insightResult/fetch/paginated/{insightId}` | `backend/src/integrations/logbook/client.ts` → `fetchFormEntries` (power HSM/RMD/LSM/RMS — RMS `rms-electrical-logbook/daily-power-consumption-record`, HSM electrical delays, RMD asset forms, HSM mill load `electrical-hsm/mill-load-log-sheet`, SMS lollipop samples `sms/ccm-lolipop-sample` (RMD chemistry), LSM / RMS Production Sheets `lsm-production-sheet/production-sheet`, `rms-production-sheet/production-sheet` — prime pcs per shift for output per shift; start → end of each run for running hours) · `fetchLogbookWindow` (sources status) | One form's entries, read fresh on every request (shared 30 s). **Inactive until `IOSENSE_HSM_INSIGHT_ID` is set** |
 
 All calls send `Authorization`, `organisation`, `ngsw-bypass: true`, `Content-Type: application/json`.
 

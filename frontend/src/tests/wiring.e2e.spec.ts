@@ -1169,3 +1169,26 @@ test('RMD condition analytics: actual rate and specific energy live, the mimic f
   await expect(tr.getByRole('row', { name: /^Line 1 S5 / })).toContainText('Not running');
   await expect(dr.getByRole('region', { name: 'Data source' })).toContainText('SPEED_FB_S1');
 });
+
+test('RMD Mill MPS and chemical composition: MILL1_MPS / MILL2_MPS from Influx, the SMS lollipop form for RMD', async ({ page }) => {
+  await page.goto('/rmd/visualization');
+  const strip = page.getByRole('region', { name: 'Headline KPIs' });
+  // Mill MPS: each mill's last reading today (the historian reads every 10 s).
+  const mps = strip.getByRole('button', { name: 'Mill MPS', exact: true });
+  await expect(mps.locator('.rm-card-pair-v')).toHaveText([/^\d+\.\d{2}$/, /^\d+\.\d{2}$/], { timeout: 60_000 });
+  await mps.click();
+  const d = page.getByRole('dialog', { name: 'Mill MPS' });
+  await expect(d.getByRole('img', { name: /^Mill speed, mean per \d+ minutes/ })).toBeVisible({ timeout: 60_000 });
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('MILL1_MPS (mill 1), MILL2_MPS (mill 2)');
+  await page.waitForTimeout(700);
+  await d.screenshot({ path: `${SHOTS}/rmd-mill-mps.png` });
+  await page.keyboard.press('Escape');
+  // Chemical composition: the form has only a test entry so far (left out) — NA, and the drawer says where it reads.
+  const chem = strip.getByRole('button', { name: 'Chemical composition', exact: true });
+  await expect(chem.locator('.rm-card-value')).toHaveText(/^(NA|C.*Si.*)$/s, { timeout: 60_000 });
+  await strip.screenshot({ path: `${SHOTS}/rmd-strip-mps-chemistry.png` });
+  await chem.click();
+  const c = page.getByRole('dialog', { name: 'Chemical composition' });
+  await expect(c.getByRole('table', { name: 'Lollipop samples' }).locator('thead th')).toHaveText(['Date', 'Furnace', 'CCM', 'Section', '%C', '%Mn', '%S', '%P', '%Si']);
+  await expect(c.getByRole('region', { name: 'Data source' })).toContainText('Steel Melting Shop → SMS → CCM Lolipop Sample');
+});

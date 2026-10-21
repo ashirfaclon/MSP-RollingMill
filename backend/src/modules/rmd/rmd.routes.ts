@@ -11,6 +11,8 @@ import { rmdPowerReport } from '../power/power.service';
 import { rmdBillets } from './billets.service';
 import { rmdCurrentTrend, rmdLive, rmdStationTrend } from './live.service';
 import { rmdCondition } from './condition.service';
+import { rmdMillSpeed } from './mill-speed.service';
+import { rmdChemistry } from './chemistry.service';
 import { rmdRunningRate } from './running-rate.service';
 import { rmdProduction } from './production.service';
 import { rmdStock } from './stock.service';
@@ -63,6 +65,18 @@ export async function rmdRoutes(app: FastifyInstance) {
   app.get('/condition', { config: { errorCode: 'rmd_condition_failed' } }, async (req) => {
     const { from, to } = parseRange(searchParams(req));
     return rmdCondition(loadEnv(), from, to);
+  });
+
+  /** Mill MPS: each mill's last speed reading of the period (m/s), and its trend. */
+  app.get('/mill-speed', { config: { errorCode: 'rmd_mill_speed_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return rmdMillSpeed(loadEnv(), from, to);
+  });
+
+  /** Chemical composition: the SMS CCM lollipop samples for RMD in the period. */
+  app.get('/chemistry', { config: { errorCode: 'rmd_chemistry_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return rmdChemistry(loadEnv(), from, to);
   });
 
   /** Running rate: production ÷ running hours (billets ≤ 10 min apart, either line). Production pending → rate null. */

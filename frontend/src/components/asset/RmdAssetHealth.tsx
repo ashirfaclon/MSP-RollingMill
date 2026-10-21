@@ -109,7 +109,7 @@ export default function RmdAssetHealth() {
           unit="L"
           note=""
           series="hold"
-          tone={oilTone}
+          tone={oil?.minLevel?.litres != null ? oilTone : undefined}
           {...(oil ? { onOpen: () => setOpen('oil'), openLabel: 'Each oil tank: level and temperature' } : {})}
         />
         {NA('VFD trips', 'per 100 run h', 'hold')}

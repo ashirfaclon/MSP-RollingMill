@@ -284,3 +284,48 @@ export interface RmdConditionReport {
   stands: RmdConditionGroup;
   finishing: RmdConditionGroup;
 }
+
+/** One trend bucket of the mill speeds: the mean reading of each mill, m/s. */
+export interface RmdMillSpeedPoint {
+  t: string;
+  mill1: number | null;
+  mill2: number | null;
+}
+
+/** Mill MPS (CR Mill1/2 · General · MILL1_MPS, MILL2_MPS), m/s, over a period of RMD days. */
+export interface RmdMillSpeedReport {
+  from: string;
+  to: string;
+  historian: { connection: 'up' | 'down'; message: string };
+  /** The last reading of the period (now, for a period that includes today). */
+  latest: { mill1: number | null; mill2: number | null; at: string | null };
+  trend: RmdMillSpeedPoint[];
+  bucketMinutes: number;
+}
+
+/** One CCM lollipop sample from the SMS form, for RMD. */
+export interface RmdChemSample {
+  date: string;
+  time: string | null;
+  furnace: string;
+  ccm: string;
+  section: string;
+  /** % C, Mn, S, P, Si. */
+  c: number | null;
+  mn: number | null;
+  s: number | null;
+  p: number | null;
+  si: number | null;
+}
+
+/** Chemical composition: SMS → CCM Lolipop Sample, entries for RMD in the period. */
+export interface RmdChemistryReport {
+  from: string;
+  to: string;
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  /** The latest sample of the period. */
+  latest: RmdChemSample | null;
+  /** Every sample of the period, newest first. */
+  samples: RmdChemSample[];
+}

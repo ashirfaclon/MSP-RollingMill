@@ -10,13 +10,17 @@
  *                       figure uses) and FINISH_PRODUCT_PRIME_MT (Prime); both open one drawer;
  *   Mass yield          Prime + SL ÷ billet input (INPUT_MT), both from the ERP log sheet;
  *   Power consumption   the logbook forms Power Reading VCB 1 / 2 / 3 (live, as filled);
- *   Specific energy     power ÷ ERP production (backend power report).
+ *   Specific energy     power ÷ ERP production (backend power report);
+ *   Mill MPS            Influx CR Mill1/2 · General · MILL1_MPS / MILL2_MPS, m/s (RmdMillSpeedCard);
+ *   Chemical composition  SMS → CCM Lolipop Sample, the RMD samples (RmdChemistryCard).
  * A card with nothing behind it opens nothing.
  */
 import { useState } from 'react';
 import KpiCard from '@/components/visualization/KpiCard';
 import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
+import RmdMillSpeedCard from './RmdMillSpeedCard';
+import RmdChemistryCard from './RmdChemistryCard';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
 import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
@@ -70,6 +74,8 @@ export default function RmdKpiStrip() {
       <RmdProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
       <PowerKpiCard mill="rmd" />
       <SpecificEnergyCard mill="rmd" />
+      <RmdMillSpeedCard />
+      <RmdChemistryCard />
     </section>
   );
 }
