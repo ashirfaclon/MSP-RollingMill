@@ -171,7 +171,7 @@ function DrivesTable({ g, sources }: { g: RmdConditionGroup; sources: SourceSyst
       <SourceBox
         sources={sources}
         formula={[
-          'Current and speed count only while the drive runs: its running status is 1 at that instant (all read every 10 s)',
+          'Current and speed count only while the drive runs: all three are averaged per minute, and a minute counts when the drive ran all of it',
           'Group current = mean of the drives that ran; speed shown per line (the lines read on different scales)',
           'Day = 08:00 IST → 08:00 IST',
         ]}

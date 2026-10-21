@@ -103,9 +103,11 @@ from(bucket: "${esc(env.influxBucket!)}")
 /**
  * Each drive's motor current (A) over a period of RMD days (08:00 → 08:00 IST), for the Asset
  * Health drill-down: the mean of every interval while the drive runs, and over the whole period.
- * "Running" is the drive's own running status (1), read at the same instant as its current — both
- * are recorded together every 10 s. Current alone cannot tell: a stopped drive can read a few amps
- * (L1 S5 ≈ 35 A with status 0, 17 Oct 2026). An interval with no running is a gap, not a dip to 0.
+ * "Running" is the drive's own running status: both are averaged per minute in the historian
+ * (fast — the storage does it), and a minute counts when the drive ran all of it (status mean 1).
+ * Current alone cannot tell: a stopped drive can read a few amps (L1 S5 ≈ 35 A with status 0,
+ * 17 Oct 2026). An interval with no running is a gap, not a dip to 0. (Against pairing every 10 s
+ * reading, 15–21 Oct 2026: the same means within 0.4 A, about 5× faster.)
  */
 export async function rmdCurrentTrend(env: Env, zone: RmdZoneId, from: string, to: string, nowMs = Date.now()): Promise<RmdCurrentTrend> {
   const fromMs = rmdDayStart(from);
@@ -116,13 +118,14 @@ export async function rmdCurrentTrend(env: Env, zone: RmdZoneId, from: string, t
   const none = defs.map((s) => ({ id: s.id, line: s.line, label: s.label, meanA: null, points: [] as [number, number | null][] }));
   if (!historianConfigured(env)) return { connection: 'down', message: MSG.HISTORIAN_NOT_CONFIGURED, ...base, series: none };
   if (toMs <= fromMs) return { connection: 'up', message: MSG.HISTORIAN_UP, ...base, series: none };
-  // Per drive: its status and current side by side at each instant, the current kept where status is 1.
+  // Per drive: status and current averaged per minute, side by side, the current kept for minutes run in full.
   const streams = defs.map((s, i) => `d${i} = from(bucket: "${esc(env.influxBucket!)}")
   |> range(start: ${fluxTime(fromMs)}, stop: ${fluxTime(toMs)})
   |> filter(fn: (r) => r._measurement == "TMT-RMD" and r.Unit == "${esc(s.unitTag)}" and r.Group == "${esc(s.group)}"
       and (r._field == "${esc(s.field)}" or r._field == "${esc(s.currentField)}"))
+  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false, timeSrc: "_start")
   |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-  |> filter(fn: (r) => exists r["${esc(s.field)}"] and exists r["${esc(s.currentField)}"] and float(v: r["${esc(s.field)}"]) >= 0.5)
+  |> filter(fn: (r) => exists r["${esc(s.field)}"] and exists r["${esc(s.currentField)}"] and float(v: r["${esc(s.field)}"]) >= 0.999)
   |> map(fn: (r) => ({ _start: r._start, _stop: r._stop, _time: r._time, _value: float(v: r["${esc(s.currentField)}"]), drive: "${esc(s.id)}" }))`).join('\n');
   const running = `${streams}
 union(tables: [${defs.map((_, i) => `d${i}`).join(', ')}])

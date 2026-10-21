@@ -35,11 +35,19 @@
 .ah-diag { max-width: 70%; text-align: right; font-size: 12px; font-weight: 700; color: var(--text); }
 .ah-row .num { font-size: 13px; font-weight: 800; }
 
-/* Motor current drill-down: one small chart per drive, grouped by line. */
-.ah-cur-line { display: flex; flex-direction: column; gap: 8px; }
-.ah-cur-line > h3 { margin: 4px 0 0; }
-.ah-cur-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.ah-cur-cell {
+/* Motor current drill-down: a strip of the line's drives to pick from, then one chart. */
+.ah-cur-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.ah-cur-chip {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 7px 9px; text-align: left;
+  font: inherit; color: inherit; cursor: pointer;
+  background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+}
+.ah-cur-chip:hover { border-color: var(--border-hi); }
+.ah-cur-chip.on { border-color: var(--info); background: var(--panel-3); }
+.ah-cur-chip-name { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; }
+.ah-cur-chip-v { font-size: 15px; font-weight: 800; }
+.ah-cur-chip-now { font-size: 10px; font-weight: 600; color: var(--muted-2); }
+.ah-cur-one {
   display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px 10px 4px;
   background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
 }
@@ -54,5 +62,4 @@
 @media (max-width: 760px) {
   .rm-strip.ah-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ah-trends, .ah-pair { grid-template-columns: minmax(0, 1fr); }
-  .ah-cur-grid { grid-template-columns: minmax(0, 1fr); }
 }

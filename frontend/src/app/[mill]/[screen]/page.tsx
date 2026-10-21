@@ -9,6 +9,7 @@ import LsmVisualization from '@/components/lsm/LsmVisualization';
 import AssetHealth from '@/components/asset/AssetHealth';
 import RmdAssetHealth from '@/components/asset/RmdAssetHealth';
 import RmdConditionAnalytics from '@/components/rmd/RmdConditionAnalytics';
+import HsmConditionAnalytics from '@/components/condition/HsmConditionAnalytics';
 import ScreenPlaceholder from '@/components/ScreenPlaceholder';
 import { MILLS, SCREENS, hasScreen, isMill, isScreen, millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
 
@@ -17,6 +18,7 @@ function screenFor(mill: MillId, screen: ScreenId) {
   if (mill === 'hsm' && screen === 'visualization') return <HsmVisualization />;
   if (mill === 'hsm' && screen === 'data-model') return <HsmDataModel />;
   if (mill === 'hsm' && screen === 'asset-health') return <AssetHealth />;
+  if (mill === 'hsm' && screen === 'condition-analytics') return <HsmConditionAnalytics />;
   if (mill === 'rmd' && screen === 'asset-health') return <RmdAssetHealth />;
   if (mill === 'rmd' && screen === 'condition-analytics') return <RmdConditionAnalytics />;
   if (mill === 'rmd' && screen === 'visualization') return <RmdVisualization />;

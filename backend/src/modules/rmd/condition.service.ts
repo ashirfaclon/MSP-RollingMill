@@ -5,8 +5,9 @@
  *   stands     CR Mill1/2 · M1 S1–S8 (line 1), M2 S1–S6 (line 2) — CURRENT_FB_Sn, SPEED_FB_Sn;
  *   finishing  Line-1 · M1 CUR_FB / SPD_FB (FS, PR1, PR2, TB1, TB2) and Line-2 · General
  *              *_Current / *_RPM (CS, pinch rolls, tail breakers).
- * "While it runs" is its running status 1 at the same instant (status, current and speed are
- * recorded together every 10 s); a drive that never ran has no mean.
+ * "While it runs": status, current and speed are averaged per minute in the historian (fast — the
+ * storage does it), and a minute counts when the drive ran all of it (status mean 1); a drive that
+ * never ran has no mean. (As the Asset Health motor current drill-down.)
  */
 import type { Env } from '../../config/env';
 import type { RmdConditionDrive, RmdConditionGroup, RmdConditionReport } from '../../contracts';
@@ -38,9 +39,10 @@ async function readDrives(env: Env, defs: RmdStationDef[], fromMs: number, toMs:
   |> range(start: ${fluxTime(fromMs)}, stop: ${fluxTime(toMs)})
   |> filter(fn: (r) => r._measurement == "TMT-RMD" and r.Unit == "${esc(s.unitTag)}" and r.Group == "${esc(s.group)}"
       and (r._field == "${esc(s.field)}" or r._field == "${esc(s.currentField)}" or r._field == "${esc(s.speedField)}"))
+  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false, timeSrc: "_start")
   |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
   |> filter(fn: (r) => exists r["${esc(s.field)}"] and exists r["${esc(s.currentField)}"] and exists r["${esc(s.speedField)}"]
-      and float(v: r["${esc(s.field)}"]) >= 0.5)
+      and float(v: r["${esc(s.field)}"]) >= 0.999)
   |> map(fn: (r) => ({ _start: r._start, _stop: r._stop, drive: "${esc(s.id)}", a: float(v: r["${esc(s.currentField)}"]), rpm: float(v: r["${esc(s.speedField)}"]) }))
   |> group(columns: ["drive"])
   |> reduce(fn: (r, accumulator) => ({ n: accumulator.n + 1.0, a: accumulator.a + r.a, rpm: accumulator.rpm + r.rpm }), identity: { n: 0.0, a: 0.0, rpm: 0.0 })`).join('\n');

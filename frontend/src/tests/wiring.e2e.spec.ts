@@ -1062,23 +1062,23 @@ test('RMD asset health: motor current and run hours open their drill-downs with 
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const cards = page.getByRole('main').getByRole('region', { name: 'Condition KPIs' });
 
-  // Motor current (route group): every drive, its current while running (status 1); stopped drives have none.
+  // Motor current (route group): pick a line, then a drive — one chart at a time.
   await cards.getByRole('button', { name: 'Motor current', exact: true }).click();
   const dc = page.getByRole('dialog', { name: 'Route · motor current' });
-  const tc = dc.getByRole('table', { name: 'Motor current per drive' });
-  await expect(tc.locator('thead th')).toHaveText(['Line', 'Drive', 'Now', 'Current now (A)', 'Average while running (A)']);
-  await expect(tc.locator('tbody tr')).toHaveCount(14, { timeout: 90_000 });
-  // 16 Oct: L1 S2 ran at 143.88 A on average; L1 S5 did not run (its ~35 A at status 0 is not counted).
-  await expect(tc.getByRole('row', { name: /^Line 1 S2 / })).toContainText('144');
-  await expect(tc.getByRole('row', { name: /^Line 1 S5 / }).locator('td').last()).toHaveText('—');
-  // One chart per stand, by line: line 1 stands 1–8, line 2 stands 1–6.
-  const l1 = dc.getByRole('region', { name: 'Line 1 motor current' });
-  const l2 = dc.getByRole('region', { name: 'Line 2 motor current' });
-  await expect(l1.locator('.ah-cur-head b')).toHaveText(['Stand 1', 'Stand 2', 'Stand 3', 'Stand 4', 'Stand 5', 'Stand 6', 'Stand 7', 'Stand 8']);
-  await expect(l2.locator('.ah-cur-head b')).toHaveText(['Stand 1', 'Stand 2', 'Stand 3', 'Stand 4', 'Stand 5', 'Stand 6']);
-  await expect(l1.getByRole('img', { name: /^Line 1 S2: motor current while running/ })).toBeVisible();
-  await expect(l1.locator('.ah-cur-cell', { hasText: 'Stand 5' })).toContainText('Not running');
-  await expect(dc.getByRole('region', { name: 'Formula' })).toContainText('running status is 1');
+  await expect(dc.getByRole('group', { name: 'Line', exact: true }).getByRole('button')).toHaveText(['Line 1', 'Line 2'], { timeout: 90_000 });
+  const pick = (l: number) => dc.getByRole('group', { name: `Line ${l} drives` });
+  await expect(pick(1).locator('.ah-cur-chip-name')).toHaveText(['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8']);
+  // 16 Oct: L1 S2 ran at ~144 A on average; L1 S5 did not run (its ~35 A at status 0 is not counted).
+  await expect(pick(1).getByRole('button', { name: /^S2/ }).locator('.ah-cur-chip-v')).toHaveText('144 A');
+  await expect(pick(1).getByRole('button', { name: /^S5/ }).locator('.ah-cur-chip-v')).toHaveText('—');
+  // The first drive that ran is shown; another opens on click.
+  await expect(dc.getByRole('img', { name: /^Line 1 S1: motor current while running/ })).toBeVisible();
+  await pick(1).getByRole('button', { name: /^S2/ }).click();
+  await expect(dc.getByRole('img', { name: /^Line 1 S2: motor current while running/ })).toBeVisible();
+  await expect(dc.locator('.ah-cur-one .ah-cur-head')).toContainText('Stand 2');
+  await dc.getByRole('group', { name: 'Line', exact: true }).getByRole('button', { name: 'Line 2' }).click();
+  await expect(pick(2).locator('.ah-cur-chip-name')).toHaveText(['S1', 'S2', 'S3', 'S4', 'S5', 'S6']);
+  await expect(dc.getByRole('region', { name: 'Formula' })).toContainText('a minute counts when the drive ran all of it');
   await page.waitForTimeout(700);
   await dc.screenshot({ path: `${SHOTS}/rmd-asset-current.png` });
   await page.keyboard.press('Escape');
@@ -1156,8 +1156,8 @@ test('RMD condition analytics: actual rate and specific energy live, the mimic f
   const t = d.getByRole('table', { name: 'Drives: current and speed while running' });
   await expect(t.locator('thead th')).toHaveText(['Line', 'Drive', 'Current (A)', 'Speed (RPM)']);
   await expect(t.locator('tbody tr')).toHaveCount(10);
-  await expect(t.getByRole('row', { name: /^Line 2 CS / })).toContainText('810');
-  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('running status is 1');
+  await expect(t.getByRole('row', { name: /^Line 2 CS / })).toContainText('811');
+  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('a minute counts when the drive ran all of it');
   await page.keyboard.press('Escape');
   await rough.click();
   const dr = page.getByRole('dialog', { name: 'Roughing group · current and speed' });
@@ -1165,7 +1165,7 @@ test('RMD condition analytics: actual rate and specific energy live, the mimic f
   await expect(tr.locator('tbody tr')).toHaveCount(14);
   // 16 Oct: L1 S2 143.88 A at 1,189 RPM; L1 S5 did not run.
   await expect(tr.getByRole('row', { name: /^Line 1 S2 / })).toContainText('144');
-  await expect(tr.getByRole('row', { name: /^Line 1 S2 / })).toContainText('1,189');
+  await expect(tr.getByRole('row', { name: /^Line 1 S2 / })).toContainText('1,190');
   await expect(tr.getByRole('row', { name: /^Line 1 S5 / })).toContainText('Not running');
   await expect(dr.getByRole('region', { name: 'Data source' })).toContainText('SPEED_FB_S1');
 });
@@ -1191,4 +1191,32 @@ test('RMD Mill MPS and chemical composition: MILL1_MPS / MILL2_MPS from Influx, 
   const c = page.getByRole('dialog', { name: 'Chemical composition' });
   await expect(c.getByRole('table', { name: 'Lollipop samples' }).locator('thead th')).toHaveText(['Date', 'Furnace', 'CCM', 'Section', '%C', '%Mn', '%S', '%P', '%Si']);
   await expect(c.getByRole('region', { name: 'Data source' })).toContainText('Steel Melting Shop → SMS → CCM Lolipop Sample');
+});
+
+test('HSM condition analytics: as the HSM sheet — actual rate = ERP production ÷ historian running hours; the rest NA', async ({ page }) => {
+  await page.goto('/hsm/condition-analytics');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  await expect(cards.locator('.rm-card-label')).toHaveText(['Actual rate', 'Output opportunity', 'Specific energy', 'Conversion cost', 'Cost variance', 'Yield material loss', 'Output margin']);
+  // 1–8 Oct: ERP PRODUCTION_MT 1,390.43 ÷ 60.28 running hours (billet counter) = 23.07 TPH.
+  await expect(cards.locator('.rm-card-value').nth(0)).toHaveText(/^23\.07\s*TPH$/, { timeout: 90_000 });
+  for (let i = 1; i < 7; i++) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  // Header: the ERP's most produced size, grade and route NA, running hours.
+  await expect(main.getByRole('heading', { level: 2 })).toHaveText(/^274–276 × \d\.\d\d mm/);
+  await expect(main.locator('.ah-fact', { hasText: 'Running hours' }).locator('dd')).toHaveText('60.3 h');
+  // Mimic: only the finished exit (= actual rate) has a source.
+  const mimic = main.getByRole('list', { name: 'Condition groups' });
+  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finished exit']);
+  await expect(mimic.locator('.rm-zone-value')).toHaveText(['NA', 'NA', 'NA', 'NA', '23.07 TPH']);
+  await page.screenshot({ path: `${SHOTS}/hsm-condition-analytics.png`, fullPage: true });
+  // The rate opens its days, with sources.
+  await cards.getByRole('button', { name: 'Actual rate', exact: true }).click();
+  const d = page.getByRole('dialog', { name: 'Actual running rate' });
+  await expect(d.getByRole('table', { name: 'Actual running rate per day' }).locator('tbody tr')).toHaveCount(8);
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('Dicharged_Billet');
 });

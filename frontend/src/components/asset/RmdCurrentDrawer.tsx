@@ -4,12 +4,13 @@
  * RMD Asset Health · Motor current drill-down, for the route / diverter or finishing drive group:
  * each drive now (running or not, its current) and its current over the dashboard's period —
  * the mean of every interval while it runs (its running status 1), a gap while it is stopped —
- * from the plant historian (/api/rmd/current). One chart per drive, grouped by line (the plant,
- * 21 Oct 2026), all on the same amp scale so the drives compare at a glance.
+ * from the plant historian (/api/rmd/current). Each drive has its own chart (the plant, 21 Oct
+ * 2026), shown one at a time: pick the line, then the drive from a strip with every drive's
+ * average and its state now; every drive on the same amp scale.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import './asset.css';
-import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
+import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { fmtNum } from '@/components/drill/DrillChart';
 import SourceBox, { type SourceSystem } from '@/components/drill/SourceBox';
 import { useDrillRange } from '@/components/drill/useDrillRange';
@@ -35,69 +36,66 @@ export default function RmdCurrentDrawer({ open, onClose, zone }: { open: boolea
 
 function Content({ trend, live, zone }: { trend: RmdCurrentTrend; live: RmdLive | null; zone: RmdZoneId }) {
   const now = live?.stations.filter((s) => s.zone === zone) ?? [];
+  const nowOf = new Map(now.map((s) => [s.id, s]));
   const running = now.filter((s) => s.on && s.currentA !== null);
   const avgNow = running.length ? running.reduce((t, s) => t + s.currentA!, 0) / running.length : null;
-  // One amp scale for every drive of the group, so a higher chart is a higher current.
+  const lines = ([1, 2] as const).filter((l) => trend.series.some((s) => s.line === l));
+  const [line, setLine] = useState<1 | 2>(lines[0] ?? 1);
+  const drives = trend.series.filter((s) => s.line === line);
+  // The picked drive, else the first that ran, else the first.
+  const [pick, setPick] = useState<string | null>(null);
+  const sel = drives.find((s) => s.id === pick) ?? drives.find((s) => s.meanA !== null) ?? drives[0] ?? null;
+  // One amp scale for every drive of the group, so switching drives keeps the scale.
   const top = useMemo(() => {
     const vals = trend.series.flatMap((s) => s.points.map((p) => p[1])).filter((v): v is number => v !== null);
     return vals.length ? Math.ceil(Math.max(...vals) / 50) * 50 : undefined;
   }, [trend.series]);
   const axes = useMemo(() => [{ title: 'A', unit: 'A', min: 0, max: top }], [top]);
-  const meanOf = new Map(trend.series.map((s) => [s.id, s.meanA]));
   const minutes = Math.round(trend.bucketSeconds / 60);
+  const name = (label: string) => (zone === 'route' ? `Stand ${label.replace(/^S/, '')}` : label);
   return (
     <>
       <Stats items={[
         { label: 'Average now', value: a(avgNow), unit: 'A · running drives', tone: avgNow === null ? 'v-na' : undefined },
         { label: 'Running now', value: live ? `${running.length} of ${now.length}` : '—' },
       ]} />
-      {([1, 2] as const).map((line) => {
-        const drives = trend.series.filter((s) => s.line === line);
-        return drives.length === 0 ? null : (
-          <section key={line} className="ah-cur-line" aria-label={`Line ${line} motor current`}>
-            <h3 className="rm-k">Line {line}</h3>
-            <div className="ah-cur-grid">
-              {drives.map((s) => (
-                <div key={s.id} className="ah-cur-cell">
-                  <div className="ah-cur-head">
-                    <b>{zone === 'route' ? `Stand ${s.label.replace(/^S/, '')}` : s.label}</b>
-                    <span className={`num ${s.meanA === null ? 'v-na' : 'v-val'}`}>{s.meanA === null ? 'Not running' : `avg ${a(s.meanA)} A`}</span>
-                  </div>
-                  <DrillChart
-                    series={[{ id: s.id, name: `L${s.line} ${s.label}`, token: LINE_TOKEN[s.line], type: 'line', data: s.points, dp: 1 }]}
-                    axes={axes}
-                    height={150}
-                    ariaLabel={`Line ${s.line} ${s.label}: motor current while running, ${minutes}-minute intervals, average ${a(s.meanA)} A`}
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-        );
-      })}
-      <div className="pd-table-wrap">
-        <table className="grid pd-table" aria-label="Motor current per drive">
-          <thead><tr><th>Line</th><th>Drive</th><th>Now</th><th className="r">Current now (A)</th><th className="r">Average while running (A)</th></tr></thead>
-          <tbody>
-            {now.map((s) => (
-              <tr key={s.id}>
-                <td>Line {s.line}</td>
-                <td><b>{s.label}</b></td>
-                <td>
-                  <span className={`pd-dot ${s.on === null ? 'pd-dot--na' : s.on ? 'pd-dot--ok' : 'pd-dot--off'}`} aria-hidden />
-                  {s.on === null ? 'No live data' : s.on ? 'On' : 'Off'}
-                </td>
-                <td className={`num r ${s.on && s.currentA !== null ? 'v-val' : 'v-na'}`}>{s.on ? a(s.currentA) : '—'}</td>
-                <td className="num r">{a(meanOf.get(s.id))}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {lines.length > 1 && (
+        <Seg label="Line" value={String(line) as '1' | '2'} options={lines.map((l) => ({ id: String(l) as '1' | '2', label: `Line ${l}` }))}
+          onChange={(v) => { setLine(Number(v) as 1 | 2); setPick(null); }} />
+      )}
+      <div className="ah-cur-pick" role="group" aria-label={`Line ${line} drives`}>
+        {drives.map((s) => {
+          const n = nowOf.get(s.id);
+          return (
+            <button key={s.id} type="button" className={`ah-cur-chip${sel?.id === s.id ? ' on' : ''}`} aria-pressed={sel?.id === s.id} onClick={() => setPick(s.id)}>
+              <span className="ah-cur-chip-name">
+                <span className={`pd-dot ${!n || n.on === null ? 'pd-dot--na' : n.on ? 'pd-dot--ok' : 'pd-dot--off'}`} aria-hidden />
+                {s.label}
+              </span>
+              <span className={`ah-cur-chip-v num ${s.meanA === null ? 'v-na' : 'v-val'}`}>{s.meanA === null ? '—' : `${a(s.meanA)} A`}</span>
+              <span className="ah-cur-chip-now">{!n || n.on === null ? 'no live data' : n.on ? `now ${a(n.currentA)} A` : 'off now'}</span>
+            </button>
+          );
+        })}
       </div>
+      {sel && (
+        <section className="ah-cur-one" aria-label={`${name(sel.label)} motor current`}>
+          <div className="ah-cur-head">
+            <b>Line {sel.line} · {name(sel.label)}</b>
+            <span className={`num ${sel.meanA === null ? 'v-na' : 'v-val'}`}>{sel.meanA === null ? 'Did not run in the period' : `average ${a(sel.meanA)} A while running`}</span>
+          </div>
+          <DrillChart
+            series={[{ id: sel.id, name: `L${sel.line} ${sel.label}`, token: LINE_TOKEN[sel.line], type: 'line', data: sel.points, dp: 1 }]}
+            axes={axes}
+            height={280}
+            ariaLabel={`Line ${sel.line} ${sel.label}: motor current while running, ${minutes}-minute intervals, average ${a(sel.meanA)} A`}
+          />
+        </section>
+      )}
       <SourceBox sources={SOURCES[zone]} formula={[
-        'Current counts only while the drive runs: its running status is 1 at that instant (both read every 10 s)',
+        'Current counts only while the drive runs: status and current are averaged per minute, and a minute counts when the drive ran all of it',
         `Trend = mean current of each ${minutes}-minute interval while running; a gap while stopped`,
-        'One chart per drive, by line; every chart on the same amp scale',
+        'Pick a line, then a drive; every drive on the same amp scale',
         'Average now = mean current of the drives running now',
         'Day = 08:00 IST → 08:00 IST',
       ]} />

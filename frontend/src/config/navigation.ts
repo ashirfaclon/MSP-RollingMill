@@ -33,7 +33,7 @@ export const SCREENS = [
     label: 'Condition Analytics',
     sub: 'Rate · Cost · Condition',
     icon: 'trend',
-    mills: ['rmd'],
+    mills: ['hsm', 'rmd'],
   },
   {
     id: 'data-model',

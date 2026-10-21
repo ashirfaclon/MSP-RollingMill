@@ -1,0 +1,5 @@
+/* HSM Condition Analytics. */
+/* The other sizes of the period, beside the most produced one. */
+.hca-more { font-size: 13px; font-weight: 700; letter-spacing: 0.2px; text-transform: none; color: var(--muted-2); }
+/* Route and investigation note under the mimic. */
+.hca-notes { margin-top: 12px; border-top: 1px solid var(--border); }
