@@ -11,6 +11,7 @@ import { parseGrain, parseRange } from './params';
 import { PLANT_DAY_START_HOUR, counterComparison, isDate, istDate, productionComparison, type CounterSpec } from './production.service';
 import { logSheetReport, ordersReport, sizeReport, stockReport } from './erp-kpis.service';
 import { electricalDelays } from './electrical-delays.service';
+import { hsmMillLoad } from './mill-load.service';
 import { STAND_METRICS, hsmLive, standTrend, type StandMetric } from './live.service';
 import { yieldComparison } from './yield.service';
 import { runningRate } from './running-rate.service';
@@ -87,6 +88,12 @@ export async function hsmRoutes(app: FastifyInstance) {
   app.get('/electrical-delays', { config: { errorCode: 'hsm_electrical_delays_failed' } }, async (req) => {
     const { from, to } = parseRange(searchParams(req));
     return electricalDelays(loadEnv(), from, to);
+  });
+
+  /** Asset Health: the logbook's Mill Load Log Sheet — load (A) and DC motor DE / NDE temperature per stand. */
+  app.get('/mill-load', { config: { errorCode: 'hsm_mill_load_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return hsmMillLoad(loadEnv(), from, to);
   });
 
   /** Finished-strip stock in the FG yard at the end of plant date `to`. */

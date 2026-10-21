@@ -84,3 +84,29 @@ export interface ElectricalDelaysReport {
   delays: ElectricalDelay[];
   totals: { all: DelayTotals; roughing: DelayTotals; finishing: DelayTotals };
 }
+
+/** GET /api/hsm/mill-load — the logbook's Mill Load Log Sheet: one reading per stand. */
+export interface HsmMillLoadEntry {
+  /** The form's Date (the day the reading is for) and its time. */
+  date: string;
+  time: string | null;
+  shift: string;
+  /** "RM 4", "FM 2" … as normalised from the form's stand name. */
+  stand: string;
+  group: 'roughing' | 'finishing' | null;
+  /** Load in amp. */
+  loadA: number | null;
+  /** DC motor drive-end / non-drive-end temperature, °C. */
+  deTempC: number | null;
+  ndeTempC: number | null;
+}
+export interface HsmMillLoadReport {
+  from: string;
+  to: string;
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  /** Each stand's latest reading of the period. */
+  latest: HsmMillLoadEntry[];
+  /** Every reading of the period, oldest first. */
+  entries: HsmMillLoadEntry[];
+}

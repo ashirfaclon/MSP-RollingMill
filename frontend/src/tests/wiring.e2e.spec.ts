@@ -737,32 +737,25 @@ test('RMD: running rate opens its drill-down — Prime + SL ÷ running hours fro
   await d.screenshot({ path: `${SHOTS}/rmd-drill-running-rate.png` });
 });
 
-test('HSM asset health: electrical faults from the logbook — MTTR per group, the latest fault, and the list', async ({ page }) => {
+test('HSM asset health: as the HSM sheet — mill load log sheet per stand, run hours from the ERP', async ({ page }) => {
   await page.goto('/hsm/asset-health');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
-  await dialog.getByLabel('Start Date').fill('2026-09-01');
-  await dialog.getByLabel('End Date').fill('2026-10-12');
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  const main = page.getByRole('main');
-  // Finishing (selected by default): 17 faults naming F stands (or "finishing mill"), MTTR from their durations.
-  const pm = main.locator('section.panel', { hasText: 'ERP PM & work-order history' });
-  // The first logbook read pages back a few weeks: allow it time.
-  await expect(pm.getByRole('button', { name: /MTTR/ })).toContainText(/\d+\.\d min/, { timeout: 90_000 });
-  await expect(main.locator('section.panel', { hasText: 'Diagnosis & process impact' })).toContainText('F4&F6 DUMP');
-  await pm.getByRole('button', { name: /MTTR/ }).click();
-  const d = page.getByRole('dialog', { name: 'Finishing · electrical faults' });
-  const t = d.getByRole('table', { name: 'Electrical faults' });
-  await expect(t.locator('thead th')).toHaveText(['Date', 'Shift', 'Stands', 'Minutes', 'Fault details']);
-  await expect(t.locator('tbody tr').first()).toContainText('F4, F6');
-  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('Electrical HSM → Electrical Delays');
+  const cards = page.getByRole('main').getByRole('region', { name: 'Condition KPIs' });
+  // Run hours: ERP log sheet NET_RUNNING_HRS, 1–8 Oct = 64.45 h.
+  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^64\.5\s*h$/, { timeout: 90_000 });
+  // Motor current opens the stands' mill load readings (none before the form started: NA).
+  await cards.getByRole('button', { name: 'Motor current', exact: true }).click();
+  const d = page.getByRole('dialog', { name: 'Finishing · mill load' });
+  const t = d.getByRole('table', { name: 'Mill load per stand' });
+  await expect(t.locator('thead th')).toHaveText(['Stand', 'Load (A)', 'DC motor DE (°C)', 'DC motor NDE (°C)', 'Reading']);
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('Electrical HSM → Mill Load Log Sheet');
+  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('RM stands = roughing, FM stands = finishing');
   await page.waitForTimeout(700);
-  await d.screenshot({ path: `${SHOTS}/hsm-asset-faults.png` });
-  await page.keyboard.press('Escape');
-  // Roughing: R-stand faults (R5 on 14 Sep, R1 on 28 Sep …).
-  await main.getByRole('button', { name: /Roughing group/ }).click();
-  await expect(main.locator('section.panel', { hasText: 'Diagnosis & process impact' })).toContainText('R1 DRIVE TRIPPED');
-  await page.screenshot({ path: `${SHOTS}/hsm-asset-health-wired.png`, fullPage: true });
+  await d.screenshot({ path: `${SHOTS}/hsm-asset-mill-load.png` });
 });
 
 test('LSM: finished stock by section, as the ERP Stock Sheet Engine for division LS', async ({ page }) => {

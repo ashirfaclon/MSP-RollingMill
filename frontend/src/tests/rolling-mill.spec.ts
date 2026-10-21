@@ -158,27 +158,29 @@ test('the sidebar: HSM has Visualization and Asset Health, RMD also Condition An
   }
 });
 
-test('HSM asset health: the mock-up layout, every figure NA; a zone selects its drive group', async ({ page }) => {
+test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; a zone selects its drive group', async ({ page }) => {
   await page.goto('/hsm/asset-health');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(/Rolling Mill\s*\/\s*Asset Health/);
   const main = page.getByRole('main');
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Finishing drive group');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
   await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Alignment/, /^Gearbox oil/, /^VFD trips/, /^Run hours/, /^PM on time/]);
-  // Wired: motor current (live, A) and run hours; the rest NA.
-  for (const i of [0, 1, 3, 4, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  // As the HSM sheet: bearing temp and motor current from the Mill Load Log Sheet (NA until real
+  // entries), run hours from the ERP; the rest NA.
+  for (const i of [0, 3, 4, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
   await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
   await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
   for (const t of ['Grouped asset mimic', 'Condition trends', 'Laser alignment · Machine inspection', 'ERP PM & work-order history', 'Diagnosis & process impact']) {
     await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
   }
   // Never a sample figure: the NA blocks stay NA.
-  for (const t of ['Condition trends', 'Laser alignment · Machine inspection']) {
+  for (const t of ['Laser alignment · Machine inspection', 'ERP PM & work-order history', 'Diagnosis & process impact']) {
     const vals = await main.locator('section.panel', { hasText: t }).locator('.num').allInnerTexts();
     expect(vals.every((v) => v.trim().startsWith('NA'))).toBe(true);
   }
-  // Roughing / finishing zones show their live stands (or NA without a live reading).
-  await expect(main.getByRole('button', { name: /Finishing group/ }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 6 on)$/);
+  // The sheet gives no source for the mimic: every zone NA.
+  await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-value')).toHaveText(Array(5).fill('NA'));
   // A zone selects its drive group.
   await main.getByRole('button', { name: /Roughing group/ }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Roughing drive group');
