@@ -8,6 +8,7 @@ import PendingMillVisualization from '@/components/mills/PendingMillVisualizatio
 import LsmVisualization from '@/components/lsm/LsmVisualization';
 import AssetHealth from '@/components/asset/AssetHealth';
 import RmdAssetHealth from '@/components/asset/RmdAssetHealth';
+import LsmAssetHealth from '@/components/asset/LsmAssetHealth';
 import RmdConditionAnalytics from '@/components/rmd/RmdConditionAnalytics';
 import HsmConditionAnalytics from '@/components/condition/HsmConditionAnalytics';
 import ScreenPlaceholder from '@/components/ScreenPlaceholder';
@@ -20,6 +21,7 @@ function screenFor(mill: MillId, screen: ScreenId) {
   if (mill === 'hsm' && screen === 'asset-health') return <AssetHealth />;
   if (mill === 'hsm' && screen === 'condition-analytics') return <HsmConditionAnalytics />;
   if (mill === 'rmd' && screen === 'asset-health') return <RmdAssetHealth />;
+  if (mill === 'lsm' && screen === 'asset-health') return <LsmAssetHealth />;
   if (mill === 'rmd' && screen === 'condition-analytics') return <RmdConditionAnalytics />;
   if (mill === 'rmd' && screen === 'visualization') return <RmdVisualization />;
   // LSM and RMS: the same screen, every figure NA until their sources are confirmed.

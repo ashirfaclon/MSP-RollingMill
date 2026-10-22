@@ -1220,3 +1220,31 @@ test('HSM condition analytics: as the HSM sheet — actual rate = ERP production
   await expect(d.getByRole('table', { name: 'Actual running rate per day' }).locator('tbody tr')).toHaveCount(8);
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText('Dicharged_Billet');
 });
+
+test('LSM asset health: as the LSM sheet — Drive Temp form for bearings and gearbox oil (inches), run hours from the ERP', async ({ page }) => {
+  await page.goto('/lsm/asset-health');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Alignment', 'Gearbox oil', 'VFD trips', 'Run hours', 'PM on time']);
+  // Run hours: ERP NET_RUNNING_HRS, 1–8 Oct = 99.34 h.
+  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^99\.3\s*h$/, { timeout: 90_000 });
+  for (const i of [0, 2, 3, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  // Bearing temp and gearbox oil from the Drive Temp form (only a test entry so far: NA until real readings).
+  await expect(cards.getByRole('button', { name: 'Bearing temp', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|\d+)\s*°C$/);
+  await expect(cards.getByRole('button', { name: 'Gearbox oil', exact: true }).locator('.rm-card-src')).toHaveText(['Level · in', 'Pressure · kg/cm²']);
+  await expect(cards.getByRole('button', { name: 'Gearbox oil', exact: true }).locator('.rm-card-pair-v').first()).toHaveText(/^(NA|\d+\.\d)$/);
+  await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-value')).toHaveText(Array(5).fill('NA'));
+  await page.screenshot({ path: `${SHOTS}/lsm-asset-health.png`, fullPage: true });
+  await cards.getByRole('button', { name: 'Gearbox oil', exact: true }).click();
+  const d = page.getByRole('dialog', { name: 'Mill drives · bearings and gearbox oil' });
+  await expect(d.getByRole('table', { name: 'Drives: bearing temperatures' }).locator('thead th')).toHaveText([
+    'Drive', 'Flywheel DE', 'Flywheel NDE', 'Reduction DE', 'Reduction NDE', 'Pinion DE', 'Pinion NDE',
+  ]);
+  await expect(d.getByRole('table', { name: 'Drives: gearbox oil' }).locator('thead th')).toHaveText(['Drive', 'Level (in)', 'Pressure (kg/cm²)', 'Reading']);
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('Light Structure Mill → LSM Mechanical → Drive Temp');
+});

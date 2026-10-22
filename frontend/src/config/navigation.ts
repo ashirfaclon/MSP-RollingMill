@@ -26,7 +26,7 @@ export const SCREENS = [
     label: 'Asset Health',
     sub: 'Condition · Maintenance',
     icon: 'gear',
-    mills: ['hsm', 'rmd'],
+    mills: ['hsm', 'rmd', 'lsm'],
   },
   {
     id: 'condition-analytics',

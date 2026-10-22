@@ -47,7 +47,7 @@ export default function KpiCard(props: {
       <span className="rm-card-label">
         {props.label}
         {/* Two sections share one unit: shown once by the title, so each figure gets the full half. */}
-        {props.pair && <span className="rm-card-label-unit">· {props.unit}</span>}
+        {props.pair && props.unit && <span className="rm-card-label-unit">· {props.unit}</span>}
       </span>
       {props.pair && !props.loading ? (
         <span className="rm-card-value rm-card-pair num v-val">

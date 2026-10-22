@@ -76,10 +76,12 @@ export const STOCK_DIVISIONS = ['RM', 'RS', 'LS', 'PL', 'SI', 'SM', 'S1'] as con
  * not have; it is spelt PRODUTION_MT there (confirmed with the user). Billet input: INPUT_MT
  * (the user, 13 Oct 2026); billets in, pieces: INPUT_PCS (the user, 13 Oct). Short length: SHORTLENGTH_MT, the sixth loss — input − production −
  * the five listed losses equals it on 40 of 41 entries (Sep–Oct 2026); added with the user, 13 Oct.
+ * Run hours: NET_RUNNING_HRS, the ERP running hours (LSM asset health sheet: Run Hours ← ERP; the
+ * user, 22 Oct 2026).
  */
 export const LSM_LOG_FIELDS = [
   'INPUT_MT', 'INPUT_PCS', 'PRODUTION_MT', 'B_LOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'COLD_MT', 'REJECT_MT', 'SHORTLENGTH_MT',
-  'LSM_BY_PASS_MT', 'CCM_BY_PASS_MT', 'END_CRACK_BY_PASS_CCM_MT',
+  'LSM_BY_PASS_MT', 'CCM_BY_PASS_MT', 'END_CRACK_BY_PASS_CCM_MT', 'NET_RUNNING_HRS',
 ] as const;
 export type LsmLogField = (typeof LSM_LOG_FIELDS)[number];
 export interface LsmLogRow { date: string; vrno: string; v: Record<LsmLogField, number | null> }

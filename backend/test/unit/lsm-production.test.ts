@@ -5,7 +5,7 @@ import { summariseLsm } from '../../src/modules/lsm/production.service';
 const entry = (date: string, vrno: string, prod: number, bloss: number, endcut: number, misroll: number, cold: number, reject: number) => ({
   date, vrno, v: {
     INPUT_MT: 285.44, INPUT_PCS: 1313, PRODUTION_MT: prod, SHORTLENGTH_MT: 2, B_LOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, COLD_MT: cold, REJECT_MT: reject,
-    LSM_BY_PASS_MT: 1, CCM_BY_PASS_MT: 2, END_CRACK_BY_PASS_CCM_MT: 0,
+    LSM_BY_PASS_MT: 1, CCM_BY_PASS_MT: 2, END_CRACK_BY_PASS_CCM_MT: 0, NET_RUNNING_HRS: 9.5,
   },
 });
 // 11 Oct 2026 as the ERP holds it (L7P26O11-0001).

@@ -8,6 +8,7 @@
  *   bypasses    LSM_BY_PASS_MT, CCM_BY_PASS_MT, END_CRACK_BY_PASS_CCM_MT — taken out before
  *               billet input (TOTAL_CAST_QTY = INPUT_MT + the three), so not losses
  *   input       INPUT_MT (billet input), INPUT_PCS (billets in, pieces) — the user, 13 Oct 2026
+ *   run hours   NET_RUNNING_HRS (Asset Health) — the user, 22 Oct 2026
  *
  * Mass yield = production ÷ billet input × 100; mass difference = billet input − production.
  */
@@ -41,6 +42,7 @@ export function summariseLsm(key: string, label: string, dates: string[], rows: 
     lsmBypassMt: sumOf(mine, 'LSM_BY_PASS_MT'),
     ccmBypassMt: sumOf(mine, 'CCM_BY_PASS_MT'),
     endCrackBypassMt: sumOf(mine, 'END_CRACK_BY_PASS_CCM_MT'),
+    runningHrs: sumOf(mine, 'NET_RUNNING_HRS'),
   };
 }
 

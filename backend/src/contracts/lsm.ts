@@ -31,6 +31,8 @@ export interface LsmProductionPeriod {
   lsmBypassMt: number | null;
   ccmBypassMt: number | null;
   endCrackBypassMt: number | null;
+  /** NET_RUNNING_HRS — ERP run hours, Σ over the period's entries; null with none filled. */
+  runningHrs: number | null;
 }
 
 export interface LsmProductionReport {
@@ -114,4 +116,37 @@ export interface FormRunningRateReport {
   logbook: { connection: 'up' | 'down'; message: string };
   rows: import('./rmd').RmdRatePeriod[];
   totals: import('./rmd').RmdRatePeriod;
+}
+
+/** One reading of LSM Mechanical → Drive Temp: a drive's bearing temperatures and gearbox oil. */
+export interface LsmDriveReading {
+  /** The LSM mill day (09:00 → 09:00 IST) of the form's date-time. */
+  date: string;
+  /** The form's date-time, as filled. */
+  at: string;
+  shift: string;
+  drive: string;
+  /** Bearing temperatures, °C. */
+  flywheelDeC: number | null;
+  flywheelNdeC: number | null;
+  reductionDeC: number | null;
+  reductionNdeC: number | null;
+  pinionDeC: number | null;
+  pinionNdeC: number | null;
+  /** Gearbox oil pressure, kg/cm². */
+  oilPressure: number | null;
+  /** Gearbox oil level, inches. */
+  oilLevelIn: number | null;
+}
+
+/** LSM Asset Health: the Drive Temp form over a period. */
+export interface LsmDriveReport {
+  from: string;
+  to: string;
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  /** Each drive's latest reading of the period. */
+  latest: LsmDriveReading[];
+  /** Every reading of the period, oldest first. */
+  entries: LsmDriveReading[];
 }
