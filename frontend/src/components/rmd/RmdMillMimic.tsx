@@ -4,8 +4,8 @@
  * RMD mill flow, live from the plant historian (refreshed every 30 s) — the same anatomy as
  * HSM's: billet infeed (billets since 08:00 IST, M1 + M2), then each zone's running state
  * with one dot per point; finished exit is the ERP log sheet's production for the period.
- * Roughing group is not sourced yet: NA, and it opens nothing. Each live zone opens the
- * drill-down that shows where its figure comes from.
+ * No roughing group (removed by the user, 22 Oct 2026). Each live zone opens the drill-down
+ * that shows where its figure comes from.
  */
 import { Fragment, useState } from 'react';
 import Panel from '@/components/Panel';
@@ -52,7 +52,6 @@ export default function RmdMillMimic() {
       value: d?.billetsToday === null || d?.billetsToday === undefined ? 'NA' : `${d.billetsToday} billets`,
       foot: 'Today · since 08:00 IST', open: () => setOpen('infeed'), openLabel: 'Billets in per day, line 1 and line 2',
     },
-    { key: 'roughing', kind: 'count', title: 'Roughing group', value: 'NA', foot: '' },
     ...[zoneOf('route'), zoneOf('finishing')].filter((z): z is Zone => z !== null),
     {
       key: 'exit', kind: 'count', title: 'Finished exit', value: prod === null ? 'NA' : `${fixed(prod, 1)} MT`,
@@ -65,7 +64,7 @@ export default function RmdMillMimic() {
       {loading ? (
         <span className="skel skel--block" style={{ height: 78 }} role="status" aria-label="Loading" />
       ) : (
-        <ol className="rm-mimic rmd-mimic" aria-label="Mill process flow">
+        <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Mill process flow">
           {zones.map((z, i) => (
             <Fragment key={z.key}>
               {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}

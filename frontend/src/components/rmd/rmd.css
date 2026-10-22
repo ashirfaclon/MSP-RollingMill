@@ -26,6 +26,10 @@
   grid-template-columns:
     minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
 }
+/* Visualization's mill flow: four zones (no roughing group). */
+.rmd-mimic.rmd-mimic--four {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+}
 
 /* Material & operating balance: plain figures (no drill-down yet) and the operating bar. */
 .rmd-figure { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
@@ -41,11 +45,11 @@
 }
 
 @media (max-width: 1180px) {
-  .rmd-mimic { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .rmd-mimic, .rmd-mimic.rmd-mimic--four { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
   .rmd-mimic .rm-mimic-arrow:nth-child(4), .rmd-mimic .rm-mimic-arrow:nth-child(8) { display: none; }
 }
 @media (max-width: 760px) {
-  .rmd-mimic { grid-template-columns: minmax(0, 1fr); }
+  .rmd-mimic, .rmd-mimic.rmd-mimic--four { grid-template-columns: minmax(0, 1fr); }
   .rmd-mimic .rm-mimic-arrow:nth-child(4), .rmd-mimic .rm-mimic-arrow:nth-child(8) { display: grid; }
 }
 

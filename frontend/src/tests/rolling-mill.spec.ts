@@ -366,13 +366,10 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   for (const name of ['Production · Prime + SL', 'Production · Prime', 'Mass yield', 'Power consumption', 'Specific energy', 'Mill MPS', 'Chemical composition']) await expect(strip.getByRole('button', { name, exact: true })).toBeVisible();
   // No "pending" or coverage notes on the ERP cards (today's entry comes a day late, so NA).
   await expect(strip.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-note')).toHaveText('');
-  // Mill flow, live: infeed, the two status zones and the exit (ERP production) wired; roughing not sourced yet.
+  // Mill flow, live: infeed, the two status zones and the exit (ERP production); no roughing group.
   const mimic = page.getByRole('list', { name: 'Mill process flow' });
-  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit']);
+  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit']);
   await expect(mimic.getByRole('button', { name: /Billet infeed/ })).toContainText('Today · since 08:00 IST');
-  const roughing = mimic.locator('.rm-zone', { hasText: 'Roughing group' });
-  await expect(roughing).toContainText('NA');
-  await expect(roughing).not.toHaveAttribute('aria-haspopup', 'dialog');   // nothing behind it, nothing to open
   await expect(mimic.getByRole('button', { name: /Finished exit/ })).toBeVisible();
   await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-dot')).toHaveCount(14);   // L1 S1–S8 + L2 S1–S6
   await expect(mimic.getByRole('button', { name: /Finishing group/ }).locator('.rm-dot')).toHaveCount(10);   // 5 per line
