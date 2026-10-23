@@ -1233,7 +1233,9 @@ test('LSM asset health: as the LSM sheet — Drive Temp form for bearings and ge
   await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Alignment', 'Gearbox oil', 'VFD trips', 'Run hours', 'PM on time']);
   // Run hours: ERP NET_RUNNING_HRS, 1–8 Oct = 99.34 h.
   await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^99\.3\s*h$/, { timeout: 90_000 });
-  for (const i of [0, 2, 3, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  for (const i of [0, 3, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  // Motor current from the Mill Load Log Sheet (only a test entry so far: NA until real readings).
+  await expect(cards.getByRole('button', { name: 'Motor current', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|\d+)\s*A$/);
   // Bearing temp and gearbox oil from the Drive Temp form (only a test entry so far: NA until real readings).
   await expect(cards.getByRole('button', { name: 'Bearing temp', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|\d+)\s*°C$/);
   await expect(cards.getByRole('button', { name: 'Gearbox oil', exact: true }).locator('.rm-card-src')).toHaveText(['Level · in', 'Pressure · kg/cm²']);
@@ -1248,4 +1250,9 @@ test('LSM asset health: as the LSM sheet — Drive Temp form for bearings and ge
   ]);
   await expect(d.getByRole('table', { name: 'Drives: gearbox oil' }).locator('thead th')).toHaveText(['Drive', 'Level (in)', 'Pressure (kg/cm²)', 'Reading']);
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText('Light Structure Mill → LSM Mechanical → Drive Temp');
+  await page.keyboard.press('Escape');
+  await cards.getByRole('button', { name: 'Motor current', exact: true }).click();
+  const m = page.getByRole('dialog', { name: 'Mill stands · motor current' });
+  await expect(m.getByRole('table', { name: 'Load per stand and pass' }).locator('thead th')).toHaveText(['Stand', 'Pass', 'Load (A)']);
+  await expect(m.getByRole('region', { name: 'Data source' })).toContainText('Light Structure Mill → Electrical Logbook → Mill Load Log Sheet');
 });

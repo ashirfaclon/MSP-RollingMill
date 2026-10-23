@@ -8,12 +8,14 @@
  *                  the Condition trend is the hottest of each reading;
  *   Gearbox oil    the same form: the lowest oil level (inches, as filled — the user, 22 Oct 2026)
  *                  and the lowest oil pressure (kg/cm²) at each drive's latest reading;
+ *   Motor current  LSM Electrical Logbook → Mill Load Log Sheet (the plant, 23 Oct 2026): the mean
+ *                  load of the passes at the latest reading, A; opens every stand and pass;
  *   Run hours      ERP log sheet NET_RUNNING_HRS over the period.
  * The sheet maps no drive to a mill section, so the figures cover every drive. No mill mimic on
- * LSM (the user, 23 Oct 2026). Motor current waits on its electrical logbook form; vibration and
- * alignment on MID; PM items on ERP PM.
+ * LSM (the user, 23 Oct 2026). Vibration and alignment wait on MID; PM items on ERP PM.
  */
 import { useMemo, useState } from 'react';
+import LsmMillLoadDrawer from './LsmMillLoadDrawer';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
@@ -21,7 +23,7 @@ import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { dm, useSelection } from '@/services/hsmProduction';
-import { rangeUrl, useApi, type LsmDriveReading, type LsmDriveReport, type LsmProductionReport } from '@/services/hsmApi';
+import { rangeUrl, useApi, type LsmDriveReading, type LsmDriveReport, type LsmMillLoadReport, type LsmProductionReport } from '@/services/hsmApi';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import './asset.css';
@@ -41,7 +43,13 @@ const time = (at: string) => `${dm(at.slice(0, 10))} · ${at.slice(11, 16)}`;
 
 export default function LsmAssetHealth() {
   const [open, setOpen] = useState(false);
+  const [loadOpen, setLoadOpen] = useState(false);
   const { dates } = useSelection();
+
+  const loadUrl = rangeUrl('/api/lsm/mill-load', dates);
+  const loadS = useApi<LsmMillLoadReport>(loadUrl);
+  const load = loadS.data && loadS.dataUrl === loadUrl ? loadS.data : null;
+  const currentA = load?.latest?.meanA ?? null;
 
   const driveUrl = rangeUrl('/api/lsm/drive-temp', dates);
   const driveS = useApi<LsmDriveReport>(driveUrl);
@@ -76,7 +84,9 @@ export default function LsmAssetHealth() {
       <section className="rm-strip ah-strip" aria-label="Condition KPIs">
         {NA('Vibration RMS', 'mm/s', 'hold')}
         <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" {...opener} />
-        {NA('Motor current', 'A', 'prod')}
+        <KpiCard label="Motor current" value={currentA === null ? 'NA' : fixed(currentA, 0)} unit="A" note="" series="prod"
+          {...(load ? { onOpen: () => setLoadOpen(true), openLabel: 'Each stand and pass: load at the latest reading' } : {})} />
+        <LsmMillLoadDrawer open={loadOpen} onClose={() => setLoadOpen(false)} report={load} loading={!loadS.data && !loadS.error} error={loadS.error} />
         {NA('Alignment', 'mm', 'order')}
         <KpiCard
           label="Gearbox oil"

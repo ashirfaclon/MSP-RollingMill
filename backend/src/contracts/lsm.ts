@@ -150,3 +150,35 @@ export interface LsmDriveReport {
   /** Every reading of the period, oldest first. */
   entries: LsmDriveReading[];
 }
+
+/** One pass of an LSM Mill Load Log Sheet reading: the stand, the pass and its load, A. */
+export interface LsmPassLoad {
+  stand: number;
+  pass: number;
+  loadA: number | null;
+}
+
+/** One entry of LSM Electrical Logbook → Mill Load Log Sheet: every stand's load at one time. */
+export interface LsmMillLoadReading {
+  /** The form's date ("date-and-time" holds the date). */
+  date: string;
+  /** The form's time, as filled. */
+  time: string | null;
+  section: string;
+  billetSize: string;
+  passes: LsmPassLoad[];
+  /** Mean load of the passes filled, A; null with none. */
+  meanA: number | null;
+}
+
+/** LSM Asset Health: the Mill Load Log Sheet over a period. */
+export interface LsmMillLoadReport {
+  from: string;
+  to: string;
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  /** The latest reading of the period. */
+  latest: LsmMillLoadReading | null;
+  /** Every reading of the period, oldest first. */
+  entries: LsmMillLoadReading[];
+}

@@ -13,6 +13,7 @@ import { lsmStock } from './stock.service';
 import { lsmPlan, LSM_SHEET_FORM } from './plan.service';
 import { formRunningRate } from './running-rate.service';
 import { lsmDriveTemp } from './drive-temp.service';
+import { lsmMillLoad } from './mill-load.service';
 import { isDate } from '../hsm/production.service';
 import { HttpError } from '../../shared/http-error';
 
@@ -48,6 +49,12 @@ export async function lsmRoutes(app: FastifyInstance) {
   app.get('/drive-temp', { config: { errorCode: 'lsm_drive_temp_failed' } }, async (req) => {
     const { from, to } = parseRange(searchParams(req));
     return lsmDriveTemp(loadEnv(), from, to);
+  });
+
+  /** Asset Health: LSM Electrical Logbook → Mill Load Log Sheet — each stand's pass loads (motor current). */
+  app.get('/mill-load', { config: { errorCode: 'lsm_mill_load_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return lsmMillLoad(loadEnv(), from, to);
   });
 
   app.get('/running-rate', { config: { errorCode: 'lsm_running_rate_failed' } }, async (req) => {
