@@ -9,14 +9,13 @@
  *   Gearbox oil    the same form: the lowest oil level (inches, as filled — the user, 22 Oct 2026)
  *                  and the lowest oil pressure (kg/cm²) at each drive's latest reading;
  *   Run hours      ERP log sheet NET_RUNNING_HRS over the period.
- * The sheet maps no drive to a mill section and has no record for the section groups, so the
- * figures cover every drive and the mimic is NA. Motor current waits on its electrical logbook
- * form; vibration and alignment on MID; PM items on ERP PM.
+ * The sheet maps no drive to a mill section, so the figures cover every drive. No mill mimic on
+ * LSM (the user, 23 Oct 2026). Motor current waits on its electrical logbook form; vibration and
+ * alignment on MID; PM items on ERP PM.
  */
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import FlowArrow from '@/components/visualization/FlowArrow';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
@@ -26,8 +25,6 @@ import { rangeUrl, useApi, type LsmDriveReading, type LsmDriveReport, type LsmPr
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import './asset.css';
-
-const GROUPS = ['Billet infeed', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finished exit'] as const;
 
 const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
 /** The hottest of a reading's six bearings; null without any. */
@@ -97,22 +94,6 @@ export default function LsmAssetHealth() {
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" />
         {NA('PM on time', '%', 'order')}
       </section>
-
-      <Panel title="Grouped asset mimic">
-        <ol className="rm-mimic rmd-mimic" aria-label="Drive groups">
-          {GROUPS.map((g, i) => (
-            <Fragment key={g}>
-              {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
-              <li className="rm-mimic-cell">
-                <div className="rm-zone rm-zone--flow">
-                  <span className="rm-zone-title">{g}</span>
-                  <span className="rm-zone-body"><span className="rm-zone-value num v-na">NA</span></span>
-                </div>
-              </li>
-            </Fragment>
-          ))}
-        </ol>
-      </Panel>
 
       <div className="rm-row">
         <Panel title="Condition trends" sub="Bearing temperature, each reading" className="rm-panel" bodyClass="rm-body ah-trends">

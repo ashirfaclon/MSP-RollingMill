@@ -1238,7 +1238,8 @@ test('LSM asset health: as the LSM sheet — Drive Temp form for bearings and ge
   await expect(cards.getByRole('button', { name: 'Bearing temp', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|\d+)\s*°C$/);
   await expect(cards.getByRole('button', { name: 'Gearbox oil', exact: true }).locator('.rm-card-src')).toHaveText(['Level · in', 'Pressure · kg/cm²']);
   await expect(cards.getByRole('button', { name: 'Gearbox oil', exact: true }).locator('.rm-card-pair-v').first()).toHaveText(/^(NA|\d+\.\d)$/);
-  await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-value')).toHaveText(Array(5).fill('NA'));
+  // No mill mimic on LSM.
+  await expect(main.getByText('Grouped asset mimic')).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/lsm-asset-health.png`, fullPage: true });
   await cards.getByRole('button', { name: 'Gearbox oil', exact: true }).click();
   const d = page.getByRole('dialog', { name: 'Mill drives · bearings and gearbox oil' });
