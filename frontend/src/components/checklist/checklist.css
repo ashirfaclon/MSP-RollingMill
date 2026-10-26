@@ -1,0 +1,43 @@
+/* HSM checklists — fill-in forms in the drill drawer. */
+.ck-launch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ck-launch-btn {
+  display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; text-align: left; cursor: pointer;
+  font: inherit; color: inherit; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.ck-launch-btn:hover { border-color: var(--info); }
+.ck-launch-btn b { font-size: 14px; }
+.ck-launch-btn span { font-size: 11px; color: var(--muted-2); }
+
+.ck-form { display: flex; flex-direction: column; gap: 16px; }
+.ck-group { display: flex; flex-direction: column; gap: 8px; }
+.ck-group-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ck-group-head h3 { margin: 0; }
+/* Inputs line up at the foot even when a label wraps to two lines. */
+.ck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px 10px; align-items: end; }
+.ck-grid--wide { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+
+.ck-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ck-f > span { font-size: 9.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--muted-2); }
+.ck-f input, .ck-f select {
+  width: 100%; min-width: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px;
+  padding: 7px 9px; color: var(--text); font-size: 12px; font-weight: 700; font-family: inherit; color-scheme: dark;
+}
+:root[data-theme="light"] .ck-f input, :root[data-theme="light"] .ck-f select { color-scheme: light; }
+.ck-f input:focus, .ck-f select:focus { outline: none; border-color: var(--info); }
+/* A value the dashboard fills itself: read-only, visibly not typed. */
+.ck-f input[readonly] { background: var(--panel-3); border-style: dashed; color: var(--text); }
+.ck-auto { font-size: 9.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--info); }
+
+.ck-sum { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--muted-2); }
+.ck-sum b { color: var(--text); }
+
+.ck-actions { display: flex; align-items: center; gap: 12px; padding-top: 4px; border-top: 1px solid var(--border-soft); }
+.ck-save {
+  padding: 8px 16px; font: inherit; font-size: 12px; font-weight: 800; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--panel-3); color: var(--muted-2); cursor: not-allowed;
+}
+.ck-actions span { font-size: 11px; color: var(--muted-2); }
+
+@media (max-width: 760px) {
+  .ck-launch { grid-template-columns: minmax(0, 1fr); }
+}

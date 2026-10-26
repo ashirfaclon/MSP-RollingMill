@@ -1296,3 +1296,29 @@ test('RMS asset health: as the RMS sheet — run hours from the ERP (NET_RUNNING
   await expect(main.getByText(/mimic/i)).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/rms-asset-health.png`, fullPage: true });
 });
+
+test('HSM checklists: production variance fills itself from Influx, the ERP and ERP stores; shift setup has every field of the plant sheet', async ({ page }) => {
+  await page.goto('/hsm/visualization');
+  const panel = page.getByRole('main').locator('section.panel', { hasText: 'Checklists' });
+  await panel.getByRole('button', { name: /Production variance checklist/ }).click();
+  const v = page.getByRole('dialog', { name: 'Production variance checklist' });
+  await v.getByLabel('Date').fill('2026-10-20');
+  // 20 Oct: Influx 210.29, ERP 195.97 → variance 14.32 MT, 7.31 %; ERP stores: mill scale 2.63, end cut 3.43.
+  await expect(v.getByLabel('Production (Influx / HMI)')).toHaveValue('210.29', { timeout: 60_000 });
+  await expect(v.getByLabel('Production (ERP)')).toHaveValue('195.97');
+  await expect(v.getByLabel('Variance (Influx − ERP)')).toHaveValue('14.32');
+  await expect(v.getByLabel('Variance %')).toHaveValue('7.31 %');
+  await expect(v.getByLabel('Mill scale')).toHaveValue('2.63');
+  await expect(v.getByLabel('End cut', { exact: true })).toHaveValue('3.43');
+  await expect(v.getByLabel('Reasons against variance')).toContainText('Not explained 8.26 MT');
+  await expect(v.getByRole('button', { name: 'Save' })).toBeDisabled();
+  await page.waitForTimeout(500);
+  await v.screenshot({ path: `${SHOTS}/hsm-checklist-variance.png` });
+  await page.keyboard.press('Escape');
+  await panel.getByRole('button', { name: /Shift setup checklist/ }).click();
+  const s = page.getByRole('dialog', { name: 'Shift setup checklist' });
+  await expect(s.locator('.ck-group-head h3')).toHaveText(['RM guide setting', 'FM guide setting', 'Vertical edger gap · pinch roll gap', 'Roll type', 'Work roll dia']);
+  await expect(s.locator('.ck-f > span')).toHaveCount(5 + 5 + 6 + 3 + 5 + 11 + 1);
+  await page.waitForTimeout(500);
+  await s.screenshot({ path: `${SHOTS}/hsm-checklist-setup.png` });
+});

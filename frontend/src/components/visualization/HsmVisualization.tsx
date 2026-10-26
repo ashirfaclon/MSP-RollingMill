@@ -15,6 +15,7 @@ import MaterialBalance from './MaterialBalance';
 import StockBySize from './StockBySize';
 import { HSM_SAMPLE } from './hsmSample';
 import { resolveMill, type MillModel } from '@/models/millModel';
+import HsmChecklists from '@/components/checklist/HsmChecklists';
 import './visualization.css';
 
 /**
@@ -50,6 +51,7 @@ export default function HsmVisualization() {
         <MaterialBalance />
         <StockBySize />
       </div>
+      <HsmChecklists />
     </div>
   );
 }
