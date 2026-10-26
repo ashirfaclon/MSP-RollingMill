@@ -10,14 +10,17 @@
  *   Finished exit        "Row 10" — the actual running rate;
  *   Billet infeed, Roughing / Finishing group   the Visualization mimic's Influx tags (the user,
  *                        26 Oct 2026): billets since 06:00, RM / FM drives on (On_Off);
+ *   Specific energy      the logbook Electrical HSM → Power Consumption ÷ ERP production — the
+ *                        Visualization card (the plant has no EMS meter; the user, 26 Oct 2026);
  *   Product header       ERP size (PROD_TRAN receipts, the most produced strip size, and how
  *                        many others) and the running hours; grade and route are not in the ERP data.
- * Waiting on the plant / ERP: matched (stable-run) baselines, EMS energy, ERP cost masters, approved
- * limits, the stand map and route layout, the machine inspection form.
+ * Waiting on the plant / ERP: matched (stable-run) baselines and target kWh/MT, ERP cost masters,
+ * approved limits, the stand map and route layout, the machine inspection form.
  */
 import { Fragment, useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
+import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import FlowArrow from '@/components/visualization/FlowArrow';
 import { StandDots, TONE } from '@/components/visualization/MillMimic';
 import { useHsmMimic } from '@/components/visualization/useHsmMimic';
@@ -100,7 +103,7 @@ export default function HsmConditionAnalytics() {
           openLabel="Actual running rate per day"
         />
         {NA('Output opportunity', 'MT', 'order')}
-        {NA('Specific energy', 'kWh/MT', 'hold')}
+        <SpecificEnergyCard mill="hsm" />
         {NA('Conversion cost', '₹/MT', 'prod')}
         {NA('Cost variance', '₹/MT', 'hold')}
         {NA('Yield material loss', '₹', 'hold')}

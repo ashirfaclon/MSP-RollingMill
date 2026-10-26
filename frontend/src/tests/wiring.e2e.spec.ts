@@ -1206,7 +1206,9 @@ test('HSM condition analytics: as the HSM sheet — actual rate = ERP production
   await expect(cards.locator('.rm-card-label')).toHaveText(['Actual rate', 'Output opportunity', 'Specific energy', 'Conversion cost', 'Cost variance', 'Yield material loss', 'Output margin']);
   // 1–8 Oct: ERP PRODUCTION_MT 1,390.43 ÷ 60.28 running hours (billet counter) = 23.07 TPH.
   await expect(cards.locator('.rm-card-value').nth(0)).toHaveText(/^23\.07\s*TPH$/, { timeout: 90_000 });
-  for (let i = 1; i < 7; i++) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  // Specific energy: the Electrical HSM → Power Consumption form ÷ ERP production (no EMS meter) — the Visualization card.
+  await expect(cards.getByRole('button', { name: 'Specific energy', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|[\d,.]+)\s*kWh\/MT$/, { timeout: 60_000 });
   // Header: the ERP's most produced size, grade and route NA, running hours.
   await expect(main.getByRole('heading', { level: 2 })).toHaveText(/^274–276 × \d\.\d\d mm/);
   await expect(main.locator('.ah-fact', { hasText: 'Running hours' }).locator('dd')).toHaveText('60.3 h');
