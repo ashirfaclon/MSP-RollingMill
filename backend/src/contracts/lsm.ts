@@ -84,6 +84,8 @@ export interface RmsProductionPeriod {
   missRollMt: number | null;
   coldMt: number | null;
   rejectMt: number | null;
+  /** NET_RUNNING_HRS — ERP run hours, Σ over the period's entries; null with none filled. */
+  runningHrs: number | null;
   /** Σ of the five; null when none is filled. */
   lossesMt: number | null;
 }

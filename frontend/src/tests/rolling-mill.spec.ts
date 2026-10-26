@@ -144,7 +144,7 @@ test('material flow shows every stage, exit and bucket, and the balance closes',
   await panel.screenshot({ path: `${SHOTS}/material-flow-narrow.png` });
 });
 
-test('the sidebar: HSM and RMD have Visualization, Asset Health and Condition Analytics; LSM Visualization and Asset Health; RMS Visualization only', async ({ page }) => {
+test('the sidebar: every mill has Visualization, Asset Health and Condition Analytics', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const nav = page.getByRole('navigation', { name: 'Dashboard screens' });
   await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/]);
@@ -152,11 +152,11 @@ test('the sidebar: HSM and RMD have Visualization, Asset Health and Condition An
   await page.goto('/rmd/visualization');
   await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/]);
   await page.goto('/lsm/visualization');
-  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/]);
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/]);
   await page.goto('/rms/visualization');
-  await expect(nav.getByRole('link')).toHaveText([/Visualization/]);
-  for (const gone of ['/lsm/condition-analytics', '/rms/condition-analytics', '/rms/asset-health']) {
-    expect((await page.request.get(gone)).status()).toBe(404);
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/]);
+  for (const there of ['/lsm/condition-analytics', '/rms/condition-analytics', '/rms/asset-health']) {
+    expect((await page.request.get(there)).status()).toBe(200);
   }
 });
 
@@ -188,12 +188,12 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; a zon
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Roughing drive group');
   await expect(main.getByRole('button', { name: /Roughing group/ })).toHaveAttribute('aria-pressed', 'true');
   await page.screenshot({ path: `${SHOTS}/hsm-asset-health.png`, fullPage: true });
-  // Switching from Asset Health to a mill without it (RMS) lands on that mill's Visualization.
+  // Switching mill keeps the screen: every mill has Asset Health.
   const trigger = page.getByRole('button', { name: /^Rolling mill:/ });
   const list = page.getByRole('listbox', { name: 'Rolling mill' });
   await expect(async () => { await trigger.click(); await expect(list).toBeVisible({ timeout: 1000 }); }).toPass({ timeout: 15_000 });
   await list.getByRole('option', { name: 'RMS' }).click();
-  await expect(page).toHaveURL(/\/rms\/visualization$/);
+  await expect(page).toHaveURL(/\/rms\/asset-health$/);
 });
 
 test('mill picker offers HSM, RMD, LSM and RMS, switches mill, keeps the screen, and drives by keyboard', async ({ page }) => {

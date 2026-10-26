@@ -109,6 +109,8 @@ export interface RmsLogRow {
   missRollMt?: number | null;
   coldMt?: number | null;
   rejectMt?: number | null;
+  /** NET_RUNNING_HRS — ERP run hours; null when not filled. */
+  runningHrs?: number | null;
 }
 export interface RmsProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmsLogRow[] }
 

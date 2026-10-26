@@ -274,7 +274,8 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
  * with PRODUCTION_MT, PRODUCTION_PCS, INPUT_PCS (billets in) and INPUT_MT1 + INPUT_MT2 (billet
  * input, MT — each entry fills one of the two; the user, 16 Oct 2026) and the losses that make up
  * billet input − production: BURNING_LOSS_MT1/2, ENDCUT_MT1/2, MISROLL_MT1/2, COLD_MT, REJECT_MT1/2
- * (the user, 16 Oct 2026; they add up to it on every October 2026 entry). Its own failure.
+ * (the user, 16 Oct 2026; they add up to it on every October 2026 entry), and NET_RUNNING_HRS —
+ * the ERP run hours (RMS asset health sheet: Run Hours ← ERP; the user, 26 Oct 2026). Its own failure.
  */
 /** RMS loss codes, each pulled as its own column. */
 const RMS_LOSS_CODES = ['BURNING_LOSS_MT1', 'BURNING_LOSS_MT2', 'ENDCUT_MT1', 'ENDCUT_MT2', 'MISROLL_MT1', 'MISROLL_MT2', 'COLD_MT', 'REJECT_MT1', 'REJECT_MT2'] as const;
@@ -292,18 +293,19 @@ async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
     conn = await oracledb.getConnection({ user: env.erpUser!, password: env.erpPassword!, connectString: env.erpDsn! });
     conn.callTimeout = 120_000;
     await conn.execute('SET TRANSACTION READ ONLY');
-    const rows = ((await conn.execute<{ D: string; VRNO: string; MT: number | null; PCS: number | null; IN_PCS: number | null; INPUT_MT1: number | null; INPUT_MT2: number | null } & Record<RmsLossCode, number | null>>(`
+    const rows = ((await conn.execute<{ D: string; VRNO: string; MT: number | null; PCS: number | null; IN_PCS: number | null; INPUT_MT1: number | null; INPUT_MT2: number | null; RUN_H: number | null } & Record<RmsLossCode, number | null>>(`
       SELECT TO_CHAR(h.VRDATE, 'YYYY-MM-DD') AS "D", h.VRNO AS "VRNO",
              ${RMS_LOSS_CODES.map((c) => `MAX(CASE WHEN b.ATTR_CODE = '${c}' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "${c}"`).join(',\n             ')},
              MAX(CASE WHEN b.ATTR_CODE = 'PRODUCTION_MT' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "MT",
              MAX(CASE WHEN b.ATTR_CODE = 'PRODUCTION_PCS' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "PCS",
              MAX(CASE WHEN b.ATTR_CODE = 'INPUT_PCS' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "IN_PCS",
              MAX(CASE WHEN b.ATTR_CODE = 'INPUT_MT1' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "INPUT_MT1",
-             MAX(CASE WHEN b.ATTR_CODE = 'INPUT_MT2' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "INPUT_MT2"
+             MAX(CASE WHEN b.ATTR_CODE = 'INPUT_MT2' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "INPUT_MT2",
+             MAX(CASE WHEN b.ATTR_CODE = 'NET_RUNNING_HRS' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "RUN_H"
         FROM MSPV7ERP1.ATTR_TRAN_DATA_HEAD h
         JOIN MSPV7ERP1.ATTR_TRAN_DATA_BODY b ON b.VRNO = h.VRNO AND b.ENTITY_CODE = h.ENTITY_CODE
        WHERE h.ENTITY_CODE = 'MP' AND h.TNATURE = 'PRLOG' AND h.DIV_CODE = 'RS' AND h.SERIES = 'L5P'
-         AND b.ATTR_CODE IN ('PRODUCTION_MT', 'PRODUCTION_PCS', 'INPUT_PCS', 'INPUT_MT1', 'INPUT_MT2', ${RMS_LOSS_CODES.map((c) => `'${c}'`).join(', ')})
+         AND b.ATTR_CODE IN ('PRODUCTION_MT', 'PRODUCTION_PCS', 'INPUT_PCS', 'INPUT_MT1', 'INPUT_MT2', 'NET_RUNNING_HRS', ${RMS_LOSS_CODES.map((c) => `'${c}'`).join(', ')})
          AND h.VRDATE >= TO_DATE(:fromDate, 'YYYY-MM-DD')
        GROUP BY h.VRDATE, h.VRNO
        ORDER BY h.VRDATE, h.VRNO`, { fromDate: FROM }, { maxRows: 0 })).rows ?? []);
@@ -320,6 +322,7 @@ async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
           missRollMt: sumOfCodes(r, ['MISROLL_MT1', 'MISROLL_MT2']),
           coldMt: sumOfCodes(r, ['COLD_MT']),
           rejectMt: sumOfCodes(r, ['REJECT_MT1', 'REJECT_MT2']),
+          runningHrs: num(r.RUN_H),
         };
       }),
     };

@@ -59,7 +59,7 @@ export function FormRunningRateFoot({ mill }: { mill: Mill }) {
   );
 }
 
-function FormRunningRateDrawer({ mill, open, onClose }: { mill: Mill; open: boolean; onClose: () => void }) {
+export function FormRunningRateDrawer({ mill, open, onClose }: { mill: Mill; open: boolean; onClose: () => void }) {
   const r = useDrillRange(['selection'], 'selection');
   const url = open && r.dates ? rangeUrl(`/api/${mill}/running-rate`, { ...r.dates, grain: r.grain }) : null;
   const { data, dataUrl, loading, error } = useApi<FormRunningRateReport>(url);

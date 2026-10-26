@@ -26,14 +26,14 @@ export const SCREENS = [
     label: 'Asset Health',
     sub: 'Condition · Maintenance',
     icon: 'gear',
-    mills: ['hsm', 'rmd', 'lsm'],
+    mills: ['hsm', 'rmd', 'lsm', 'rms'],
   },
   {
     id: 'condition-analytics',
     label: 'Condition Analytics',
     sub: 'Rate · Cost · Condition',
     icon: 'trend',
-    mills: ['hsm', 'rmd'],
+    mills: ['hsm', 'rmd', 'lsm', 'rms'],
   },
   {
     id: 'data-model',

@@ -39,7 +39,7 @@ export function summariseRms(key: string, label: string, dates: string[], rows: 
   const input = mine.map((r) => r.inputMt ?? null).filter((x): x is number => x !== null);
   const productionMt = v.length ? round2(v.reduce((a, b) => a + b, 0)) : null;
   const billetInputMt = input.length ? round2(input.reduce((a, b) => a + b, 0)) : null;
-  const lossOf = (k: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'rejectMt') => {
+  const lossOf = (k: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'rejectMt' | 'runningHrs') => {
     const xs = mine.map((r) => r[k] ?? null).filter((x): x is number => x !== null);
     return xs.length ? round2(xs.reduce((a, b) => a + b, 0)) : null;
   };
@@ -56,6 +56,7 @@ export function summariseRms(key: string, label: string, dates: string[], rows: 
     massYieldPct: massYield(productionMt, billetInputMt),
     ...losses,
     lossesMt: lossVals.every((l) => l === null) ? null : round2(lossVals.reduce<number>((a, l) => a + (l ?? 0), 0)),
+    runningHrs: lossOf('runningHrs'),
   };
 }
 

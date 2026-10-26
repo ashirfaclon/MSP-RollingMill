@@ -1256,3 +1256,43 @@ test('LSM asset health: as the LSM sheet — Drive Temp form for bearings and ge
   await expect(m.getByRole('table', { name: 'Load per stand and pass' }).locator('thead th')).toHaveText(['Stand', 'Pass', 'Load (A)']);
   await expect(m.getByRole('region', { name: 'Data source' })).toContainText('Light Structure Mill → Electrical Logbook → Mill Load Log Sheet');
 });
+
+for (const c of [
+  { mill: 'lsm', rate: '25.00' },   // 1–8 Oct: 2,106.12 MT ÷ 84.24 h (Production Sheet runs)
+  { mill: 'rms', rate: '38.47' },   // 1–8 Oct: 4,114.29 MT ÷ 92.17 h
+] as const) test(`${c.mill.toUpperCase()} condition analytics: actual rate = the Visualization running rate, specific energy from the power form; no mimic; the rest NA`, async ({ page }) => {
+  await page.goto(`/${c.mill}/condition-analytics`);
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  await expect(cards.locator('.rm-card-label')).toHaveText(['Actual rate', 'Output opportunity', 'Specific energy', 'Conversion cost', 'Cost variance', 'Yield material loss', 'Output margin']);
+  await expect(cards.locator('.rm-card-value').nth(0)).toHaveText(new RegExp(`^${c.rate.replace('.', '\\.')}\\s*TPH$`), { timeout: 90_000 });
+  for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(main.getByText(/mimic/i)).toHaveCount(0);
+  await expect(main.locator('section.panel', { hasText: 'Costing & impact' }).locator('.num')).toHaveText(Array(8).fill('NA'));
+  await expect(main.locator('section.panel', { hasText: 'Matched-run performance' }).locator('.num')).toHaveText(['NA', 'NA']);
+  await page.screenshot({ path: `${SHOTS}/${c.mill}-condition-analytics.png`, fullPage: true });
+  await cards.getByRole('button', { name: 'Actual rate', exact: true }).click();
+  await expect(page.getByRole('dialog').first()).toBeVisible();
+});
+
+test('RMS asset health: as the RMS sheet — run hours from the ERP (NET_RUNNING_HRS); offline-sheet and MID items NA; no mimic', async ({ page }) => {
+  await page.goto('/rms/asset-health');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Alignment', 'Gearbox oil', 'VFD trips', 'Run hours', 'PM on time']);
+  // 1–8 Oct: Σ NET_RUNNING_HRS = 102.16 h.
+  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^102\.2\s*h$/, { timeout: 90_000 });
+  for (const i of [0, 1, 2, 3, 4, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(main.getByText(/mimic/i)).toHaveCount(0);
+  await page.screenshot({ path: `${SHOTS}/rms-asset-health.png`, fullPage: true });
+});
