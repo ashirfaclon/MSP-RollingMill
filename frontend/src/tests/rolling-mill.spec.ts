@@ -182,7 +182,9 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; a zon
     expect(vals.every((v) => v.trim().startsWith('NA'))).toBe(true);
   }
   // The sheet gives no source for the mimic: every zone NA.
-  await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-value')).toHaveText(Array(5).fill('NA'));
+  await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit']);
+  // The Visualization mimic's Influx tags: billets today, drives on per group, the production counter.
+  await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-value')).toHaveText([/^(NA|\d+ billets)$/, /\S/, /\S/, /^(NA|[\d,.]+ MT)$/], { timeout: 60_000 });
   // A zone selects its drive group.
   await main.getByRole('button', { name: /Roughing group/ }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Roughing drive group');

@@ -1211,8 +1211,9 @@ test('HSM condition analytics: as the HSM sheet — actual rate = ERP production
   await expect(main.locator('.ah-fact', { hasText: 'Running hours' }).locator('dd')).toHaveText('60.3 h');
   // Mimic: only the finished exit (= actual rate) has a source.
   const mimic = main.getByRole('list', { name: 'Condition groups' });
-  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finished exit']);
-  await expect(mimic.locator('.rm-zone-value')).toHaveText(['NA', 'NA', 'NA', 'NA', '23.07 TPH']);
+  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit']);
+  // Billet infeed and the stand groups live from the Visualization mimic's tags; exit = the actual rate.
+  await expect(mimic.locator('.rm-zone-value')).toHaveText([/^(NA|\d+ billets)$/, /\S/, /\S/, '23.07 TPH'], { timeout: 60_000 });
   await page.screenshot({ path: `${SHOTS}/hsm-condition-analytics.png`, fullPage: true });
   // The rate opens its days, with sources.
   await cards.getByRole('button', { name: 'Actual rate', exact: true }).click();
@@ -1297,19 +1298,23 @@ test('RMS asset health: as the RMS sheet — run hours from the ERP (NET_RUNNING
   await page.screenshot({ path: `${SHOTS}/rms-asset-health.png`, fullPage: true });
 });
 
-test('HSM checklists: production variance fills itself from Influx, the ERP and ERP stores; shift setup has every field of the plant sheet', async ({ page }) => {
+test('HSM checklists: production variance — per day, the production figures filled by the dashboard, the reasons typed; shift setup has every field of the plant sheet', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const panel = page.getByRole('main').locator('section.panel', { hasText: 'Checklists' });
   await panel.getByRole('button', { name: /Production variance checklist/ }).click();
   const v = page.getByRole('dialog', { name: 'Production variance checklist' });
+  await expect(v.getByLabel('Shift')).toHaveCount(0);
   await v.getByLabel('Date').fill('2026-10-20');
-  // 20 Oct: Influx 210.29, ERP 195.97 → variance 14.32 MT, 7.31 %; ERP stores: mill scale 2.63, end cut 3.43.
+  // 20 Oct: Influx 210.29, ERP 195.97 → variance 14.32 MT, 7.31 %.
   await expect(v.getByLabel('Production (Influx / HMI)')).toHaveValue('210.29', { timeout: 60_000 });
   await expect(v.getByLabel('Production (ERP)')).toHaveValue('195.97');
   await expect(v.getByLabel('Variance (Influx − ERP)')).toHaveValue('14.32');
   await expect(v.getByLabel('Variance %')).toHaveValue('7.31 %');
-  await expect(v.getByLabel('Mill scale')).toHaveValue('2.63');
-  await expect(v.getByLabel('End cut', { exact: true })).toHaveValue('3.43');
+  // The reasons start empty and are typed by the user.
+  for (const r of ['Miss roll', 'Finish end cut', 'Mill scale']) await expect(v.getByLabel(r)).toHaveValue('');
+  await expect(v.getByLabel('End cut', { exact: true })).toHaveValue('');
+  await v.getByLabel('Mill scale').fill('2.63');
+  await v.getByLabel('End cut', { exact: true }).fill('3.43');
   await expect(v.getByLabel('Reasons against variance')).toContainText('Not explained 8.26 MT');
   await expect(v.getByRole('button', { name: 'Save' })).toBeDisabled();
   await page.waitForTimeout(500);

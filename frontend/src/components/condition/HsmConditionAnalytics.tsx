@@ -8,6 +8,8 @@
  *                        historian (Dicharged_Billet: billets ≤ 10 min apart — the Visualization
  *                        running hours), over the days that have both; opens per day;
  *   Finished exit        "Row 10" — the actual running rate;
+ *   Billet infeed, Roughing / Finishing group   the Visualization mimic's Influx tags (the user,
+ *                        26 Oct 2026): billets since 06:00, RM / FM drives on (On_Off);
  *   Product header       ERP size (PROD_TRAN receipts, the most produced strip size, and how
  *                        many others) and the running hours; grade and route are not in the ERP data.
  * Waiting on the plant / ERP: matched (stable-run) baselines, EMS energy, ERP cost masters, approved
@@ -17,6 +19,8 @@ import { Fragment, useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import FlowArrow from '@/components/visualization/FlowArrow';
+import { StandDots, TONE } from '@/components/visualization/MillMimic';
+import { useHsmMimic } from '@/components/visualization/useHsmMimic';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
@@ -53,12 +57,18 @@ export default function HsmConditionAnalytics() {
   const top = sizes?.length ? [...sizes].sort((a, b) => b.producedMt - a.producedMt)[0] : null;
   const runH = rateR?.totals.runH ?? null;
 
-  const zones: { title: string; value: string; foot: string }[] = [
-    { title: 'Billet infeed', value: 'NA', foot: 'feed context' },
-    { title: 'Roughing group', value: 'NA', foot: 'current / RPM' },
-    { title: 'Intermediate group', value: 'NA', foot: 'load' },
-    { title: 'Finishing group', value: 'NA', foot: 'speed' },
-    { title: 'Finished exit', value: tph === null ? 'NA' : `${fixed(tph, 2)} TPH`, foot: 'actual rate' },
+  // Billet infeed and the two stand groups: the Visualization mimic's Influx tags (the user, 26 Oct 2026).
+  const mimic = useHsmMimic();
+  const groupZone = (id: 'roughing' | 'finishing', title: string) => {
+    const g = mimic.group(id);
+    const on = g && g.state !== 'no-data';
+    return { title, value: on ? g.stateLabel : 'NA', foot: on ? `${g.on} of ${g.total} on` : 'drives on / off', tone: g ? TONE[g.state] : 'flow', stands: on ? id : null };
+  };
+  const zones: { title: string; value: string; foot: string; tone: string; stands: 'roughing' | 'finishing' | null }[] = [
+    { title: 'Billet infeed', value: mimic.billetsToday === null ? 'NA' : `${mimic.billetsToday} billets`, foot: 'Today · since 06:00 IST', tone: 'flow', stands: null },
+    groupZone('roughing', 'Roughing group'),
+    groupZone('finishing', 'Finishing group'),
+    { title: 'Finished exit', value: tph === null ? 'NA' : `${fixed(tph, 2)} TPH`, foot: 'actual rate', tone: 'flow', stands: null },
   ];
 
   return (
@@ -108,14 +118,17 @@ export default function HsmConditionAnalytics() {
       </div>
 
       <Panel title="Grouped condition mimic">
-        <ol className="rm-mimic rmd-mimic" aria-label="Condition groups">
+        <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Condition groups">
           {zones.map((z, i) => (
             <Fragment key={z.title}>
               {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
               <li className="rm-mimic-cell">
-                <div className="rm-zone rm-zone--flow">
+                <div className={`rm-zone rm-zone--${z.tone}`}>
                   <span className="rm-zone-title">{z.title}</span>
-                  <span className="rm-zone-body"><span className={`rm-zone-value num ${z.value === 'NA' ? 'v-na' : 'v-val'}`}>{z.value}</span></span>
+                  <span className="rm-zone-body">
+                    <span className={`rm-zone-value num ${z.value === 'NA' ? 'v-na' : 'v-val'}`}>{z.value}</span>
+                    {z.stands && <StandDots stands={mimic.stands(z.stands)} />}
+                  </span>
                   <span className="rm-zone-foot">{z.foot}</span>
                 </div>
               </li>

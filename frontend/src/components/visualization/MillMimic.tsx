@@ -21,7 +21,7 @@ import { useProduction, useSelection } from '@/services/hsmProduction';
 const HM = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
 const hm = (iso: string | null) => (iso ? `${HM.format(new Date(iso))} IST` : '—');
 
-const TONE: Record<GroupNow['state'], string> = { 'all-on': 'ok', partial: 'risk', 'all-off': 'na', 'no-data': 'na' };
+export const TONE: Record<GroupNow['state'], string> = { 'all-on': 'ok', partial: 'risk', 'all-off': 'na', 'no-data': 'na' };
 
 export default function MillMimic() {
   const live = useApi<HsmLive>('/api/hsm/live', 30_000);
@@ -101,7 +101,7 @@ export default function MillMimic() {
 }
 
 /** One dot per stand: on, off, or no fresh reading. */
-function StandDots({ stands }: { stands: HsmLive['stands'] }) {
+export function StandDots({ stands }: { stands: HsmLive['stands'] }) {
   return (
     <span className="rm-dots" aria-label={stands.map((s) => `${s.id} ${s.on === null ? 'no data' : s.on ? 'on' : 'off'}`).join(', ')}>
       {stands.map((s) => (

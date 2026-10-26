@@ -11,6 +11,8 @@
  *   Motor current      Mill Load Log Sheet: mean load (A) at the group's stands' latest readings;
  *                      as % once each motor's rated current is given.
  *   Run hours          ERP log sheet NET_RUNNING_HRS over the period (whole mill).
+ *   Mimic, status   the Visualization mimic's Influx tags (the user, 26 Oct 2026): billets since
+ *                      06:00, RM / FM drives on (On_Off), the production counter for the period.
  * The stand name places a reading in its group (RM → roughing, FM → finishing). Clicking a zone
  * selects its drive group. Vibration and alignment wait on MID; PM items on ERP PM; the rest have
  * no source in the sheet.
@@ -19,6 +21,8 @@ import { Fragment, useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import FlowArrow from '@/components/visualization/FlowArrow';
+import { StandDots, TONE } from '@/components/visualization/MillMimic';
+import { useHsmMimic } from '@/components/visualization/useHsmMimic';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
@@ -29,7 +33,8 @@ import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import './asset.css';
 
-const GROUPS = ['Billet infeed', 'Roughing group', 'Intermediate group', 'Finishing group', 'Finished exit'] as const;
+/** HSM has no intermediate group (the user, 26 Oct 2026; the historian has only RM 1–5 and FM 1–6). */
+const GROUPS = ['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit'] as const;
 type Group = (typeof GROUPS)[number];
 /** The zones whose stands the Mill Load Log Sheet covers. */
 const STANDS: Partial<Record<Group, 'roughing' | 'finishing'>> = { 'Roughing group': 'roughing', 'Finishing group': 'finishing' };
@@ -62,6 +67,8 @@ export default function AssetHealth() {
   const loadA = loads.length ? loads.reduce((a, b) => a + b, 0) / loads.length : null;
   const trend = gid && load ? load.entries.filter((e) => e.group === gid && hottest(e) !== null) : [];
   const canOpen = !!gid && !!load;
+  const mimic = useHsmMimic();
+  const liveGroup = gid ? mimic.group(gid) : null;
 
   return (
     <div className="rm-viz ah">
@@ -70,7 +77,9 @@ export default function AssetHealth() {
           <span className="rm-k">Selected asset</span>
           <h2 className="ah-asset-name">HSM · {drive} drive group</h2>
         </div>
-        <span className="chip chip--na ah-status">Status NA</span>
+        {liveGroup && liveGroup.state !== 'no-data'
+          ? <span className="chip chip--info ah-status">{liveGroup.stateLabel}</span>
+          : <span className="chip chip--na ah-status">Status NA</span>}
         <dl className="ah-asset-facts">
           {['Last inspection', 'Next PM · ERP', 'Open work orders', 'Health score'].map((k) => (
             <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className="num v-na">NA</dd></div>
@@ -104,18 +113,30 @@ export default function AssetHealth() {
       </section>
 
       <Panel title="Grouped asset mimic">
-        <ol className="rm-mimic rmd-mimic" aria-label="Drive groups">
-          {GROUPS.map((g, i) => (
-            <Fragment key={g}>
-              {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
-              <li className="rm-mimic-cell">
-                <button type="button" className={`rm-zone rm-zone--flow ah-zone${g === group ? ' is-selected' : ''}`} aria-pressed={g === group} onClick={() => setGroup(g)}>
-                  <span className="rm-zone-title">{g}</span>
-                  <span className="rm-zone-body"><span className="rm-zone-value num v-na">NA</span></span>
-                </button>
-              </li>
-            </Fragment>
-          ))}
+        <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Drive groups">
+          {GROUPS.map((g, i) => {
+            const sg = STANDS[g] ?? null;
+            const grp = sg ? mimic.group(sg) : null;
+            const value = g === 'Billet infeed' ? (mimic.billetsToday === null ? 'NA' : `${mimic.billetsToday} billets`)
+              : g === 'Finished exit' ? (mimic.exitMt === null ? 'NA' : `${fixed(mimic.exitMt, 1)} MT`)
+              : grp && grp.state !== 'no-data' ? grp.stateLabel : 'NA';
+            const tone = grp ? `rm-zone--${TONE[grp.state]}` : 'rm-zone--flow';
+            return (
+              <Fragment key={g}>
+                {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
+                <li className="rm-mimic-cell">
+                  <button type="button" className={`rm-zone ${tone} ah-zone${g === group ? ' is-selected' : ''}`} aria-pressed={g === group} onClick={() => setGroup(g)}>
+                    <span className="rm-zone-title">{g}</span>
+                    <span className="rm-zone-body">
+                      <span className={`rm-zone-value num ${value === 'NA' ? 'v-na' : 'v-val'}`}>{value}</span>
+                      {sg && value !== 'NA' && <StandDots stands={mimic.stands(sg)} />}
+                    </span>
+                    <span className="rm-zone-foot">{g === 'Billet infeed' ? 'Today · since 06:00 IST' : ' '}</span>
+                  </button>
+                </li>
+              </Fragment>
+            );
+          })}
         </ol>
       </Panel>
 

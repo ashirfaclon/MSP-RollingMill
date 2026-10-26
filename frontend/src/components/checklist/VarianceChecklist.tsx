@@ -2,13 +2,13 @@
 
 /**
  * HSM · Production variance checklist — the plant's "Production variance checklist" sheet
- * (Rolling_Mill_Checklists_Data.xlsx) as a form. Everything the dashboard already has is filled in:
+ * (Rolling_Mill_Checklists_Data.xlsx) as a form, one per plant day (no shift; the user, 26 Oct 2026).
+ * Filled by the dashboard:
  *   Production (Influx)   the Production card's counter total for the plant day;
  *   Production (ERP)      the ERP log sheet's PRODUCTION_MT for the day;
- *   Variance, Variance %  Influx − ERP, and that ÷ ERP × 100 (the sheet's "Variance / 100" is a slip);
- *   Reasons               the day's by-products booked in ERP stores — miss roll, finish end cut,
- *                         mill scale, end cut (strip end cut) — editable.
- * Preview only: saving is not connected yet (storage and day vs shift to be confirmed by the user).
+ *   Variance, Variance %  Influx − ERP, and that ÷ ERP × 100 (the sheet's "Variance / 100" is a slip).
+ * The reasons (miss roll, finish end cut, mill scale, end cut) are typed by the user.
+ * Preview only: saving is not connected yet (storage to be confirmed by the user).
  */
 import { useEffect, useState } from 'react';
 import DrillDrawer from '@/components/drill/DrillDrawer';
@@ -28,7 +28,6 @@ const mt = (v: number | null) => (v === null ? '' : fixed(v, 2));
 export default function VarianceChecklist({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { today } = useSelection();
   const [date, setDate] = useState('');
-  const [shift, setShift] = useState<'Day' | 'Night'>('Day');
   const day = date || today || '';
   const prod = useProduction(open && day ? { from: day, to: day, grain: 'day' } : null);
   const d = prod.data?.days.find((x) => x.date === day) ?? null;
@@ -37,15 +36,11 @@ export default function VarianceChecklist({ open, onClose }: { open: boolean; on
   const variance = influx !== null && erp !== null ? influx - erp : null;
   const pct = variance !== null && erp ? (variance / erp) * 100 : null;
 
-  // Reasons start from the ERP's by-products for the day; the person can correct them.
+  // The reasons are typed by the person; a new date starts them empty.
   const [reasons, setReasons] = useState<Record<ReasonKey, string>>({ missRoll: '', finishEndcut: '', millScale: '', stripEndcut: '' });
-  const bp = d?.byProducts ?? null;
   useEffect(() => {
-    setReasons({
-      missRoll: bp ? String(bp.missRoll) : '', finishEndcut: bp ? String(bp.finishEndcut) : '',
-      millScale: bp ? String(bp.millScale) : '', stripEndcut: bp ? String(bp.stripEndcut) : '',
-    });
-  }, [day, bp]);
+    setReasons({ missRoll: '', finishEndcut: '', millScale: '', stripEndcut: '' });
+  }, [day]);
   const reasonTotal = REASONS.reduce((a, r) => a + (Number(reasons[r.key]) || 0), 0);
   const unexplained = variance !== null ? variance - reasonTotal : null;
 
@@ -57,11 +52,6 @@ export default function VarianceChecklist({ open, onClose }: { open: boolean; on
           <div className="ck-grid ck-grid--wide">
             <label className="ck-f"><span>Date</span>
               <input type="date" value={day} max={today ?? undefined} onChange={(e) => setDate(e.target.value)} />
-            </label>
-            <label className="ck-f"><span>Shift</span>
-              <select value={shift} onChange={(e) => setShift(e.target.value as 'Day' | 'Night')}>
-                <option>Day</option><option>Night</option>
-              </select>
             </label>
           </div>
         </div>
@@ -77,7 +67,7 @@ export default function VarianceChecklist({ open, onClose }: { open: boolean; on
         </div>
 
         <div className="ck-group">
-          <div className="ck-group-head"><h3 className="rm-k">Reason for variance · MT</h3><span className="ck-auto">From ERP stores · can be corrected</span></div>
+          <div className="ck-group-head"><h3 className="rm-k">Reason for variance · MT</h3></div>
           <div className="ck-grid ck-grid--wide">
             {REASONS.map((r) => (
               <label className="ck-f" key={r.key}><span>{r.label}</span>
