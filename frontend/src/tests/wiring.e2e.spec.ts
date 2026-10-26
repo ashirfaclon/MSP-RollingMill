@@ -751,7 +751,8 @@ test('HSM asset health: as the HSM sheet — mill load log sheet per stand, run 
   await cards.getByRole('button', { name: 'Motor current', exact: true }).click();
   const d = page.getByRole('dialog', { name: 'Finishing · mill load' });
   const t = d.getByRole('table', { name: 'Mill load per stand' });
-  await expect(t.locator('thead th')).toHaveText(['Stand', 'Load (A)', 'DC motor DE (°C)', 'DC motor NDE (°C)', 'Reading']);
+  await expect(t.locator('thead th')).toHaveText(['Stand', 'Load (A)', 'Rated (A)', 'Loading (%)', 'DC motor DE (°C)', 'DC motor NDE (°C)', 'Reading']);
+  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('Loading % = load ÷ rated current × 100');
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText('Electrical HSM → Mill Load Log Sheet');
   await expect(d.getByRole('region', { name: 'Formula' })).toContainText('RM stands = roughing, FM stands = finishing');
   await page.waitForTimeout(700);

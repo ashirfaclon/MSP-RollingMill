@@ -171,7 +171,7 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; a zon
   // entries), run hours from the ERP; the rest NA.
   for (const i of [0, 3, 4, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
   await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
-  await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
+  await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)%$/);
   await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
   for (const t of ['Grouped asset mimic', 'Condition trends', 'Laser alignment · Machine inspection', 'ERP PM & work-order history', 'Diagnosis & process impact']) {
     await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();

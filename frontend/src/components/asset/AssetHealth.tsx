@@ -8,8 +8,9 @@
  *                      selected group's stands' latest readings, °C; opens every stand, and the
  *                      Condition trend is the hottest of each reading. (Deviation from a
  *                      comparable-load baseline once the form has history.)
- *   Motor current      Mill Load Log Sheet: mean load (A) at the group's stands' latest readings;
- *                      as % once each motor's rated current is given.
+ *   Motor current      Mill Load Log Sheet: loading % = load ÷ the motor's rated current × 100
+ *                      (Strip_Mill_DC_Motor_Details.xlsx, the plant, 26 Oct 2026), the mean of the
+ *                      group's stands at their latest readings; the drill-down shows amps and %.
  *   Run hours          ERP log sheet NET_RUNNING_HRS over the period (whole mill).
  *   Mimic, status   the Visualization mimic's Influx tags (the user, 26 Oct 2026): billets since
  *                      06:00, RM / FM drives on (On_Off), the production counter for the period.
@@ -27,6 +28,7 @@ import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
+import { HSM_RATED_CURRENT_A, loadingPct } from '@/config/hsmMotors';
 import { dm, useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type HsmMillLoadEntry, type HsmMillLoadReport, type RunningRateReport } from '@/services/hsmApi';
 import '@/components/visualization/visualization.css';
@@ -65,6 +67,8 @@ export default function AssetHealth() {
   const bearingC = temps.length ? Math.max(...temps) : null;
   const loads = latest.map((e) => e.loadA).filter((v): v is number => v !== null);
   const loadA = loads.length ? loads.reduce((a, b) => a + b, 0) / loads.length : null;
+  const pcts = latest.map((e) => loadingPct(e.stand, e.loadA)).filter((v): v is number => v !== null);
+  const loadPct = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null;
   const trend = gid && load ? load.entries.filter((e) => e.group === gid && hottest(e) !== null) : [];
   const canOpen = !!gid && !!load;
   const mimic = useHsmMimic();
@@ -99,8 +103,8 @@ export default function AssetHealth() {
         />
         <KpiCard
           label="Motor current"
-          value={loadA === null ? 'NA' : fixed(loadA, 0)}
-          unit="A"
+          value={loadPct === null ? 'NA' : fixed(loadPct, 0)}
+          unit="%"
           note=""
           series="prod"
           {...(canOpen ? { onOpen: () => setOpen(true), openLabel: 'Each stand: load and DC motor temperatures' } : {})}
@@ -173,19 +177,22 @@ export default function AssetHealth() {
         {load && (
           <>
             <Stats items={[
+              { label: 'Motor current loading', value: loadPct === null ? 'NA' : fixed(loadPct, 0), unit: '% · mean of stands', tone: loadPct === null ? 'v-na' : undefined },
               { label: 'Motor current', value: loadA === null ? 'NA' : fixed(loadA, 0), unit: 'A · mean of stands', tone: loadA === null ? 'v-na' : undefined },
               { label: 'Hottest bearing', value: bearingC === null ? 'NA' : fixed(bearingC, 0), unit: '°C · DC motor', tone: bearingC === null ? 'v-na' : undefined },
             ]} />
             <div className="pd-table-wrap">
               <table className="grid pd-table" aria-label="Mill load per stand">
-                <thead><tr><th>Stand</th><th className="r">Load (A)</th><th className="r">DC motor DE (°C)</th><th className="r">DC motor NDE (°C)</th><th>Reading</th></tr></thead>
+                <thead><tr><th>Stand</th><th className="r">Load (A)</th><th className="r">Rated (A)</th><th className="r">Loading (%)</th><th className="r">DC motor DE (°C)</th><th className="r">DC motor NDE (°C)</th><th>Reading</th></tr></thead>
                 <tbody>
                   {latest.length === 0
-                    ? <tr><td colSpan={5} className="v-na">NA</td></tr>
+                    ? <tr><td colSpan={7} className="v-na">NA</td></tr>
                     : latest.map((e) => (
                       <tr key={e.stand}>
                         <td><b>{e.stand}</b></td>
                         <td className="num r">{e.loadA === null ? '—' : fixed(e.loadA, 0)}</td>
+                        <td className="num r">{HSM_RATED_CURRENT_A[e.stand] ? fixed(HSM_RATED_CURRENT_A[e.stand], 0) : '—'}</td>
+                        <td className="num r v-val">{loadingPct(e.stand, e.loadA) === null ? '—' : fixed(loadingPct(e.stand, e.loadA), 0)}</td>
                         <td className="num r">{e.deTempC === null ? '—' : fixed(e.deTempC, 0)}</td>
                         <td className="num r">{e.ndeTempC === null ? '—' : fixed(e.ndeTempC, 0)}</td>
                         <td>{dm(e.date)}{e.time ? ` · ${e.time.slice(11, 16)}` : ''} · {e.shift}</td>
@@ -201,7 +208,8 @@ export default function AssetHealth() {
               ] }]}
               formula={[
                 'Each stand\'s latest reading of the period; RM stands = roughing, FM stands = finishing',
-                'Motor current = mean load of the group\'s stands (A); % loading once rated currents are given',
+                'Loading % = load ÷ rated current × 100 per stand (rated current: Strip_Mill_DC_Motor_Details, R1–R5 630–983 A, F1–F6 1,214–1,807 A)',
+                'Motor current = the mean loading % of the group\'s stands',
                 'Bearing temp = the hottest DC motor DE / NDE temperature of the group\'s stands',
               ]}
             />
