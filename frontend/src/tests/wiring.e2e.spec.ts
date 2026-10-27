@@ -56,12 +56,11 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   // Finished exit = the Production card's Influx figure: Σ Total_Production_Ton increases, 22–28 Sep.
   const exit = page.getByRole('button', { name: /Finished exit/ });
   await expect(exit).toContainText('1,141.1 MT');
-  // No order link in the ERP: all production is Made To Stock — same figure as the Production card.
-  await expect(page.getByRole('article', { name: 'Made To Stock', exact: true })).toContainText('1,141.1');
+  // Order allocation: the production total only — no Made To Order / Made To Stock split.
   const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
   await expect(split.locator('.rm-alloc-total')).toHaveText('1,141.1 MT');
-  await expect(split).toContainText('Made To Stock1,141.1 MT');
-  await expect(split).toContainText('Made To Order0.0 MT');
+  await expect(split).not.toContainText('Made To');
+  await expect(page.getByRole('region', { name: 'Headline KPIs' }).locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/]);
 
   const panel = page.locator('section.panel', { hasText: 'Material & operating balance' });
   // One click target for the whole balance; the figures inside are plain text.
@@ -205,18 +204,17 @@ test('finished stock by size: the plant\'s stock query per size — a plain view
   const tabs = panel.getByRole('group', { name: 'Stock grade' });
   await expect(tabs.getByRole('button', { name: 'Prime · 49' })).toHaveAttribute('aria-pressed', 'true');
   await expect(panel.locator('.rm-size--stock')).toHaveCount(49);
-  const bars = await panel.locator('.rm-size-stack > i:nth-child(2)').evaluateAll((els) =>
+  const bars = await panel.locator('.rm-size-stack > i').evaluateAll((els) =>
     els.map((e) => e.getBoundingClientRect().width / e.parentElement!.getBoundingClientRect().width));
   expect(bars[0]).toBeCloseTo(1, 2);
   expect(bars[1]).toBeCloseTo(76.2 / 113.8, 1);
   await expect(panel.locator('.rm-sizes-foot')).toHaveCount(0);   // no summary line
-  // Defective strip on its own tab: 17 sizes, 48.1 MT. Prime 749.4 + defective 48.1 = 797.5, the Free stock card.
+  // Defective strip on its own tab: 17 sizes, 48.1 MT. Prime 749.4 + defective 48.1 = 797.5, the finished stock.
   await tabs.getByRole('button', { name: 'Defective · 17' }).click();
   await expect(panel.locator('.rm-size--stock')).toHaveCount(17);
   await expect(panel.locator('.rm-size--stock').first()).toContainText('358–360');
   await tabs.getByRole('button', { name: 'Prime · 49' }).click();
-  // Agrees with the Free stock card and the Order allocation block.
-  await expect(page.getByRole('button', { name: 'Free stock', exact: true })).toContainText('797.5');
+  // Agrees with the Order allocation block.
   await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').nth(1)).toContainText('797.5 MT');
   // The list scrolls inside the panel instead of stretching the row past the balance panel beside it.
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
@@ -237,26 +235,15 @@ test('order allocation: no open-orders chip', async ({ page }) => {
   await expect(panel.getByRole('button', { name: /Open orders/ })).toHaveCount(0);
 });
 
-test('finished stock: ERP stock ledger to the period end — one drawer, from Free stock and from Order allocation', async ({ page }) => {
+test('finished stock: ERP stock ledger to the period end — the drawer from Order allocation', async ({ page }) => {
   await pickWeek(page);
   const block = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').nth(1);
-  // The title and the total, no note; then the split as the cards have it: with order 0, all of it free.
-  await expect(block).toHaveText(/^Finished stock-?\d[\d,]*\.\d MTStock with order\s*0\.0 MTFree stock\s*-?\d[\d,]*\.\d MT$/);
+  // The title and the total only: no Stock with order / Free stock split.
+  await expect(block).toHaveText(/^Finished stock-?\d[\d,]*\.\d MT$/);
   const total = (await block.locator('.rm-alloc-total').innerText()).replace(' MT', '');
-  await expect(block.locator('.rm-legend')).toContainText(new RegExp(`Free stock\\s*${total.replace(/[.,]/g, '\\$&')} MT`));
-  // The bar, like Production's: all of it free.
-  await expect(block.getByRole('img', { name: /^Finished stock .* with order 0\.0 MT, free / })).toBeVisible();
-  // Free stock and the Order allocation block open the same drawer, on the same figure.
-  for (const open of [
-    () => page.getByRole('button', { name: 'Free stock', exact: true }).click(),
-    () => block.getByRole('button', { name: /Finished stock/ }).click(),
-  ]) {
-    await open();
-    const d = page.getByRole('dialog', { name: 'Finished stock · ERP' });
-    await expect(d.locator('.pd-stats')).toContainText(total);
-    await d.getByRole('button', { name: 'Close Finished stock · ERP' }).click();
-    await expect(d).toBeHidden();
-  }
+  await block.getByRole('button', { name: /Finished stock/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Finished stock · ERP' }).locator('.pd-stats')).toContainText(total);
+  await page.getByRole('button', { name: 'Close Finished stock · ERP' }).click();
   await block.getByRole('button', { name: /Finished stock/ }).click();
   const drawer = page.getByRole('dialog', { name: 'Finished stock · ERP' });
   // The dashboard's 7 days, by day; stock is the balance at the end of each.
@@ -626,6 +613,16 @@ test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, a
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
 
+  // Output per shift is not in the ERP, so the panel opens on the whole day.
+  const back = page.locator('.rm-flip-face--back section.panel');
+  await expect(back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' })).toHaveAttribute('aria-pressed', 'true');
+  // Whole day: ERP Prime + SL 1,689.86 ÷ 2,121.44 = 79.7 %.
+  await expect(back.locator('.rm-shift-val')).toHaveText(['1,689.9 MT']);
+  await expect(back.locator('.rm-shift-comp')).toHaveText(['79.7%']);
+  await page.waitForTimeout(700);
+  await back.screenshot({ path: `${SHOTS}/rmd-shift-whole-day.png` });
+  await back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'By shift' }).click();
+
   // Oct plan 8,220.638 MT ÷ 31 calendar days (shutdown dates not given) = 265.18 a day → 1–8 Oct 2,121.4 MT, 1,060.7 a shift.
   const panel = page.locator('.rm-flip-face--front section.panel');
   await expect(panel.locator('.chip')).toHaveText('Plan 2,121 MT');
@@ -637,14 +634,7 @@ test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, a
   await expect(panel).not.toContainText('-431.6');
   await panel.screenshot({ path: `${SHOTS}/rmd-shift-plan.png` });
 
-  // Whole day: ERP Prime + SL 1,689.86 ÷ 2,121.44 = 79.7 %.
   await panel.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' }).click();
-  const back = page.locator('.rm-flip-face--back section.panel');
-  await expect(back.locator('.rm-shift-val')).toHaveText(['1,689.9 MT']);
-  await expect(back.locator('.rm-shift-comp')).toHaveText(['79.7%']);
-  await page.waitForTimeout(700);
-  await back.screenshot({ path: `${SHOTS}/rmd-shift-whole-day.png` });
-
   await back.getByRole('button', { name: 'Whole-day production, plan vs actual per day' }).click();
   const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
   const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
@@ -722,7 +712,8 @@ test('RMD: running rate opens its drill-down — Prime + SL ÷ running hours fro
   await dialog.getByLabel('Start Date').fill('2026-10-01');
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  const foot = page.locator('.rm-flip-face--front .rm-foot').getByRole('button', { name: /Running rate/ });
+  // RMD opens on the whole day (no output per shift).
+  const foot = page.locator('.rm-flip-face--back .rm-foot').getByRole('button', { name: /Running rate/ });
   await expect(foot).toContainText(/\d+\.\d{2} TPH/);
   const shown = (await foot.locator('.rm-foot-v').innerText()).replace(' TPH', '');
   await foot.click();
@@ -882,10 +873,14 @@ test('RMD asset health: route drive group by default; motor current live, run ho
     await d.getByRole('button', { name: /Close/ }).click();
   }
   const mimic = main.getByRole('list', { name: 'Drive groups' });
-  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit']);
+  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit']);
   await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);
-  await mimic.getByRole('button', { name: /Roughing group/ }).click();
-  await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Roughing drive group');
+  // As the Visualization mimic: billets since 08:00 IST today; exit = ERP Prime + SL 1–8 Oct 1,689.9 MT.
+  await expect(mimic.getByRole('button', { name: /Billet infeed/ })).toContainText('Today · since 08:00 IST');
+  await expect(mimic.getByRole('button', { name: /Billet infeed/ }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ billets)$/);
+  await expect(mimic.getByRole('button', { name: /Finished exit/ }).locator('.rm-zone-value')).toHaveText('1,689.9 MT');
+  await mimic.getByRole('button', { name: /Finishing group/ }).click();
+  await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Finishing drive group');
   await page.screenshot({ path: `${SHOTS}/rmd-asset-health.png`, fullPage: true });
 });
 
@@ -1018,41 +1013,16 @@ test('RMD: Order allocation\'s Finished stock is the total only — no Stock wit
 });
 
 for (const mill of ['hsm', 'lsm', 'rms'] as const) {
-  test(`${mill.toUpperCase()}: Order allocation's Finished stock shows Stock with order and Free stock, as the cards`, async ({ page }) => {
+  test(`${mill.toUpperCase()}: Order allocation — the two totals only, no MTO / MTS and no Stock with order / Free stock`, async ({ page }) => {
     await page.goto(`/${mill}/visualization`);
     const alloc = page.locator('section.panel', { hasText: 'Order allocation' });
-    const legend = alloc.locator('.rm-alloc-block', { hasText: 'Finished stock' }).locator('.rm-legend');
-    await expect(legend).toHaveText(/Stock with order\s*0\.0 MT\s*Free stock\s*-?[\d,]+\.\d MT/);
+    await expect(alloc.locator('.rm-alloc-total')).toHaveText([/^(NA|-?[\d,]+\.\d MT)$/, /^(NA|-?[\d,]+\.\d MT)$/]);
+    await expect(alloc.locator('.rm-legend')).toHaveCount(0);
+    for (const t of ['Made To', 'Stock with order', 'Free stock']) await expect(alloc).not.toContainText(t);
+    await expect(page.getByRole('region', { name: 'Headline KPIs' }).locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/]);
     await alloc.screenshot({ path: `${SHOTS}/${mill}-order-allocation.png` });
   });
 }
-
-for (const c of [
-  { mill: 'lsm', prod: '2,106.1' },   // 1–8 Oct PRODUTION_MT 2,106.12
-  { mill: 'rms', prod: '4,114.3' },   // 1–8 Oct PRODUCTION_MT 4,114.29
-] as const) test(`${c.mill.toUpperCase()}: order split as HSM — Made To Stock = production, Stock with order 0, Free stock = all finished stock`, async ({ page }) => {
-  await page.goto(`/${c.mill}/visualization`);
-  await page.getByRole('button', { name: /Duration/ }).click();
-  const dialog = page.getByRole('dialog', { name: 'Select period' });
-  await dialog.getByLabel('Start Date').fill('2026-10-01');
-  await dialog.getByLabel('End Date').fill('2026-10-08');
-  await dialog.getByRole('button', { name: 'Apply' }).click();
-  const strip = page.getByRole('region', { name: 'Headline KPIs' });
-  // All of the period's production is Made To Stock.
-  await expect(strip.locator('.rm-card', { hasText: 'Made To Stock' }).locator('.rm-card-value')).toContainText(c.prod);
-  await expect(strip.locator('.rm-card', { hasText: 'Stock with order' }).locator('.rm-card-value')).toHaveText(/^0\s*MT$/);
-  const alloc = page.locator('section.panel', { hasText: 'Order allocation' });
-  const prod = alloc.locator('.rm-alloc-block').nth(0);
-  await expect(prod.locator('.rm-legend')).toHaveText(new RegExp(`Made To Order\\s*0\\.0 MT\\s*Made To Stock\\s*${c.prod.replace(/[.,]/g, '\\$&')} MT`));
-  await expect(prod.getByRole('img', { name: new RegExp(`made to order 0\\.0 MT, made to stock ${c.prod.replace(/[.,]/g, '\\$&')} MT`) })).toBeVisible();
-  // Finished stock: the Free stock card, the Order allocation total and its free part are one figure.
-  const stock = alloc.locator('.rm-alloc-block').nth(1);
-  const total = (await stock.locator('.rm-alloc-total').innerText()).replace(' MT', '');
-  await expect(strip.locator('.rm-card', { hasText: 'Free stock' }).locator('.rm-card-value')).toContainText(total);
-  await expect(stock.locator('.rm-legend')).toHaveText(new RegExp(`Stock with order\\s*0\\.0 MT\\s*Free stock\\s*${total.replace(/[.,]/g, '\\$&')} MT`));
-  await expect(stock.getByRole('img', { name: /with order 0\.0 MT, free / })).toBeVisible();
-  await alloc.screenshot({ path: `${SHOTS}/${c.mill}-order-allocation-split.png` });
-});
 
 test('RMD asset health: motor current and run hours open their drill-downs with a trend', async ({ page }) => {
   await page.goto('/rmd/asset-health');
@@ -1139,13 +1109,10 @@ test('RMD condition analytics: actual rate and specific energy live, the mimic f
   for (const t of ['Matched-run performance', 'Costing & impact']) await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
 
   const mimic = main.getByRole('list', { name: 'Condition groups' });
-  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit']);
+  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit']);
   // Billet infeed: 1,075 billets ÷ 15.92 running hours = 68 a running hour.
   await expect(mimic.locator('.rm-zone', { hasText: 'Billet infeed' }).locator('.rm-zone-value')).toHaveText('68 billets/h');
-  // As the sheet: roughing = CR Mill M1 S1–S8 / M2 S1–S6 current and speed while running (16 Oct 100.12 A);
-  // route / diverter = those stands' running status now.
-  const rough = mimic.getByRole('button', { name: 'Roughing group' });
-  await expect(rough.locator('.rm-zone-value')).toHaveText('100 A', { timeout: 90_000 });
+  // Route / diverter = the CR Mill stands' running status now.
   await expect(mimic.locator('.rm-zone', { hasText: 'Route / diverter' }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);
   await expect(mimic.locator('.rm-zone', { hasText: 'Finished exit' }).locator('.rm-zone-value')).toHaveText('16.15 TPH');
   // Finishing: mean current of the drives that ran, 16 Oct 22.44 A; opens each drive.
@@ -1159,16 +1126,6 @@ test('RMD condition analytics: actual rate and specific energy live, the mimic f
   await expect(t.locator('tbody tr')).toHaveCount(10);
   await expect(t.getByRole('row', { name: /^Line 2 CS / })).toContainText('811');
   await expect(d.getByRole('region', { name: 'Formula' })).toContainText('a minute counts when the drive ran all of it');
-  await page.keyboard.press('Escape');
-  await rough.click();
-  const dr = page.getByRole('dialog', { name: 'Roughing group · current and speed' });
-  const tr = dr.getByRole('table', { name: 'Drives: current and speed while running' });
-  await expect(tr.locator('tbody tr')).toHaveCount(14);
-  // 16 Oct: L1 S2 143.88 A at 1,189 RPM; L1 S5 did not run.
-  await expect(tr.getByRole('row', { name: /^Line 1 S2 / })).toContainText('144');
-  await expect(tr.getByRole('row', { name: /^Line 1 S2 / })).toContainText('1,190');
-  await expect(tr.getByRole('row', { name: /^Line 1 S5 / })).toContainText('Not running');
-  await expect(dr.getByRole('region', { name: 'Data source' })).toContainText('SPEED_FB_S1');
 });
 
 test('RMD Mill MPS and chemical composition: MILL1_MPS / MILL2_MPS from Influx, the SMS lollipop form for RMD', async ({ page }) => {

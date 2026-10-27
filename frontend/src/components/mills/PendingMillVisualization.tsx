@@ -12,18 +12,14 @@
  * rate = PRODUCTION_MT ÷ running hours calculated from the RMS Production Sheet's runs.
  * Never a sample number. The KPI list follows the plant's Visualisation sheet for the mill
  * (LSM.xlsx / R.M.S.xlsx); each card and panel is wired once its source is confirmed.
- * Order split as HSM and LSM (the user, 17 Oct 2026): the ERP links no production or stock to an
- * order, so Made To Order 0 / Made To Stock = all production, and Stock with order 0 / Free stock
- * = all finished stock — cards and Order allocation.
+ * Order allocation: the production and finished stock totals; no Made To Order / Stock split and no
+ * Stock with order / Free stock (dropped on every mill — the user, 27 Oct 2026).
  * Power, specific energy: the RMS Daily Power Consumption Record (actual kWh, VCB-1) ÷ PRODUCTION_MT.
  * No mill mimic on RMS (the user, 16 Oct 2026), as on LSM.
  */
 import { useState, type KeyboardEvent } from 'react';
 import Panel from '@/components/Panel';
-import StockSplitLegend from '@/components/production/StockSplitLegend';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import StackBar from '@/components/visualization/StackBar';
-import LegendItem from '@/components/visualization/Legend';
 import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
 import { FormRunningRateFoot } from '@/components/production/FormRunningRate';
 import PowerKpiCard from '@/components/production/PowerKpiCard';
@@ -40,9 +36,6 @@ const CARDS: { label: string; unit: string; series: Series }[] = [
   { label: 'Mass yield', unit: '%', series: 'order' },
   { label: 'Power consumption', unit: 'MWh', series: 'prod' },
   { label: 'Specific energy', unit: 'kWh/MT', series: 'prod' },
-  { label: 'Made To Stock', unit: 'MT', series: 'free' },
-  { label: 'Stock with order', unit: 'MT', series: 'order' },
-  { label: 'Free stock', unit: 'MT', series: 'free' },
 ];
 
 /** RMS losses (ERP log sheet): together they are billet input − production. */
@@ -74,7 +67,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
   const [prodOpen, setProdOpen] = useState(false);
   return (
     <div className="rm-viz">
-      <section className="rm-strip" aria-label="Headline KPIs">
+      <section className="rm-strip rm-strip--four" aria-label="Headline KPIs">
         {CARDS.map((c) => c.label === 'Mass yield' && mill === 'rms'
           ? (
             <KpiCard
@@ -108,14 +101,6 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
           ? <PowerKpiCard key={c.label} mill="rms" />
           : c.label === 'Specific energy' && mill === 'rms'
           ? <SpecificEnergyCard key={c.label} mill="rms" />
-          // As HSM: no production or stock is linked to an order, so all of it is Made To Stock / free.
-          : c.label === 'Made To Stock' && mill === 'rms'
-          ? <KpiCard key={c.label} label="Made To Stock" value={prodMt === null ? 'NA' : fixed(prodMt, 1)} unit="MT" note="" series="free"
-              meterPct={prodMt ? 100 : 0} loading={!prod.data && !prod.error} />
-          : c.label === 'Stock with order' && mill === 'rms'
-          ? <KpiCard key={c.label} label="Stock with order" value={stockMt === null ? 'NA' : fixed(0, 0)} unit="MT" note="" series="order" meterPct={0} />
-          : c.label === 'Free stock' && mill === 'rms'
-          ? <KpiCard key={c.label} label="Free stock" value={stockMt === null ? 'NA' : fixed(stockMt, 1)} unit="MT" note="" series="free" meterPct={stockMt ? 100 : 0} />
           : <KpiCard key={c.label} label={c.label} value="NA" unit={c.unit} note="" series={c.series} />)}
       </section>
       {mill === 'rms' && <RmsProductionDrawer open={prodOpen} onClose={() => setProdOpen(false)} />}
@@ -131,36 +116,12 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
               <span className="rm-k">Production</span>
               <span className={`rm-alloc-total num ${prodMt === null ? 'v-na' : 'v-val'}`}>{prodMt === null ? 'NA' : `${fixed(prodMt, 1)} MT`}</span>
             </div>
-            {prodMt === null ? (
-              <div className="rm-legend">
-                <span className="rmd-legend-item rm-tone--order"><i className="rm-dot" aria-hidden />Made To Order <b className="num v-na">NA</b></span>
-                <span className="rmd-legend-item rm-tone--free"><i className="rm-dot" aria-hidden />Made To Stock <b className="num v-na">NA</b></span>
-              </div>
-            ) : (
-              <>
-                <StackBar
-                  label={`Production ${fixed(prodMt, 1)} MT: made to order 0.0 MT, made to stock ${fixed(prodMt, 1)} MT`}
-                  parts={[{ label: 'Made To Order', value: 0, series: 'order' }, { label: 'Made To Stock', value: prodMt, series: 'free' }]}
-                />
-                <div className="rm-legend">
-                  <LegendItem series="order" label="Made To Order" value="0.0 MT" />
-                  <LegendItem series="free" label="Made To Stock" value={`${fixed(prodMt, 1)} MT`} />
-                </div>
-              </>
-            )}
           </div>
           <div className="rm-alloc-block">
             <div className="rm-alloc-head">
               <span className="rm-k">Finished stock</span>
               <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{stockMt === null ? 'NA' : `${fixed(stockMt, 1)} MT`}</span>
             </div>
-            {stockMt !== null && (
-              <StackBar
-                label={`Finished stock ${fixed(stockMt, 1)} MT: with order 0.0 MT, free ${fixed(stockMt, 1)} MT`}
-                parts={[{ label: 'Stock with order', value: 0, series: 'order' }, { label: 'Free stock', value: Math.max(0, stockMt), series: 'free' }]}
-              />
-            )}
-            <StockSplitLegend withOrderMt={stockMt === null ? null : 0} freeMt={stockMt} />
           </div>
         </Panel>
       </div>

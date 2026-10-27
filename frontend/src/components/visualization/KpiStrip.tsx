@@ -1,17 +1,16 @@
-import KpiCard from './KpiCard';
 import ProductionKpiCard from '@/components/production/ProductionKpiCard';
 import YieldKpiCard from '@/components/production/YieldKpiCard';
-import ProductionWithoutOrderCard from '@/components/production/ProductionWithoutOrderCard';
-import FreeStockCard from '@/components/production/FreeStockCard';
 import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
-import { fixed } from '@/lib/num';
 import type { MillModel } from '@/models/millModel';
 
-/** The seven headline figures, left to right as on the comp. Cards with no live source show 0. */
-export default function KpiStrip({ m }: { m: MillModel }) {
+/**
+ * The headline figures, left to right as on the comp. No Made To Order / Made To Stock and no Stock
+ * with order / Free stock cards: the order split is dropped on every mill (the user, 27 Oct 2026).
+ */
+export default function KpiStrip(_: { m: MillModel }) {
   return (
-    <section className="rm-strip" aria-label="Headline KPIs">
+    <section className="rm-strip rm-strip--four" aria-label="Headline KPIs">
       {/* Live from the ERP, for the Duration filter's period; opens the ERP-vs-Influx drawer. */}
       <ProductionKpiCard />
       {/* Live from the ERP log sheet: Σ production ÷ Σ billet input; opens the yield drawer. */}
@@ -20,18 +19,6 @@ export default function KpiStrip({ m }: { m: MillModel }) {
       <PowerKpiCard />
       {/* Live: logbook power ÷ the Production card's Total (Influx), kWh/MT. */}
       <SpecificEnergyCard />
-      {/* Made To Stock = all production: the ERP does not link production to orders. */}
-      <ProductionWithoutOrderCard />
-      <KpiCard
-        label="Stock with order"
-        value={fixed(m.stock.withOrder, 0)}
-        unit="MT"
-        note=""
-        series="order"
-        meterPct={m.stock.withOrderPct ?? undefined}
-      />
-      {/* Live: ERP stock ledger to the period end; all stock is free (no order link in the ERP). */}
-      <FreeStockCard />
     </section>
   );
 }

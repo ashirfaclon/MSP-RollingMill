@@ -6,12 +6,11 @@
  *   Actual rate        ERP Prime + SL ÷ running hours from the billet counters — the
  *                      Visualization running rate (the user, 21 Oct 2026); opens its drill-down;
  *   Specific energy    the VCB 1 / 2 / 3 power forms ÷ ERP Prime + SL;
- *   Mimic              exactly as the sheet (the plant, 21 Oct 2026): billet infeed = billets ÷
- *                      running hours; roughing = CR Mill1/2 M1 S1–S8 and M2 S1–S6 current and
- *                      speed while running over the period; route / diverter = those stands'
- *                      running status now; finishing = the finishing drives' current and speed
- *                      while running; finished exit = actual rate. Roughing and finishing open
- *                      each drive.
+ *   Mimic              as the sheet (the plant, 21 Oct 2026), no roughing group (the user,
+ *                      27 Oct 2026): billet infeed = billets ÷ running hours; route / diverter =
+ *                      the CR Mill1/2 stands' running status now; finishing = the finishing drives'
+ *                      current and speed while running; finished exit = actual rate. Finishing
+ *                      opens each drive.
  * Waiting on the plant: the benchmark (matched) rate — output opportunity, matched-run performance;
  * the cost figures — conversion cost, cost variance, yield material loss, output margin, costing &
  * impact.
@@ -46,7 +45,7 @@ export default function RmdConditionAnalytics() {
   const rate = rateS.data && rateS.dataUrl === rateUrl ? rateS.data.totals : null;
   const billets = billetsS.data && billetsS.dataUrl === billetsUrl ? billetsS.data.totals.totalPcs : null;
   const cond = condS.data && condS.dataUrl === condUrl ? condS.data : null;
-  const [open, setOpen] = useState<'rate' | 'roughing' | 'finishing' | null>(null);
+  const [open, setOpen] = useState<'rate' | 'finishing' | null>(null);
 
   const perHour = billets !== null && rate?.runH ? billets / rate.runH : null;
   // Route / diverter: the CR Mill stands' running status now (line 1 = M1 S1–S8, line 2 = M2 S1–S6).
@@ -54,16 +53,11 @@ export default function RmdConditionAnalytics() {
   const zoneNow = live?.zones.find((z) => z.id === 'route') ?? null;
   const routeState = !zoneNow || zoneNow.state === 'no-data' ? 'NA' : `${zoneNow.on} of ${zoneNow.total} on`;
   const onIn = (l: 1 | 2) => `L${l} ${route.filter((s) => s.line === l && s.on).length} of ${route.filter((s) => s.line === l).length}`;
-  const rough = cond?.stands ?? null;
   const fin = cond?.finishing ?? null;
   const rpm = (g: RmdConditionGroup | null) => (g ? [1, 2].map((l) => `L${l} ${g.meanRpmByLine[l] == null ? '—' : fixed(g.meanRpmByLine[l], 0)}`).join(' · ') + ' RPM' : '');
 
   const zones: { title: string; value: string; foot: string; open?: () => void; openLabel?: string }[] = [
     { title: 'Billet infeed', value: perHour === null ? 'NA' : `${fixed(perHour, 0)} billets/h`, foot: 'billets per running hour' },
-    {
-      title: 'Roughing group', value: rough?.meanA == null ? 'NA' : `${fixed(rough.meanA, 0)} A`, foot: rough?.meanA == null ? 'current / RPM' : rpm(rough),
-      open: () => setOpen('roughing'), openLabel: 'Each stand: current and speed while running',
-    },
     { title: 'Route / diverter', value: routeState, foot: routeState === 'NA' ? 'running status now' : `${onIn(1)} · ${onIn(2)}` },
     {
       title: 'Finishing group', value: fin?.meanA == null ? 'NA' : `${fixed(fin.meanA, 0)} A`, foot: fin?.meanA == null ? 'current / RPM' : rpm(fin),
@@ -104,7 +98,7 @@ export default function RmdConditionAnalytics() {
       </div>
 
       <Panel title="Grouped condition mimic">
-        <ol className="rm-mimic rmd-mimic" aria-label="Condition groups">
+        <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Condition groups">
           {zones.map((z, i) => {
             const body = (
               <>
@@ -128,10 +122,6 @@ export default function RmdConditionAnalytics() {
       </Panel>
 
       <RmdRunningRateDrawer open={open === 'rate'} onClose={() => setOpen(null)} />
-      <DrillDrawer open={open === 'roughing'} onClose={() => setOpen(null)} title="Roughing group · current and speed" sub="RMD · A · RPM"
-        loading={!condS.data && !condS.error} error={condS.error} hasData={!!cond}>
-        {rough && <DrivesTable g={rough} sources={ROUGHING_SOURCES} />}
-      </DrillDrawer>
       <DrillDrawer open={open === 'finishing'} onClose={() => setOpen(null)} title="Finishing group · current and speed" sub="RMD · A · RPM"
         loading={!condS.data && !condS.error} error={condS.error} hasData={!!cond}>
         {fin && <DrivesTable g={fin} sources={FINISHING_SOURCES} />}
@@ -141,9 +131,6 @@ export default function RmdConditionAnalytics() {
 }
 
 /** Each drive: mean current and speed while running over the period. */
-const ROUGHING_SOURCES: SourceSystem[] = [
-  { name: 'Influx', rows: [['Tag', 'CURRENT_FB_S1 … S8, SPEED_FB_S1 … S8 (line 1); … S1 … S6 (line 2); RUNNING_STATUS_Sn for running'], ['Filter', "_measurement = 'TMT-RMD', Unit = 'CR Mill1/2', Group = 'M1' (line 1), 'M2' (line 2)"]] },
-];
 const FINISHING_SOURCES: SourceSystem[] = [
   { name: 'Influx · line 1', rows: [['Tag', 'CUR_FB_FS / PR1 / PR2 / TB1 / TB2, SPD_FB_FS / PR1 / PR2 / TB1 / TB2; RUNNING_STATUS_… for running'], ['Filter', "_measurement = 'TMT-RMD', Unit = 'Line-1', Group = 'M1'"]] },
   { name: 'Influx · line 2', rows: [['Tag', 'CS / Pinch_Roll_Pre / Pinch_Roll_Post / Tail_Break_01 / Tail_Break_02 _Current and _RPM; …_On_Off for running'], ['Filter', "_measurement = 'TMT-RMD', Unit = 'Line-2', Group = 'General'"]] },

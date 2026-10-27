@@ -36,6 +36,8 @@
   grid-auto-rows: auto auto auto minmax(4px, 1fr);
   column-gap: 10px; row-gap: 10px;
 }
+/* A strip of four headline cards (no order / stock split on any mill). */
+.rm-strip.rm-strip--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 /*
  * Each card spans four rows of the strip and adopts them as a subgrid, so label, value,
@@ -362,7 +364,7 @@
 }
 
 @media (max-width: 760px) {
-  .rm-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rm-strip, .rm-strip.rm-strip--four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rm-card-value { font-size: 22px; }
   .rm-mimic { grid-template-columns: minmax(0, 1fr); }
   .rm-mimic-arrow { transform: rotate(90deg); height: 14px; }

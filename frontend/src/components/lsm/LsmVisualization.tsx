@@ -16,17 +16,13 @@
  *   Production by shift   the plant's October 2026 plan (8,750 MT), spread to days, half per
  *                         shift, as RMD's; whole day = PRODUTION_MT vs plan.
  *   Running rate          PRODUTION_MT ÷ running hours calculated from the LSM Production Sheet's runs.
- *   Order split           as HSM (the user, 17 Oct 2026): the ERP links no production or stock to
- *                         an order, so Made To Order 0 / Made To Stock = all production, and Stock
- *                         with order 0 / Free stock = all finished stock — cards and Order allocation.
+ *   Order allocation      the production and finished stock totals; no Made To Order / Stock split
+ *                         and no Stock with order / Free stock (dropped on every mill — the user, 27 Oct 2026).
  * No mill mimic on LSM (the user, 16 Oct 2026).
  */
 import { useState, type KeyboardEvent } from 'react';
 import Panel from '@/components/Panel';
-import StockSplitLegend from '@/components/production/StockSplitLegend';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import StackBar from '@/components/visualization/StackBar';
-import LegendItem from '@/components/visualization/Legend';
 import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
 import { FormRunningRateFoot } from '@/components/production/FormRunningRate';
 import '@/components/visualization/visualization.css';
@@ -54,7 +50,7 @@ export default function LsmVisualization() {
 
   return (
     <div className="rm-viz">
-      <section className="rm-strip" aria-label="Headline KPIs">
+      <section className="rm-strip rm-strip--four" aria-label="Headline KPIs">
         <KpiCard
           label="Production"
           value={t?.productionMt == null ? 'NA' : fixed(t.productionMt, 1)}
@@ -77,11 +73,6 @@ export default function LsmVisualization() {
         />
         <PowerKpiCard mill="lsm" />
         <SpecificEnergyCard mill="lsm" />
-        {/* As HSM: no production or stock is linked to an order, so all of it is Made To Stock / free. */}
-        <KpiCard label="Made To Stock" value={t?.productionMt == null ? 'NA' : fixed(t.productionMt, 1)} unit="MT" note="" series="free"
-          meterPct={t?.productionMt ? 100 : 0} loading={!data && !error} />
-        <KpiCard label="Stock with order" value={stockMt === null ? 'NA' : fixed(0, 0)} unit="MT" note="" series="order" meterPct={0} />
-        <KpiCard label="Free stock" value={stockMt === null ? 'NA' : fixed(stockMt, 1)} unit="MT" note="" series="free" meterPct={stockMt ? 100 : 0} />
       </section>
       <LsmProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
       <LsmProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
@@ -97,36 +88,12 @@ export default function LsmVisualization() {
               <span className="rm-k">Production</span>
               <span className={`rm-alloc-total num ${t?.productionMt == null ? 'v-na' : 'v-val'}`}>{mt(t?.productionMt)}</span>
             </div>
-            {t?.productionMt == null ? (
-              <div className="rm-legend">
-                <span className="rmd-legend-item rm-tone--order"><i className="rm-dot" aria-hidden />Made To Order <b className="num v-na">NA</b></span>
-                <span className="rmd-legend-item rm-tone--free"><i className="rm-dot" aria-hidden />Made To Stock <b className="num v-na">NA</b></span>
-              </div>
-            ) : (
-              <>
-                <StackBar
-                  label={`Production ${fixed(t.productionMt, 1)} MT: made to order 0.0 MT, made to stock ${fixed(t.productionMt, 1)} MT`}
-                  parts={[{ label: 'Made To Order', value: 0, series: 'order' }, { label: 'Made To Stock', value: t.productionMt, series: 'free' }]}
-                />
-                <div className="rm-legend">
-                  <LegendItem series="order" label="Made To Order" value="0.0 MT" />
-                  <LegendItem series="free" label="Made To Stock" value={`${fixed(t.productionMt, 1)} MT`} />
-                </div>
-              </>
-            )}
           </div>
           <div className="rm-alloc-block">
             <div className="rm-alloc-head">
               <span className="rm-k">Finished stock</span>
               <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{mt(stockMt)}</span>
             </div>
-            {stockMt !== null && (
-              <StackBar
-                label={`Finished stock ${fixed(stockMt, 1)} MT: with order 0.0 MT, free ${fixed(stockMt, 1)} MT`}
-                parts={[{ label: 'Stock with order', value: 0, series: 'order' }, { label: 'Free stock', value: Math.max(0, stockMt), series: 'free' }]}
-              />
-            )}
-            <StockSplitLegend withOrderMt={stockMt === null ? null : 0} freeMt={stockMt} />
           </div>
         </Panel>
       </div>

@@ -3,10 +3,12 @@
 /**
  * RMD · Asset Health — HSM's layout, with RMD's zones and the sources of RMD FACLON persona - 3
  * (confirmed 14–15 Oct 2026). NA wherever there is no source (MID, ERP PM, VFD trips):
- *   Mimic + status    route / finishing: live drive status (RUNNING_STATUS / *_On_Off);
+ *   Mimic + status    as the Visualization mimic, no roughing group (the user, 27 Oct 2026):
+ *                     billet infeed = billets since 08:00 IST; route / finishing = live drive status
+ *                     (RUNNING_STATUS / *_On_Off); finished exit = ERP production for the period;
  *   Bearing temp      the hottest bearing at the latest Mill Bearing Temperature entries of the
- *                     group (logbook tmt-mechanical; roughing = 20" and 16" R stands, route = intermill,
- *                     NC and OC stands); opens every bearing and the trend;
+ *                     group (logbook tmt-mechanical; route = intermill, NC and OC stands); opens
+ *                     every bearing and the trend;
  *   Motor current     average live current feedback of the group's running drives, A; opens each
  *                     drive's current now and its trend while running (status 1) over the period;
  *   Gearbox oil       the oil (litres) in the group's tank lowest against its capacity — the
@@ -36,15 +38,15 @@ import { useMid } from './useMid';
 import { MidVibrationDrawer, MidVibrationTrend, midDate } from './MidVibration';
 import './asset.css';
 
-const GROUPS = ['Billet infeed', 'Roughing group', 'Route / diverter', 'Finishing group', 'Finished exit'] as const;
+const GROUPS = ['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit'] as const;
 type Group = (typeof GROUPS)[number];
 /** The zones with live drives, and the zones with mechanical forms. */
 const LIVE: Partial<Record<Group, 'route' | 'finishing'>> = { 'Route / diverter': 'route', 'Finishing group': 'finishing' };
-const FORMS: Partial<Record<Group, 'roughing' | 'route'>> = { 'Roughing group': 'roughing', 'Route / diverter': 'route' };
+const FORMS: Partial<Record<Group, 'route'>> = { 'Route / diverter': 'route' };
 /** The MID sections of the zones (the plant's machine list, 27 Oct 2026). */
-const MID_SECTION: Partial<Record<Group, 'roughing' | 'route' | 'finishing'>> = { 'Roughing group': 'roughing', 'Route / diverter': 'route', 'Finishing group': 'finishing' };
+const MID_SECTION: Partial<Record<Group, 'route' | 'finishing'>> = { 'Route / diverter': 'route', 'Finishing group': 'finishing' };
 const NAME: Record<Group, string> = {
-  'Billet infeed': 'Billet infeed', 'Roughing group': 'Roughing', 'Route / diverter': 'Route', 'Finishing group': 'Finishing', 'Finished exit': 'Finished exit',
+  'Billet infeed': 'Billet infeed', 'Route / diverter': 'Route', 'Finishing group': 'Finishing', 'Finished exit': 'Finished exit',
 };
 
 const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
@@ -62,7 +64,9 @@ export default function RmdAssetHealth() {
   const formsUrl = rangeUrl('/api/rmd/asset-forms', dates);
   const f = useApi<RmdAssetForms>(formsUrl);
   const forms = f.data && f.dataUrl === formsUrl ? f.data : null;
-  const run = useRmdProduction(dates).data?.totals.runningHrs ?? null;
+  const totals = useRmdProduction(dates).data?.totals;
+  const run = totals?.runningHrs ?? null;
+  const prod = totals?.productionMt ?? null;
 
   const zoneLive = zone && live ? live.zones.find((z) => z.id === zone) ?? null : null;
   const running = zone && live ? live.stations.filter((s) => s.zone === zone && s.on && s.currentA !== null) : [];
@@ -127,10 +131,14 @@ export default function RmdAssetHealth() {
       </section>
 
       <Panel title="Grouped asset mimic">
-        <ol className="rm-mimic rmd-mimic" aria-label="Drive groups">
+        <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Drive groups">
           {GROUPS.map((g, i) => {
             const zl = LIVE[g] && live ? live.zones.find((z) => z.id === LIVE[g]) ?? null : null;
-            const value = zl && zl.state !== 'no-data' ? `${zl.on} of ${zl.total} on` : 'NA';
+            // Billet infeed and finished exit as the Visualization mimic.
+            const value = g === 'Billet infeed' ? (live?.billetsToday == null ? 'NA' : `${live.billetsToday} billets`)
+              : g === 'Finished exit' ? (prod === null ? 'NA' : `${fixed(prod, 1)} MT`)
+              : zl && zl.state !== 'no-data' ? `${zl.on} of ${zl.total} on` : 'NA';
+            const foot = g === 'Billet infeed' ? 'Today · since 08:00 IST' : null;
             return (
               <Fragment key={g}>
                 {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
@@ -138,6 +146,7 @@ export default function RmdAssetHealth() {
                   <button type="button" className={`rm-zone rm-zone--flow ah-zone${g === group ? ' is-selected' : ''}`} aria-pressed={g === group} onClick={() => setGroup(g)}>
                     <span className="rm-zone-title">{g}</span>
                     <span className="rm-zone-body"><span className={`rm-zone-value num ${value === 'NA' ? 'v-na' : 'v-val'}`}>{value}</span></span>
+                    {foot && <span className="rm-zone-foot">{foot}</span>}
                   </button>
                 </li>
               </Fragment>
@@ -184,7 +193,7 @@ export default function RmdAssetHealth() {
         loading={!forms} error={f.error} hasData={!!forms}>
         {bearing && <ReadingsTable rows={bearing.latest} unit="°C" label="Bearing temperatures" max={bearing.max} source={[
           ['Form', 'Rolling Mill Division (TMT) → Mechanical → Mill Bearing Temperature'],
-          ['Forms', fg === 'roughing' ? '20 Inch R Stand, 16 Inch R Stand' : 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)'],
+          ['Forms', 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)'],
           ['Field', 'Flywheel / Reduction gear / Pinion gear, D and ND side (°C) — each form\'s latest entry in the period'],
         ]} formula={['Bearing temp = the hottest of those readings', 'Limits: bearings 45–65 °C, flywheel 45–80 °C (plant)']} />}
       </DrillDrawer>
@@ -198,7 +207,7 @@ export default function RmdAssetHealth() {
               ['Field', 'one value per tank — the latest entry in the period'],
             ]} formula={[
               'Oil (L) = level (inches) × 0.0254 × inside length × inside width (m) × 1000 — box tanks, flat bottom, level from the bottom',
-              'Tank size (L × W × D, m): 20" / 16" R stand 1.63 × 1.26 × 1.30 (2,670 L); Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)',
+              'Tank size (L × W × D, m): Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)',
               'Gearbox oil = the oil in the tank lowest against its capacity',
               'Limits: oil tank temperature 45–65 °C (plant); level — none yet',
             ]} />

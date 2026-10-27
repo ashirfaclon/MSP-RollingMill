@@ -9,8 +9,6 @@ import { useState } from 'react';
 import StockDrawer from '@/components/drill/StockDrawer';
 import { fixed } from '@/lib/num';
 import { useFinishedStock } from './useFinishedStock';
-import StockSplitLegend from './StockSplitLegend';
-import StackBar from '@/components/visualization/StackBar';
 
 export default function FinishedStockBlock() {
   const { data, loading, error } = useFinishedStock();
@@ -24,17 +22,6 @@ export default function FinishedStockBlock() {
           {data ? `${fixed(data.totals.stockMt, 1)} MT` : error ? 'NA' : <span className="skel skel--num" role="status" aria-label="Loading" />}
         </span>
       </button>
-      {/* As the Stock with order (0) and Free stock (all of it) cards; drawn like the Production split above. */}
-      {data && (
-        <StackBar
-          label={`Finished stock ${fixed(data.totals.stockMt, 1)} MT: with order 0.0 MT, free ${fixed(data.totals.stockMt, 1)} MT`}
-          parts={[
-            { label: 'Stock with order', value: 0, series: 'order' },
-            { label: 'Free stock', value: Math.max(0, data.totals.stockMt), series: 'free' },
-          ]}
-        />
-      )}
-      <StockSplitLegend withOrderMt={data ? 0 : null} freeMt={data ? data.totals.stockMt : null} />
       <StockDrawer open={open} onClose={() => setOpen(false)} data={data} loading={loading} error={error} />
     </div>
   );

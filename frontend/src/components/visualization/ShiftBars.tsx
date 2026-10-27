@@ -36,8 +36,10 @@ export default function ShiftBars(props: {
   sub?: ReactNode;
   /** Opens the plan-vs-actual drill-down from the bars and the plan gap (HSM), in the view shown. */
   onOpen?: (view: View) => void;
+  /** The face shown first: 'day' where there is no output per shift (RMD). */
+  initialView?: View;
 }) {
-  const [view, setView] = useState<View>('shift');
+  const [view, setView] = useState<View>(props.initialView ?? 'shift');
   const open = props.onOpen ? () => props.onOpen!(view) : undefined;
   const flipped = view === 'day';
 

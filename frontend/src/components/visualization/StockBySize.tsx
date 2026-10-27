@@ -84,9 +84,8 @@ export default function StockBySize() {
                 <li key={r.key}>
                   <div className="rm-size rm-size--stock">
                     <span className="rm-size-name">{r.label}</span>
-                    {/* With order first (none in the ERP), then free stock — as on the comp. */}
+                    {/* The size's stock; no with-order / free split (the user, 27 Oct 2026). */}
                     <span className="rm-size-stack" aria-hidden>
-                      <i className="rm-tone--order" style={{ width: '0%' }} />
                       <i className="rm-tone--free" style={{ width: `${(r.stockMt / max) * 100}%` }} />
                     </span>
                     <span className="rm-size-total num">{fixed(r.stockMt, 1)} MT</span>

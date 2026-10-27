@@ -44,6 +44,8 @@ export default function RmdShiftProduction({ rate, mill = 'rmd' }: { rate: React
         planGapMt={t?.gapMt ?? null}
         sub={shiftsLabel(DAY_START_HOUR[mill])}
         rate={rate}
+        // RMD has no output per shift (the ERP has no shift): open on the whole day (the user, 27 Oct 2026).
+        initialView={mill === 'rmd' ? 'day' : 'shift'}
         onOpen={(v) => { setLastView(v); setOpen(v); }}
       />
       <RmdPlanDrawer open={open !== null} view={open ?? lastView} onClose={() => setOpen(null)} mill={mill} />
