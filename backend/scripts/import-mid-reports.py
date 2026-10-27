@@ -7,7 +7,7 @@ Only what the report holds is written: a reading typed as a date / time (an Exce
 "04:01") is skipped and listed under "skipped". Field and machine names follow the form spec.
 
 Run (needs xlrd and openpyxl):
-  python import-mid-reports.py <report> <mill> <YYYY-MM-DD> [<report> <mill> <date> …] > ../src/modules/mid/data/mid-reports.json
+  python import-mid-reports.py <report> <mill> <YYYY-MM-DD> [<report> <mill> <date> …] > ../src/modules/mid/mid-reports.json
 """
 import json, os, re, shutil, sys, tempfile
 

@@ -3,13 +3,13 @@
  * Form 1 VIBRATION READING (one row per point) and Form 2 MACHINE CONDITION (one row per machine).
  *
  * Until the forms go live, the rows are MID's Excel reports, converted once by
- * scripts/import-mid-reports.py into data/mid-reports.json (the user, 27 Oct 2026). When the forms
+ * scripts/import-mid-reports.py into mid-reports.json (the user, 27 Oct 2026). When the forms
  * are made, their entries join here as a second source, a logbook entry replacing a report row of
  * the same date, mill, machine and point; the screens read the same report either way.
  */
 import type { MidMachine, MidPoint, MidReport, MidStatus, MidVisit } from '../../contracts';
 import { sectionOf } from './sections';
-import reports from './data/mid-reports.json';
+import reports from './mid-reports.json';
 
 interface ReadingRow extends MidPoint { date: string; mill: string; machine: string }
 interface ConditionRow { date: string; mill: string; machine: string; status: string; diagnosis: string | null }
