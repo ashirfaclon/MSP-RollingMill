@@ -169,7 +169,7 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; a zon
   await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Alignment/, /^Gearbox oil/, /^VFD trips/, /^Run hours/, /^PM on time/]);
   // As the HSM sheet: bearing temp and motor current from the Mill Load Log Sheet (NA until real
   // entries), run hours from the ERP; the rest NA.
-  for (const i of [0, 3, 4, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  for (const i of [3, 4, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
   await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
   await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)%$/);
   await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);

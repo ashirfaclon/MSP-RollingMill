@@ -33,6 +33,8 @@ import { dm, useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type HsmMillLoadEntry, type HsmMillLoadReport, type RunningRateReport } from '@/services/hsmApi';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
+import { useMid } from './useMid';
+import { MidVibrationDrawer, MidVibrationTrend, midDate } from './MidVibration';
 import './asset.css';
 
 /** HSM has no intermediate group (the user, 26 Oct 2026; the historian has only RM 1–5 and FM 1–6). */
@@ -54,6 +56,8 @@ export default function AssetHealth() {
   const drive = group.replace(/ group$/, '');
   const gid = STANDS[group] ?? null;
   const { dates } = useSelection();
+  const [vibOpen, setVibOpen] = useState(false);
+  const mid = useMid('hsm', gid);
 
   const loadUrl = rangeUrl('/api/hsm/mill-load', dates);
   const loadS = useApi<HsmMillLoadReport>(loadUrl);
@@ -85,14 +89,16 @@ export default function AssetHealth() {
           ? <span className="chip chip--info ah-status">{liveGroup.stateLabel}</span>
           : <span className="chip chip--na ah-status">Status NA</span>}
         <dl className="ah-asset-facts">
-          {['Last inspection', 'Next PM · ERP', 'Open work orders', 'Health score'].map((k) => (
-            <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className="num v-na">NA</dd></div>
+          {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', null], ['Open work orders', null], ['Health score', null]] as const).map(([k, v]) => (
+            <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className={`num ${v ? 'v-val' : 'v-na'}`}>{v ?? 'NA'}</dd></div>
           ))}
         </dl>
       </Panel>
 
       <section className="rm-strip ah-strip" aria-label="Condition KPIs">
-        {NA('Vibration RMS', 'mm/s', 'hold')}
+        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold"
+          {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
+        <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${drive} group`} mid={mid} />
         <KpiCard
           label="Bearing temp"
           value={bearingC === null ? 'NA' : fixed(bearingC, 0)}
@@ -146,10 +152,7 @@ export default function AssetHealth() {
 
       <div className="rm-row">
         <Panel title="Condition trends" sub="Bearing temperature, each reading" className="rm-panel" bodyClass="rm-body ah-trends">
-          <div className="ah-trend">
-            <div className="ah-trend-head"><span className="rm-k">Vibration · mm/s RMS</span><span className="num v-na">NA</span></div>
-            <div className="ah-trend-plot" role="img" aria-label="Vibration: no data" />
-          </div>
+          <MidVibrationTrend mid={mid} />
           <BearingTrend entries={trend} />
         </Panel>
         <Panel title="Laser alignment · Machine inspection" className="rm-panel" bodyClass="rm-body ah-pair">
@@ -168,7 +171,13 @@ export default function AssetHealth() {
           {['PM completed on time', 'MTBF', 'MTTR', 'Open action'].map((k) => <Row key={k} k={k} />)}
         </Panel>
         <Panel title="Diagnosis & process impact" className="rm-panel" bodyClass="rm-body ah-list">
-          {['Diagnosis', 'Asset stop', 'Output effect', 'Value'].map((k) => <Row key={k} k={k} />)}
+          <div className="ah-row">
+            <span className="rm-k">Diagnosis</span>
+            {mid.worst
+              ? <span className="ah-diag">{mid.worst.status === 'Good' ? 'All machines Good (MID)' : `${mid.worst.status} · ${mid.worst.machine}${mid.worst.diagnosis ? `: ${mid.worst.diagnosis}` : ''}`}</span>
+              : <span className="num v-na">NA</span>}
+          </div>
+          {['Asset stop', 'Output effect', 'Value'].map((k) => <Row key={k} k={k} />)}
         </Panel>
       </div>
 

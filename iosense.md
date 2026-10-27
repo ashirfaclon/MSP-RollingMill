@@ -29,6 +29,8 @@ and panels still render the sample model (`hsmSample.ts`).
 | `GET /api/rmd/chemistry` | Logbook form `sms/ccm-lolipop-sample` (mill = RMD; furnace-number, ccm, c-18, mn-19, s-20, p-21, si-22) | RMD Visualization: Chemical composition card and its samples drawer |
 | `GET /api/lsm/drive-temp` | Logbook form `lsm-mechanical/drive-temp` (drive-name; flywheel / reduction gearbox / pinion gearbox bearing DE, NDE °C; oil-level-inches; oil-pressure-kg-cm2) | LSM Asset Health: bearing temp, gearbox oil level and pressure, bearing trend |
 | `GET /api/lsm/mill-load` | Logbook form `electrical-logbook/mill-load-log-sheet` (date-and-time, time, section, billet-size, stand-<s>-pass-<p>-amp: stand 1 passes 1–4, stands 2–7 passes 5–10) | LSM Asset Health: motor current and its drill-down |
+| `GET /api/mid/:mill` | MID vibration reports (Excel) converted to the MID logbook form shapes (`backend/src/modules/mid/data/mid-reports.json`, `backend/scripts/import-mid-reports.py`) — the MID logbook forms replace them once live | Asset Health (all mills): vibration, its trend, last inspection, diagnosis |
+| `GET /api/hsm/costing` | The plant's monthly costing sheet (`backend/src/modules/hsm/costing/months.ts`; Sep 2026) | HSM Condition Analytics: conversion cost, yield material loss, tariff, net material, other conversion |
 
 ## Calls
 

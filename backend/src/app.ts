@@ -13,6 +13,7 @@ import { hsmRoutes } from './modules/hsm/hsm.routes';
 import { rmdRoutes } from './modules/rmd/rmd.routes';
 import { lsmRoutes } from './modules/lsm/lsm.routes';
 import { rmsRoutes } from './modules/rms/rms.routes';
+import { midRoutes } from './modules/mid/mid.routes';
 import { sourcesRoutes } from './modules/sources/sources.routes';
 import { systemRoutes, type Lifecycle } from './modules/system/system.routes';
 
@@ -56,6 +57,7 @@ export async function buildApp({ config, lifecycle = { shuttingDown: false } }: 
     await api.register(rmdRoutes, { prefix: '/rmd' });
     await api.register(lsmRoutes, { prefix: '/lsm' });
     await api.register(rmsRoutes, { prefix: '/rms' });
+    await api.register(midRoutes, { prefix: '/mid' });
   }, { prefix: '/api' });
 
   return app;
