@@ -17,6 +17,7 @@ import { yieldComparison } from './yield.service';
 import { runningRate } from './running-rate.service';
 import { powerReport } from '../power/power.service';
 import { planReport } from './plan.service';
+import { hsmCosting } from './costing/costing.service';
 
 /** Billets into the mill: ERP log sheet INPUT_PCS vs the Influx Dicharged_Billet counter. */
 const BILLETS: CounterSpec = { key: 'billets', tag: HSM_DISCHARGED_BILLET, erp: (r) => r.v?.INPUT_PCS ?? null };
@@ -52,6 +53,12 @@ export async function hsmRoutes(app: FastifyInstance) {
   });
 
   /** Power consumption: Σ power-consumed of the logbook form "Electrical HSM → Power Consumption", by the form's date. */
+  /** Costing: the plant's monthly conversion-cost sheets for the months of the period. */
+  app.get('/costing', { config: { errorCode: 'hsm_costing_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return hsmCosting(from, to);
+  });
+
   app.get('/power', { config: { errorCode: 'hsm_power_failed' } }, async (req) => {
     const { from, to } = parseRange(searchParams(req));
     return powerReport(loadEnv(), from, to);

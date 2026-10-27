@@ -10,17 +10,22 @@
  *   Finished exit        "Row 10" — the actual running rate;
  *   Billet infeed, Roughing / Finishing group   the Visualization mimic's Influx tags (the user,
  *                        26 Oct 2026): billets since 06:00, RM / FM drives on (On_Off);
- *   Specific energy      the logbook Electrical HSM → Power Consumption ÷ ERP production — the
- *                        Visualization card (the plant has no EMS meter; the user, 26 Oct 2026);
+ *   Specific energy      the logbook Electrical HSM → Power Consumption ÷ ERP production, over the
+ *                        days with both (the plant has no EMS meter; the user, 26 Oct 2026);
+ *   Conversion cost,     the plant's monthly costing sheet (2026 Costing - SEP26.xlsx, 27 Oct 2026):
+ *   Yield material loss, conversion cost ₹/MT, the losses' ₹ (MT × ₹/MT), tariff, other conversion
+ *   costing rows         and net material rates — for a period whose months all have a sheet;
  *   Product header       ERP size (PROD_TRAN receipts, the most produced strip size, and how
  *                        many others) and the running hours; grade and route are not in the ERP data.
- * Waiting on the plant / ERP: matched (stable-run) baselines and target kWh/MT, ERP cost masters,
- * approved limits, the stand map and route layout, the machine inspection form.
+ * Waiting on the plant / ERP: matched (stable-run) baselines and target kWh/MT, standard cost and
+ * tariff, output margin / contribution, approved limits, the stand map and route layout, the machine
+ * inspection form.
  */
 import { Fragment, useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
+import HsmSpecificEnergy from './HsmSpecificEnergy';
+import HsmCostingDrawer from './HsmCostingDrawer';
 import FlowArrow from '@/components/visualization/FlowArrow';
 import { StandDots, TONE } from '@/components/visualization/MillMimic';
 import { useHsmMimic } from '@/components/visualization/useHsmMimic';
@@ -28,14 +33,17 @@ import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { dm, useSelection } from '@/services/hsmProduction';
-import { rangeUrl, useApi, type RateDay, type RunningRateReport, type SizeReport } from '@/services/hsmApi';
+import { rangeUrl, useApi, type CostingReport, type RateDay, type RunningRateReport, type SizeReport } from '@/services/hsmApi';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import '@/components/asset/asset.css';
 import './condition.css';
 
 const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
-const Row = ({ k }: { k: string }) => <div className="ah-row"><span className="rm-k">{k}</span><span className="num v-na">NA</span></div>;
+const Row = ({ k, v = null }: { k: string; v?: string | null }) => (
+  <div className="ah-row"><span className="rm-k">{k}</span><span className={`num ${v === null ? 'v-na' : 'v-val'}`}>{v ?? 'NA'}</span></div>
+);
+const inr = (v: number, dp = 0) => `₹${v.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
 
 /** ERP MT ÷ historian running hours over the days that have both (ERP entries come a day late). */
 export function actualRate(days: RateDay[]) {
@@ -54,6 +62,15 @@ export default function HsmConditionAnalytics() {
   const rateR = rateS.data && rateS.dataUrl === rateUrl ? rateS.data : null;
   const sizes = sizesS.data && sizesS.dataUrl === sizesUrl ? sizesS.data.rows.filter((r) => !r.defective && r.producedMt > 0) : null;
   const [open, setOpen] = useState(false);
+  const [costOpen, setCostOpen] = useState(false);
+  const costUrl = rangeUrl('/api/hsm/costing', dates);
+  const costS = useApi<CostingReport>(costUrl);
+  const cost = costS.data && costS.dataUrl === costUrl ? costS.data : null;
+  const cp = cost?.period ?? null;
+  // Net material rates as the sheet prices the losses (burning loss apart from the scrap-type losses).
+  const rates = cost?.sheets.length === 1 ? cost.sheets[0].losses : null;
+  const burning = rates?.find((l) => l.name === 'Burning loss')?.rate ?? null;
+  const scrap = rates?.find((l) => l.name !== 'Burning loss')?.rate ?? null;
 
   const rate = useMemo(() => (rateR ? actualRate(rateR.days) : null), [rateR]);
   const tph = rate?.tph ?? null;
@@ -103,10 +120,12 @@ export default function HsmConditionAnalytics() {
           openLabel="Actual running rate per day"
         />
         {NA('Output opportunity', 'MT', 'order')}
-        <SpecificEnergyCard mill="hsm" />
-        {NA('Conversion cost', '₹/MT', 'prod')}
+        <HsmSpecificEnergy />
+        <KpiCard label="Conversion cost" value={cp ? fixed(cp.conversionPerMt, 0) : 'NA'} unit="₹/MT" note="" series="prod"
+          loading={!costS.data && !costS.error} onOpen={() => setCostOpen(true)} openLabel="The plant's costing sheet, line by line" />
         {NA('Cost variance', '₹/MT', 'hold')}
-        {NA('Yield material loss', '₹', 'hold')}
+        <KpiCard label="Yield material loss" value={cp ? fixed(cp.materialLossRs / 1e5, 2) : 'NA'} unit="₹ lakh" note="" series="hold"
+          onOpen={() => setCostOpen(true)} openLabel="The plant's costing sheet, line by line" />
         {NA('Output margin', '₹', 'order')}
       </section>
 
@@ -115,8 +134,14 @@ export default function HsmConditionAnalytics() {
           {['Production rate · actual vs matched', 'Energy per MT · actual vs matched'].map((k) => <Row key={k} k={k} />)}
         </Panel>
         <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
-          {['Tariff', 'Contribution', 'Net material', 'Other conversion · actual / standard', 'Conversion cost per finished MT',
-            'Cost variance', 'Yield material variance', 'Throughput contribution opportunity'].map((k) => <Row key={k} k={k} />)}
+          <Row k="Tariff" v={cp ? `${inr(cp.tariffPerKwh, 2)}/kWh` : null} />
+          <Row k="Contribution" />
+          <Row k="Net material" v={burning !== null && scrap !== null ? `${inr(burning)}/MT burning loss · ${inr(scrap)}/MT other losses` : null} />
+          <Row k="Other conversion · actual / standard" v={cp ? `${inr(cp.otherConversionPerMt)}/MT · standard NA` : null} />
+          <Row k="Conversion cost per finished MT" v={cp ? `${inr(cp.conversionPerMt)}/MT` : null} />
+          <Row k="Cost variance" />
+          <Row k="Yield material variance" />
+          <Row k="Throughput contribution opportunity" />
         </Panel>
       </div>
 
@@ -144,6 +169,7 @@ export default function HsmConditionAnalytics() {
         </div>
       </Panel>
 
+      <HsmCostingDrawer open={costOpen} onClose={() => setCostOpen(false)} report={cost} loading={!costS.data && !costS.error} error={costS.error} />
       <DrillDrawer open={open} onClose={() => setOpen(false)} title="Actual running rate" sub="HSM · TPH"
         loading={!rateS.data && !rateS.error} error={rateS.error} hasData={!!rateR}>
         {rateR && rate && <RateContent days={rateR.days} rate={rate} />}

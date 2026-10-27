@@ -138,3 +138,46 @@ export interface PlanReport {
     actualByShift: Record<string, number>;
   };
 }
+
+/** One line of the plant's monthly HSM costing sheet: a cost, and the same per MT of production. */
+export interface CostLine {
+  name: string;
+  /** MT for a loss, kWh for power; null where the sheet gives none. */
+  qty: number | null;
+  /** ₹ per MT (loss) or ₹ per kWh (power); null where the sheet gives none. */
+  rate: number | null;
+  rs: number;
+  perMt: number;
+}
+
+/** The plant's HSM conversion-cost sheet for one month (e.g. "2026 Costing - SEP26.xlsx"). */
+export interface CostingMonth {
+  month: string;
+  source: string;
+  productionMt: number;
+  losses: CostLine[];
+  power: CostLine[];
+  others: CostLine[];
+  /** The sheet's "Total Conversion Cost/MT". */
+  conversionPerMt: number;
+  tariffPerKwh: number;
+}
+
+/** GET /api/hsm/costing — the months of the period that have a costing sheet, and the period's figures. */
+export interface CostingReport {
+  from: string;
+  to: string;
+  /** Every month the period touches. */
+  months: string[];
+  /** Those with a sheet. */
+  sheets: CostingMonth[];
+  /** The period's figures, production-weighted over its months — null unless every month has a sheet. */
+  period: {
+    productionMt: number;
+    conversionPerMt: number;
+    otherConversionPerMt: number;
+    powerPerMt: number;
+    materialLossRs: number;
+    tariffPerKwh: number;
+  } | null;
+}

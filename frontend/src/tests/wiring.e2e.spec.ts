@@ -1330,3 +1330,29 @@ test('HSM checklists: production variance — per day, the production figures fi
   await page.waitForTimeout(500);
   await s.screenshot({ path: `${SHOTS}/hsm-checklist-setup.png` });
 });
+
+test('HSM condition analytics, September: conversion cost, material loss and costing rows from the plant\'s costing sheet; specific energy ÷ ERP production', async ({ page }) => {
+  await page.goto('/hsm/condition-analytics');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-09-01');
+  await dialog.getByLabel('End Date').fill('2026-09-30');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  // 2026 Costing - SEP26: total conversion cost ₹2,906.29/MT; losses ₹36,95,346 = ₹36.95 lakh.
+  await expect(cards.getByRole('button', { name: 'Conversion cost', exact: true }).locator('.rm-card-value')).toHaveText(/^2,?906\s*₹\/MT$/, { timeout: 60_000 });
+  await expect(cards.getByRole('button', { name: 'Yield material loss', exact: true }).locator('.rm-card-value')).toHaveText(/^36\.95\s*₹ lakh$/);
+  await expect(cards.getByRole('button', { name: 'Specific energy', exact: true }).locator('.rm-card-value')).toHaveText(/^[\d,.]+\s*kWh\/MT$/);
+  const costing = main.locator('section.panel', { hasText: 'Costing & impact' });
+  await expect(costing.locator('.ah-row', { hasText: 'Tariff' }).locator('.num')).toHaveText('₹5.75/kWh');
+  await expect(costing.locator('.ah-row', { hasText: 'Other conversion' }).locator('.num')).toHaveText('₹1,543/MT · standard NA');
+  await expect(costing.locator('.ah-row', { hasText: 'Conversion cost per finished MT' }).locator('.num')).toHaveText('₹2,906/MT');
+  await expect(costing.locator('.ah-row', { hasText: 'Net material' }).locator('.num')).toHaveText('₹37,800/MT burning loss · ₹6,000/MT other losses');
+  await page.screenshot({ path: `${SHOTS}/hsm-condition-analytics-sep.png`, fullPage: true });
+  await cards.getByRole('button', { name: 'Conversion cost', exact: true }).click();
+  const d = page.getByRole('dialog', { name: 'Conversion cost' });
+  await expect(d.getByRole('table', { name: /^Cost lines September 2026$/ }).locator('tfoot')).toContainText('2,906');
+  await page.waitForTimeout(600);
+  await d.screenshot({ path: `${SHOTS}/hsm-costing-drawer.png` });
+});
