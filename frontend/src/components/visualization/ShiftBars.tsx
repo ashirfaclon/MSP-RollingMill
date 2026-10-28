@@ -21,8 +21,9 @@ export type View = 'shift' | 'day';
 /**
  * "Production by shift": each shift's output against its plan target, with its compliance
  * (actual ÷ plan). A toggle in the head flips the card over (a 180° turn) to the whole day:
- * one bar for all shifts together against the day's plan. Shared by every mill — HSM passes
- * live figures, RMD a sample — so the panel reads the same whatever the number of shifts.
+ * one bar for all shifts together against the day's plan. Shared by every mill, so the panel
+ * reads the same whatever the number of shifts. With no output per shift (`shiftData` false —
+ * RMD always), the panel is the whole day alone: no By shift view, no toggle.
  */
 export default function ShiftBars(props: {
   shifts: ShiftBar[];
@@ -36,56 +37,70 @@ export default function ShiftBars(props: {
   sub?: ReactNode;
   /** Opens the plan-vs-actual drill-down from the bars and the plan gap (HSM), in the view shown. */
   onOpen?: (view: View) => void;
-  /** The face shown first: 'day' where there is no output per shift (RMD). */
-  initialView?: View;
+  /**
+   * Whether the period has output per shift: false = the whole day only — no By shift view, no
+   * switch (the user, 28 Oct 2026; RMD always, the ERP has no shift); null / omitted = not known yet.
+   */
+  shiftData?: boolean | null;
 }) {
-  const [view, setView] = useState<View>(props.initialView ?? 'shift');
-  const open = props.onOpen ? () => props.onOpen!(view) : undefined;
-  const flipped = view === 'day';
+  const [view, setView] = useState<View>('shift');
+  const dayOnly = props.shiftData === false;
+  const shown: View = dayOnly ? 'day' : view;
+  const open = props.onOpen ? () => props.onOpen!(shown) : undefined;
+  const flipped = shown === 'day';
+
+  const panel = (v: View) => (
+    <Panel
+      title={dayOnly ? 'Production · whole day' : 'Production by shift'}
+      sub={props.sub}
+      right={
+        <span className="rm-shift-head">
+          {!dayOnly && (
+            <Seg
+              label="Shift view"
+              value={view}
+              onChange={setView}
+              options={[
+                { id: 'shift', label: 'By shift', title: 'Each shift against its plan' },
+                { id: 'day', label: 'Whole day', title: 'All shifts together against the day’s plan' },
+              ]}
+            />
+          )}
+          {props.planMt === null
+            ? <span className="chip chip--na" title="No plan for this period">Plan NA</span>
+            : <span className="chip chip--info">Plan {fixed(props.planMt, 0)} MT</span>}
+        </span>
+      }
+      className="rm-panel"
+      bodyClass="rm-body"
+    >
+      <Bars
+        rows={v === 'shift' ? props.shifts : [{ name: 'Total', ...props.day }]}
+        label={v === 'shift' ? 'Production by shift, plan vs actual per day' : 'Whole-day production, plan vs actual per day'}
+        onOpen={open}
+      />
+      <div className="rm-foot">
+        {props.rate}
+        {open ? (
+          <button type="button" className="rm-foot-item rm-foot-btn" onClick={open} aria-haspopup="dialog" title="Plan vs actual per shift, per day">
+            <PlanGap v={props.planGapMt} />
+          </button>
+        ) : (
+          <span className="rm-foot-item"><PlanGap v={props.planGapMt} /></span>
+        )}
+      </div>
+    </Panel>
+  );
+
+  // No output per shift: the whole day alone, no card to turn over.
+  if (dayOnly) return panel('day');
 
   const face = (v: View) => {
-    const hidden = v !== view;
+    const hidden = v !== shown;
     return (
       // The face turned away is inert: not focusable, not read, not clickable.
       <div className={`rm-flip-face rm-flip-face--${v === 'shift' ? 'front' : 'back'}`} aria-hidden={hidden} inert={hidden}>
-        <Panel
-          title="Production by shift"
-          sub={props.sub}
-          right={
-            <span className="rm-shift-head">
-              <Seg
-                label="Shift view"
-                value={view}
-                onChange={setView}
-                options={[
-                  { id: 'shift', label: 'By shift', title: 'Each shift against its plan' },
-                  { id: 'day', label: 'Whole day', title: 'All shifts together against the day’s plan' },
-                ]}
-              />
-              {props.planMt === null
-                ? <span className="chip chip--na" title="No plan for this period">Plan NA</span>
-                : <span className="chip chip--info">Plan {fixed(props.planMt, 0)} MT</span>}
-            </span>
-          }
-          className="rm-panel"
-          bodyClass="rm-body"
-        >
-          <Bars
-            rows={v === 'shift' ? props.shifts : [{ name: 'Total', ...props.day }]}
-            label={v === 'shift' ? 'Production by shift, plan vs actual per day' : 'Whole-day production, plan vs actual per day'}
-            onOpen={open}
-          />
-          <div className="rm-foot">
-            {props.rate}
-            {open ? (
-              <button type="button" className="rm-foot-item rm-foot-btn" onClick={open} aria-haspopup="dialog" title="Plan vs actual per shift, per day">
-                <PlanGap v={props.planGapMt} />
-              </button>
-            ) : (
-              <span className="rm-foot-item"><PlanGap v={props.planGapMt} /></span>
-            )}
-          </div>
-        </Panel>
+        {panel(v)}
       </div>
     );
   };

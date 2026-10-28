@@ -516,7 +516,7 @@ test('RMD: production and losses from the ERP log sheet (FA-SKJ), and what they 
   await expect(page.getByRole('list', { name: 'Mill process flow' }).getByRole('button', { name: /Finished exit/ })).toContainText('1,689.9 MT');
   await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('1,689.9 MT');
   // Running rate now calculates: production ÷ running hours.
-  await expect(page.locator('.rm-flip-face--front .rm-foot')).toContainText(/Running rate\s*\d+\.\d{2} TPH/);
+  await expect(page.locator('section.panel', { hasText: 'Production · whole day' }).locator('.rm-foot')).toContainText(/Running rate\s*\d+\.\d{2} TPH/);
 
   await card.click();
   const prod = page.getByRole('dialog', { name: 'Production · ERP log sheet' });
@@ -613,29 +613,23 @@ test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, a
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
 
-  // Output per shift is not in the ERP, so the panel opens on the whole day.
-  const back = page.locator('.rm-flip-face--back section.panel');
-  await expect(back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' })).toHaveAttribute('aria-pressed', 'true');
-  // Whole day: ERP Prime + SL 1,689.86 ÷ 2,121.44 = 79.7 %.
-  await expect(back.locator('.rm-shift-val')).toHaveText(['1,689.9 MT']);
-  await expect(back.locator('.rm-shift-comp')).toHaveText(['79.7%']);
-  await page.waitForTimeout(700);
-  await back.screenshot({ path: `${SHOTS}/rmd-shift-whole-day.png` });
-  await back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'By shift' }).click();
-
-  // Oct plan 8,220.638 MT ÷ 31 calendar days (shutdown dates not given) = 265.18 a day → 1–8 Oct 2,121.4 MT, 1,060.7 a shift.
-  const panel = page.locator('.rm-flip-face--front section.panel');
+  // Output per shift is not in the ERP: the whole day only — no By shift view, no switch (the user, 28 Oct 2026).
+  const panel = page.locator('section.panel', { hasText: 'Production · whole day' });
+  await expect(panel.getByRole('group', { name: 'Shift view' })).toHaveCount(0);
+  await expect(page.locator('.rm-flip')).toHaveCount(0);
+  await expect(panel.locator('.panel-sub')).toHaveText('09:00 IST → 09:00 IST');
+  // Oct plan 8,220.638 MT ÷ 31 calendar days (shutdown dates not given) = 265.18 a day → 1–8 Oct 2,121.4 MT.
   await expect(panel.locator('.chip')).toHaveText('Plan 2,121 MT');
-  await expect(panel.locator('.rm-shift-name')).toHaveText(['Day', 'Night']);
-  await expect(panel.locator('.rm-shift-val')).toHaveText(['NA', 'NA']);   // output per shift is not in the ERP
-  await expect(panel.locator('.rm-shift-target-label')).toContainText('1,061 MT target');
+  // Whole day: ERP Prime + SL 1,689.86 ÷ 2,121.44 = 79.7 %.
+  await expect(panel.locator('.rm-shift-name')).toHaveText(['Total']);
+  await expect(panel.locator('.rm-shift-val')).toHaveText(['1,689.9 MT']);
+  await expect(panel.locator('.rm-shift-comp')).toHaveText(['79.7%']);
   // Plan gap over the days with both: 1,689.86 − 2,121.44 = −431.58: short, shown without a sign.
   await expect(panel).toContainText('431.6 MT');
   await expect(panel).not.toContainText('-431.6');
-  await panel.screenshot({ path: `${SHOTS}/rmd-shift-plan.png` });
+  await panel.screenshot({ path: `${SHOTS}/rmd-shift-whole-day.png` });
 
-  await panel.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' }).click();
-  await back.getByRole('button', { name: 'Whole-day production, plan vs actual per day' }).click();
+  await panel.getByRole('button', { name: 'Whole-day production, plan vs actual per day' }).click();
   const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
   const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
   await expect(dt.locator('thead th')).toHaveText(['Period', 'Prime + SL', 'Target', 'Compliance', 'Plan gap']);
@@ -646,18 +640,6 @@ test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, a
   await expect(dd.getByRole('region', { name: 'Formula' })).toContainText('month plan ÷ calendar days');
   await page.waitForTimeout(700);
   await dd.screenshot({ path: `${SHOTS}/rmd-drill-plan-day.png` });
-  await page.keyboard.press('Escape');
-  await back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'By shift' }).click();
-
-  // By shift: the targets, half the day each; output per shift NA.
-  await panel.getByRole('button', { name: 'Production by shift, plan vs actual per day' }).click();
-  const ds = page.getByRole('dialog', { name: 'Production by shift · plan' });
-  const st = ds.getByRole('table', { name: 'Production by shift by period' });
-  await expect(st.locator('thead th')).toHaveText(['Period', 'Day output', 'Day target', 'Night output', 'Night target']);
-  await expect(st.getByRole('row', { name: /^1 Oct/ })).toContainText('132.6');
-  await expect(st.locator('tfoot')).toContainText('1,060.7');
-  await page.waitForTimeout(700);
-  await ds.screenshot({ path: `${SHOTS}/rmd-drill-plan-shift.png` });
 });
 
 test('LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant gave the codes', async ({ page }) => {
@@ -712,8 +694,8 @@ test('RMD: running rate opens its drill-down — Prime + SL ÷ running hours fro
   await dialog.getByLabel('Start Date').fill('2026-10-01');
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  // RMD opens on the whole day (no output per shift).
-  const foot = page.locator('.rm-flip-face--back .rm-foot').getByRole('button', { name: /Running rate/ });
+  // RMD: the whole day only (no output per shift).
+  const foot = page.locator('section.panel', { hasText: 'Production · whole day' }).locator('.rm-foot').getByRole('button', { name: /Running rate/ });
   await expect(foot).toContainText(/\d+\.\d{2} TPH/);
   const shown = (await foot.locator('.rm-foot-v').innerText()).replace(' TPH', '');
   await foot.click();

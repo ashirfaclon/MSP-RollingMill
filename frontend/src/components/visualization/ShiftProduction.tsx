@@ -55,6 +55,8 @@ export default function ShiftProduction({ m }: { m: MillModel }) {
         ? `Plan covers ${plan!.totals.plannedDays} of ${plan!.totals.days} days · gap over those`
         : undefined}
       rate={<RunningRateFoot />}
+      // The counter's split by shift; no day of the period has one: the whole day only.
+      shiftData={plan ? plan.days.some((d) => d.actualByShift != null) : null}
       onOpen={(v) => { setLastView(v); setOpen(v); }}
     />
     <ShiftPlanDrawer open={open !== null} view={open ?? lastView} onClose={() => setOpen(null)} />

@@ -378,12 +378,12 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   await expect(mimic.getByRole('button', { name: /Finished exit/ })).toBeVisible();
   await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-dot')).toHaveCount(14);   // L1 S1–S8 + L2 S1–S6
   await expect(mimic.getByRole('button', { name: /Finishing group/ }).locator('.rm-dot')).toHaveCount(10);   // 5 per line
-  // Production by shift: two shifts (08–20, 20–08); targets from the FY plan, output per shift NA (not in the ERP).
-  const shifts = page.locator('.rm-flip-face--front section.panel');
-  await expect(shifts.locator('.rm-shift-name')).toHaveText(['Day', 'Night']);
-  await expect(shifts.locator('.panel-sub')).toHaveText('Day 09:00–21:00 IST · Night 21:00–09:00 IST');
-  await expect(shifts.locator('.rm-shift-val')).toHaveText(['NA', 'NA']);
-  await expect(shifts.locator('.rm-shift-comp')).toHaveText(['NA', 'NA']);
+  // No output per shift in the ERP: the whole day only — no By shift view, no switch (the user, 28 Oct 2026).
+  const shifts = page.locator('section.panel', { hasText: 'Production · whole day' });
+  await expect(shifts.getByRole('group', { name: 'Shift view' })).toHaveCount(0);
+  await expect(shifts.locator('.rm-shift-name')).toHaveText(['Total']);
+  await expect(shifts.locator('.panel-sub')).toHaveText('09:00 IST → 09:00 IST');
+  await expect(shifts.locator('.rm-shift-val')).toHaveText([/^(NA|[\d,]+\.\d MT)/]);
   await expect(shifts.locator('.chip')).toHaveText(/^Plan \d/);
   await expect(shifts.locator('.rm-foot')).toContainText(/Running rate\s*NA/);
   // Order allocation: production from the ERP log sheet, finished stock from the item ledger; no MTO / MTS split.
@@ -408,7 +408,9 @@ for (const mill of ['lsm', 'rms'] as const) {
     const start = mill === 'lsm' ? '09:00' : '09:30';
     const mid = mill === 'lsm' ? '21:00' : '21:30';
     await expect(page.getByRole('button', { name: /Duration/ })).toContainText(new RegExp(`${start} IST → \\d{1,2} \\w{3} ${start} IST`));
-    await expect(page.locator('.rm-flip-face--front .panel-sub')).toHaveText(`Day ${start}–${mid} IST · Night ${mid}–${start} IST`);
+    // By shift when the period has output per shift; else the whole day only (today: the ERP comes a day late).
+    const shiftPanel = page.locator('section.panel', { hasText: /Production (by shift|· whole day)/ }).first();
+    await expect(shiftPanel.locator('.panel-sub')).toHaveText(new RegExp(`^(Day ${start}–${mid} IST · Night ${mid}–${start} IST|${start} IST → ${start} IST)$`));
     const strip = page.getByRole('region', { name: 'Headline KPIs' });
     await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/]);
     // LSM: Production is wired (ERP log sheet FA-LP-P) and opens its drawer; Today's entry comes a day late, so NA.
@@ -420,7 +422,7 @@ for (const mill of ['lsm', 'rms'] as const) {
     // No mill mimic on LSM or RMS.
     await expect(page.getByRole('list', { name: 'Mill process flow' })).toHaveCount(0);
     await expect(page.locator('section.panel', { hasText: 'Mill mimic' })).toHaveCount(0);
-    for (const title of ['Production by shift', 'Order allocation', 'Material & operating balance', 'Finished stock by size']) {
+    for (const title of [/Production (by shift|· whole day)/, 'Order allocation', 'Material & operating balance', 'Finished stock by size']) {
       await expect(page.locator('section.panel', { hasText: title }).first()).toBeVisible();
     }
     // No sample figures anywhere.

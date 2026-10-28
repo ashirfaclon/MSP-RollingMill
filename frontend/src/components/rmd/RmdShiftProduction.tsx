@@ -4,8 +4,9 @@
  * Production by shift (RMD, LSM), from /api/{mill}/plan:
  *   – targets: the plant's plan (RMD: month-wise FY plan, Prime + SL; LSM: October 2026,
  *     PRODUTION_MT), spread to days, half per shift;
- *   – output per shift: RMD NA (the ERP has no shift); LSM the ERP day split by the shifts'
- *     prime pieces in the logbook's LSM Production Sheet, against that shift's plan;
+ *   – output per shift: RMD none (the ERP has no shift), so the whole day only; LSM the ERP day
+ *     split by the shifts' prime pieces in the logbook's LSM Production Sheet, against that
+ *     shift's plan — a period with no shift output shows the whole day only (the user, 28 Oct 2026);
  *   – whole day: ERP Prime + SL against the plan, with compliance and plan gap over the days
  *     that have both (the ERP is entered a day or two late).
  * Running rate as before (ERP production ÷ running hours).
@@ -14,7 +15,7 @@ import { useState, type ReactNode } from 'react';
 import ShiftBars from '@/components/visualization/ShiftBars';
 import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdPlanReport } from '@/services/hsmApi';
-import { DAY_START_HOUR, shiftsLabel } from '@/lib/plantDay';
+import { DAY_START_HOUR, dayStartIst, shiftsLabel } from '@/lib/plantDay';
 import RmdPlanDrawer, { type PlanMill, type RmdShiftView } from './RmdPlanDrawer';
 
 export default function RmdShiftProduction({ rate, mill = 'rmd' }: { rate: ReactNode; mill?: PlanMill }) {
@@ -25,6 +26,9 @@ export default function RmdShiftProduction({ rate, mill = 'rmd' }: { rate: React
   const t = plan?.totals ?? null;
   const [open, setOpen] = useState<RmdShiftView | null>(null);
   const [lastView, setLastView] = useState<RmdShiftView>('shift');
+  // Output per shift: RMD never (the ERP has no shift); LSM / RMS when the period has any — else the whole day only.
+  const shiftData = mill === 'rmd' ? false
+    : plan ? (['Day', 'Night'] as const).some((n) => t?.shifts?.[n]?.actualMt != null) : null;
 
   return (
     <>
@@ -42,10 +46,9 @@ export default function RmdShiftProduction({ rate, mill = 'rmd' }: { rate: React
         }}
         planMt={t?.planMt ?? null}
         planGapMt={t?.gapMt ?? null}
-        sub={shiftsLabel(DAY_START_HOUR[mill])}
+        sub={shiftData === false ? `${dayStartIst(DAY_START_HOUR[mill])} → ${dayStartIst(DAY_START_HOUR[mill])}` : shiftsLabel(DAY_START_HOUR[mill])}
         rate={rate}
-        // RMD has no output per shift (the ERP has no shift): open on the whole day (the user, 27 Oct 2026).
-        initialView={mill === 'rmd' ? 'day' : 'shift'}
+        shiftData={shiftData}
         onOpen={(v) => { setLastView(v); setOpen(v); }}
       />
       <RmdPlanDrawer open={open !== null} view={open ?? lastView} onClose={() => setOpen(null)} mill={mill} />
