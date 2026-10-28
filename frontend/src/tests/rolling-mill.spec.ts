@@ -162,18 +162,18 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; a zon
   const main = page.getByRole('main');
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Finishing drive group');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Alignment/, /^Gearbox oil/, /^VFD trips/, /^Run hours/, /^PM on time/]);
+  await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/, /^PM on time/]);
   // As the HSM sheet: bearing temp and motor current from the Mill Load Log Sheet (NA until real
   // entries), run hours from the ERP; the rest NA.
-  for (const i of [3, 4, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  for (const i of [3, 5]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
   await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
   await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)%$/);
-  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
-  for (const t of ['Grouped asset mimic', 'Condition trends', 'Laser alignment · Machine inspection', 'ERP PM & work-order history', 'Diagnosis & process impact']) {
+  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
+  for (const t of ['Grouped asset mimic', 'Condition trends', 'ERP PM & work-order history', 'Remarks']) {
     await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
   }
   // Never a sample figure: the NA blocks stay NA.
-  for (const t of ['Laser alignment · Machine inspection', 'ERP PM & work-order history', 'Diagnosis & process impact']) {
+  for (const t of ['ERP PM & work-order history']) {
     const vals = await main.locator('section.panel', { hasText: t }).locator('.num').allInnerTexts();
     expect(vals.every((v) => v.trim().startsWith('NA'))).toBe(true);
   }

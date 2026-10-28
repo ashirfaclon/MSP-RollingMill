@@ -12,7 +12,7 @@
  *                  load of the passes at the latest reading, A; opens every stand and pass;
  *   Run hours      ERP log sheet NET_RUNNING_HRS over the period.
  * The sheet maps no drive to a mill section, so the figures cover every drive. No mill mimic on
- * LSM (the user, 23 Oct 2026). Vibration and alignment wait on MID; PM items on ERP PM.
+ * LSM (the user, 23 Oct 2026). Vibration from MID; PM items on ERP PM.
  */
 import { useMemo, useState } from 'react';
 import LsmMillLoadDrawer from './LsmMillLoadDrawer';
@@ -27,7 +27,7 @@ import { rangeUrl, useApi, type LsmDriveReading, type LsmDriveReport, type LsmMi
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
-import { MidVibrationDrawer, MidVibrationTrend, midDate } from './MidVibration';
+import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
 import './asset.css';
 
 const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
@@ -93,7 +93,6 @@ export default function LsmAssetHealth() {
         <KpiCard label="Motor current" value={currentA === null ? 'NA' : fixed(currentA, 0)} unit="A" note="" series="prod"
           {...(load ? { onOpen: () => setLoadOpen(true), openLabel: 'Each stand and pass: load at the latest reading' } : {})} />
         <LsmMillLoadDrawer open={loadOpen} onClose={() => setLoadOpen(false)} report={load} loading={!loadS.data && !loadS.error} error={loadS.error} />
-        {NA('Alignment', 'mm', 'order')}
         <KpiCard
           label="Gearbox oil"
           value=""
@@ -106,24 +105,14 @@ export default function LsmAssetHealth() {
           ]}
           {...opener}
         />
-        {NA('VFD trips', 'per 100 run h', 'hold')}
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" />
         {NA('PM on time', '%', 'order')}
       </section>
 
-      <div className="rm-row">
+      <div className="rm-row ah-row--one">
         <Panel title="Condition trends" sub="Bearing temperature, each reading" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
           <BearingTrend entries={trend} />
-        </Panel>
-        <Panel title="Laser alignment · Machine inspection" className="rm-panel" bodyClass="rm-body ah-pair">
-          {['As-found', 'As-left'].map((k) => (
-            <div className="ah-figure" key={k}>
-              <span className="rm-k">{k}</span>
-              <span className="ah-figure-v num v-na">NA</span>
-              <span className="ah-figure-sub">Offset | angle <b className="v-na">NA</b></span>
-            </div>
-          ))}
         </Panel>
       </div>
 
@@ -131,14 +120,8 @@ export default function LsmAssetHealth() {
         <Panel title="ERP PM & work-order history" className="rm-panel" bodyClass="rm-body ah-list">
           {['PM completed on time', 'MTBF', 'MTTR', 'Open action'].map((k) => <Row key={k} k={k} />)}
         </Panel>
-        <Panel title="Diagnosis & process impact" className="rm-panel" bodyClass="rm-body ah-list">
-          <div className="ah-row">
-            <span className="rm-k">Diagnosis</span>
-            {mid.worst
-              ? <span className="ah-diag">{mid.worst.status === 'Good' ? 'All machines Good (MID)' : `${mid.worst.status} · ${mid.worst.machine}${mid.worst.diagnosis ? `: ${mid.worst.diagnosis}` : ''}`}</span>
-              : <span className="num v-na">NA</span>}
-          </div>
-          {['Asset stop', 'Output effect', 'Value'].map((k) => <Row key={k} k={k} />)}
+        <Panel title="Remarks" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
+          <MidRemarks mid={mid} />
         </Panel>
       </div>
 

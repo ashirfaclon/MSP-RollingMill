@@ -15,7 +15,7 @@
  *   Mimic, status   the Visualization mimic's Influx tags (the user, 26 Oct 2026): billets since
  *                      06:00, RM / FM drives on (On_Off), the production counter for the period.
  * The stand name places a reading in its group (RM → roughing, FM → finishing). Clicking a zone
- * selects its drive group. Vibration and alignment wait on MID; PM items on ERP PM; the rest have
+ * selects its drive group. Vibration from MID; PM items on ERP PM; the rest have
  * no source in the sheet.
  */
 import { Fragment, useMemo, useState } from 'react';
@@ -34,7 +34,7 @@ import { rangeUrl, useApi, type HsmMillLoadEntry, type HsmMillLoadReport, type R
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
-import { MidVibrationDrawer, MidVibrationTrend, midDate } from './MidVibration';
+import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
 import './asset.css';
 
 /** HSM has no intermediate group (the user, 26 Oct 2026; the historian has only RM 1–5 and FM 1–6). */
@@ -115,9 +115,7 @@ export default function AssetHealth() {
           series="prod"
           {...(canOpen ? { onOpen: () => setOpen(true), openLabel: 'Each stand: load and DC motor temperatures' } : {})}
         />
-        {NA('Alignment', 'mm', 'order')}
         {NA('Gearbox oil', '', 'hold')}
-        {NA('VFD trips', 'per 100 run h', 'hold')}
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" />
         {NA('PM on time', '%', 'order')}
       </section>
@@ -150,19 +148,10 @@ export default function AssetHealth() {
         </ol>
       </Panel>
 
-      <div className="rm-row">
+      <div className="rm-row ah-row--one">
         <Panel title="Condition trends" sub="Bearing temperature, each reading" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
           <BearingTrend entries={trend} />
-        </Panel>
-        <Panel title="Laser alignment · Machine inspection" className="rm-panel" bodyClass="rm-body ah-pair">
-          {['As-found', 'As-left'].map((k) => (
-            <div className="ah-figure" key={k}>
-              <span className="rm-k">{k}</span>
-              <span className="ah-figure-v num v-na">NA</span>
-              <span className="ah-figure-sub">Offset | angle <b className="v-na">NA</b></span>
-            </div>
-          ))}
         </Panel>
       </div>
 
@@ -170,14 +159,8 @@ export default function AssetHealth() {
         <Panel title="ERP PM & work-order history" className="rm-panel" bodyClass="rm-body ah-list">
           {['PM completed on time', 'MTBF', 'MTTR', 'Open action'].map((k) => <Row key={k} k={k} />)}
         </Panel>
-        <Panel title="Diagnosis & process impact" className="rm-panel" bodyClass="rm-body ah-list">
-          <div className="ah-row">
-            <span className="rm-k">Diagnosis</span>
-            {mid.worst
-              ? <span className="ah-diag">{mid.worst.status === 'Good' ? 'All machines Good (MID)' : `${mid.worst.status} · ${mid.worst.machine}${mid.worst.diagnosis ? `: ${mid.worst.diagnosis}` : ''}`}</span>
-              : <span className="num v-na">NA</span>}
-          </div>
-          {['Asset stop', 'Output effect', 'Value'].map((k) => <Row key={k} k={k} />)}
+        <Panel title="Remarks" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
+          <MidRemarks mid={mid} />
         </Panel>
       </div>
 

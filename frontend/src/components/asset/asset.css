@@ -7,8 +7,11 @@
 .ah-fact { display: flex; flex-direction: column; gap: 6px; }
 .ah-fact dd { margin: 0; font-size: 18px; font-weight: 800; }
 
-/* Eight condition cards in one row. */
-.rm-strip.ah-strip { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+/* Six condition cards in one row. */
+.rm-strip.ah-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+/* A row with one panel (Condition trends): full width. */
+.rm-row.ah-row--one { grid-template-columns: minmax(0, 1fr); }
 
 /* Mimic zones are buttons that select the drive group. */
 .ah-zone { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
@@ -20,11 +23,6 @@
 .ah-trend-head { display: flex; justify-content: space-between; align-items: baseline; }
 .ah-trend-plot { height: 64px; border-bottom: 1px solid var(--border); background: repeating-linear-gradient(90deg, transparent 0 6px, var(--panel-3) 6px 7px) bottom / 100% 1px no-repeat; }
 
-.ah-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.ah-figure { display: flex; flex-direction: column; gap: 6px; }
-.ah-figure-v { font-size: 24px; font-weight: 800; }
-.ah-figure-sub { font-size: 11px; color: var(--muted-2); }
-
 .ah-list { display: flex; flex-direction: column; }
 /* Rows from the top, not spread over a tall panel (Condition Analytics). */
 .rm-body.ah-list--top { justify-content: flex-start; gap: 0; }
@@ -32,7 +30,13 @@
 .ah-row:last-child { border-bottom: 0; }
 .ah-row--button { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .ah-row--button:hover { background: var(--panel-3); }
-.ah-diag { max-width: 70%; text-align: right; font-size: 12px; font-weight: 700; color: var(--text); }
+/* Remarks: one line item per machine remark. */
+.ah-remarks { list-style: none; margin: 0; padding: 0; }
+.ah-remark { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.ah-remark:last-child { border-bottom: 0; }
+.ah-remark-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 12px; color: var(--text); }
+.ah-remark-status { font-size: 11px; font-weight: 800; white-space: nowrap; }
+.ah-remark-text { font-size: 12px; line-height: 1.45; color: var(--muted); }
 .ah-row .num { font-size: 13px; font-weight: 800; }
 
 /* Motor current drill-down: a strip of the line's drives to pick from, then one chart. */
@@ -61,5 +65,5 @@
 }
 @media (max-width: 760px) {
   .rm-strip.ah-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ah-trends, .ah-pair { grid-template-columns: minmax(0, 1fr); }
+  .ah-trends { grid-template-columns: minmax(0, 1fr); }
 }

@@ -2,7 +2,7 @@
 
 /**
  * RMD · Asset Health — HSM's layout, with RMD's zones and the sources of RMD FACLON persona - 3
- * (confirmed 14–15 Oct 2026). NA wherever there is no source (MID, ERP PM, VFD trips):
+ * (confirmed 14–15 Oct 2026). NA wherever there is no source (MID, ERP PM):
  *   Mimic + status    as the Visualization mimic, no roughing group (the user, 27 Oct 2026):
  *                     billet infeed = billets since 08:00 IST; route / finishing = live drive status
  *                     (RUNNING_STATUS / *_On_Off); finished exit = ERP production for the period;
@@ -35,7 +35,7 @@ import RmdRunHoursDrawer from './RmdRunHoursDrawer';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
-import { MidVibrationDrawer, MidVibrationTrend, midDate } from './MidVibration';
+import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
 import './asset.css';
 
 const GROUPS = ['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit'] as const;
@@ -114,7 +114,6 @@ export default function RmdAssetHealth() {
           series="prod"
           {...(zone ? { onOpen: () => setOpen('current'), openLabel: 'Each drive\'s current now, and its trend while running' } : {})}
         />
-        {NA('Alignment', 'mm', 'order')}
         <KpiCard
           label="Gearbox oil"
           value={oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA'}
@@ -124,7 +123,6 @@ export default function RmdAssetHealth() {
           tone={oil?.minLevel?.litres != null ? oilTone : undefined}
           {...(oil ? { onOpen: () => setOpen('oil'), openLabel: 'Each oil tank: level and temperature' } : {})}
         />
-        {NA('VFD trips', 'per 100 run h', 'hold')}
         <KpiCard label="Run hours" value={run === null ? 'NA' : fixed(run, 1)} unit="h" note="" series="prod"
           onOpen={() => setOpen('run')} openLabel="Run hours per day, from the ERP log sheet" />
         {NA('PM on time', '%', 'order')}
@@ -155,19 +153,10 @@ export default function RmdAssetHealth() {
         </ol>
       </Panel>
 
-      <div className="rm-row">
+      <div className="rm-row ah-row--one">
         <Panel title="Condition trends" sub="Bearing temperature, each reading" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
           <BearingTrend trend={bearing?.trend ?? []} />
-        </Panel>
-        <Panel title="Laser alignment · Machine inspection" className="rm-panel" bodyClass="rm-body ah-pair">
-          {['As-found', 'As-left'].map((k) => (
-            <div className="ah-figure" key={k}>
-              <span className="rm-k">{k}</span>
-              <span className="ah-figure-v num v-na">NA</span>
-              <span className="ah-figure-sub">Offset | angle <b className="v-na">NA</b></span>
-            </div>
-          ))}
         </Panel>
       </div>
 
@@ -175,14 +164,8 @@ export default function RmdAssetHealth() {
         <Panel title="ERP PM & work-order history" className="rm-panel" bodyClass="rm-body ah-list">
           {['PM completed on time', 'MTBF', 'MTTR', 'Open action'].map((k) => <Row key={k} k={k} />)}
         </Panel>
-        <Panel title="Diagnosis & process impact" className="rm-panel" bodyClass="rm-body ah-list">
-          <div className="ah-row">
-            <span className="rm-k">Diagnosis</span>
-            {mid.worst
-              ? <span className="ah-diag">{mid.worst.status === 'Good' ? 'All machines Good (MID)' : `${mid.worst.status} · ${mid.worst.machine}${mid.worst.diagnosis ? `: ${mid.worst.diagnosis}` : ''}`}</span>
-              : <span className="num v-na">NA</span>}
-          </div>
-          {['Asset stop', 'Output effect', 'Value'].map((k) => <Row key={k} k={k} />)}
+        <Panel title="Remarks" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
+          <MidRemarks mid={mid} />
         </Panel>
       </div>
 

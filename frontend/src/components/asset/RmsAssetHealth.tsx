@@ -5,8 +5,8 @@
  * Asset Health; the user, 26 Oct 2026):
  *   Run hours      ERP log sheet NET_RUNNING_HRS over the period (division RS, series L5P).
  * Everything else is NA: bearing temp, motor current, gearbox oil, PM on time, MTBF and MTTR come
- * from an "offline sheet" (not in any system we read); vibration and alignment wait on MID; VFD
- * trips are n/a. No mill mimic on RMS (the user, 23 Oct 2026).
+ * from an "offline sheet" (not in any system we read); vibration from MID. No mill mimic on RMS
+ * (the user, 23 Oct 2026). No VFD trips card on any mill (the user, 28 Oct 2026).
  */
 import { useState } from 'react';
 import Panel from '@/components/Panel';
@@ -16,7 +16,7 @@ import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmsProductionReport } from '@/services/hsmApi';
 import '@/components/visualization/visualization.css';
 import { useMid } from './useMid';
-import { MidVibrationDrawer, MidVibrationTrend, midDate } from './MidVibration';
+import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
 import './asset.css';
 
 const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
@@ -51,14 +51,12 @@ export default function RmsAssetHealth() {
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title="RMS · mill" mid={mid} />
         {NA('Bearing temp', '°C', 'hold')}
         {NA('Motor current', 'A', 'prod')}
-        {NA('Alignment', 'mm', 'order')}
         {NA('Gearbox oil', '', 'hold')}
-        {NA('VFD trips', 'per 100 run h', 'hold')}
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" loading={!prodS.data && !prodS.error} />
         {NA('PM on time', '%', 'order')}
       </section>
 
-      <div className="rm-row">
+      <div className="rm-row ah-row--one">
         <Panel title="Condition trends" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
           <div className="ah-trend">
@@ -66,29 +64,14 @@ export default function RmsAssetHealth() {
             <div className="ah-trend-plot" role="img" aria-label="Bearing temp · °C: no data" />
           </div>
         </Panel>
-        <Panel title="Laser alignment · Machine inspection" className="rm-panel" bodyClass="rm-body ah-pair">
-          {['As-found', 'As-left'].map((k) => (
-            <div className="ah-figure" key={k}>
-              <span className="rm-k">{k}</span>
-              <span className="ah-figure-v num v-na">NA</span>
-              <span className="ah-figure-sub">Offset | angle <b className="v-na">NA</b></span>
-            </div>
-          ))}
-        </Panel>
       </div>
 
       <div className="rm-row">
         <Panel title="ERP PM & work-order history" className="rm-panel" bodyClass="rm-body ah-list">
           {['PM completed on time', 'MTBF', 'MTTR', 'Open action'].map((k) => <Row key={k} k={k} />)}
         </Panel>
-        <Panel title="Diagnosis & process impact" className="rm-panel" bodyClass="rm-body ah-list">
-          <div className="ah-row">
-            <span className="rm-k">Diagnosis</span>
-            {mid.worst
-              ? <span className="ah-diag">{mid.worst.status === 'Good' ? 'All machines Good (MID)' : `${mid.worst.status} · ${mid.worst.machine}${mid.worst.diagnosis ? `: ${mid.worst.diagnosis}` : ''}`}</span>
-              : <span className="num v-na">NA</span>}
-          </div>
-          {['Asset stop', 'Output effect', 'Value'].map((k) => <Row key={k} k={k} />)}
+        <Panel title="Remarks" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
+          <MidRemarks mid={mid} />
         </Panel>
       </div>
     </div>

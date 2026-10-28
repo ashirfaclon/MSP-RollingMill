@@ -737,7 +737,7 @@ test('HSM asset health: as the HSM sheet — mill load log sheet per stand, run 
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const cards = page.getByRole('main').getByRole('region', { name: 'Condition KPIs' });
   // Run hours: ERP log sheet NET_RUNNING_HRS, 1–8 Oct = 64.45 h.
-  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^64\.5\s*h$/, { timeout: 90_000 });
+  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^64\.5\s*h$/, { timeout: 90_000 });
   // Motor current opens the stands' mill load readings (none before the form started: NA).
   await cards.getByRole('button', { name: 'Motor current', exact: true }).click();
   const d = page.getByRole('dialog', { name: 'Finishing · mill load' });
@@ -851,14 +851,14 @@ test('RMD asset health: route drive group by default; motor current live, run ho
   const main = page.getByRole('main');
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Route drive group');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Alignment/, /^Gearbox oil/, /^VFD trips/, /^Run hours/, /^PM on time/]);
+  await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/, /^PM on time/]);
   // Run hours: Σ ACTUAL_RUNNING_HRS 1–8 Oct = 87.75 h.
-  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^87\.8h$/);
+  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^87\.8h$/);
   // Motor current: live; NA while no route drive runs.
   await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
   // Bearing temp and gearbox oil from the mechanical forms: a reading, or NA without entries.
   await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^(NA|\d+)°C$/);
-  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^(NA|[\d,]+)L$/);
+  await expect(cards.locator('.rm-card-value').nth(3)).toHaveText(/^(NA|[\d,]+)L$/);
   // Bearing drawer: each reading against the plant's limits (bearings 45–65 °C, flywheel 45–80 °C).
   const bearingCard = cards.getByRole('button', { name: /Bearing temp/ });
   if (await bearingCard.count()) {
@@ -1191,10 +1191,10 @@ test('LSM asset health: as the LSM sheet — Drive Temp form for bearings and ge
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const main = page.getByRole('main');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Alignment', 'Gearbox oil', 'VFD trips', 'Run hours', 'PM on time']);
+  await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Gearbox oil', 'Run hours', 'PM on time']);
   // Run hours: ERP NET_RUNNING_HRS, 1–8 Oct = 99.34 h.
-  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^99\.3\s*h$/, { timeout: 90_000 });
-  for (const i of [3, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^99\.3\s*h$/, { timeout: 90_000 });
+  for (const i of [5]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
   // Motor current from the Mill Load Log Sheet (only a test entry so far: NA until real readings).
   await expect(cards.getByRole('button', { name: 'Motor current', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|\d+)\s*A$/);
   // Bearing temp and gearbox oil from the Drive Temp form (only a test entry so far: NA until real readings).
@@ -1250,10 +1250,10 @@ test('RMS asset health: as the RMS sheet — run hours from the ERP (NET_RUNNING
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const main = page.getByRole('main');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Alignment', 'Gearbox oil', 'VFD trips', 'Run hours', 'PM on time']);
+  await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Gearbox oil', 'Run hours', 'PM on time']);
   // 1–8 Oct: Σ NET_RUNNING_HRS = 102.16 h.
-  await expect(cards.locator('.rm-card-value').nth(6)).toHaveText(/^102\.2\s*h$/, { timeout: 90_000 });
-  for (const i of [1, 2, 3, 4, 5, 7]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^102\.2\s*h$/, { timeout: 90_000 });
+  for (const i of [1, 2, 3, 5]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
   await expect(main.getByText(/mimic/i)).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/rms-asset-health.png`, fullPage: true });
 });
@@ -1315,17 +1315,21 @@ test('HSM condition analytics, September: conversion cost, material loss and cos
 });
 
 for (const c of [
-  { mill: 'hsm', vib: '4.4', visit: '21 Apr 2026', drawer: 'Finishing group · vibration' },   // FINISHING-01–06, highest 4.4 mm/s
-  { mill: 'rmd', vib: '2.9', visit: '23 Jan 2026', drawer: 'Route group · vibration' },       // DC motors / New DC, highest 2.9 mm/s
-  { mill: 'lsm', vib: '24.0', visit: '13 Apr 2026', drawer: 'LSM · mill · vibration' },       // as reported (Mill pump 6 B2 V — to confirm)
-  { mill: 'rms', vib: '4.8', visit: '10 Jan 2026', drawer: 'RMS · mill · vibration' },
-] as const) test(`${c.mill.toUpperCase()} asset health: MID vibration, last inspection and diagnosis from MID's report (form shapes)`, async ({ page }) => {
+  // Remarks: every machine with one at the last visit, whole mill — Un-acceptable, then Acceptable, then Good.
+  { mill: 'hsm', vib: '4.4', visit: '21 Apr 2026', drawer: 'Finishing group · vibration', remarks: ['PUMP-04Acceptable', 'PUMP-12Acceptable'] },
+  { mill: 'rmd', vib: '2.9', visit: '23 Jan 2026', drawer: 'Route group · vibration', remarks: ['COLD WATER PUMP 02 NEWAcceptable', 'COLD WATER PUMP 03 NEWAcceptable'] },
+  { mill: 'lsm', vib: '24.0', visit: '13 Apr 2026', drawer: 'LSM · mill · vibration', remarks: ['MILL PUMP NO. 4Un-acceptable', 'MILL PUMP NO. 5Acceptable', 'SLP NO. 4Good'] },
+  { mill: 'rms', vib: '4.8', visit: '10 Jan 2026', drawer: 'RMS · mill · vibration', remarks: ['SLP MOTOR NO. 1Acceptable', 'SLP MOTOR NO. 3Acceptable'] },
+] as const) test(`${c.mill.toUpperCase()} asset health: MID vibration, last inspection and remarks from MID's report (form shapes)`, async ({ page }) => {
   await page.goto(`/${c.mill}/asset-health`);
   const main = page.getByRole('main');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
   await expect(cards.getByRole('button', { name: 'Vibration RMS', exact: true }).locator('.rm-card-value')).toHaveText(new RegExp(`^${c.vib.replace('.', '\\.')}\\s*mm/s$`), { timeout: 60_000 });
   await expect(main.locator('.ah-fact', { hasText: 'Last inspection' }).locator('dd')).toHaveText(c.visit);
-  await expect(main.locator('.ah-row', { hasText: 'Diagnosis' }).locator('.ah-diag')).toHaveText(/\S/);
+  const remarks = main.getByRole('list', { name: 'Remarks' });
+  await expect(remarks.locator('.ah-remark-head')).toHaveText([...c.remarks]);
+  for (const t of await remarks.locator('.ah-remark-text').allInnerTexts()) expect(t.trim()).not.toBe('');
+  await main.locator('section.panel', { hasText: 'Remarks' }).last().screenshot({ path: `${SHOTS}/${c.mill}-remarks.png` });
   await expect(main.locator('.ah-trend', { hasText: 'Vibration' }).getByRole('img', { name: /^Highest vibration per MID visit/ })).toBeVisible();
   await cards.getByRole('button', { name: 'Vibration RMS', exact: true }).click();
   const d = page.getByRole('dialog', { name: c.drawer });

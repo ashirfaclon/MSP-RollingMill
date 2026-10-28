@@ -97,5 +97,32 @@ export function MidVibrationTrend({ mid }: { mid: MidView }) {
   );
 }
 
+/** Remarks order (the user, 28 Oct 2026): Un-acceptable, then Acceptable, then Good. */
+const REMARK_ORDER: Record<MidStatus, number> = { 'Un-acceptable': 0, Acceptable: 1, Good: 2 };
+
+/**
+ * The Remarks panel: each machine's remark at the last MID visit, one line each — the whole mill, not the
+ * selected group (HSM's and RMD's remarks are on auxiliary pumps, which no mimic zone selects).
+ */
+export function MidRemarks({ mid }: { mid: MidView }) {
+  const rows = (mid.report?.latest?.machines ?? [])
+    .filter((m) => m.diagnosis)
+    .sort((x, y) => (x.status ? REMARK_ORDER[x.status] : 3) - (y.status ? REMARK_ORDER[y.status] : 3));
+  if (!rows.length) return <div className="ah-row"><span className="num v-na">NA</span></div>;
+  return (
+    <ul className="ah-remarks" aria-label="Remarks">
+      {rows.map((m) => (
+        <li className="ah-remark" key={m.machine}>
+          <span className="ah-remark-head">
+            <b>{m.machine}</b>
+            <span className={`ah-remark-status ${m.status ? TONE[m.status] : 'v-na'}`}>{m.status ?? 'NA'}</span>
+          </span>
+          <span className="ah-remark-text">{m.diagnosis}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** "21 Apr 2026" for the Last inspection fact; null without a visit. */
 export const midDate = (d: string | null) => (d ? day(d) : null);
