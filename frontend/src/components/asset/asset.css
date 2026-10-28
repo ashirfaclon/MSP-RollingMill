@@ -3,7 +3,7 @@
 .ah-asset-body { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 24px; }
 .ah-asset-id { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ah-asset-name { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text); }
-.ah-asset-facts { display: grid; grid-template-columns: repeat(4, auto); gap: 8px 32px; margin: 0; }
+.ah-asset-facts { display: grid; grid-template-columns: repeat(3, auto); gap: 8px 32px; margin: 0; }
 .ah-fact { display: flex; flex-direction: column; gap: 6px; }
 .ah-fact dd { margin: 0; font-size: 18px; font-weight: 800; }
 
