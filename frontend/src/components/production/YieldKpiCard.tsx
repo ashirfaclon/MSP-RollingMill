@@ -14,7 +14,7 @@
  * The drawer shows both per day.
  */
 import { useState, type ReactNode } from 'react';
-import KpiCard from '@/components/visualization/KpiCard';
+import KpiCard, { NO_ENTRIES } from '@/components/visualization/KpiCard';
 import MassYieldDrawer, { yieldDelta } from '@/components/drill/MassYieldDrawer';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
@@ -44,7 +44,8 @@ export default function YieldKpiCard() {
           Delta <b className={`num ${Math.abs(d) < 0.05 ? 'v-ok' : 'v-warn'}`}>{fixed(d, 1)} %</b>
         </span>
       );
-    } else note = '';
+    } else if (!t.erpDays) note = <span className="rm-card-empty">ERP · {NO_ENTRIES}</span>;
+    else note = '';
   }
   const pct = (v: number | null | undefined) => (v === null || v === undefined ? 'NA' : fixed(v, 1));
   const erp = t?.erpDays ? t.erpYieldPct : null;

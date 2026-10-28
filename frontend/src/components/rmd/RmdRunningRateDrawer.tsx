@@ -64,7 +64,7 @@ function Content({ data }: { data: RmdRunningRateReport }) {
       <SourceBox sources={SOURCES} formula={[
         'Running rate = PRODUCT_PRIME_SLENGTH_MT ÷ running hours',
         `Running hours = time between two BILLET_COUNT counts (either line), when ${data.gapMinutes} min or less apart`,
-        'Day = 08:00 IST → 08:00 IST',
+        'Day = 09:00 IST → 09:00 IST',
       ]} />
       {data.influx.connection === 'down' && <p className="v-warn">{data.influx.message}</p>}
     </>

@@ -72,6 +72,7 @@ export default function RmdConditionAnalytics() {
         <KpiCard
           label="Actual rate"
           value={rate?.rateTph == null ? 'NA' : fixed(rate.rateTph, 2)}
+          noEntries={!!rate && rate.rateTph == null}
           unit="TPH"
           note=""
           series="prod"
@@ -160,7 +161,7 @@ function DrivesTable({ g, sources }: { g: RmdConditionGroup; sources: SourceSyst
         formula={[
           'Current and speed count only while the drive runs: all three are averaged per minute, and a minute counts when the drive ran all of it',
           'Group current = mean of the drives that ran; speed shown per line (the lines read on different scales)',
-          'Day = 08:00 IST → 08:00 IST',
+          'Day = 09:00 IST → 09:00 IST',
         ]}
       />
     </>

@@ -49,13 +49,14 @@ export default function RmsAssetHealth() {
       </Panel>
 
       <section className="rm-strip ah-strip" aria-label="Condition KPIs">
-        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold"
+        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title="RMS · mill" mid={mid} />
         {NA('Bearing temp', '°C', 'hold')}
         {NA('Motor current', 'A', 'prod')}
         {NA('Gearbox oil', '', 'hold')}
-        <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" loading={!prodS.data && !prodS.error} />
+        <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" loading={!prodS.data && !prodS.error}
+          noEntries={!!prodS.data && prodS.dataUrl === url && runH == null} />
         <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
         <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={runH} title="RMS" />
       </section>

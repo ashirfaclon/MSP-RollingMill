@@ -27,7 +27,6 @@ export default function PowerKpiCard({ mill = 'hsm' }: { mill?: PowerMill }) {
   const kwh = data?.totals.kwh ?? null;
   const note = error ? 'Logbook unavailable'
     : data?.logbook.connection === 'down' ? data.logbook.message
-    : data && data.totals.entries === 0 ? 'No entries filled'
     : '';
   return (
     <>
@@ -38,6 +37,7 @@ export default function PowerKpiCard({ mill = 'hsm' }: { mill?: PowerMill }) {
         note={note}
         series="prod"
         loading={loading}
+        noEntries={!!data && data.logbook.connection !== 'down' && data.totals.entries === 0}
         onOpen={() => setOpen(true)}
         openLabel="Logbook power entries behind this figure"
       />

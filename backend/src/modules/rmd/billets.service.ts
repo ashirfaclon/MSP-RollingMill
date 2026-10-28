@@ -1,7 +1,7 @@
 /**
  * RMD billets in, from the Influx counters — one per line (M1, M2), per RMD plant day, grouped
- * by day / week / month. RMD runs a 24-hour cycle of two shifts, 08:00–20:00 and 20:00–08:00
- * IST (plant, 9 Oct 2026), so its day is 08:00 → 08:00 IST — not HSM's 06:00. A day's
+ * by day / week / month. RMD runs a 24-hour cycle of two shifts, 09:00–21:00 and 21:00–09:00
+ * IST (the plant, 28 Oct 2026; was 08:00 from 9 Oct), so its day is 09:00 → 09:00 IST — not HSM's 06:00. A day's
  * billets are the sum of the counter's increases in it (resets dropped, as for HSM). This is
  * the denominator of RMD's mass yield; the numerator (ERP finished production) is not wired.
  */
@@ -15,11 +15,11 @@ const H_MS = 3_600_000;
 const DAY_MS = 24 * H_MS;
 const IST_MS = 330 * 60_000;
 
-/** The RMD day starts with its first shift, 08:00 IST. */
-export const RMD_DAY_START_HOUR = 8;
-/** RMD date an instant falls in (before 08:00 IST it is still the previous date). */
+/** The RMD day starts with its first shift, 09:00 IST (the plant, 28 Oct 2026). */
+export const RMD_DAY_START_HOUR = 9;
+/** RMD date an instant falls in (before 09:00 IST it is still the previous date). */
 const plantDateOf = (ms: number) => istDate(ms - RMD_DAY_START_HOUR * H_MS);
-/** Epoch ms of 08:00 IST on RMD date `d`. */
+/** Epoch ms of 09:00 IST on RMD date `d`. */
 export const rmdDayStart = (d: string) => Date.parse(`${d}T00:00:00Z`) - IST_MS + RMD_DAY_START_HOUR * H_MS;
 
 /**

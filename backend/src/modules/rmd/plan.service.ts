@@ -1,7 +1,7 @@
 /**
  * RMD production plan: the plant's month-wise plan for FY 2026-27, Prime + Short length,
  * on line + off line — the same measure as the Production · Prime + SL card. Spread to days
- * and halved between the two 12-hour shifts (Day 08–20, Night 20–08 IST).
+ * and halved between the two 12-hour shifts (Day 09–21, Night 21–09 IST).
  *
  * A month's daily plan = month ÷ its working days, with the shutdown days at 0. The plant
  * gives the number of working days but not which dates are the shutdown (Apr 2, Oct 2, Nov 1):

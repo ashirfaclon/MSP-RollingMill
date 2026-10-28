@@ -97,7 +97,7 @@ function Content({ trend, live, zone }: { trend: RmdCurrentTrend; live: RmdLive 
         `Trend = mean current of each ${minutes}-minute interval while running; a gap while stopped`,
         'Pick a line, then a drive; every drive on the same amp scale',
         'Average now = mean current of the drives running now',
-        'Day = 08:00 IST → 08:00 IST',
+        'Day = 09:00 IST → 09:00 IST',
       ]} />
       {trend.connection === 'down' && <p className="v-warn">{trend.message}</p>}
     </>

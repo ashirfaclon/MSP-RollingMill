@@ -6,8 +6,9 @@
  *   Bearing temp   LSM Mechanical → Drive Temp: the hottest bearing (flywheel, reduction gearbox,
  *                  pinion gearbox, DE / NDE) at each drive's latest reading, °C; opens every drive;
  *                  the Condition trend is the hottest of each reading;
- *   Gearbox oil    the same form: the lowest oil level (inches, as filled — the user, 22 Oct 2026)
- *                  and the lowest oil pressure (kg/cm²) at each drive's latest reading;
+ *   Gearbox oil    the same form, a Level / Pressure switch (the user, 28 Oct 2026): the lowest oil
+ *                  level (inches, as filled — the user, 22 Oct 2026) or the lowest oil pressure
+ *                  (kg/cm²) at each drive's latest reading;
  *   Motor current  LSM Electrical Logbook → Mill Load Log Sheet (the plant, 23 Oct 2026): the mean
  *                  load of the passes at the latest reading, A; opens every stand and pass;
  *   Run hours      ERP log sheet NET_RUNNING_HRS over the period.
@@ -16,6 +17,7 @@
  */
 import { useMemo, useState } from 'react';
 import LsmMillLoadDrawer from './LsmMillLoadDrawer';
+import FlipKpiCard from './FlipKpiCard';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
@@ -90,26 +92,25 @@ export default function LsmAssetHealth() {
       </Panel>
 
       <section className="rm-strip ah-strip" aria-label="Condition KPIs">
-        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold"
+        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title="LSM · mill" mid={mid} />
-        <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" {...opener} />
-        <KpiCard label="Motor current" value={currentA === null ? 'NA' : fixed(currentA, 0)} unit="A" note="" series="prod"
+        <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" noEntries={!!drives && bearingC === null} {...opener} />
+        <KpiCard label="Motor current" value={currentA === null ? 'NA' : fixed(currentA, 0)} unit="A" note="" series="prod" noEntries={!!load && currentA === null}
           {...(load ? { onOpen: () => setLoadOpen(true), openLabel: 'Each stand and pass: load at the latest reading' } : {})} />
         <LsmMillLoadDrawer open={loadOpen} onClose={() => setLoadOpen(false)} report={load} loading={!loadS.data && !loadS.error} error={loadS.error} />
-        <KpiCard
+        {/* Level or pressure (the user, 28 Oct 2026): the card turns over between them. */}
+        <FlipKpiCard
           label="Gearbox oil"
-          value=""
-          unit=""
-          note=""
           series="hold"
-          pair={[
-            { source: 'Level · in', value: levelIn === null ? 'NA' : fixed(levelIn, 1) },
-            { source: 'Pressure · kg/cm²', value: pressure === null ? 'NA' : fixed(pressure, 1) },
+          faces={[
+            { id: 'level', label: 'Level', title: 'The lowest oil level (inches, as filled)', card: { value: levelIn === null ? 'NA' : fixed(levelIn, 1), unit: 'in', noEntries: !!drives && levelIn === null } },
+            { id: 'pressure', label: 'Pressure', title: 'The lowest oil pressure (kg/cm²)', card: { value: pressure === null ? 'NA' : fixed(pressure, 1), unit: 'kg/cm²', noEntries: !!drives && pressure === null } },
           ]}
           {...opener}
         />
-        <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" />
+        <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod"
+          noEntries={!!prodS.data && prodS.dataUrl === prodUrl && runH == null} />
         <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
         <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={runH} title="LSM" />
       </section>

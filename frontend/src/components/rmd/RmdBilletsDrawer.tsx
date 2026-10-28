@@ -99,5 +99,5 @@ const SOURCES: SourceSystem[] = [
 ];
 
 const FORMULA = [
-  'Billets in = Σ BILLET_COUNT increases per day (08:00 IST → 08:00 IST), M1 + M2',
+  'Billets in = Σ BILLET_COUNT increases per day (09:00 IST → 09:00 IST), M1 + M2',
 ];

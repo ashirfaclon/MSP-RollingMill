@@ -30,6 +30,7 @@ export default function RmdMillSpeedCard() {
         value=""
         unit="m/s"
         note={r?.historian.connection === 'down' ? r.historian.message : ''}
+        noEntries={!!r && r.historian.connection === 'up' && r.latest.mill1 == null && r.latest.mill2 == null ? 'No readings in this period' : false}
         series="prod"
         loading={!r && !error}
         pair={[{ source: 'Mill 1', value: mps(r?.latest.mill1) }, { source: 'Mill 2', value: mps(r?.latest.mill2) }]}
@@ -69,7 +70,7 @@ function Content({ r }: { r: RmdMillSpeedReport }) {
         formula={[
           'Card = each mill\'s last reading of the period (m/s)',
           `Chart = mean reading per ${r.bucketMinutes} minutes`,
-          'Day = 08:00 IST → 08:00 IST',
+          'Day = 09:00 IST → 09:00 IST',
         ]}
       />
       {r.historian.connection === 'down' && <p className="v-warn">{r.historian.message}</p>}

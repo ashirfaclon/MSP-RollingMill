@@ -38,6 +38,7 @@ export default function FormMillConditionAnalytics({ mill }: { mill: 'lsm' | 'rm
         <KpiCard
           label="Actual rate"
           value={rate === null ? 'NA' : fixed(rate, 2)}
+          noEntries={!!rateS.data && rateS.dataUrl === url && rate === null}
           unit="TPH"
           note=""
           series="prod"

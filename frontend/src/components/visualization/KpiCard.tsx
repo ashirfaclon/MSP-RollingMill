@@ -22,6 +22,9 @@ export type Series =
 
 import type { ReactNode } from 'react';
 
+/** The note of a wired KPI whose source has nothing for the period. */
+export const NO_ENTRIES = 'No entries recorded yet';
+
 export default function KpiCard(props: {
   label: string;
   value: string;
@@ -40,8 +43,16 @@ export default function KpiCard(props: {
   pair?: { source: string; value: string }[];
   /** Colours the value against limits: v-ok inside, v-risk outside. */
   tone?: 'v-ok' | 'v-warn' | 'v-risk';
+  /**
+   * Wired, loaded, and its source has no entries for the period: the note says so, so an NA reads as
+   * "nothing recorded", not a fault (the user, 28 Oct 2026). Never while loading or on an error.
+   */
+  noEntries?: boolean | string;
 }) {
   const { meterPct } = props;
+  const note = props.noEntries && !props.loading
+    ? <span className="rm-card-empty">{typeof props.noEntries === 'string' ? props.noEntries : NO_ENTRIES}</span>
+    : props.note;
   const body = (
     <>
       <span className="rm-card-label">
@@ -68,7 +79,7 @@ export default function KpiCard(props: {
         </span>
       )}
       {/* Always rendered (empty when there is nothing to flag) so the cards stay aligned. */}
-      <span className="rm-card-note" title={typeof props.note === 'string' && props.note ? props.note : undefined}>{props.note}</span>
+      <span className="rm-card-note" title={typeof props.note === 'string' && props.note ? props.note : undefined}>{note}</span>
       {meterPct !== undefined && (
         <span
           className="rm-meter"

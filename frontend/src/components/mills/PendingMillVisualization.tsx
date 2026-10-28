@@ -74,6 +74,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
               key={c.label}
               label="Mass yield"
               value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
+              noEntries={!!prod.data && prod.data.erp.connection === 'up' && t?.massYieldPct == null}
               unit="%"
               note={prodNote}
               series="order"
@@ -88,6 +89,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
               key={c.label}
               label="Production"
               value={prodMt === null ? 'NA' : fixed(prodMt, 1)}
+              noEntries={!!prod.data && prod.data.erp.connection === 'up' && prodMt === null}
               unit="MT"
               note={prodNote}
               series="prod"

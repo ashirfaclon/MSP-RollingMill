@@ -1,6 +1,6 @@
 /**
- * RMD running rate (TPH) = production ÷ hours the mill was running, per RMD day (08:00 →
- * 08:00 IST) / week / month. Production is the ERP log sheet (PRODUCT_PRIME_SLENGTH_MT,
+ * RMD running rate (TPH) = production ÷ hours the mill was running, per RMD day (09:00 →
+ * 09:00 IST) / week / month. Production is the ERP log sheet (PRODUCT_PRIME_SLENGTH_MT,
  * production.service.ts), summed by its date.
  *
  * Running hours, as for HSM: the mill is running while billets keep entering less than

@@ -112,6 +112,7 @@ export default function HsmConditionAnalytics() {
         <KpiCard
           label="Actual rate"
           value={tph === null ? 'NA' : fixed(tph, 2)}
+          noEntries={!!rateR && tph === null}
           unit="TPH"
           note=""
           series="prod"
@@ -122,9 +123,11 @@ export default function HsmConditionAnalytics() {
         {NA('Output opportunity', 'MT', 'order')}
         <HsmSpecificEnergy />
         <KpiCard label="Conversion cost" value={cp ? fixed(cp.conversionPerMt, 0) : 'NA'} unit="₹/MT" note="" series="prod"
+          noEntries={cost && !cp ? 'No costing sheet for this period' : false}
           loading={!costS.data && !costS.error} onOpen={() => setCostOpen(true)} openLabel="The plant's costing sheet, line by line" />
         {NA('Cost variance', '₹/MT', 'hold')}
         <KpiCard label="Yield material loss" value={cp ? fixed(cp.materialLossRs / 1e5, 2) : 'NA'} unit="₹ lakh" note="" series="hold"
+          noEntries={cost && !cp ? 'No costing sheet for this period' : false}
           onOpen={() => setCostOpen(true)} openLabel="The plant's costing sheet, line by line" />
         {NA('Output margin', '₹', 'order')}
       </section>

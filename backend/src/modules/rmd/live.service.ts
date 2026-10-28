@@ -1,5 +1,5 @@
 /**
- * RMD mill flow, live from the plant historian: billets since the RMD day started (08:00 IST)
+ * RMD mill flow, live from the plant historian: billets since the RMD day started (09:00 IST)
  * and the running status of every route / diverter and finishing point, with a trend of each
  * point's running share for the drill-down.
  *
@@ -84,7 +84,7 @@ from(bucket: "${esc(env.influxBucket!)}")
         fresh,
       };
     });
-    // Billets today: both counters read since 08:00 — a counter with no reading today adds nothing.
+    // Billets today: both counters read since 09:00 — a counter with no reading today adds nothing.
     const counted = [m1, m2].filter((c) => c.connection === 'up' && c.lastReadingAt !== null && c.lastReadingAt >= dayStart);
     const lastMs = last as number | null;
     return {
@@ -101,7 +101,7 @@ from(bucket: "${esc(env.influxBucket!)}")
 }
 
 /**
- * Each drive's motor current (A) over a period of RMD days (08:00 → 08:00 IST), for the Asset
+ * Each drive's motor current (A) over a period of RMD days (09:00 → 09:00 IST), for the Asset
  * Health drill-down: the mean of every interval while the drive runs, and over the whole period.
  * "Running" is the drive's own running status: both are averaged per minute in the historian
  * (fast — the storage does it), and a minute counts when the drive ran all of it (status mean 1).

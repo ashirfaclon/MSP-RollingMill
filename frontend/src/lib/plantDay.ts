@@ -1,6 +1,6 @@
 /**
  * The plant day: a date means the mill's day-start hour IST on that date to the same hour the
- * next day — never midnight to midnight. HSM's day starts at 06:00; RMD's at 08:00 (its two
+ * next day — never midnight to midnight. HSM's day starts at 06:00; RMD's at 09:00 (its two
  * shifts are 08:00–20:00 and 20:00–08:00). Selecting 24 Sep on HSM reads 24 Sep 06:00 →
  * 25 Sep 06:00. Every date the Duration filter holds is a plant date in this sense.
  *
@@ -11,10 +11,10 @@
 export const PLANT_DAY_START_HOUR = 6;
 /**
  * Where each mill's day starts, IST hour (9.5 = 09:30). Each mill runs a 24-hour cycle of
- * two 12-hour shifts that begin at its day start: RMD 08:00 (plant, 9 Oct 2026), LSM 09:00
+ * two 12-hour shifts that begin at its day start: RMD 09:00 (the plant, 28 Oct 2026; was 08:00), LSM 09:00
  * and RMS 09:30 (plant, 12 Oct 2026). HSM's 06:00 is the project's original day.
  */
-export const DAY_START_HOUR = { hsm: 6, rmd: 8, lsm: 9, rms: 9.5 } as const;
+export const DAY_START_HOUR = { hsm: 6, rmd: 9, lsm: 9, rms: 9.5 } as const;
 /** "06:00" — the cycle boundary as shown on screen. */
 export const PLANT_DAY_START = `${String(PLANT_DAY_START_HOUR).padStart(2, '0')}:00`;
 

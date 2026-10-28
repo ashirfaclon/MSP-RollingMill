@@ -1,6 +1,6 @@
 /**
  * RMD Mill MPS, as the plant gave it: CR Mill1/2 · General · MILL1_MPS (mill 1) and MILL2_MPS
- * (mill 2), the mill speed in m/s, read every 10 s. Over a period of RMD days (08:00 → 08:00 IST):
+ * (mill 2), the mill speed in m/s, read every 10 s. Over a period of RMD days (09:00 → 09:00 IST):
  *   latest  each mill's last reading of the period — now, for a period that includes today;
  *   trend   each mill's mean reading per bucket (about 150 buckets over the period).
  */

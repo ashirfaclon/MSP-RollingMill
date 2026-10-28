@@ -30,7 +30,7 @@ const ORDER: DurationPreset[] = [
 export default function DateRangePicker() {
   const sel = useGlobalSel();
   const now = useMinute();
-  /** The mill's day start (HSM 06:00, RMD 08:00): every date and label below follows it. */
+  /** The mill's day start (HSM 06:00, RMD 09:00): every date and label below follows it. */
   const hour = useDayStartHour();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);

@@ -34,7 +34,7 @@ const MILL: Record<PlanMill, MillPlan> = {
     measure: 'Prime + SL',
     field: 'PRODUCT_PRIME_SLENGTH_MT',
     dayPlan: 'Day plan = month plan ÷ calendar days (shutdown dates not given), Prime + SL',
-    shifts: 'Shift target = day plan ÷ 2  (Day 08:00–20:00 IST, Night 20:00–08:00 IST)',
+    shifts: 'Shift target = day plan ÷ 2  (Day 09:00–21:00 IST, Night 21:00–09:00 IST)',
     plan: { name: 'Plan', rows: [
       ['File', 'RMD Month Wise production plan FY 26-27, sheet Production Plan'],
       ['Field', 'TOTAL PRODUCTION — PRIME + SHORT LENGTH (MT), on line + off line, per month'],

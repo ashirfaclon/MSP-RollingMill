@@ -18,9 +18,12 @@ export default function SpecificEnergyCard({ mill = 'hsm' }: { mill?: PowerMill 
   const t = data?.totals;
   const note = error ? 'Logbook unavailable'
     : data?.logbook.connection === 'down' ? data.logbook.message
-    : t && t.kwh === null ? 'No power entries'
-    : t && !t.productionMt ? 'No production for this period'
     : '';
+  // Wired, nothing recorded: no power entries, or no production entered for the period.
+  const empty = !t || error || data?.logbook.connection === 'down' ? false
+    : t.kwh === null ? 'No power entries recorded yet'
+    : !t.productionMt ? 'No production entries recorded yet'
+    : false;
   return (
     <>
       <KpiCard
@@ -30,6 +33,7 @@ export default function SpecificEnergyCard({ mill = 'hsm' }: { mill?: PowerMill 
         note={note}
         series="prod"
         loading={loading}
+        noEntries={empty}
         onOpen={() => setOpen(true)}
         openLabel="Power and production per day"
       />

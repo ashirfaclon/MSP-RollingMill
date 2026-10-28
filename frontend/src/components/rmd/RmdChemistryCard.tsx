@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import DrillDrawer from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
+import { NO_ENTRIES } from '@/components/visualization/KpiCard';
 import { useSelection, dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdChemSample, type RmdChemistryReport } from '@/services/hsmApi';
 
@@ -45,7 +46,9 @@ export default function RmdChemistryCard() {
             )
             : <span className="rm-card-value num v-val">NA</span>}
         <span className="rm-card-note">
-          {last ? `Furnace ${last.furnace || '—'} · CCM ${last.ccm || '—'} · ${dm(last.date)}` : r?.logbook.connection === 'down' ? r.logbook.message : ''}
+          {last ? `Furnace ${last.furnace || '—'} · CCM ${last.ccm || '—'} · ${dm(last.date)}`
+            : r?.logbook.connection === 'down' ? r.logbook.message
+            : r ? <span className="rm-card-empty">{NO_ENTRIES}</span> : ''}
         </span>
       </button>
       <DrillDrawer open={open} onClose={() => setOpen(false)} title="Chemical composition" sub="RMD · SMS lollipop samples · %"

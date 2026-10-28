@@ -37,12 +37,14 @@ export default function RmdKpiStrip() {
   const note = error ? 'ERP data unavailable'
     : data?.erp.connection === 'down' ? data.erp.message
     : '';
+  const up = !!data && data.erp.connection === 'up';
 
   return (
     <section className="rm-strip rmd-strip" aria-label="Headline KPIs">
       <KpiCard
         label="Production · Prime + SL"
         value={mt1(t?.productionMt)}
+        noEntries={up && t?.productionMt == null}
         unit="MT"
         note={note}
         series="prod"
@@ -53,6 +55,7 @@ export default function RmdKpiStrip() {
       <KpiCard
         label="Production · Prime"
         value={mt1(t?.primeMt)}
+        noEntries={up && t?.primeMt == null}
         unit="MT"
         note={note}
         series="prod"
@@ -64,6 +67,7 @@ export default function RmdKpiStrip() {
       <KpiCard
         label="Mass yield"
         value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
+        noEntries={up && t?.massYieldPct == null}
         unit="%"
         note={note}
         series="order"

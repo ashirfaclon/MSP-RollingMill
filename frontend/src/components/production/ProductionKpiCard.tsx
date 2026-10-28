@@ -9,7 +9,7 @@
  * Clicking it opens the ERP-vs-Influx drawer, where the two are compared day by day.
  */
 import { useState, type ReactNode } from 'react';
-import KpiCard from '@/components/visualization/KpiCard';
+import KpiCard, { NO_ENTRIES } from '@/components/visualization/KpiCard';
 import ProductionDrawer from './ProductionDrawer';
 import { COUNTER_START_DATE, dm, useProduction, useSelection } from '@/services/hsmProduction';
 
@@ -39,6 +39,8 @@ export default function ProductionKpiCard() {
         </span>
       );
     }
+    // ERP not entered for the period yet (the counter has figures): say so under the pair.
+    else if (!t.erpDays) note = <span className="rm-card-empty">ERP · {NO_ENTRIES}</span>;
     else note = '';
   }
 

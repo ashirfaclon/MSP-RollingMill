@@ -14,8 +14,9 @@
  *   Run hours          ERP log sheet NET_RUNNING_HRS over the period (whole mill).
  *   Mimic, status   the Visualization mimic's Influx tags (the user, 26 Oct 2026): billets since
  *                      06:00, RM / FM drives on (On_Off), the production counter for the period.
- * The stand name places a reading in its group (RM → roughing, FM → finishing). Clicking a zone
- * selects its drive group. Vibration from MID; PM items on ERP PM; the rest have
+ * The stand name places a reading in its group (RM → roughing, FM → finishing). The drive group is
+ * chosen in the header (the user, 28 Oct 2026) — roughing, finishing, auxiliary (MID's pumps); the
+ * mimic only shows the live state. Vibration from MID; PM items on ERP PM; the rest have
  * no source in the sheet.
  */
 import { Fragment, useMemo, useState } from 'react';
@@ -24,7 +25,7 @@ import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import FlowArrow from '@/components/visualization/FlowArrow';
 import { StandDots, TONE } from '@/components/visualization/MillMimic';
 import { useHsmMimic } from '@/components/visualization/useHsmMimic';
-import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
+import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
@@ -39,10 +40,14 @@ import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, pmFacts, usePm } from './ErpPm';
 import './asset.css';
 
 /** HSM has no intermediate group (the user, 26 Oct 2026; the historian has only RM 1–5 and FM 1–6). */
-const GROUPS = ['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit'] as const;
-type Group = (typeof GROUPS)[number];
-/** The zones whose stands the Mill Load Log Sheet covers. */
-const STANDS: Partial<Record<Group, 'roughing' | 'finishing'>> = { 'Roughing group': 'roughing', 'Finishing group': 'finishing' };
+const ZONES = ['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit'] as const;
+const ZONE_STANDS: Partial<Record<(typeof ZONES)[number], 'roughing' | 'finishing'>> = { 'Roughing group': 'roughing', 'Finishing group': 'finishing' };
+/** The drive groups the header selects; each is also its MID section. */
+type Group = 'roughing' | 'finishing' | 'auxiliary';
+const GROUPS: { id: Group; label: string }[] = [{ id: 'roughing', label: 'Roughing' }, { id: 'finishing', label: 'Finishing' }, { id: 'auxiliary', label: 'Auxiliary' }];
+/** The groups whose stands the Mill Load Log Sheet covers. */
+const STANDS: Partial<Record<Group, 'roughing' | 'finishing'>> = { roughing: 'roughing', finishing: 'finishing' };
+const NAME: Record<Group, string> = { roughing: 'Roughing', finishing: 'Finishing', auxiliary: 'Auxiliary' };
 
 const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
 /** The hotter of a reading's DE and NDE temperature; null without either. */
@@ -52,13 +57,13 @@ const hottest = (e: HsmMillLoadEntry) => {
 };
 
 export default function AssetHealth() {
-  const [group, setGroup] = useState<Group>('Finishing group');
+  const [group, setGroup] = useState<Group>('finishing');
   const [open, setOpen] = useState(false);
-  const drive = group.replace(/ group$/, '');
+  const drive = NAME[group];
   const gid = STANDS[group] ?? null;
   const { dates } = useSelection();
   const [vibOpen, setVibOpen] = useState(false);
-  const mid = useMid('hsm', gid);
+  const mid = useMid('hsm', group);
   const pm = usePm('hsm');
   const pmFact = pmFacts(pm);
   const [pmOpen, setPmOpen] = useState(false);
@@ -87,7 +92,8 @@ export default function AssetHealth() {
       <Panel className="ah-asset" bodyClass="ah-asset-body">
         <div className="ah-asset-id">
           <span className="rm-k">Selected asset</span>
-          <h2 className="ah-asset-name">HSM · {drive} drive group</h2>
+          <h2 className="ah-asset-name">HSM · {group === 'auxiliary' ? 'Auxiliary · pumps' : `${drive} drive group`}</h2>
+          <Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} />
         </div>
         {liveGroup && liveGroup.state !== 'no-data'
           ? <span className="chip chip--info ah-status">{liveGroup.stateLabel}</span>
@@ -100,12 +106,13 @@ export default function AssetHealth() {
       </Panel>
 
       <section className="rm-strip ah-strip" aria-label="Condition KPIs">
-        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold"
+        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${drive} group`} mid={mid} />
         <KpiCard
           label="Bearing temp"
           value={bearingC === null ? 'NA' : fixed(bearingC, 0)}
+          noEntries={!!gid && !!load && bearingC === null}
           unit="°C"
           note=""
           series="hold"
@@ -114,21 +121,23 @@ export default function AssetHealth() {
         <KpiCard
           label="Motor current"
           value={loadPct === null ? 'NA' : fixed(loadPct, 0)}
+          noEntries={!!gid && !!load && loadPct === null}
           unit="%"
           note=""
           series="prod"
           {...(canOpen ? { onOpen: () => setOpen(true), openLabel: 'Each stand: load and DC motor temperatures' } : {})}
         />
         {NA('Gearbox oil', '', 'hold')}
-        <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" />
+        <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod"
+          noEntries={!!rateS.data && rateS.dataUrl === rateUrl && runH == null} />
         <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
         <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={runH} title="HSM" />
       </section>
 
       <Panel title="Grouped asset mimic">
         <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Drive groups">
-          {GROUPS.map((g, i) => {
-            const sg = STANDS[g] ?? null;
+          {ZONES.map((g, i) => {
+            const sg = ZONE_STANDS[g] ?? null;
             const grp = sg ? mimic.group(sg) : null;
             const value = g === 'Billet infeed' ? (mimic.billetsToday === null ? 'NA' : `${mimic.billetsToday} billets`)
               : g === 'Finished exit' ? (mimic.exitMt === null ? 'NA' : `${fixed(mimic.exitMt, 1)} MT`)
@@ -138,14 +147,14 @@ export default function AssetHealth() {
               <Fragment key={g}>
                 {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
                 <li className="rm-mimic-cell">
-                  <button type="button" className={`rm-zone ${tone} ah-zone${g === group ? ' is-selected' : ''}`} aria-pressed={g === group} onClick={() => setGroup(g)}>
+                  <div className={`rm-zone ${tone}`}>
                     <span className="rm-zone-title">{g}</span>
                     <span className="rm-zone-body">
                       <span className={`rm-zone-value num ${value === 'NA' ? 'v-na' : 'v-val'}`}>{value}</span>
                       {sg && value !== 'NA' && <StandDots stands={mimic.stands(sg)} />}
                     </span>
                     <span className="rm-zone-foot">{g === 'Billet infeed' ? 'Today · since 06:00 IST' : ' '}</span>
-                  </button>
+                  </div>
                 </li>
               </Fragment>
             );

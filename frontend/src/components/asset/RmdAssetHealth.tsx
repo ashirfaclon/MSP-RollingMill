@@ -3,19 +3,23 @@
 /**
  * RMD · Asset Health — HSM's layout, with RMD's zones and the sources of RMD FACLON persona - 3
  * (confirmed 14–15 Oct 2026). NA wherever there is no source (MID, ERP PM):
- *   Mimic + status    as the Visualization mimic, no roughing group (the user, 27 Oct 2026):
- *                     billet infeed = billets since 08:00 IST; route / finishing = live drive status
- *                     (RUNNING_STATUS / *_On_Off); finished exit = ERP production for the period;
+ *   Drive group       chosen in the header (the user, 28 Oct 2026), not on the mimic: roughing
+ *                     (20" / 16" R stands — no PLC, so no live status or current), route /
+ *                     diverter, finishing, auxiliary (MID's pumps);
+ *   Mimic + status    as the Visualization mimic, no roughing group (the user, 27 Oct 2026), display
+ *                     only: billet infeed = billets since 09:00 IST; route / finishing = live drive
+ *                     status (RUNNING_STATUS / *_On_Off); finished exit = ERP production for the period;
  *   Bearing temp      the hottest bearing at the latest Mill Bearing Temperature entries of the
- *                     group (logbook tmt-mechanical; route = intermill, NC and OC stands); opens
- *                     every bearing and the trend;
+ *                     group (logbook tmt-mechanical; roughing = 20" and 16" R stands, route =
+ *                     intermill, NC and OC stands); opens every bearing and the trend;
  *   Motor current     average live current feedback of the group's running drives, A; opens each
  *                     drive's current now and its trend while running (status 1) over the period;
- *   Gearbox oil       the oil (litres) in the group's tank lowest against its capacity — the
- *                     level (inches) × the tank's inside length × width — with the temperatures;
+ *   Gearbox oil       a switch (the plant, 28 Oct 2026): Level = the oil (litres) in the group's tank
+ *                     lowest against its capacity — the level (inches) × the tank's inside length ×
+ *                     width; Temp = the hottest tank's oil temperature, against 45–65 °C;
  *   Run hours         ERP log sheet ACTUAL_RUNNING_HRS over the period (whole mill); opens per day;
  *   Condition trends  bearing temperature: the hottest bearing of each entry.
- * Clicking a zone selects its drive group. Test entries are left out.
+ * Test entries are left out.
  * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
  * 45–65 °C — a card turns red when any of its readings is outside them, green when all are inside.
  */
@@ -23,15 +27,17 @@ import { Fragment, useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import FlowArrow from '@/components/visualization/FlowArrow';
-import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
+import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
-import { rangeUrl, useApi, type RmdAssetForms, type RmdLive, type RmdReading } from '@/services/hsmApi';
+import { rangeUrl, useApi, type RmdAssetForms, type RmdConditionReport, type RmdLive, type RmdReading } from '@/services/hsmApi';
+import { dm } from '@/lib/plantDay';
 import { useRmdProduction } from '@/components/rmd/RmdProductionDrawer';
 import RmdCurrentDrawer from './RmdCurrentDrawer';
 import RmdRunHoursDrawer from './RmdRunHoursDrawer';
+import FlipKpiCard from './FlipKpiCard';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
@@ -39,27 +45,29 @@ import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './Mi
 import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, pmFacts, usePm } from './ErpPm';
 import './asset.css';
 
-const GROUPS = ['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit'] as const;
-type Group = (typeof GROUPS)[number];
-/** The zones with live drives, and the zones with mechanical forms. */
-const LIVE: Partial<Record<Group, 'route' | 'finishing'>> = { 'Route / diverter': 'route', 'Finishing group': 'finishing' };
-const FORMS: Partial<Record<Group, 'route'>> = { 'Route / diverter': 'route' };
-/** The MID sections of the zones (the plant's machine list, 27 Oct 2026). */
-const MID_SECTION: Partial<Record<Group, 'route' | 'finishing'>> = { 'Route / diverter': 'route', 'Finishing group': 'finishing' };
-const NAME: Record<Group, string> = {
-  'Billet infeed': 'Billet infeed', 'Route / diverter': 'Route', 'Finishing group': 'Finishing', 'Finished exit': 'Finished exit',
-};
+/** The mimic: live zones only — display, not a selector. */
+const ZONES = ['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit'] as const;
+const ZONE_LIVE: Partial<Record<(typeof ZONES)[number], 'route' | 'finishing'>> = { 'Route / diverter': 'route', 'Finishing group': 'finishing' };
+/** The drive groups the header selects; each is also its MID section (the plant's machine list, 27 Oct 2026). */
+type Group = 'roughing' | 'route' | 'finishing' | 'auxiliary';
+const GROUPS: { id: Group; label: string }[] = [
+  { id: 'roughing', label: 'Roughing' }, { id: 'route', label: 'Route / diverter' }, { id: 'finishing', label: 'Finishing' }, { id: 'auxiliary', label: 'Auxiliary' },
+];
+/** The groups with live drives, and the groups with mechanical forms. */
+const LIVE: Partial<Record<Group, 'route' | 'finishing'>> = { route: 'route', finishing: 'finishing' };
+const FORMS: Partial<Record<Group, 'roughing' | 'route'>> = { roughing: 'roughing', route: 'route' };
+const NAME: Record<Group, string> = { roughing: 'Roughing', route: 'Route', finishing: 'Finishing', auxiliary: 'Auxiliary' };
 
 const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
 
 export default function RmdAssetHealth() {
-  const [group, setGroup] = useState<Group>('Route / diverter');
+  const [group, setGroup] = useState<Group>('route');
   const [open, setOpen] = useState<'bearing' | 'oil' | 'current' | 'run' | null>(null);
   const zone = LIVE[group] ?? null;
   const fg = FORMS[group] ?? null;
   const { dates } = useSelection();
   const [vibOpen, setVibOpen] = useState(false);
-  const mid = useMid('rmd', MID_SECTION[group] ?? null);
+  const mid = useMid('rmd', group);
   const pm = usePm('rmd');
   const pmFact = pmFacts(pm);
   const [pmOpen, setPmOpen] = useState(false);
@@ -73,19 +81,28 @@ export default function RmdAssetHealth() {
   const prod = totals?.productionMt ?? null;
 
   const zoneLive = zone && live ? live.zones.find((z) => z.id === zone) ?? null : null;
-  const running = zone && live ? live.stations.filter((s) => s.zone === zone && s.on && s.currentA !== null) : [];
+  // Live: the group's drives running now, from a fresh reading only.
+  const running = zone && live?.fresh ? live.stations.filter((s) => s.zone === zone && s.on && s.currentA !== null) : [];
   const currentA = running.length ? running.reduce((a, s) => a + s.currentA!, 0) / running.length : null;
+  // Not live: the group's mean current while running over the period — the Condition Analytics figure (CR Mill stands = route).
+  const condUrl = rangeUrl('/api/rmd/condition', zone ? dates : null);
+  const condS = useApi<RmdConditionReport>(condUrl);
+  const cond = condS.data && condS.dataUrl === condUrl ? condS.data : null;
+  const periodA = zone === 'route' ? cond?.stands.meanA : zone === 'finishing' ? cond?.finishing.meanA : null;
+  const motorA = currentA ?? periodA ?? null;
   const bearing = fg && forms ? forms.bearing[fg] : null;
   const oil = fg && forms ? forms.oil[fg] : null;
   const bearingTone = toneOf(bearing?.latest ?? []);
   const oilTone = toneOf(oil?.temperature ?? []);
+  const oilTempC = oil?.temperature.length ? Math.max(...oil.temperature.map((r) => r.value)) : null;
 
   return (
     <div className="rm-viz ah">
       <Panel className="ah-asset" bodyClass="ah-asset-body">
         <div className="ah-asset-id">
           <span className="rm-k">Selected asset</span>
-          <h2 className="ah-asset-name">RMD · {NAME[group]} drive group</h2>
+          <h2 className="ah-asset-name">RMD · {group === 'auxiliary' ? 'Auxiliary · pumps' : `${NAME[group]} drive group`}</h2>
+          <Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} />
         </div>
         {zoneLive
           ? <span className={`chip ${zoneLive.state === 'no-data' ? 'chip--na' : 'chip--info'} ah-status`}>{zoneLive.stateLabel}</span>
@@ -98,36 +115,47 @@ export default function RmdAssetHealth() {
       </Panel>
 
       <section className="rm-strip ah-strip" aria-label="Condition KPIs">
-        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold"
+        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${NAME[group]} group`} mid={mid} />
         <KpiCard
           label="Bearing temp"
           value={bearing?.max ? fixed(bearing.max.value, 0) : 'NA'}
+          noEntries={!!fg && !!forms && !bearing?.max}
           unit="°C"
           note=""
           series="hold"
           tone={bearingTone}
           {...(bearing ? { onOpen: () => setOpen('bearing'), openLabel: 'Every bearing at the latest reading, and the trend' } : {})}
         />
+        {/* Live while any of the group's drives runs; otherwise the mean while running over the selected dates (the user, 28 Oct 2026). */}
         <KpiCard
           label="Motor current"
-          value={currentA === null ? 'NA' : fixed(currentA, 0)}
+          value={motorA === null ? 'NA' : fixed(motorA, 0)}
           unit="A"
-          note=""
+          note={currentA !== null
+            ? <span className="chip chip--ok" title="Live: the drives running now">Live</span>
+            : periodA != null && dates
+              ? <span className="chip chip--info" title="Not live: the mean while running over the selected dates">Avg · {dm(dates.from)}–{dm(dates.to)}</span>
+              : ''}
+          noEntries={!!zone && currentA === null && !!cond && periodA == null ? 'Not run in this period' : false}
+          loading={!!zone && currentA === null && !cond && !condS.error}
           series="prod"
           {...(zone ? { onOpen: () => setOpen('current'), openLabel: 'Each drive\'s current now, and its trend while running' } : {})}
         />
-        <KpiCard
+        {/* Level or temperature (the plant, 28 Oct 2026). Limits exist for the temperature only (45–65 °C): no colour on the level. */}
+        <FlipKpiCard
           label="Gearbox oil"
-          value={oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA'}
-          unit="L"
-          note=""
           series="hold"
-          tone={oil?.minLevel?.litres != null ? oilTone : undefined}
+          faces={[
+            { id: 'level', label: 'Level', title: 'Oil in the tank lowest against its capacity (L)',
+              card: { value: oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA', unit: 'L', noEntries: !!fg && !!forms && oil?.minLevel?.litres == null } },
+            { id: 'temp', label: 'Temp', title: 'The hottest oil tank (°C)',
+              card: { value: oilTempC !== null ? fixed(oilTempC, 0) : 'NA', unit: '°C', tone: oilTempC !== null ? oilTone : undefined, noEntries: !!fg && !!forms && oilTempC === null } },
+          ]}
           {...(oil ? { onOpen: () => setOpen('oil'), openLabel: 'Each oil tank: level and temperature' } : {})}
         />
-        <KpiCard label="Run hours" value={run === null ? 'NA' : fixed(run, 1)} unit="h" note="" series="prod"
+        <KpiCard label="Run hours" value={run === null ? 'NA' : fixed(run, 1)} unit="h" note="" series="prod" noEntries={!!totals && run === null}
           onOpen={() => setOpen('run')} openLabel="Run hours per day, from the ERP log sheet" />
         <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
         <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={run} title="RMD" />
@@ -135,22 +163,22 @@ export default function RmdAssetHealth() {
 
       <Panel title="Grouped asset mimic">
         <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Drive groups">
-          {GROUPS.map((g, i) => {
-            const zl = LIVE[g] && live ? live.zones.find((z) => z.id === LIVE[g]) ?? null : null;
+          {ZONES.map((g, i) => {
+            const zl = ZONE_LIVE[g] && live ? live.zones.find((z) => z.id === ZONE_LIVE[g]) ?? null : null;
             // Billet infeed and finished exit as the Visualization mimic.
             const value = g === 'Billet infeed' ? (live?.billetsToday == null ? 'NA' : `${live.billetsToday} billets`)
               : g === 'Finished exit' ? (prod === null ? 'NA' : `${fixed(prod, 1)} MT`)
               : zl && zl.state !== 'no-data' ? `${zl.on} of ${zl.total} on` : 'NA';
-            const foot = g === 'Billet infeed' ? 'Today · since 08:00 IST' : null;
+            const foot = g === 'Billet infeed' ? 'Today · since 09:00 IST' : null;
             return (
               <Fragment key={g}>
                 {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
                 <li className="rm-mimic-cell">
-                  <button type="button" className={`rm-zone rm-zone--flow ah-zone${g === group ? ' is-selected' : ''}`} aria-pressed={g === group} onClick={() => setGroup(g)}>
+                  <div className="rm-zone rm-zone--flow">
                     <span className="rm-zone-title">{g}</span>
                     <span className="rm-zone-body"><span className={`rm-zone-value num ${value === 'NA' ? 'v-na' : 'v-val'}`}>{value}</span></span>
                     {foot && <span className="rm-zone-foot">{foot}</span>}
-                  </button>
+                  </div>
                 </li>
               </Fragment>
             );
@@ -181,7 +209,7 @@ export default function RmdAssetHealth() {
         loading={!forms} error={f.error} hasData={!!forms}>
         {bearing && <ReadingsTable rows={bearing.latest} unit="°C" label="Bearing temperatures" max={bearing.max} source={[
           ['Form', 'Rolling Mill Division (TMT) → Mechanical → Mill Bearing Temperature'],
-          ['Forms', 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)'],
+          ['Forms', fg === 'roughing' ? '20 Inch R Stand, 16 Inch R Stand' : 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)'],
           ['Field', 'Flywheel / Reduction gear / Pinion gear, D and ND side (°C) — each form\'s latest entry in the period'],
         ]} formula={['Bearing temp = the hottest of those readings', 'Limits: bearings 45–65 °C, flywheel 45–80 °C (plant)']} />}
       </DrillDrawer>
@@ -195,7 +223,9 @@ export default function RmdAssetHealth() {
               ['Field', 'one value per tank — the latest entry in the period'],
             ]} formula={[
               'Oil (L) = level (inches) × 0.0254 × inside length × inside width (m) × 1000 — box tanks, flat bottom, level from the bottom',
-              'Tank size (L × W × D, m): Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)',
+              fg === 'roughing'
+                ? 'Tank size (L × W × D, m): 20" / 16" R stand 1.63 × 1.26 × 1.30 (2,670 L)'
+                : 'Tank size (L × W × D, m): Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)',
               'Gearbox oil = the oil in the tank lowest against its capacity',
               'Limits: oil tank temperature 45–65 °C (plant); level — none yet',
             ]} />

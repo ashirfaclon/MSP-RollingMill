@@ -54,6 +54,7 @@ export default function LsmVisualization() {
         <KpiCard
           label="Production"
           value={t?.productionMt == null ? 'NA' : fixed(t.productionMt, 1)}
+          noEntries={!!data && data.erp.connection === 'up' && t?.productionMt == null}
           unit="MT"
           note={note}
           series="prod"
@@ -64,6 +65,7 @@ export default function LsmVisualization() {
         <KpiCard
           label="Mass yield"
           value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
+          noEntries={!!data && data.erp.connection === 'up' && t?.massYieldPct == null}
           unit="%"
           note={note}
           series="order"

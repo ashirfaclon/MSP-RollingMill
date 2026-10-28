@@ -39,7 +39,7 @@ export async function rmdRoutes(app: FastifyInstance) {
     return rmdPowerReport(loadEnv(), from, to);
   });
 
-  /** The mill flow now: billets since 08:00 IST and every running-status point. */
+  /** The mill flow now: billets since 09:00 IST and every running-status point. */
   app.get('/live', { config: { errorCode: 'rmd_live_failed' } }, async () => rmdLive(loadEnv()));
 
   /** One zone's points: running share per interval over the last 2 / 6 / 24 / 72 h. */

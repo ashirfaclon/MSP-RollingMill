@@ -2,7 +2,7 @@
 
 /**
  * RMD mill flow, live from the plant historian (refreshed every 30 s) — the same anatomy as
- * HSM's: billet infeed (billets since 08:00 IST, M1 + M2), then each zone's running state
+ * HSM's: billet infeed (billets since 09:00 IST, M1 + M2), then each zone's running state
  * with one dot per point; finished exit is the ERP log sheet's production for the period.
  * No roughing group (removed by the user, 22 Oct 2026). Each live zone opens the drill-down
  * that shows where its figure comes from.
@@ -50,7 +50,7 @@ export default function RmdMillMimic() {
     {
       key: 'infeed', kind: 'count', title: 'Billet infeed',
       value: d?.billetsToday === null || d?.billetsToday === undefined ? 'NA' : `${d.billetsToday} billets`,
-      foot: 'Today · since 08:00 IST', open: () => setOpen('infeed'), openLabel: 'Billets in per day, line 1 and line 2',
+      foot: 'Today · since 09:00 IST', open: () => setOpen('infeed'), openLabel: 'Billets in per day, line 1 and line 2',
     },
     ...[zoneOf('route'), zoneOf('finishing')].filter((z): z is Zone => z !== null),
     {

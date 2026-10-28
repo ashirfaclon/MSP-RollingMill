@@ -41,10 +41,10 @@ async function pickWeek(page: Page) {
 test('mass yield card and the material balance show the ERP log sheet for the period', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const yieldCard = page.getByRole('button', { name: 'Mass yield', exact: true });
-  // Today: the ERP is entered 1–2 days late — no note about it.
+  // Today: the ERP is entered 1–2 days late — no ERP entry yet, and the card says so.
   await expect(yieldCard.locator('.rm-card-pair-item').nth(0)).toContainText('ERP');
   await expect(yieldCard.locator('.rm-card-pair-item').nth(1)).toContainText('Influx');
-  await expect(yieldCard.locator('.rm-card-note')).toHaveText('');
+  await expect(yieldCard.locator('.rm-card-note')).toHaveText('ERP · No entries recorded yet');
 
   await pickWeek(page);
   // Before rejection, both sides. ERP: PRODUCTION_MT 1,076.51 ÷ INPUT_MT 1,121.34 = 96.00 %.
@@ -429,8 +429,8 @@ test('RMD: mass yield from the ERP log sheet (Prime + SL ÷ INPUT_MT); billets i
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
 
-  // RMD's day is 08:00 → 08:00 IST (shifts 08–20, 20–08) — the filter says so.
-  await expect(page.getByRole('button', { name: /Duration/ })).toContainText('1 Oct 08:00 IST → 9 Oct 08:00 IST');
+  // RMD's day is 09:00 → 09:00 IST (shifts 09–21, 21–09; the plant, 28 Oct 2026) — the filter says so.
+  await expect(page.getByRole('button', { name: /Duration/ })).toContainText('1 Oct 09:00 IST → 9 Oct 09:00 IST');
   // Mass yield, 1–8 Oct: Σ PRODUCT_PRIME_SLENGTH_MT 1,689.86 ÷ Σ INPUT_MT 1,752.03 = 96.45 %.
   const yieldCard = page.getByRole('button', { name: 'Mass yield', exact: true });
   await expect(yieldCard.locator('.rm-card-value')).toContainText('96.5');
@@ -737,7 +737,7 @@ test('HSM asset health: as the HSM sheet — mill load log sheet per stand, run 
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const cards = page.getByRole('main').getByRole('region', { name: 'Condition KPIs' });
   // Run hours: ERP log sheet NET_RUNNING_HRS, 1–8 Oct = 64.45 h.
-  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^64\.5\s*h$/, { timeout: 90_000 });
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^64\.5\s*h$/, { timeout: 90_000 });
   // Motor current opens the stands' mill load readings (none before the form started: NA).
   await cards.getByRole('button', { name: 'Motor current', exact: true }).click();
   const d = page.getByRole('dialog', { name: 'Finishing · mill load' });
@@ -851,14 +851,14 @@ test('RMD asset health: route drive group by default; motor current live, run ho
   const main = page.getByRole('main');
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Route drive group');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/, /^PM on time/]);
+  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/, /^PM on time/]);
   // Run hours: Σ ACTUAL_RUNNING_HRS 1–8 Oct = 87.75 h.
-  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^87\.8h$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^87\.8h$/);
   // Motor current: live; NA while no route drive runs.
-  await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
   // Bearing temp and gearbox oil from the mechanical forms: a reading, or NA without entries.
-  await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^(NA|\d+)°C$/);
-  await expect(cards.locator('.rm-card-value').nth(3)).toHaveText(/^(NA|[\d,]+)L$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(1)).toHaveText(/^(NA|\d+)°C$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(3)).toHaveText(/^(NA|[\d,]+)L$/);
   // Bearing drawer: each reading against the plant's limits (bearings 45–65 °C, flywheel 45–80 °C).
   const bearingCard = cards.getByRole('button', { name: /Bearing temp/ });
   if (await bearingCard.count()) {
@@ -874,14 +874,84 @@ test('RMD asset health: route drive group by default; motor current live, run ho
   }
   const mimic = main.getByRole('list', { name: 'Drive groups' });
   await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit']);
-  await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);
-  // As the Visualization mimic: billets since 08:00 IST today; exit = ERP Prime + SL 1–8 Oct 1,689.9 MT.
-  await expect(mimic.getByRole('button', { name: /Billet infeed/ })).toContainText('Today · since 08:00 IST');
-  await expect(mimic.getByRole('button', { name: /Billet infeed/ }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ billets)$/);
-  await expect(mimic.getByRole('button', { name: /Finished exit/ }).locator('.rm-zone-value')).toHaveText('1,689.9 MT');
-  await mimic.getByRole('button', { name: /Finishing group/ }).click();
+  const zone = (t: string) => mimic.locator('.rm-zone', { hasText: t });
+  await expect(zone('Route / diverter').locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);
+  // As the Visualization mimic: billets since 09:00 IST today; exit = ERP Prime + SL 1–8 Oct 1,689.9 MT.
+  await expect(zone('Billet infeed')).toContainText('Today · since 09:00 IST');
+  await expect(zone('Billet infeed').locator('.rm-zone-value')).toHaveText(/^(NA|\d+ billets)$/);
+  await expect(zone('Finished exit').locator('.rm-zone-value')).toHaveText('1,689.9 MT');
+  // The mimic only shows the live state; the drive group is chosen in the header (the user, 28 Oct 2026).
+  await expect(mimic.getByRole('button')).toHaveCount(0);
+  const groups = main.getByRole('group', { name: 'Drive group' });
+  await expect(groups.getByRole('button')).toHaveText(['Roughing', 'Route / diverter', 'Finishing', 'Auxiliary']);
+  await expect(groups.getByRole('button', { name: 'Route / diverter' })).toHaveAttribute('aria-pressed', 'true');
+  // Roughing (20" / 16" R stands): no PLC, so no live status or current.
+  await groups.getByRole('button', { name: 'Roughing' }).click();
+  await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Roughing drive group');
+  await expect(main.locator('.ah-status')).toHaveText('Status NA');
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^NA/);
+  await groups.getByRole('button', { name: 'Auxiliary' }).click();
+  await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Auxiliary · pumps');
+  await groups.getByRole('button', { name: 'Finishing' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Finishing drive group');
   await page.screenshot({ path: `${SHOTS}/rmd-asset-health.png`, fullPage: true });
+});
+
+test('RMD asset health: roughing group — the 20" and 16" R stands\' gearbox oil and bearings from the forms', async ({ page }) => {
+  await page.goto('/rmd/asset-health');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-28');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  await main.getByRole('group', { name: 'Drive group' }).getByRole('button', { name: 'Roughing' }).click();
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  // 28 Oct levels: 20" 20 in (1,043 L), 16" 17 in (887 L) of 2,670 L each — the lower against its capacity is 887 L.
+  const oil = cards.getByRole('button', { name: 'Gearbox oil', exact: true });
+  await expect(oil.locator('.rm-card-value')).toHaveText(/^887\s*L$/, { timeout: 60_000 });
+  await expect(oil.locator('.rm-card-value')).toHaveClass(/v-val/);   // no limits for the level: no colour
+  // The switch: the hottest tank's oil temperature, 1 Oct 16" 51 °C (20" 46.5 °C) — inside 45–65 °C.
+  const view = main.getByRole('group', { name: 'Gearbox oil view' });
+  await view.getByRole('button', { name: 'Temp' }).click();
+  await expect(main.locator('.ah-card-switch')).toHaveClass(/is-flipped/);   // the card turns over
+  await expect(oil.locator('.rm-card-value')).toHaveText(/^51\s*°C$/);
+  await expect(oil.locator('.rm-card-value')).toHaveClass(/v-ok/);
+  await page.waitForTimeout(700);
+  await cards.screenshot({ path: `${SHOTS}/rmd-gearbox-oil-temp.png` });
+  await view.getByRole('button', { name: 'Level' }).click();
+  await expect(oil.locator('.rm-card-value')).toHaveText(/^887\s*L$/);
+  await oil.click();
+  const d = page.getByRole('dialog', { name: 'Roughing · gearbox oil' });
+  const t = d.getByRole('table', { name: 'Oil tank level' });
+  await expect(t.locator('tbody tr td:first-child')).toHaveText(['20" R stand', '16" R stand']);
+  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('20" / 16" R stand 1.63 × 1.26 × 1.30 (2,670 L)');
+  await page.waitForTimeout(600);
+  await d.screenshot({ path: `${SHOTS}/rmd-roughing-oil.png` });
+  await page.keyboard.press('Escape');
+  // The 20" / 16" bearing forms were last filled on 23 Aug 2026: no reading in October — NA, and the card says why.
+  const bearing = cards.locator('.rm-card', { hasText: 'Bearing temp' });
+  await expect(bearing.locator('.rm-card-value')).toHaveText(/^NA/);
+  await expect(bearing.locator('.rm-card-note')).toHaveText('No entries recorded yet');
+});
+
+test('RMD asset health: motor current — live with a Live chip while drives run, else the period mean while running with an Avg chip', async ({ page }) => {
+  await page.goto('/rmd/asset-health');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-16');
+  await dialog.getByLabel('End Date').fill('2026-10-16');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const card = page.getByRole('main').getByRole('region', { name: 'Condition KPIs' }).getByRole('button', { name: 'Motor current', exact: true });
+  const chip = card.locator('.rm-card-note .chip');
+  await expect(chip).toHaveText(/^(Live|Avg · 16 Oct–16 Oct)$/, { timeout: 90_000 });
+  if ((await chip.innerText()) === 'Live') {
+    await expect(card.locator('.rm-card-value')).toHaveText(/^\d[\d,]*\s*A$/);
+  } else {
+    // Route group = the CR Mill M1 S1–S8 / M2 S1–S6 stands, 16 Oct: 100.21 A while running (RMD day 09:00 → 09:00) — the Condition Analytics figure.
+    await expect(card.locator('.rm-card-value')).toHaveText(/^100\s*A$/);
+  }
+  await card.screenshot({ path: `${SHOTS}/rmd-motor-current-chip.png` });
 });
 
 test('LSM: production by shift — the October plan (8,750 MT) per day and shift; output per shift = ERP day split by the form\'s prime pieces', async ({ page }) => {
@@ -1039,8 +1109,8 @@ test('RMD asset health: motor current and run hours open their drill-downs with 
   await expect(dc.getByRole('group', { name: 'Line', exact: true }).getByRole('button')).toHaveText(['Line 1', 'Line 2'], { timeout: 90_000 });
   const pick = (l: number) => dc.getByRole('group', { name: `Line ${l} drives` });
   await expect(pick(1).locator('.ah-cur-chip-name')).toHaveText(['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8']);
-  // 16 Oct: L1 S2 ran at ~144 A on average; L1 S5 did not run (its ~35 A at status 0 is not counted).
-  await expect(pick(1).getByRole('button', { name: /^S2/ }).locator('.ah-cur-chip-v')).toHaveText('144 A');
+  // 16 Oct (09:00 → 09:00): L1 S2 ran at ~147 A on average; L1 S5 did not run (its ~35 A at status 0 is not counted).
+  await expect(pick(1).getByRole('button', { name: /^S2/ }).locator('.ah-cur-chip-v')).toHaveText('147 A');
   await expect(pick(1).getByRole('button', { name: /^S5/ }).locator('.ah-cur-chip-v')).toHaveText('—');
   // The first drive that ran is shown; another opens on click.
   await expect(dc.getByRole('img', { name: /^Line 1 S1: motor current while running/ })).toBeVisible();
@@ -1102,20 +1172,20 @@ test('RMD condition analytics: actual rate and specific energy live, the mimic f
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const main = page.getByRole('main');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText([/^Actual rate/, /^Output opportunity/, /^Specific energy/, /^Conversion cost/, /^Cost variance/, /^Yield material loss/, /^Output margin/]);
-  // Actual rate = the Visualization running rate (Prime + SL ÷ billet-counter running hours): 16 Oct 16.15 TPH.
-  await expect(cards.getByRole('button', { name: 'Actual rate', exact: true }).locator('.rm-card-value')).toHaveText(/^16\.15\s*TPH$/, { timeout: 90_000 });
-  for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText([/^Actual rate/, /^Output opportunity/, /^Specific energy/, /^Conversion cost/, /^Cost variance/, /^Yield material loss/, /^Output margin/]);
+  // Actual rate = the Visualization running rate (Prime + SL ÷ billet-counter running hours): 16 Oct (09:00 → 09:00) 257.07 MT ÷ 15.6 h = 16.48 TPH.
+  await expect(cards.getByRole('button', { name: 'Actual rate', exact: true }).locator('.rm-card-value')).toHaveText(/^16\.48\s*TPH$/, { timeout: 90_000 });
+  for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   for (const t of ['Matched-run performance', 'Costing & impact']) await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
 
   const mimic = main.getByRole('list', { name: 'Condition groups' });
   await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit']);
-  // Billet infeed: 1,075 billets ÷ 15.92 running hours = 68 a running hour.
-  await expect(mimic.locator('.rm-zone', { hasText: 'Billet infeed' }).locator('.rm-zone-value')).toHaveText('68 billets/h');
+  // Billet infeed: 1,023 billets ÷ 15.6 running hours = 66 a running hour.
+  await expect(mimic.locator('.rm-zone', { hasText: 'Billet infeed' }).locator('.rm-zone-value')).toHaveText('66 billets/h');
   // Route / diverter = the CR Mill stands' running status now.
   await expect(mimic.locator('.rm-zone', { hasText: 'Route / diverter' }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);
-  await expect(mimic.locator('.rm-zone', { hasText: 'Finished exit' }).locator('.rm-zone-value')).toHaveText('16.15 TPH');
-  // Finishing: mean current of the drives that ran, 16 Oct 22.44 A; opens each drive.
+  await expect(mimic.locator('.rm-zone', { hasText: 'Finished exit' }).locator('.rm-zone-value')).toHaveText('16.48 TPH');
+  // Finishing: mean current of the drives that ran, 16 Oct 22.23 A; opens each drive.
   const fin = mimic.getByRole('button', { name: 'Finishing group' });
   await expect(fin.locator('.rm-zone-value')).toHaveText('22 A', { timeout: 90_000 });
   await page.screenshot({ path: `${SHOTS}/rmd-condition-analytics.png`, fullPage: true });
@@ -1124,7 +1194,7 @@ test('RMD condition analytics: actual rate and specific energy live, the mimic f
   const t = d.getByRole('table', { name: 'Drives: current and speed while running' });
   await expect(t.locator('thead th')).toHaveText(['Line', 'Drive', 'Current (A)', 'Speed (RPM)']);
   await expect(t.locator('tbody tr')).toHaveCount(10);
-  await expect(t.getByRole('row', { name: /^Line 2 CS / })).toContainText('811');
+  await expect(t.getByRole('row', { name: /^Line 2 CS / })).toContainText('825');
   await expect(d.getByRole('region', { name: 'Formula' })).toContainText('a minute counts when the drive ran all of it');
 });
 
@@ -1160,10 +1230,10 @@ test('HSM condition analytics: as the HSM sheet — actual rate = ERP production
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const main = page.getByRole('main');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText(['Actual rate', 'Output opportunity', 'Specific energy', 'Conversion cost', 'Cost variance', 'Yield material loss', 'Output margin']);
+  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText(['Actual rate', 'Output opportunity', 'Specific energy', 'Conversion cost', 'Cost variance', 'Yield material loss', 'Output margin']);
   // 1–8 Oct: ERP PRODUCTION_MT 1,390.43 ÷ 60.28 running hours (billet counter) = 23.07 TPH.
-  await expect(cards.locator('.rm-card-value').nth(0)).toHaveText(/^23\.07\s*TPH$/, { timeout: 90_000 });
-  for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(0)).toHaveText(/^23\.07\s*TPH$/, { timeout: 90_000 });
+  for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   // Specific energy: the Electrical HSM → Power Consumption form ÷ ERP production (no EMS meter) — the Visualization card.
   await expect(cards.getByRole('button', { name: 'Specific energy', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|[\d,.]+)\s*kWh\/MT$/, { timeout: 60_000 });
   // Header: the ERP's most produced size, grade and route NA, running hours.
@@ -1191,17 +1261,27 @@ test('LSM asset health: as the LSM sheet — Drive Temp form for bearings and ge
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const main = page.getByRole('main');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Gearbox oil', 'Run hours', 'PM on time']);
+  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Gearbox oil', 'Run hours', 'PM on time']);
   // Run hours: ERP NET_RUNNING_HRS, 1–8 Oct = 99.34 h.
-  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^99\.3\s*h$/, { timeout: 90_000 });
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^99\.3\s*h$/, { timeout: 90_000 });
   // PM on time from the ERP PM schedule: none of LSM's PM is closed by its due date yet.
-  await expect(cards.locator('.rm-card-value').nth(5)).toHaveText(/^0\.0\s*%$/);   // 1–8 Oct: 6 due, none done
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(5)).toHaveText(/^0\.0\s*%$/);   // 1–8 Oct: 6 due, none done
   // Motor current from the Mill Load Log Sheet (only a test entry so far: NA until real readings).
   await expect(cards.getByRole('button', { name: 'Motor current', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|\d+)\s*A$/);
   // Bearing temp and gearbox oil from the Drive Temp form (only a test entry so far: NA until real readings).
   await expect(cards.getByRole('button', { name: 'Bearing temp', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|\d+)\s*°C$/);
-  await expect(cards.getByRole('button', { name: 'Gearbox oil', exact: true }).locator('.rm-card-src')).toHaveText(['Level · in', 'Pressure · kg/cm²']);
-  await expect(cards.getByRole('button', { name: 'Gearbox oil', exact: true }).locator('.rm-card-pair-v').first()).toHaveText(/^(NA|\d+\.\d)$/);
+  // Gearbox oil: a Level / Pressure switch — the card turns over (the user, 28 Oct 2026).
+  const oil = cards.getByRole('button', { name: 'Gearbox oil', exact: true });
+  await expect(oil.locator('.rm-card-value')).toHaveText(/^(NA|\d+\.\d)\s*in$/);
+  const view = main.getByRole('group', { name: 'Gearbox oil view' });
+  await expect(view.getByRole('button')).toHaveText(['Level', 'Pressure']);
+  await view.getByRole('button', { name: 'Pressure' }).click();
+  await expect(main.locator('.ah-card-switch')).toHaveClass(/is-flipped/);
+  await expect(oil.locator('.rm-card-value')).toHaveText(/^(NA|\d+\.\d)\s*kg\/cm²$/);
+  await page.waitForTimeout(700);
+  await cards.screenshot({ path: `${SHOTS}/lsm-gearbox-oil-pressure.png` });
+  await view.getByRole('button', { name: 'Level' }).click();
+  await expect(oil.locator('.rm-card-value')).toHaveText(/^(NA|\d+\.\d)\s*in$/);
   // No mill mimic on LSM.
   await expect(main.getByText('Grouped asset mimic')).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/lsm-asset-health.png`, fullPage: true });
@@ -1231,9 +1311,9 @@ for (const c of [
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const main = page.getByRole('main');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText(['Actual rate', 'Output opportunity', 'Specific energy', 'Conversion cost', 'Cost variance', 'Yield material loss', 'Output margin']);
-  await expect(cards.locator('.rm-card-value').nth(0)).toHaveText(new RegExp(`^${c.rate.replace('.', '\\.')}\\s*TPH$`), { timeout: 90_000 });
-  for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText(['Actual rate', 'Output opportunity', 'Specific energy', 'Conversion cost', 'Cost variance', 'Yield material loss', 'Output margin']);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(0)).toHaveText(new RegExp(`^${c.rate.replace('.', '\\.')}\\s*TPH$`), { timeout: 90_000 });
+  for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   await expect(main.getByText(/mimic/i)).toHaveCount(0);
   await expect(main.locator('section.panel', { hasText: 'Costing & impact' }).locator('.num')).toHaveText(Array(8).fill('NA'));
   await expect(main.locator('section.panel', { hasText: 'Matched-run performance' }).locator('.num')).toHaveText(['NA', 'NA']);
@@ -1251,12 +1331,12 @@ test('RMS asset health: as the RMS sheet — run hours from the ERP (NET_RUNNING
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const main = page.getByRole('main');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Gearbox oil', 'Run hours', 'PM on time']);
+  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Gearbox oil', 'Run hours', 'PM on time']);
   // 1–8 Oct: Σ NET_RUNNING_HRS = 102.16 h.
-  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^102\.2\s*h$/, { timeout: 90_000 });
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^102\.2\s*h$/, { timeout: 90_000 });
   // PM on time, ERP PM schedule: 1–8 Oct 3 due, none done.
-  await expect(cards.locator('.rm-card-value').nth(5)).toHaveText(/^0\.0\s*%$/);
-  for (const i of [1, 2, 3]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(5)).toHaveText(/^0\.0\s*%$/);
+  for (const i of [1, 2, 3]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   await expect(main.getByText(/mimic/i)).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/rms-asset-health.png`, fullPage: true });
 });

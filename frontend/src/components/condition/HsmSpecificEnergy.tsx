@@ -34,6 +34,7 @@ export default function HsmSpecificEnergy() {
   return (
     <>
       <KpiCard label="Specific energy" value={perMt === null ? 'NA' : fixed(perMt, 1)} unit="kWh/MT" note="" series="hold"
+        noEntries={!!power && !!prod.data && perMt === null}
         loading={!power && !powerS.error} onOpen={() => setOpen(true)} openLabel="Power and ERP production per day" />
       <DrillDrawer open={open} onClose={() => setOpen(false)} title="Specific energy" sub="HSM · kWh/MT"
         loading={!power && !powerS.error} error={powerS.error} hasData={!!power}>

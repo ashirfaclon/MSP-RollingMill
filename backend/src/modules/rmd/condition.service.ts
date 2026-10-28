@@ -1,6 +1,6 @@
 /**
  * RMD Condition Analytics · grouped condition mimic (RMD FACLON Persona - 2, KPI-3 … KPI-7): each
- * drive's mean current (A) and speed (RPM) while it runs, over a period of RMD days (08:00 → 08:00
+ * drive's mean current (A) and speed (RPM) while it runs, over a period of RMD days (09:00 → 09:00
  * IST), from the plant historian:
  *   stands     CR Mill1/2 · M1 S1–S8 (line 1), M2 S1–S6 (line 2) — CURRENT_FB_Sn, SPEED_FB_Sn;
  *   finishing  Line-1 · M1 CUR_FB / SPD_FB (FS, PR1, PR2, TB1, TB2) and Line-2 · General

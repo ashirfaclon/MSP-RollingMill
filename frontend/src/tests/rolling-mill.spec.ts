@@ -156,19 +156,19 @@ test('the sidebar: every mill has Visualization, Asset Health and Condition Anal
   }
 });
 
-test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; a zone selects its drive group', async ({ page }) => {
+test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; the header selects the drive group', async ({ page }) => {
   await page.goto('/hsm/asset-health');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(/Rolling Mill\s*\/\s*Asset Health/);
   const main = page.getByRole('main');
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Finishing drive group');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/, /^PM on time/]);
+  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/, /^PM on time/]);
   // As the HSM sheet: bearing temp and motor current from the Mill Load Log Sheet (NA until real
   // entries), run hours from the ERP; the rest NA.
-  for (const i of [3, 5]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
-  await expect(cards.locator('.rm-card-value').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
-  await expect(cards.locator('.rm-card-value').nth(2)).toHaveText(/^(NA|\d[\d,]*)%$/);
-  await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
+  for (const i of [3, 5]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^(NA|\d[\d,]*)%$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
   for (const t of ['Grouped asset mimic', 'Condition trends', 'ERP PM & work-order history', 'Remarks']) {
     await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
   }
@@ -181,10 +181,17 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; a zon
   await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit']);
   // The Visualization mimic's Influx tags: billets today, drives on per group, the production counter.
   await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-value')).toHaveText([/^(NA|\d+ billets)$/, /\S/, /\S/, /^(NA|[\d,.]+ MT)$/], { timeout: 60_000 });
-  // A zone selects its drive group.
-  await main.getByRole('button', { name: /Roughing group/ }).click();
+  // The mimic only shows the live state; the header selects the drive group (the user, 28 Oct 2026).
+  await expect(main.getByRole('list', { name: 'Drive groups' }).getByRole('button')).toHaveCount(0);
+  const groups = main.getByRole('group', { name: 'Drive group' });
+  await expect(groups.getByRole('button')).toHaveText(['Roughing', 'Finishing', 'Auxiliary']);
+  await groups.getByRole('button', { name: 'Roughing' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Roughing drive group');
-  await expect(main.getByRole('button', { name: /Roughing group/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(groups.getByRole('button', { name: 'Roughing' })).toHaveAttribute('aria-pressed', 'true');
+  // Auxiliary: MID's pumps (PUMP-04 / 07 / 08 / 12), highest 4.1 mm/s on 21 Apr 2026.
+  await groups.getByRole('button', { name: 'Auxiliary' }).click();
+  await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Auxiliary · pumps');
+  await expect(cards.getByRole('button', { name: 'Vibration RMS', exact: true }).locator('.rm-card-value')).toHaveText(/^\d+\.\d\s*mm\/s$/, { timeout: 60_000 });
   await page.screenshot({ path: `${SHOTS}/hsm-asset-health.png`, fullPage: true });
   // Switching mill keeps the screen: every mill has Asset Health.
   const trigger = page.getByRole('button', { name: /^Rolling mill:/ });
@@ -362,19 +369,19 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   // Wired: production and mass yield (ERP), power (forms), specific energy (power ÷ ERP production), Mill MPS (Influx) and
   // chemical composition (SMS form) open their drawers.
   for (const name of ['Production · Prime + SL', 'Production · Prime', 'Mass yield', 'Power consumption', 'Specific energy', 'Mill MPS', 'Chemical composition']) await expect(strip.getByRole('button', { name, exact: true })).toBeVisible();
-  // No "pending" or coverage notes on the ERP cards (today's entry comes a day late, so NA).
-  await expect(strip.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-note')).toHaveText('');
+  // No coverage notes on the ERP cards; today's entry comes a day late, so NA — wired, nothing entered yet, and the card says so.
+  await expect(strip.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-note')).toHaveText('No entries recorded yet');
   // Mill flow, live: infeed, the two status zones and the exit (ERP production); no roughing group.
   const mimic = page.getByRole('list', { name: 'Mill process flow' });
   await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit']);
-  await expect(mimic.getByRole('button', { name: /Billet infeed/ })).toContainText('Today · since 08:00 IST');
+  await expect(mimic.getByRole('button', { name: /Billet infeed/ })).toContainText('Today · since 09:00 IST');
   await expect(mimic.getByRole('button', { name: /Finished exit/ })).toBeVisible();
   await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-dot')).toHaveCount(14);   // L1 S1–S8 + L2 S1–S6
   await expect(mimic.getByRole('button', { name: /Finishing group/ }).locator('.rm-dot')).toHaveCount(10);   // 5 per line
   // Production by shift: two shifts (08–20, 20–08); targets from the FY plan, output per shift NA (not in the ERP).
   const shifts = page.locator('.rm-flip-face--front section.panel');
   await expect(shifts.locator('.rm-shift-name')).toHaveText(['Day', 'Night']);
-  await expect(shifts.locator('.panel-sub')).toHaveText('Day 08:00–20:00 IST · Night 20:00–08:00 IST');
+  await expect(shifts.locator('.panel-sub')).toHaveText('Day 09:00–21:00 IST · Night 21:00–09:00 IST');
   await expect(shifts.locator('.rm-shift-val')).toHaveText(['NA', 'NA']);
   await expect(shifts.locator('.rm-shift-comp')).toHaveText(['NA', 'NA']);
   await expect(shifts.locator('.chip')).toHaveText(/^Plan \d/);

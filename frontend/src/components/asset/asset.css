@@ -13,10 +13,34 @@
 /* A row with one panel (Condition trends): full width. */
 .rm-row.ah-row--one { grid-template-columns: minmax(0, 1fr); }
 
-/* Mimic zones are buttons that select the drive group. */
-.ah-zone { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
-.ah-zone.is-selected { outline: 2px solid var(--s-prod); outline-offset: -2px; }
-.ah-zone:focus-visible { outline: 2px solid var(--focus, var(--s-prod)); }
+/*
+ * A card with two views (FlipKpiCard): the card turns over (180°) between them; the switch in its
+ * corner is the card's sibling (the card is a button) and does not turn. Every level shares
+ * the strip's four rows (subgrid), as a plain card does.
+ */
+.ah-card-switch { position: relative; display: grid; grid-row: span 4; grid-template-rows: subgrid; min-width: 0; perspective: 1200px; }
+.ah-flip-inner {
+  display: grid; grid-row: 1 / -1; grid-column: 1; grid-template-rows: subgrid; min-width: 0;
+  transform-style: preserve-3d; transition: transform 600ms cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+.ah-card-switch.is-flipped .ah-flip-inner { transform: rotateY(180deg); }
+.ah-flip-face {
+  display: grid; grid-area: 1 / 1 / -1 / 2; grid-template-rows: subgrid; min-width: 0;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+}
+.ah-flip-face--back { transform: rotateY(180deg); }
+@media (prefers-reduced-motion: reduce) { .ah-flip-inner { transition: none; } }
+/*
+ * The switch has the card's fourth row to itself (bottom-right), so it clears the label, the figure and
+ * the note — the note stays in row 3 instead of dropping to the foot. The row is shared across the
+ * strip, so every card keeps the same height.
+ */
+.ah-card-switch > .tb-seg { grid-row: 4; grid-column: 1; justify-self: end; align-self: end; margin: 0 8px 8px 0; z-index: 2; }
+.ah-card-switch .rm-card-note:last-child { grid-row: auto; align-self: start; }
+.ah-card-switch > .tb-seg .tb-seg-btn { padding: 2px 7px; font-size: 10px; }
+
+/* The drive-group selector under the asset name (the mimic only shows the live state). */
+.ah-asset-id .tb-seg { align-self: flex-start; margin-top: 6px; flex-wrap: wrap; }
 
 .ah-trends { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .ah-trend { display: flex; flex-direction: column; gap: 10px; }

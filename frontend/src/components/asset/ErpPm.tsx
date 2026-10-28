@@ -47,6 +47,7 @@ export function PmOnTimeCard({ pm, onOpen }: { pm: PmView; onOpen: () => void })
   const pct = pm.inErp ? pm.report!.pm.onTimePct : null;
   return (
     <KpiCard label="PM on time" value={pct === null ? 'NA' : fixed(pct, 1)} unit="%" note="" series="order" loading={pm.loading}
+      noEntries={pm.inErp && pct === null ? 'No PM due in this period' : false}
       {...(pm.inErp ? { onOpen, openLabel: 'PM due, done on time and breakdowns, from the ERP' } : {})} />
   );
 }

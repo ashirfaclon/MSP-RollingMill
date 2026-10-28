@@ -58,7 +58,7 @@ export interface RmdLive {
   connection: 'up' | 'down';
   message: string;
   now: string;
-  /** The RMD day running now (08:00 → 08:00 IST) and its start. */
+  /** The RMD day running now (09:00 → 09:00 IST) and its start. */
   plantDay: string;
   plantDayStart: string;
   /** Billets since the RMD day started, M1 + M2 (sum of counter increases). */
