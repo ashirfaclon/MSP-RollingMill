@@ -36,6 +36,7 @@ import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
 import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
+import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, pmFacts, usePm } from './ErpPm';
 import './asset.css';
 
 const GROUPS = ['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit'] as const;
@@ -59,6 +60,9 @@ export default function RmdAssetHealth() {
   const { dates } = useSelection();
   const [vibOpen, setVibOpen] = useState(false);
   const mid = useMid('rmd', MID_SECTION[group] ?? null);
+  const pm = usePm('rmd');
+  const pmFact = pmFacts(pm);
+  const [pmOpen, setPmOpen] = useState(false);
 
   const live = useApi<RmdLive>('/api/rmd/live', 30_000).data;
   const formsUrl = rangeUrl('/api/rmd/asset-forms', dates);
@@ -87,7 +91,7 @@ export default function RmdAssetHealth() {
           ? <span className={`chip ${zoneLive.state === 'no-data' ? 'chip--na' : 'chip--info'} ah-status`}>{zoneLive.stateLabel}</span>
           : <span className="chip chip--na ah-status">Status NA</span>}
         <dl className="ah-asset-facts">
-          {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', null], ['Open work orders', null], ['Health score', null]] as const).map(([k, v]) => (
+          {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', pmFact.nextPm], ['Open work orders', pmFact.openWorkOrders], ['Health score', null]] as const).map(([k, v]) => (
             <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className={`num ${v ? 'v-val' : 'v-na'}`}>{v ?? 'NA'}</dd></div>
           ))}
         </dl>
@@ -125,7 +129,8 @@ export default function RmdAssetHealth() {
         />
         <KpiCard label="Run hours" value={run === null ? 'NA' : fixed(run, 1)} unit="h" note="" series="prod"
           onOpen={() => setOpen('run')} openLabel="Run hours per day, from the ERP log sheet" />
-        {NA('PM on time', '%', 'order')}
+        <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
+        <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={run} title="RMD" />
       </section>
 
       <Panel title="Grouped asset mimic">
@@ -162,7 +167,7 @@ export default function RmdAssetHealth() {
 
       <div className="rm-row">
         <Panel title="ERP PM & work-order history" className="rm-panel" bodyClass="rm-body ah-list">
-          {['PM completed on time', 'MTBF', 'MTTR', 'Open action'].map((k) => <Row key={k} k={k} />)}
+          <ErpPmRows pm={pm} runH={run} onOpen={() => setPmOpen(true)} />
         </Panel>
         <Panel title="Remarks" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
           <MidRemarks mid={mid} />
@@ -209,9 +214,6 @@ function toneOf(rows: RmdReading[]): 'v-ok' | 'v-risk' | undefined {
 }
 const LIMIT_TONE = { ok: 'v-ok', low: 'v-risk', high: 'v-risk' } as const;
 
-function Row({ k }: { k: string }) {
-  return <div className="ah-row"><span className="rm-k">{k}</span><span className="num v-na">NA</span></div>;
-}
 
 function BearingTrend({ trend }: { trend: { at: string; maxC: number }[] }) {
   const categories = useMemo(() => trend.map((t) => t.at.slice(5)), [trend]);

@@ -24,7 +24,8 @@ import oracledb from 'oracledb';
 import { loadEnv, type Env } from '../../config/env';
 import { RMD_STOCK_GODOWN, RMD_STOCK_ITEMS } from '../../modules/rmd/stock-items';
 import {
-  ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, RMD_LOG_FIELDS, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
+  ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, PM_DIVISIONS, RMD_LOG_FIELDS, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
+  type ErpPmCache, type PmMill,
   type LsmLogField, type LsmProductionCache, type LsmStockCache, type RmsProductionCache, type RmdLogField, type RmdProductionCache, type RmdStockCache,
   type ErpCache, type ErpCommercialCache, type ErpDivisionRow, type ErpProductionCache,
   type ErpProductionRow, type ErpSyncAttempt, type LogField,
@@ -266,6 +267,7 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
   await pullDivisionStock(env, p.lsmStock, 'LS', 'LSM', log);
   await pullDivisionStock(env, p.rmsStock, 'RS', 'RMS', log);
   await pullRmsLog(env, p, log);
+  await pullPm(env, p, log);
 }
 
 /**
@@ -330,6 +332,85 @@ async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
     log(`  RMS log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);
   } catch (err) {
     log(`  RMS log sheet not synced: ${(err as Error).message}`);
+  } finally {
+    await conn?.close();
+  }
+}
+
+/**
+ * ERP PM for the four mills (the plant's tables, 28 Oct 2026), equipment by its division
+ * (PM_DIVISIONS), entity MP:
+ *   equipment   EQPT_ID_MAST, a count per mill;
+ *   PM schedule EQPT_PM_TRAN, TNATURE = 'PMREM': one reminder per scheduled occurrence, due on
+ *               FROM_DATE, done when ACTION_VRNO links it to its done action, on ACTION_VRDATE.
+ *               A reminder closed by a test action (remarked "test") is not done. Per mill and
+ *               due date: due, done, done by the due date;
+ *   breakdowns  EQPT_PM_LOG, TNATURE = 'BKDN': FROM_DATE → TO_DATE, REMARKS, CLOSED_STATUS;
+ *   work orders EQPT_PM_TRAN, TNATURE = 'WOPM', one per voucher: closed (PLAN_CLOSED_STATUS) or
+ *               cancelled (CANCELLEDDATE).
+ * Its own failure: the previous PM cache stays in place.
+ */
+async function pullPm(env: Env, p: Paths, log: (line: string) => void) {
+  let conn: oracledb.Connection | null = null;
+  const mills = Object.entries(PM_DIVISIONS) as [PmMill, string][];
+  const millOf = (div: unknown) => mills.find(([, d]) => d === div)![0];
+  const divs = mills.map(([, d]) => `'${d}'`).join(', ');
+  try {
+    conn = await oracledb.getConnection({ user: env.erpUser!, password: env.erpPassword!, connectString: env.erpDsn! });
+    conn.callTimeout = 300_000;
+    await conn.execute('SET TRANSACTION READ ONLY');
+    const q = async <T>(sql: string) => ((await conn!.execute<T>(sql, {}, { maxRows: 0 })).rows ?? []) as T[];
+    const equipment = await q<{ DIV: string; N: number }>(`
+      SELECT DIV_CODE AS "DIV", COUNT(*) AS "N" FROM MSPV7ERP1.EQPT_ID_MAST
+       WHERE ENTITY_CODE = 'MP' AND DIV_CODE IN (${divs}) GROUP BY DIV_CODE`);
+    const done = `t.ACTION_VRNO IS NOT NULL AND NOT EXISTS (
+          SELECT 1 FROM MSPV7ERP1.EQPT_PM_TRAN a
+           WHERE a.ENTITY_CODE = t.ENTITY_CODE AND a.TNATURE = 'WDON' AND a.VRNO = t.ACTION_VRNO
+             AND (LOWER(TRIM(a.REMARK)) = 'test' OR LOWER(TRIM(a.PLAN_CLOSE_REMARK)) = 'test'))`;
+    const days = await q<{ DIV: string; D: string; N: number; DONE: number; ON_TIME: number }>(`
+      SELECT m.DIV_CODE AS "DIV", TO_CHAR(t.FROM_DATE, 'YYYY-MM-DD') AS "D", COUNT(*) AS "N",
+             SUM(CASE WHEN ${done} THEN 1 ELSE 0 END) AS "DONE",
+             SUM(CASE WHEN TRUNC(t.ACTION_VRDATE) <= TRUNC(t.FROM_DATE) AND ${done} THEN 1 ELSE 0 END) AS "ON_TIME"
+        FROM MSPV7ERP1.EQPT_PM_TRAN t
+        JOIN MSPV7ERP1.EQPT_ID_MAST m ON m.ENTITY_CODE = t.ENTITY_CODE AND m.EQPT_ID = t.EQPT_ID
+       WHERE t.ENTITY_CODE = 'MP' AND t.TNATURE = 'PMREM' AND t.CANCELLEDDATE IS NULL AND m.DIV_CODE IN (${divs})
+       GROUP BY m.DIV_CODE, TO_CHAR(t.FROM_DATE, 'YYYY-MM-DD')
+       ORDER BY 1, 2`);
+    const breakdowns = await q<{ DIV: string; VRNO: string; NAME: string; F: string; T: string; H: number | null; R: string | null; CS: string | null }>(`
+      SELECT m.DIV_CODE AS "DIV", l.VRNO AS "VRNO", m.EQPT_ID_NAME AS "NAME",
+             TO_CHAR(l.FROM_DATE, 'YYYY-MM-DD"T"HH24:MI') AS "F", TO_CHAR(l.TO_DATE, 'YYYY-MM-DD"T"HH24:MI') AS "T",
+             ROUND((l.TO_DATE - l.FROM_DATE) * 24, 3) AS "H", l.REMARKS AS "R", l.CLOSED_STATUS AS "CS"
+        FROM MSPV7ERP1.EQPT_PM_LOG l
+        JOIN MSPV7ERP1.EQPT_ID_MAST m ON m.ENTITY_CODE = l.ENTITY_CODE AND m.EQPT_ID = l.EQPT_ID
+       WHERE l.ENTITY_CODE = 'MP' AND l.TNATURE = 'BKDN' AND m.DIV_CODE IN (${divs})
+       ORDER BY l.FROM_DATE`);
+    const orders = await q<{ DIV: string; VRNO: string; D: string; NAME: string; CLOSED: number; CANC: number }>(`
+      SELECT m.DIV_CODE AS "DIV", t.VRNO AS "VRNO", TO_CHAR(t.VRDATE, 'YYYY-MM-DD') AS "D", m.EQPT_ID_NAME AS "NAME",
+             MAX(CASE WHEN t.PLAN_CLOSED_STATUS IS NOT NULL THEN 1 ELSE 0 END) AS "CLOSED",
+             MAX(CASE WHEN t.CANCELLEDDATE IS NOT NULL THEN 1 ELSE 0 END) AS "CANC"
+        FROM MSPV7ERP1.EQPT_PM_TRAN t
+        JOIN MSPV7ERP1.EQPT_ID_MAST m ON m.ENTITY_CODE = t.ENTITY_CODE AND m.EQPT_ID = t.EQPT_ID
+       WHERE t.ENTITY_CODE = 'MP' AND t.TNATURE = 'WOPM' AND m.DIV_CODE IN (${divs})
+       GROUP BY m.DIV_CODE, t.VRNO, t.VRDATE, m.EQPT_ID_NAME
+       ORDER BY 3`);
+    const cache: ErpPmCache = {
+      syncedAt: new Date().toISOString(),
+      source: 'MSPV7ERP1 · EQPT_ID_MAST, EQPT_PM_TRAN (PMREM, WOPM), EQPT_PM_LOG (BKDN) · entity MP',
+      equipment: Object.fromEntries(mills.map(([m, d]) => [m, Number(equipment.find((r) => r.DIV === d)?.N ?? 0)])) as Record<PmMill, number>,
+      days: days.map((r) => ({ mill: millOf(r.DIV), date: String(r.D), due: Number(r.N), done: Number(r.DONE), doneOnTime: Number(r.ON_TIME) })),
+      breakdowns: breakdowns.map((r) => ({
+        mill: millOf(r.DIV), vrno: String(r.VRNO), equipment: String(r.NAME ?? '').trim(), from: String(r.F), to: String(r.T),
+        hours: num(r.H), remark: r.R === null ? null : String(r.R).trim(), closed: r.CS !== null,
+      })),
+      workOrders: orders.map((r) => ({
+        mill: millOf(r.DIV), vrno: String(r.VRNO), date: String(r.D), equipment: String(r.NAME ?? '').trim(),
+        closed: Number(r.CLOSED) === 1, cancelled: Number(r.CANC) === 1,
+      })),
+    };
+    writeAtomic(p.pm, cache);
+    log(`  ERP PM: equipment ${mills.map(([m]) => `${m} ${cache.equipment[m]}`).join(', ')} · ${cache.days.length} due dates · ${cache.breakdowns.length} breakdowns · ${cache.workOrders.length} work orders`);
+  } catch (err) {
+    log(`  ERP PM not synced: ${(err as Error).message}`);
   } finally {
     await conn?.close();
   }

@@ -42,8 +42,39 @@ export const cachePaths = (env: Env) => {
     lsmStock: path.join(dir, 'erp-lsm-stock.json'),
     rmsStock: path.join(dir, 'erp-rms-stock.json'),
     rmsProduction: path.join(dir, 'erp-rms-production.json'),
+    pm: path.join(dir, 'erp-pm.json'),
   };
 };
+
+/**
+ * ERP PM (the plant, 28 Oct 2026): equipment EQPT_ID_MAST, PM schedule EQPT_JOB_LIST_MAST /
+ * EQPT_PM_TRAN, work orders and breakdowns EQPT_PM_LOG / EQPT_PM_TRAN. A mill is its equipment's
+ * division: HSM S1, RMD RM, LSM LS, RMS RS.
+ */
+export const PM_DIVISIONS = { hsm: 'S1', rmd: 'RM', lsm: 'LS', rms: 'RS' } as const;
+export type PmMill = keyof typeof PM_DIVISIONS;
+/** PM reminders of one mill falling due on one date: how many, done, and done by the due date. */
+export interface ErpPmDay { mill: PmMill; date: string; due: number; done: number; doneOnTime: number }
+/** One breakdown (EQPT_PM_LOG, TNATURE = 'BKDN'): plant-local times, hours down. */
+export interface ErpPmBreakdown {
+  mill: PmMill; vrno: string; equipment: string; from: string; to: string; hours: number | null;
+  remark: string | null; closed: boolean;
+}
+/** One work order (EQPT_PM_TRAN, TNATURE = 'WOPM'). */
+export interface ErpPmWorkOrder { mill: PmMill; vrno: string; date: string; equipment: string; closed: boolean; cancelled: boolean }
+export interface ErpPmCache {
+  syncedAt: string;
+  source: string;
+  /** Equipment in EQPT_ID_MAST per mill (0: the mill is not in the ERP's PM module). */
+  equipment: Record<PmMill, number>;
+  days: ErpPmDay[];
+  breakdowns: ErpPmBreakdown[];
+  workOrders: ErpPmWorkOrder[];
+}
+
+export function readErpPm(env: Env): ErpPmCache | null {
+  return readJson<ErpPmCache>(cachePaths(env).pm);
+}
 
 /**
  * RMD log-sheet codes, exactly as the plant gave them (RMD - ERP Data Filled.xlsx, 10 Oct

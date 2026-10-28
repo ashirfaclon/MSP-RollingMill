@@ -14,6 +14,7 @@ import { rmdRoutes } from './modules/rmd/rmd.routes';
 import { lsmRoutes } from './modules/lsm/lsm.routes';
 import { rmsRoutes } from './modules/rms/rms.routes';
 import { midRoutes } from './modules/mid/mid.routes';
+import { pmRoutes } from './modules/pm/pm.routes';
 import { sourcesRoutes } from './modules/sources/sources.routes';
 import { systemRoutes, type Lifecycle } from './modules/system/system.routes';
 
@@ -58,6 +59,7 @@ export async function buildApp({ config, lifecycle = { shuttingDown: false } }: 
     await api.register(lsmRoutes, { prefix: '/lsm' });
     await api.register(rmsRoutes, { prefix: '/rms' });
     await api.register(midRoutes, { prefix: '/mid' });
+    await api.register(pmRoutes, { prefix: '/pm' });
   }, { prefix: '/api' });
 
   return app;

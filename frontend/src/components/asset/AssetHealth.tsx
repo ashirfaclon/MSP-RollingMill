@@ -35,6 +35,7 @@ import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
 import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
+import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, pmFacts, usePm } from './ErpPm';
 import './asset.css';
 
 /** HSM has no intermediate group (the user, 26 Oct 2026; the historian has only RM 1–5 and FM 1–6). */
@@ -58,6 +59,9 @@ export default function AssetHealth() {
   const { dates } = useSelection();
   const [vibOpen, setVibOpen] = useState(false);
   const mid = useMid('hsm', gid);
+  const pm = usePm('hsm');
+  const pmFact = pmFacts(pm);
+  const [pmOpen, setPmOpen] = useState(false);
 
   const loadUrl = rangeUrl('/api/hsm/mill-load', dates);
   const loadS = useApi<HsmMillLoadReport>(loadUrl);
@@ -89,7 +93,7 @@ export default function AssetHealth() {
           ? <span className="chip chip--info ah-status">{liveGroup.stateLabel}</span>
           : <span className="chip chip--na ah-status">Status NA</span>}
         <dl className="ah-asset-facts">
-          {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', null], ['Open work orders', null], ['Health score', null]] as const).map(([k, v]) => (
+          {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', pmFact.nextPm], ['Open work orders', pmFact.openWorkOrders], ['Health score', null]] as const).map(([k, v]) => (
             <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className={`num ${v ? 'v-val' : 'v-na'}`}>{v ?? 'NA'}</dd></div>
           ))}
         </dl>
@@ -117,7 +121,8 @@ export default function AssetHealth() {
         />
         {NA('Gearbox oil', '', 'hold')}
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" />
-        {NA('PM on time', '%', 'order')}
+        <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
+        <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={runH} title="HSM" />
       </section>
 
       <Panel title="Grouped asset mimic">
@@ -157,7 +162,7 @@ export default function AssetHealth() {
 
       <div className="rm-row">
         <Panel title="ERP PM & work-order history" className="rm-panel" bodyClass="rm-body ah-list">
-          {['PM completed on time', 'MTBF', 'MTTR', 'Open action'].map((k) => <Row key={k} k={k} />)}
+          <ErpPmRows pm={pm} runH={runH} onOpen={() => setPmOpen(true)} />
         </Panel>
         <Panel title="Remarks" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
           <MidRemarks mid={mid} />
@@ -231,6 +236,3 @@ function BearingTrend({ entries }: { entries: HsmMillLoadEntry[] }) {
   );
 }
 
-function Row({ k }: { k: string }) {
-  return <div className="ah-row"><span className="rm-k">{k}</span><span className="num v-na">NA</span></div>;
-}

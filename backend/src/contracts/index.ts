@@ -12,3 +12,4 @@ export type * from './system';
 export type * from './rmd';
 export type * from './lsm';
 export type * from './mid';
+export type * from './pm';

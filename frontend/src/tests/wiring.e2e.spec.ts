@@ -1194,7 +1194,8 @@ test('LSM asset health: as the LSM sheet — Drive Temp form for bearings and ge
   await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Gearbox oil', 'Run hours', 'PM on time']);
   // Run hours: ERP NET_RUNNING_HRS, 1–8 Oct = 99.34 h.
   await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^99\.3\s*h$/, { timeout: 90_000 });
-  for (const i of [5]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  // PM on time from the ERP PM schedule: none of LSM's PM is closed by its due date yet.
+  await expect(cards.locator('.rm-card-value').nth(5)).toHaveText(/^0\.0\s*%$/);   // 1–8 Oct: 6 due, none done
   // Motor current from the Mill Load Log Sheet (only a test entry so far: NA until real readings).
   await expect(cards.getByRole('button', { name: 'Motor current', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|\d+)\s*A$/);
   // Bearing temp and gearbox oil from the Drive Temp form (only a test entry so far: NA until real readings).
@@ -1253,7 +1254,9 @@ test('RMS asset health: as the RMS sheet — run hours from the ERP (NET_RUNNING
   await expect(cards.locator('.rm-card-label')).toHaveText(['Vibration RMS', 'Bearing temp', 'Motor current', 'Gearbox oil', 'Run hours', 'PM on time']);
   // 1–8 Oct: Σ NET_RUNNING_HRS = 102.16 h.
   await expect(cards.locator('.rm-card-value').nth(4)).toHaveText(/^102\.2\s*h$/, { timeout: 90_000 });
-  for (const i of [1, 2, 3, 5]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
+  // PM on time, ERP PM schedule: 1–8 Oct 3 due, none done.
+  await expect(cards.locator('.rm-card-value').nth(5)).toHaveText(/^0\.0\s*%$/);
+  for (const i of [1, 2, 3]) await expect(cards.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
   await expect(main.getByText(/mimic/i)).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/rms-asset-health.png`, fullPage: true });
 });
@@ -1337,4 +1340,45 @@ for (const c of [
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText('MID logbook forms');
   await page.waitForTimeout(600);
   await d.screenshot({ path: `${SHOTS}/${c.mill}-mid-vibration.png` });
+});
+
+for (const c of [
+  // 1 Aug – 27 Oct 2026, ERP PM (EQPT_* tables), whole mill. HSM (division S1) has no equipment in the ERP: NA throughout.
+  { mill: 'hsm', pct: /^NA/, done: 'NA', mtbf: /^NA$/, mttr: 'NA', action: 'NA', wo: 'NA' },
+  // RMD: 1,563 PM due, 1 done on time; 1 breakdown (Flying Shear Building, 2.05 h, not closed).
+  { mill: 'rmd', pct: /^0\.1\s*%$/, done: '1 of 1,563', mtbf: /^[\d,]+\.\d h$/, mttr: '2.05 h', action: '1', wo: '0' },
+  // LSM: 35 due, 1 done late; its only breakdown is remarked "TEST" — left out.
+  { mill: 'lsm', pct: /^0\.0\s*%$/, done: '0 of 35', mtbf: /^(NA|No failure · [\d,]+\.\d run h)$/, mttr: 'No failure', action: '0', wo: '0' },
+  // RMS: 7 due, 2 done on time; 2 breakdowns, 1.36 h, both closed; MTBF 1,087.81 run h ÷ 2.
+  { mill: 'rms', pct: /^28\.6\s*%$/, done: '2 of 7', mtbf: /^543\.9 h$/, mttr: '0.68 h', action: '0', wo: '0' },
+] as const) test(`${c.mill.toUpperCase()} asset health: ERP PM — PM on time, next PM, open work orders, MTBF / MTTR, open action`, async ({ page }) => {
+  await page.goto(`/${c.mill}/asset-health`);
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-08-01');
+  await dialog.getByLabel('End Date').fill('2026-10-27');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const main = page.getByRole('main');
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  await expect(cards.locator('.rm-card', { hasText: 'PM on time' }).locator('.rm-card-value')).toHaveText(c.pct, { timeout: 60_000 });
+  await expect(main.locator('.ah-fact', { hasText: 'Open work orders' }).locator('dd')).toHaveText(c.wo);
+  await expect(main.locator('.ah-fact', { hasText: 'Next PM' }).locator('dd')).toHaveText(c.mill === 'hsm' ? 'NA' : /^\d{1,2} \w{3} \d{4}$/);
+  const panel = main.locator('section.panel', { hasText: 'ERP PM & work-order history' });
+  const val = (k: string) => panel.locator('.ah-row', { hasText: k }).locator('.num');
+  await expect(val('PM completed on time')).toHaveText(c.done);
+  await expect(val('MTBF')).toHaveText(c.mtbf, { timeout: 60_000 });
+  await expect(val('MTTR')).toHaveText(c.mttr);
+  await expect(val('Open action')).toHaveText(c.action);
+  await panel.screenshot({ path: `${SHOTS}/${c.mill}-erp-pm.png` });
+  if (c.mill === 'hsm') {
+    await expect(panel.getByRole('button')).toHaveCount(0);
+    return;
+  }
+  await cards.getByRole('button', { name: 'PM on time', exact: true }).click();
+  const d = page.getByRole('dialog', { name: `${c.mill.toUpperCase()} · ERP PM` });
+  await expect(d.getByRole('table', { name: 'PM due per month' }).locator('thead th')).toHaveText(['Month', 'Due', 'Done on time', 'Done late', 'Not done']);
+  await expect(d.getByRole('table', { name: 'Breakdowns' })).toBeVisible();
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('EQPT_PM_TRAN · TNATURE = PMREM');
+  await page.waitForTimeout(600);
+  await d.screenshot({ path: `${SHOTS}/${c.mill}-erp-pm-drawer.png` });
 });
