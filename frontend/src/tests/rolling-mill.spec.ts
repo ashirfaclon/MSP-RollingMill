@@ -188,9 +188,12 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; the h
   await groups.getByRole('button', { name: 'Roughing' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Roughing drive group');
   await expect(groups.getByRole('button', { name: 'Roughing' })).toHaveAttribute('aria-pressed', 'true');
+  // Status from the RM drives' On_Off: the live state, or "No live data" — never NA.
+  await expect(main.locator('.ah-status')).toHaveText(/^(All on|All off|\d+ of \d+ on|No live data)$/, { timeout: 60_000 });
   // Auxiliary: MID's pumps (PUMP-04 / 07 / 08 / 12), highest 4.1 mm/s on 21 Apr 2026.
   await groups.getByRole('button', { name: 'Auxiliary' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Auxiliary · pumps');
+  await expect(main.locator('.ah-status')).toHaveCount(0);   // the pumps have no PLC signal: no status
   await expect(cards.getByRole('button', { name: 'Vibration RMS', exact: true }).locator('.rm-card-value')).toHaveText(/^\d+\.\d\s*mm\/s$/, { timeout: 60_000 });
   await page.screenshot({ path: `${SHOTS}/hsm-asset-health.png`, fullPage: true });
   // Switching mill keeps the screen: every mill has Asset Health.

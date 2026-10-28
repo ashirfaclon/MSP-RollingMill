@@ -104,9 +104,10 @@ export default function RmdAssetHealth() {
           <h2 className="ah-asset-name">RMD · {group === 'auxiliary' ? 'Auxiliary · pumps' : `${NAME[group]} drive group`}</h2>
           <Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} />
         </div>
-        {zoneLive
-          ? <span className={`chip ${zoneLive.state === 'no-data' ? 'chip--na' : 'chip--info'} ah-status`}>{zoneLive.stateLabel}</span>
-          : <span className="chip chip--na ah-status">Status NA</span>}
+        {/* Status only where there is a source (the user, 28 Oct 2026): route / finishing drives — none for roughing (no PLC) or the pumps. */}
+        {zone && (zoneLive && zoneLive.state !== 'no-data'
+          ? <span className="chip chip--info ah-status">{zoneLive.stateLabel}</span>
+          : <span className="chip chip--na ah-status">No live data</span>)}
         <dl className="ah-asset-facts">
           {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', pmFact.nextPm], ['Open work orders', pmFact.openWorkOrders]] as const).map(([k, v]) => (
             <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className={`num ${v ? 'v-val' : 'v-na'}`}>{v ?? 'NA'}</dd></div>

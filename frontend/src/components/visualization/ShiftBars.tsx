@@ -42,6 +42,8 @@ export default function ShiftBars(props: {
    * switch (the user, 28 Oct 2026; RMD always, the ERP has no shift); null / omitted = not known yet.
    */
   shiftData?: boolean | null;
+  /** Opens the production plan config (the user, 28 Oct 2026). */
+  onEditPlan?: () => void;
 }) {
   const [view, setView] = useState<View>('shift');
   const dayOnly = props.shiftData === false;
@@ -69,6 +71,9 @@ export default function ShiftBars(props: {
           {props.planMt === null
             ? <span className="chip chip--na" title="No plan for this period">Plan NA</span>
             : <span className="chip chip--info">Plan {fixed(props.planMt, 0)} MT</span>}
+          {props.onEditPlan && (
+            <button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={props.onEditPlan} title="Fill in the production plan">Edit plan</button>
+          )}
         </span>
       }
       className="rm-panel"

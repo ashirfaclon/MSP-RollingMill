@@ -7,6 +7,7 @@ import RunningRateFoot from '@/components/production/RunningRateFoot';
 import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type PlanReport } from '@/services/hsmApi';
 import ShiftBars from './ShiftBars';
+import PlanConfig from '@/components/plan/PlanConfig';
 
 /**
  * HSM · Production by shift, all from /api/hsm/plan:
@@ -28,6 +29,7 @@ export default function ShiftProduction({ m }: { m: MillModel }) {
   /** The drawer opens in the card's view (by shift / whole day); null = closed. */
   const [open, setOpen] = useState<ShiftView | null>(null);
   const [lastView, setLastView] = useState<ShiftView>('shift');
+  const [planOpen, setPlanOpen] = useState(false);
   // Output over the PLANNED days only, so compliance compares like with like.
   const plannedDays = plan ? plan.days.filter((d) => d.planMt !== null) : [];
   const plannedOut = (shift: string) => plannedDays.reduce((a, d) => a + (d.actualByShift?.[shift] ?? 0), 0);
@@ -58,8 +60,10 @@ export default function ShiftProduction({ m }: { m: MillModel }) {
       // The counter's split by shift; no day of the period has one: the whole day only.
       shiftData={plan ? plan.days.some((d) => d.actualByShift != null) : null}
       onOpen={(v) => { setLastView(v); setOpen(v); }}
+      onEditPlan={() => setPlanOpen(true)}
     />
     <ShiftPlanDrawer open={open !== null} view={open ?? lastView} onClose={() => setOpen(null)} />
+    <PlanConfig mill="hsm" open={planOpen} onClose={() => setPlanOpen(false)} />
     </>
   );
 }

@@ -22,6 +22,8 @@
  * inspection form.
  */
 import { Fragment, useMemo, useState } from 'react';
+import CaInputs from './CaInputs';
+import '@/components/plan/plan.css';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import HsmSpecificEnergy from './HsmSpecificEnergy';
@@ -63,6 +65,7 @@ export default function HsmConditionAnalytics() {
   const sizes = sizesS.data && sizesS.dataUrl === sizesUrl ? sizesS.data.rows.filter((r) => !r.defective && r.producedMt > 0) : null;
   const [open, setOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
+  const [inputsOpen, setInputsOpen] = useState(false);
   const costUrl = rangeUrl('/api/hsm/costing', dates);
   const costS = useApi<CostingReport>(costUrl);
   const cost = costS.data && costS.dataUrl === costUrl ? costS.data : null;
@@ -136,15 +139,13 @@ export default function HsmConditionAnalytics() {
         <Panel title="Matched-run performance" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
           {['Production rate · actual vs matched', 'Energy per MT · actual vs matched'].map((k) => <Row key={k} k={k} />)}
         </Panel>
-        <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
+        <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top" right={<button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={() => setInputsOpen(true)} title="Targets and costs for the month">Edit inputs</button>}>
           <Row k="Tariff" v={cp ? `${inr(cp.tariffPerKwh, 2)}/kWh` : null} />
           <Row k="Contribution" />
           <Row k="Net material" v={burning !== null && scrap !== null ? `${inr(burning)}/MT burning loss · ${inr(scrap)}/MT other losses` : null} />
           <Row k="Other conversion · actual / standard" v={cp ? `${inr(cp.otherConversionPerMt)}/MT · standard NA` : null} />
-          <Row k="Conversion cost per finished MT" v={cp ? `${inr(cp.conversionPerMt)}/MT` : null} />
-          <Row k="Cost variance" />
+          {/* No repeats of the Conversion cost, Cost variance and Output margin cards (the user, 28 Oct 2026). */}
           <Row k="Yield material variance" />
-          <Row k="Throughput contribution opportunity" />
         </Panel>
       </div>
 
@@ -177,6 +178,7 @@ export default function HsmConditionAnalytics() {
         loading={!rateS.data && !rateS.error} error={rateS.error} hasData={!!rateR}>
         {rateR && rate && <RateContent days={rateR.days} rate={rate} />}
       </DrillDrawer>
+      <CaInputs mill="hsm" open={inputsOpen} onClose={() => setInputsOpen(false)} />
     </div>
   );
 }

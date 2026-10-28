@@ -16,6 +16,8 @@
  * impact.
  */
 import { Fragment, useState } from 'react';
+import CaInputs from '@/components/condition/CaInputs';
+import '@/components/plan/plan.css';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import FlowArrow from '@/components/visualization/FlowArrow';
@@ -46,6 +48,7 @@ export default function RmdConditionAnalytics() {
   const billets = billetsS.data && billetsS.dataUrl === billetsUrl ? billetsS.data.totals.totalPcs : null;
   const cond = condS.data && condS.dataUrl === condUrl ? condS.data : null;
   const [open, setOpen] = useState<'rate' | 'finishing' | null>(null);
+  const [inputsOpen, setInputsOpen] = useState(false);
 
   const perHour = billets !== null && rate?.runH ? billets / rate.runH : null;
   // Route / diverter: the CR Mill stands' running status now (line 1 = M1 S1–S8, line 2 = M2 S1–S6).
@@ -92,9 +95,9 @@ export default function RmdConditionAnalytics() {
         <Panel title="Matched-run performance" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
           {['Production rate · actual vs matched', 'Energy per MT · actual vs matched'].map((k) => <Row key={k} k={k} />)}
         </Panel>
-        <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
-          {['Tariff', 'Contribution', 'Net material', 'Other conversion · actual / standard', 'Conversion cost per finished MT',
-            'Cost variance', 'Yield material variance', 'Throughput contribution opportunity'].map((k) => <Row key={k} k={k} />)}
+        <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top" right={<button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={() => setInputsOpen(true)} title="Targets and costs for the month">Edit inputs</button>}>
+          {/* No repeats of the Conversion cost, Cost variance and Output margin cards (the user, 28 Oct 2026). */}
+          {['Tariff', 'Contribution', 'Net material', 'Other conversion · actual / standard', 'Yield material variance'].map((k) => <Row key={k} k={k} />)}
         </Panel>
       </div>
 
@@ -127,6 +130,7 @@ export default function RmdConditionAnalytics() {
         loading={!condS.data && !condS.error} error={condS.error} hasData={!!cond}>
         {fin && <DrivesTable g={fin} sources={FINISHING_SOURCES} />}
       </DrillDrawer>
+      <CaInputs mill={'rmd'} open={inputsOpen} onClose={() => setInputsOpen(false)} />
     </div>
   );
 }

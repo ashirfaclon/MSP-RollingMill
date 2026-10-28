@@ -95,9 +95,10 @@ export default function AssetHealth() {
           <h2 className="ah-asset-name">HSM · {group === 'auxiliary' ? 'Auxiliary · pumps' : `${drive} drive group`}</h2>
           <Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} />
         </div>
-        {liveGroup && liveGroup.state !== 'no-data'
+        {/* Status only where there is a source (the user, 28 Oct 2026): the RM / FM drives' On_Off — none for the pumps. */}
+        {gid && (liveGroup && liveGroup.state !== 'no-data'
           ? <span className="chip chip--info ah-status">{liveGroup.stateLabel}</span>
-          : <span className="chip chip--na ah-status">Status NA</span>}
+          : <span className="chip chip--na ah-status">No live data</span>)}
         <dl className="ah-asset-facts">
           {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', pmFact.nextPm], ['Open work orders', pmFact.openWorkOrders]] as const).map(([k, v]) => (
             <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className={`num ${v ? 'v-val' : 'v-na'}`}>{v ?? 'NA'}</dd></div>

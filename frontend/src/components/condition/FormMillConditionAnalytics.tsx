@@ -12,6 +12,8 @@
  * matched-run performance too — except the mill mimic: none on LSM or RMS (the user, 23 and 26 Oct 2026).
  */
 import { useState } from 'react';
+import CaInputs from '@/components/condition/CaInputs';
+import '@/components/plan/plan.css';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
@@ -31,6 +33,7 @@ export default function FormMillConditionAnalytics({ mill }: { mill: 'lsm' | 'rm
   const rateS = useApi<FormRunningRateReport>(url);
   const rate = rateS.data && rateS.dataUrl === url ? rateS.data.totals.rateTph : null;
   const [open, setOpen] = useState(false);
+  const [inputsOpen, setInputsOpen] = useState(false);
 
   return (
     <div className="rm-viz">
@@ -58,13 +61,14 @@ export default function FormMillConditionAnalytics({ mill }: { mill: 'lsm' | 'rm
         <Panel title="Matched-run performance" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
           {['Production rate · actual vs matched', 'Energy per MT · actual vs matched'].map((k) => <Row key={k} k={k} />)}
         </Panel>
-        <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
-          {['Tariff', 'Contribution', 'Net material', 'Other conversion · actual / standard', 'Conversion cost per finished MT',
-            'Cost variance', 'Yield material variance', 'Throughput contribution opportunity'].map((k) => <Row key={k} k={k} />)}
+        <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top" right={<button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={() => setInputsOpen(true)} title="Targets and costs for the month">Edit inputs</button>}>
+          {/* No repeats of the Conversion cost, Cost variance and Output margin cards (the user, 28 Oct 2026). */}
+          {['Tariff', 'Contribution', 'Net material', 'Other conversion · actual / standard', 'Yield material variance'].map((k) => <Row key={k} k={k} />)}
         </Panel>
       </div>
 
       <FormRunningRateDrawer mill={mill} open={open} onClose={() => setOpen(false)} />
+      <CaInputs mill={mill} open={inputsOpen} onClose={() => setInputsOpen(false)} />
     </div>
   );
 }

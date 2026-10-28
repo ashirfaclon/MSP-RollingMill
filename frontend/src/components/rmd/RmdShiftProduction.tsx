@@ -17,6 +17,7 @@ import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdPlanReport } from '@/services/hsmApi';
 import { DAY_START_HOUR, dayStartIst, shiftsLabel } from '@/lib/plantDay';
 import RmdPlanDrawer, { type PlanMill, type RmdShiftView } from './RmdPlanDrawer';
+import PlanConfig from '@/components/plan/PlanConfig';
 
 export default function RmdShiftProduction({ rate, mill = 'rmd' }: { rate: ReactNode; mill?: PlanMill }) {
   const { dates } = useSelection();
@@ -26,6 +27,7 @@ export default function RmdShiftProduction({ rate, mill = 'rmd' }: { rate: React
   const t = plan?.totals ?? null;
   const [open, setOpen] = useState<RmdShiftView | null>(null);
   const [lastView, setLastView] = useState<RmdShiftView>('shift');
+  const [planOpen, setPlanOpen] = useState(false);
   // Output per shift: RMD never (the ERP has no shift); LSM / RMS when the period has any — else the whole day only.
   const shiftData = mill === 'rmd' ? false
     : plan ? (['Day', 'Night'] as const).some((n) => t?.shifts?.[n]?.actualMt != null) : null;
@@ -50,8 +52,10 @@ export default function RmdShiftProduction({ rate, mill = 'rmd' }: { rate: React
         rate={rate}
         shiftData={shiftData}
         onOpen={(v) => { setLastView(v); setOpen(v); }}
+        onEditPlan={() => setPlanOpen(true)}
       />
       <RmdPlanDrawer open={open !== null} view={open ?? lastView} onClose={() => setOpen(null)} mill={mill} />
+      <PlanConfig mill={mill} open={planOpen} onClose={() => setPlanOpen(false)} />
     </>
   );
 }

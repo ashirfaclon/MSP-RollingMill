@@ -870,7 +870,7 @@ test('RMD asset health: route drive group by default; motor current live, run ho
   // Roughing (20" / 16" R stands): no PLC, so no live status or current.
   await groups.getByRole('button', { name: 'Roughing' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Roughing drive group');
-  await expect(main.locator('.ah-status')).toHaveText('Status NA');
+  await expect(main.locator('.ah-status')).toHaveCount(0);   // no source of a status: no chip
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^NA/);
   await groups.getByRole('button', { name: 'Auxiliary' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Auxiliary · pumps');
@@ -1266,6 +1266,7 @@ test('LSM asset health: as the LSM sheet — Drive Temp form for bearings and ge
   await expect(oil.locator('.rm-card-value')).toHaveText(/^(NA|\d+\.\d)\s*in$/);
   // No mill mimic on LSM.
   await expect(main.getByText('Grouped asset mimic')).toHaveCount(0);
+  await expect(main.locator('.ah-status')).toHaveCount(0);   // no drive status in any LSM source: no chip
   await page.screenshot({ path: `${SHOTS}/lsm-asset-health.png`, fullPage: true });
   await cards.getByRole('button', { name: 'Gearbox oil', exact: true }).click();
   const d = page.getByRole('dialog', { name: 'Mill drives · bearings and gearbox oil' });
@@ -1297,7 +1298,7 @@ for (const c of [
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(0)).toHaveText(new RegExp(`^${c.rate.replace('.', '\\.')}\\s*TPH$`), { timeout: 90_000 });
   for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   await expect(main.getByText(/mimic/i)).toHaveCount(0);
-  await expect(main.locator('section.panel', { hasText: 'Costing & impact' }).locator('.num')).toHaveText(Array(8).fill('NA'));
+  await expect(main.locator('section.panel', { hasText: 'Costing & impact' }).locator('.num')).toHaveText(Array(5).fill('NA'));
   await expect(main.locator('section.panel', { hasText: 'Matched-run performance' }).locator('.num')).toHaveText(['NA', 'NA']);
   await page.screenshot({ path: `${SHOTS}/${c.mill}-condition-analytics.png`, fullPage: true });
   await cards.getByRole('button', { name: 'Actual rate', exact: true }).click();
@@ -1320,6 +1321,7 @@ test('RMS asset health: as the RMS sheet — run hours from the ERP (NET_RUNNING
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(5)).toHaveText(/^0\.0\s*%$/);
   for (const i of [1, 2, 3]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   await expect(main.getByText(/mimic/i)).toHaveCount(0);
+  await expect(main.locator('.ah-status')).toHaveCount(0);   // no drive status in any RMS source: no chip
   await page.screenshot({ path: `${SHOTS}/rms-asset-health.png`, fullPage: true });
 });
 
@@ -1369,7 +1371,7 @@ test('HSM condition analytics, September: conversion cost, material loss and cos
   const costing = main.locator('section.panel', { hasText: 'Costing & impact' });
   await expect(costing.locator('.ah-row', { hasText: 'Tariff' }).locator('.num')).toHaveText('₹5.75/kWh');
   await expect(costing.locator('.ah-row', { hasText: 'Other conversion' }).locator('.num')).toHaveText('₹1,543/MT · standard NA');
-  await expect(costing.locator('.ah-row', { hasText: 'Conversion cost per finished MT' }).locator('.num')).toHaveText('₹2,906/MT');
+  await expect(costing.locator('.ah-row')).toHaveCount(5);   // no repeats of the cards
   await expect(costing.locator('.ah-row', { hasText: 'Net material' }).locator('.num')).toHaveText('₹37,800/MT burning loss · ₹6,000/MT other losses');
   await page.screenshot({ path: `${SHOTS}/hsm-condition-analytics-sep.png`, fullPage: true });
   await cards.getByRole('button', { name: 'Conversion cost', exact: true }).click();
@@ -1443,4 +1445,49 @@ for (const c of [
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText('EQPT_PM_TRAN · TNATURE = PMREM');
   await page.waitForTimeout(600);
   await d.screenshot({ path: `${SHOTS}/${c.mill}-erp-pm-drawer.png` });
+});
+
+for (const c of [
+  // RMD: the FY plan's October, 8,220.638 MT (Prime + SL) over 31 days; HSM: the Oct 1–18 rolling plan.
+  { mill: 'rmd', total: /^8220\.\d+$/ },   // Σ the daily targets (265.18 × 31)
+  { mill: 'hsm', total: /^\d+(\.\d+)?$/ },
+] as const) test(`${c.mill.toUpperCase()}: production plan config — opens on the current plan, month total, shutdowns, Day / Night per day`, async ({ page }) => {
+  await page.goto(`/${c.mill}/visualization`);
+  await page.getByRole('button', { name: 'Edit plan' }).click();
+  const d = page.getByRole('dialog', { name: `${c.mill.toUpperCase()} · production plan` });
+  await d.getByLabel('Month', { exact: true }).fill('2026-10');
+  const table = d.getByRole('table', { name: 'Plan per day and shift' });
+  await expect(table.locator('tbody tr')).toHaveCount(31, { timeout: 60_000 });
+  await expect(d.getByLabel('Month plan (MT)')).toHaveValue(c.total);
+  await expect(table.locator('thead th')).toHaveText(['Date', 'Shutdown', 'Day (MT)', 'Night (MT)', 'Day total']);
+  // A shutdown date gets no target; the month spreads over the working days, half per shift.
+  await d.getByLabel('Month plan (MT)').fill('3000');
+  await table.getByLabel('2 Oct shutdown', { exact: true }).check();
+  await expect(d.getByLabel('Working days')).toHaveValue('30 of 31');
+  await d.getByRole('button', { name: 'Spread over working days' }).click();
+  await expect(table.getByLabel('1 Oct Day shift target', { exact: true })).toHaveValue('50');
+  await expect(table.getByLabel('2 Oct Day shift target', { exact: true })).toBeDisabled();
+  await expect(table.locator('tfoot')).toContainText('3,000.00');
+  await expect(d.getByRole('button', { name: 'Save plan' })).toBeDisabled();
+  await page.waitForTimeout(600);
+  await d.screenshot({ path: `${SHOTS}/${c.mill}-plan-config.png` });
+});
+
+for (const c of [
+  { mill: 'rmd', n: 9 },
+  { mill: 'lsm', n: 9 },
+  { mill: 'hsm', n: 6 },   // HSM's costing sheet gives actual tariff, other conversion and material values
+] as const) test(`${c.mill.toUpperCase()} condition analytics: CA inputs — the month's targets and costs, ${c.n} fields`, async ({ page }) => {
+  await page.goto(`/${c.mill}/condition-analytics`);
+  const costing = page.getByRole('main').locator('section.panel', { hasText: 'Costing & impact' });
+  await costing.getByRole('button', { name: 'Edit inputs' }).click();
+  const d = page.getByRole('dialog', { name: `${c.mill.toUpperCase()} · CA inputs` });
+  await expect(d.getByLabel('Month', { exact: true })).toBeVisible();
+  await expect(d.locator('.ck-group .ck-f')).toHaveCount(c.n);
+  await expect(d.getByRole('region', { name: 'Targets' }).locator('.ck-f > span')).toHaveText(['Benchmark running rate (MT/h)', 'Benchmark specific energy (kWh/MT)', 'Standard mass yield (%)']);
+  await d.getByLabel('Incremental contribution (₹/MT)').fill('1200');
+  await expect(d.getByLabel('Incremental contribution (₹/MT)')).toHaveValue('1200');
+  await expect(d.getByRole('button', { name: 'Save inputs' })).toBeDisabled();
+  await page.waitForTimeout(600);
+  await d.screenshot({ path: `${SHOTS}/${c.mill}-ca-inputs.png` });
 });
