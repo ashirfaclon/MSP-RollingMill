@@ -124,27 +124,27 @@ const MISSING_FLAG: Signal<boolean> = { value: null, ts: null, quality: 'missing
 export const isOpen = (e: TwinEdge, r: TwinRoute) =>
   !e.via || (r.diverters[e.via.diverterId]?.position.quality === 'good' && r.diverters[e.via.diverterId].position.value === e.via.position);
 
-/** Active path = open edges reachable from the infeed that pass only through running nodes. */
+/**
+ * Active edges: an open edge carries steel when the machine FEEDING it is measured running
+ * (the run from the infeed, when the first machine is). A stopped machine stills only its own
+ * run: a stand standing mid-line does not switch off the mill after it (the user, 30 Oct 2026 —
+ * the moving steel is the point of the drawing, and each run's own feeder is a measurement).
+ */
 export function activeEdges(r: TwinRoute): Set<string> {
   const out = new Set<string>();
-  const queue = [INFEED];
-  const seen = new Set(queue);
-  while (queue.length) {
-    const at = queue.shift()!;
-    for (const e of r.edges) {
-      if (e.from !== at || !isOpen(e, r)) continue;
-      if (e.to !== EXIT && runningOf(r.nodes[e.to]?.running ?? MISSING_FLAG) !== true) continue;
-      out.add(e.id);
-      if (!seen.has(e.to)) { seen.add(e.to); queue.push(e.to); }
-    }
+  for (const e of r.edges) {
+    if (!isOpen(e, r)) continue;
+    const feeder = e.from === INFEED ? r.nodes[e.to] : r.nodes[e.from];
+    if (runningOf(feeder?.running ?? MISSING_FLAG) === true) out.add(e.id);
   }
   return out;
 }
 
-/** Running machines the walk never reached: an inconsistency to report, not to hide. */
+/** Running machines with nothing running into them: a gap in the line, kept for the model's readers. */
 export function orphanRunning(r: TwinRoute, active: Set<string>): string[] {
-  const reached = new Set(r.edges.filter((e) => active.has(e.id)).map((e) => e.to));
-  return Object.values(r.nodes).filter((n) => runningOf(n.running) === true && !reached.has(n.id)).map((n) => n.id);
+  const fed = new Set(r.edges.filter((e) => active.has(e.id) && e.from !== INFEED).map((e) => e.to));
+  const first = new Set(r.edges.filter((e) => e.from === INFEED).map((e) => e.to));
+  return Object.values(r.nodes).filter((n) => runningOf(n.running) === true && !fed.has(n.id) && !first.has(n.id)).map((n) => n.id);
 }
 
 /** Everything a selection lights: the machine and its whole path, upstream and downstream, along open edges (spec C4). */

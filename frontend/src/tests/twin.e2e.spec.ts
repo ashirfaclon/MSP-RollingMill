@@ -51,7 +51,7 @@ test('HSM mill mimic is the process twin: table, RM1–RM5, FM1–FM6, coil on o
   await page.keyboard.press('Escape');
 });
 
-test('HSM rolling (fixture): hot bars and moving runs along the active path only; RM4 stopped mid-line = fault, downstream unfed → banner; FM6 unknown', async ({ page }) => {
+test('HSM rolling (fixture): hot bars and moving runs along the active path only; RM4 stopped mid-line = fault, downstream unfed; FM6 unknown', async ({ page }) => {
   await serveHsm(page, 'rolling');
   await page.goto('/hsm/visualization');
   const panel = panelOf(page);
@@ -60,10 +60,11 @@ test('HSM rolling (fixture): hot bars and moving runs along the active path only
   await expect(panel.locator('.panel-sub')).toHaveText('9 of 11 stands on');
   await expect(twin.locator('image.mx-sprite--dark[href="/twin/stand-hot-dark.png"]')).toHaveCount(9);
   await expect(twin.locator('.mx-lamp--running')).toHaveCount(9);
-  // The active path stops at RM3: RM4 is not running, so nothing past it is fed — three moving runs, and the banner.
-  await expect(twin.locator('.mx-pipe--active')).toHaveCount(3);
-  await expect(twin.locator('.mx-pipe-flow')).toHaveCount(3);
-  await expect(twin.locator('.mx-banner')).toHaveText('Route inconsistent: RM5, FM1, FM2, FM3, FM4, FM5 running with no feed path.');
+  // A run moves when its feeder runs: ten moving runs; RM4's own run and FM6's are still.
+  await expect(twin.locator('.mx-pipe--active')).toHaveCount(10);
+  await expect(twin.locator('.mx-pipe-flow')).toHaveCount(10);
+  await expect(twin.locator('.mx-pipe[data-k="r:RM_04>RM_05"]')).toHaveClass(/mx-pipe--idle/);
+  await expect(twin.locator('.mx-banner')).toHaveCount(0);   // no sentence: the idle runs say it
   const rm4 = twin.locator('.mx-node', { hasText: 'RM4' });
   await expect(rm4.locator('image.mx-sprite--dark')).toHaveClass(/is-fault/);
   await expect(rm4.locator('.mx-lamp')).toHaveClass(/mx-lamp--fault/);
@@ -97,13 +98,11 @@ test('HSM one stale stand (fixture): only FM3 greys out, with its age; its run h
   const fm3 = twin.locator('.mx-node', { hasText: 'FM3' });
   await expect(fm3.locator('.mx-read')).toHaveClass(/mx-read--stale/, { timeout: 60_000 });
   await expect(fm3.locator('.mx-read')).toContainText('1,050');
-  await expect(fm3.locator('.mx-read-age')).toHaveText(' · 20m');
+  await expect(fm3.locator('.mx-sub.mx-read--stale')).toHaveText('20M OLD');
   await expect(fm3.locator('.mx-lamp')).toHaveClass(/mx-lamp--unknown/);
   await expect(twin.locator('.mx-node', { hasText: 'FM2' }).locator('.mx-read')).not.toHaveClass(/mx-read--stale/);
   await expect(twin.locator('.mx-pipe[data-k="r:FM_03>FM_04"] .mx-pipe-flow')).toHaveCount(0);
-  await expect(panel.locator('.chip')).toHaveText('Live · 1 stale');
-  await panel.locator('.chip').click();
-  await expect(panel.getByRole('dialog', { name: 'Signals not good' })).toContainText('FM3');
+  await expect(panel.locator('.chip')).toHaveText(/^Live · \d\d:\d\d IST$/);
 });
 
 test('RMD mill mimic is the process twin: one infeed, two rows in the dashboard\'s order, one exit; a station opens its zone', async ({ page }) => {
@@ -130,23 +129,23 @@ test('RMD mill mimic is the process twin: one infeed, two rows in the dashboard\
   await page.keyboard.press('Escape');
 });
 
-test('RMD the 01:38 case (fixture): line 2 stands carry the steel, line 1 finishing runs with no feed path → banner; FS at −4 A is doubtful, never green', async ({ page }) => {
+test('RMD the 01:38 case (fixture): line 2 stands carry the steel, line 1 finishing runs with no feed path; FS at −4 A is doubtful, never green', async ({ page }) => {
   await serveRmd(page, 'liveCrossover');
   await page.goto('/rmd/visualization');
   const panel = panelOf(page);
   const twin = panel.getByRole('img', { name: /^RMD mill/ });
-  await expect(twin.locator('.mx-banner')).toHaveText('Route inconsistent: FS, PRI, PR2, TB1, TB2 running with no feed path.', { timeout: 60_000 });
+  await expect(twin.locator('.mx-pipe[data-k="r:L1_S8>L1_FS"]')).toHaveClass(/mx-pipe--idle/, { timeout: 60_000 });   // no feed path into FS: idle, no sentence
   await expect(twin.locator('.mx-group')).toHaveText(['Line 1 · Route / diverter · 0 of 8 on', 'Line 1 · Finishing · 5 of 5 on', 'Line 2 · Route / diverter · 6 of 6 on', 'Line 2 · Finishing · 0 of 5 on']);
-  // Six moving runs: the fork into line 2's S1 and S1 → … → S6; the run on to CS is idle.
-  await expect(twin.locator('.mx-pipe--active')).toHaveCount(6);
-  await expect(twin.locator('.mx-pipe[data-k="r:L2_S6>L2_CS_On_Off"]')).toHaveClass(/mx-pipe--idle/);
+  // Line 2: the fork and S1 → … → S6 → CS move (7); line 1's finishing moves its five; S8 → FS is still.
+  await expect(twin.locator('.mx-pipe--active')).toHaveCount(12);
+  await expect(twin.locator('.mx-pipe[data-k="r:L2_S6>L2_CS_On_Off"]')).toHaveClass(/mx-pipe--active/);
   const fs = twin.locator('.mx-node', { hasText: 'FS' });
   await expect(fs.locator('.mx-read')).toHaveText(/^-4 \? A$/);
   await expect(fs.locator('.mx-read')).toHaveClass(/mx-read--suspect/);
   await expect(fs.locator('.mx-lamp')).toHaveClass(/mx-lamp--warning/);
   await expect(fs.locator('.mx-bar')).toHaveCount(0);
   await expect(twin.locator('.mx-sub', { hasText: /^LINE 2 SPEED/ })).toHaveText('LINE 2 SPEED 18.4 M/S');
-  await expect(panel.locator('.chip')).toHaveText('Live · 1 doubtful');
+  await expect(panel.locator('.chip')).toHaveText(/^Live · \d\d:\d\d IST$/);
   // Selecting PRI lights its whole path: infeed … FS, PRI, PR2, TB1, TB2 … exit — not line 2.
   await twin.locator('.mx-node', { hasText: 'PRI' }).click();
   await expect(twin.locator('.mx-select')).toHaveCount(1);
@@ -195,10 +194,10 @@ for (const c of CASES) test(`fixture ${c.mill}/${c.id} draws with no two labels 
   }
 });
 
-test('allNull shows one empty-state line and nothing animates; under reduced motion nothing moves', async ({ page }) => {
+test('allNull: NA everywhere and nothing animates; under reduced motion nothing moves', async ({ page }) => {
   await page.goto('/twin/fixtures?mill=hsm&id=allNull');
   const twin = page.getByRole('img', { name: /mill:/ });
-  await expect(twin.locator('text', { hasText: 'NO LIVE DATA FROM THE HISTORIAN' })).toHaveCount(1);
+  await expect(twin.locator('.mx-read', { hasText: 'NA' })).toHaveCount(11 + 1);   // every stand and the infeed; no sentence
   await expect(twin.locator('.mx-pipe-flow')).toHaveCount(0);
   // Reduced motion: the rolling fixture keeps its weight but nothing animates.
   await page.emulateMedia({ reducedMotion: 'reduce' });

@@ -136,7 +136,7 @@ export function Readout({ cx, y, signal, spec, now, unit, dp = 0, small, anchor 
     <text className={`mx-read${small ? ' mx-read--sm' : ''}${na ? ' is-na' : ''} mx-read--${r.quality}${accumulated ? ' mx-read--total' : ''}`} x={cx} y={y} textAnchor={anchor}>
       {r.text}
       {!na && unit && text === undefined && <tspan className="mx-read-unit"> {unit}</tspan>}
-      {r.suffix && <tspan className="mx-read-age">{r.suffix}</tspan>}
+
     </text>
   );
 }

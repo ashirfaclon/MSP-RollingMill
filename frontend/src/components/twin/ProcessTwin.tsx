@@ -9,7 +9,8 @@
  * WHAT MOVES IS MEASURED. A run moves only when it is on the ACTIVE PATH — open edges
  * reachable from the infeed through machines that report running — at the measured speed of
  * the machine feeding it; an idle branch recedes; a running machine the path never reaches
- * puts the amber banner up rather than being explained away.
+ * is drawn as it is — running, with the runs into it idle — not explained away (no banner text:
+ * the user, 30 Oct 2026).
  *
  * LANES (spec C5), fixed heights, nothing shares one:
  *   header 14 → name 14 → machine band → reading 16 → ref bar 6 → row meta 12
@@ -20,7 +21,7 @@
  * so a one-stand row or a two-line mill draws from the same code, and the pass line never steps.
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { good, periodLabel, readingText } from './signal';
+import { ageOf, good, periodLabel, readingText } from './signal';
 import { EXIT, INFEED, litSet, type TwinModel, type TwinNode, type TwinRow } from './twinModel';
 import { Sprite } from './twinArt';
 import { Lamp, Readout, RefBar, Run, SelectRing, TwinDefs, flowOf, nozzle, spriteBox, spriteMetres, type Box, type RunState } from './twinDraw';
@@ -32,7 +33,7 @@ import './twin.css';
 const VB_W = 1151;
 const PAD = 16;
 /** Lanes, px. */
-const LANE = { header: 14, name: 14, reading: 16, bar: 6, meta: 12, rowGap: 18, banner: 22 };
+const LANE = { header: 14, name: 14, reading: 16, bar: 6, meta: 12, rowGap: 18 };
 /** Between machines, and between a row's sections. */
 const GAP = { machine: 8, section: 30, endRun: 24 };
 /** A header's width: the .mx-group face is ~6.1 px a character at 9.5 px plus 1.2 px tracking. */
@@ -117,8 +118,7 @@ function layout(m: TwinModel): Layout {
     });
     return { row: r, top, floor, sections, machines };
   });
-  /* The banner lane is always reserved, so the panel does not jump when a route inconsistency appears. */
-  const h = (plans.length ? plans[plans.length - 1].top + rowH + PAD / 2 : rowH + PAD) + LANE.banner;
+  const h = plans.length ? plans[plans.length - 1].top + rowH + PAD / 2 : rowH + PAD;
   /* The ends stand on the middle row's floor (one row: the same floor, one straight line). */
   const midFloor = plans.length ? (plans[0].floor + plans[plans.length - 1].floor) / 2 : h / 2;
   const infeed = spriteBox(END.infeed, PAD + infeedW / 2, midFloor, pxPerM);
@@ -201,11 +201,6 @@ export default function ProcessTwin({ model, onOpen, selected, onSelect }: {
     return <Run key={e.id} k={e.id} on={isOn(e.id)} state={runState(e.id)} d={runPath(from, to, via)} flow={flowOf(speed, load ?? speed)} />;
   });
 
-  const banner = model.orphans.length
-    ? `Route inconsistent: ${model.orphans.map((id) => model.route.nodes[id].name).join(', ')} running with no feed path.`
-    : null;
-  const allNull = model.totals.total > 0 && Object.values(model.route.nodes).every((n) => n.running.quality === 'missing');
-  const nothing = model.totals.total === 0;
 
   return (
     <div className={`mx-host${sel !== null ? ' is-sel' : ''}`} style={{ aspectRatio: VB_W / L.h }}
@@ -251,7 +246,7 @@ export default function ProcessTwin({ model, onOpen, selected, onSelect }: {
             {rp.row.speed && rp.sections[0] && (() => {
               const r = readingText(rp.row.speed.signal, rp.row.speed.spec, model.now, rp.row.speed.dp);
               return (
-                <text className={`mx-sub${r.quality === 'suspect' ? ' mx-read--suspect' : ''}`} x={rp.sections[0].x0} y={rp.floor + LANE.reading + LANE.bar + LANE.meta - 2} textAnchor="start">
+                <text className={`mx-sub${r.quality === 'suspect' ? ' mx-read--suspect' : ''}`} x={rp.sections[0].x0 - 10} y={rp.top + 11} textAnchor="end">
                   {rp.row.label.toUpperCase()} SPEED {r.text.toUpperCase()}{r.quality === 'missing' ? '' : ` ${rp.row.speed.unit.toUpperCase()}`}{r.suffix.toUpperCase()}
                 </text>
               );
@@ -268,6 +263,11 @@ export default function ProcessTwin({ model, onOpen, selected, onSelect }: {
                   <Readout cx={b.cx} y={readY} signal={n.current} spec={CURRENT} now={model.now} unit="A" small
                     text={n.running.quality === 'missing' ? 'NA' : stopped || (n.state === 'fault' && n.running.value === false) ? 'Off' : undefined} />
                   <RefBar cx={b.cx} y={rp.floor + LANE.reading + 1} load={n.load} tone={n.tone} quality={n.current.quality} />
+                  {(n.current.quality === 'stale' || n.running.quality === 'stale') && (
+                    <text className="mx-sub mx-read--stale" x={b.cx} y={rp.floor + LANE.reading + LANE.bar + LANE.meta - 2} textAnchor="middle">
+                      {ageOf(n.current.ts ?? n.running.ts, model.now).toUpperCase()} OLD
+                    </text>
+                  )}
                   {selected === n.id && <SelectRing b={b} />}
                 </g>
               );
@@ -291,16 +291,6 @@ export default function ProcessTwin({ model, onOpen, selected, onSelect }: {
           );
         })()}
 
-        {/* The one empty-state line (spec §6 allNull), and the route banner (spec C1). */}
-        {(nothing || allNull) && (
-          <text className="mx-sub" x={VB_W / 2} y={L.h / 2 - 24} textAnchor="middle">NO LIVE DATA FROM THE HISTORIAN</text>
-        )}
-        {banner && (
-          <g role="status" aria-label={banner}>
-            <rect className="mx-banner-box" x={VB_W / 2 - 230} y={L.h - 19} width={460} height={16} rx={3} />
-            <text className="mx-banner" x={VB_W / 2} y={L.h - 7.5} textAnchor="middle">{banner}</text>
-          </g>
-        )}
       </svg>
       {selected !== null && (
         <button type="button" className="mx-clear" onClick={(e) => { e.stopPropagation(); onSelect(null); }}>Clear selection</button>

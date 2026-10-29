@@ -38,23 +38,27 @@ describe('signal quality', () => {
 });
 
 describe('route', () => {
-  test('HSM rolling: the path runs from the infeed through every running stand; RM4 stops it short of RM5 → RM5 is an orphan', () => {
+  test('HSM rolling: a run moves when its feeder runs; RM4 stopped stills only its own run; RM5 has nothing running into it', () => {
     const m = hsmTwinModel(HSM_FIXTURES.rolling, 1000, NOW);
     expect(m.active.has(runKey('infeed', 'RM_01'))).toBe(true);
-    expect(m.active.has(runKey('RM_03', 'RM_04'))).toBe(false);
-    expect(m.orphans).toEqual(['RM_05', 'FM_01', 'FM_02', 'FM_03', 'FM_04', 'FM_05']);
+    expect(m.active.has(runKey('RM_03', 'RM_04'))).toBe(true);
+    expect(m.active.has(runKey('RM_04', 'RM_05'))).toBe(false);
+    expect(m.active.has(runKey('RM_05', 'FM_01'))).toBe(true);
+    expect(m.active.has(runKey('FM_06', 'exit'))).toBe(false);
+    expect(m.orphans).toEqual(['RM_05']);
     expect(m.route.nodes.RM_04).toMatchObject({ state: 'fault', tone: 'risk', load: null, speed: null });
     expect(m.route.nodes.FM_06).toMatchObject({ state: 'unknown' });
     expect(m.route.nodes.RM_02.load).toBeCloseTo(1);           // the section's highest current
     expect(m.route.nodes.RM_02.refKind).toBe('section-max');
   });
-  test('the 01:38 case: line 1 finishing running with no feed path → banner; line 2 stands active', () => {
+  test('the 01:38 case: line 2 stands and line 1 finishing each move their own runs; FS has nothing running into it', () => {
     const f = RMD_FIXTURES.liveCrossover;
     const m = rmdTwinModel(f.live, f.mps, 2000, NOW);
     expect(m.active.has(runKey('infeed', 'L2_S1'))).toBe(true);
-    expect(m.active.has(runKey('L2_S5', 'L2_S6'))).toBe(true);
-    expect(m.active.has(runKey('L2_S6', 'L2_CS_On_Off'))).toBe(false);
-    expect(m.orphans).toEqual(['L1_FS', 'L1_PRI', 'L1_PR2', 'L1_TB1', 'L1_TB2']);
+    expect(m.active.has(runKey('L2_S6', 'L2_CS_On_Off'))).toBe(true);
+    expect(m.active.has(runKey('L1_S8', 'L1_FS'))).toBe(false);
+    expect(m.active.has(runKey('L1_FS', 'L1_PRI'))).toBe(true);
+    expect(m.orphans).toEqual(['L1_FS']);
     expect(orphanRunning(m.route, activeEdges(m.route))).toEqual(m.orphans);
     // FS at −4 A: suspect, a warning, never a plain good reading.
     expect(m.route.nodes.L1_FS).toMatchObject({ state: 'warning', tone: 'warn' });
