@@ -13,7 +13,7 @@
  *                      group's stands at their latest readings; the drill-down shows amps and %.
  *   Run hours          ERP log sheet NET_RUNNING_HRS over the period (whole mill).
  *   Mimic, status   the Visualization mimic's Influx tags (the user, 26 Oct 2026): billets since
- *                      06:00, RM / FM drives on (On_Off), the production counter for the period.
+ *                      08:00, RM / FM drives on (On_Off), the production counter for the period.
  * The stand name places a reading in its group (RM → roughing, FM → finishing). The drive group is
  * chosen in the header (the user, 28 Oct 2026) — roughing, finishing, auxiliary (MID's pumps); the
  * mimic only shows the live state. Vibration from MID. No PM items: HSM's equipment is not in the
@@ -149,7 +149,7 @@ export default function AssetHealth() {
                       <span className={`rm-zone-value num ${value === 'NA' ? 'v-na' : 'v-val'}`}>{value}</span>
                       {sg && value !== 'NA' && <StandDots stands={mimic.stands(sg)} />}
                     </span>
-                    <span className="rm-zone-foot">{g === 'Billet infeed' ? 'Today · since 06:00 IST' : ' '}</span>
+                    <span className="rm-zone-foot">{g === 'Billet infeed' ? 'Today · since 08:00 IST' : ' '}</span>
                   </div>
                 </li>
               </Fragment>

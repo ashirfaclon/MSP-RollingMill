@@ -6,12 +6,12 @@
  *
  *     counter just before the reset − counter when the event started
  *
- * An event starts at the plant day's 06:00 (counter as it stood then) or at a reset (from
+ * An event starts at the plant day's 08:00 (counter as it stood then) or at a reset (from
  * 0 — so anything already on the counter at the first reading after a reset is counted).
- * The last event of a day ends at the next 06:00, or at the latest reading while the day
+ * The last event of a day ends at the next 08:00, or at the latest reading while the day
  * is still running. A plant day's production is the total of its events.
  *
- * Why not "counter at day end − counter at day start": the counter is not reset at 06:00,
+ * Why not "counter at day end − counter at day start": the counter is not reset at 08:00,
  * so that difference subtracts yesterday's running total and goes negative on reset days.
  */
 import type { Env } from '../../config/env';
@@ -19,7 +19,10 @@ import { MSG } from '../../shared/messages';
 import { FRESH_MS, collect, esc, fluxTime, queryApi } from '../../integrations/influx';
 import { historianConfigured } from '../../integrations/historian/client';
 import type { TagDef } from '../../integrations/historian/tags';
-import { DAY_MS, plantDayStart, type Increment } from './production.service';
+import { DAY_MS, PLANT_DAY_START_HOUR, plantDayStart, type Increment } from './production.service';
+
+/** The plant-day boundary as a UTC offset for Flux windows (08:00 IST = 02:30 UTC = 150m); read at query time. */
+const dayOffsetMin = () => (((PLANT_DAY_START_HOUR * 60 - 330) % 1440) + 1440) % 1440;
 import type { CounterEventEnd, CounterEventStart } from '../../contracts';
 
 const H_MS = 3_600_000;
@@ -37,7 +40,7 @@ export interface CounterEventsRead {
   connection: 'up' | 'down';
   message: string;
   resets: Reset[];
-  /** Counter as it stood at each plant-day boundary (06:00 IST), keyed by that instant. */
+  /** Counter as it stood at each plant-day boundary (08:00 IST), keyed by that instant. */
   atBoundary: Map<number, number>;
   first: { t: number; v: number } | null;
   last: { t: number; v: number } | null;
@@ -61,7 +64,7 @@ export interface CounterEvent {
 
 /**
  * Three small queries: the resets (each drop with the value before and after), the
- * counter at every 06:00 IST boundary, and the first/last reading for coverage.
+ * counter at every 08:00 IST boundary, and the first/last reading for coverage.
  */
 export async function readCounterEvents(env: Env, t: TagDef, fromMs: number, toMs: number): Promise<CounterEventsRead> {
   const none = { resets: [], atBoundary: new Map<number, number>(), first: null, last: null };
@@ -79,10 +82,10 @@ export async function readCounterEvents(env: Env, t: TagDef, fromMs: number, toM
   |> difference()
   |> filter(fn: (r) => r._value < 0.0)
   |> keep(columns: ["_time", "_value", "v"])`),
-      // Last reading of each 06:00 → 06:00 IST window, stamped at the window's end (offset
-      // 30 m: UTC midnight + 00:30 = 06:00 IST).
+      // Last reading of each plant-day window (08:00 → 08:00 IST), stamped at the window's end
+      // (offset: the boundary in UTC — 08:00 IST = 02:30 UTC).
       collect<{ _time: string; _value: number }>(q, `${sel(fromMs - DAY_MS)}
-  |> aggregateWindow(every: 1d, offset: 30m, fn: last, createEmpty: false)
+  |> aggregateWindow(every: 1d, offset: ${dayOffsetMin()}m, fn: last, createEmpty: false)
   |> keep(columns: ["_time", "_value"])`),
       collect<{ _time: string; _value: number }>(q, `${sel(fromMs - H_MS)} |> first() |> keep(columns: ["_time", "_value"])`),
       collect<{ _time: string; _value: number }>(q, `${sel(fromMs - H_MS)} |> last() |> keep(columns: ["_time", "_value"])`),
@@ -128,7 +131,7 @@ export function counterEvents(
       curT = r.t; cur = 0; startedBy = 'reset';           // a new event counts from 0
     }
     // Still running (today), or the feed stopped mid-day: end at the latest reading. A day
-    // whose last reading is seconds before its 06:00 end, and that 06:00 has passed, is complete.
+    // whose last reading is seconds before its 08:00 end, and that 08:00 has passed, is complete.
     const running = e > nowMs || c.last.t < e - FRESH_MS;
     const endValue = running ? c.last.v : c.atBoundary.get(e) ?? c.last.v;
     out.push(piece(date, curT, running ? c.last.t : e, cur, endValue, startedBy, running ? 'latest reading' : 'day end'));

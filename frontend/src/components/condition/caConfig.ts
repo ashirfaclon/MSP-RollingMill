@@ -2,8 +2,8 @@
  * Condition Analytics inputs (the user, 28 Oct 2026): the targets and costs no system gives, typed in
  * once a month per mill — one target per month, not per size (the user). The same list is the form
  * spec (CA Inputs Form Spec.xlsx): each field a column of the logbook form the dashboard saves to.
- * HSM's costing sheet already gives its actual tariff, other conversion and material values, so HSM
- * asks only for the rest.
+ * The same nine fields for every mill, HSM included: the config replaces the plant's Excel sheets
+ * (the user, 29 Oct 2026).
  */
 export type CaMill = 'hsm' | 'rmd' | 'lsm' | 'rms';
 export type CaGroup = 'Targets' | 'Costs';
@@ -18,7 +18,6 @@ export interface CaField {
 }
 
 const ALL: CaMill[] = ['hsm', 'rmd', 'lsm', 'rms'];
-const NOT_HSM: CaMill[] = ['rmd', 'lsm', 'rms'];
 
 export const CA_FIELDS: CaField[] = [
   { key: 'benchmarkRateTph', label: 'Benchmark running rate (MT/h)', group: 'Targets', mills: ALL,
@@ -27,15 +26,15 @@ export const CA_FIELDS: CaField[] = [
     feeds: 'Matched energy per MT, standard conversion cost' },
   { key: 'standardYieldPct', label: 'Standard mass yield (%)', group: 'Targets', mills: ALL,
     feeds: 'Yield material loss and variance' },
-  { key: 'tariffActual', label: 'Electricity tariff · actual (₹/kWh)', group: 'Costs', mills: NOT_HSM,
+  { key: 'tariffActual', label: 'Electricity tariff · actual (₹/kWh)', group: 'Costs', mills: ALL,
     feeds: 'Conversion cost, cost variance (tariff)' },
   { key: 'tariffStandard', label: 'Electricity tariff · standard (₹/kWh)', group: 'Costs', mills: ALL,
     feeds: 'Standard conversion cost, cost variance' },
-  { key: 'otherConversionActualRs', label: 'Other conversion cost · actual, month (₹)', group: 'Costs', mills: NOT_HSM,
+  { key: 'otherConversionActualRs', label: 'Other conversion cost · actual, month (₹)', group: 'Costs', mills: ALL,
     feeds: 'Conversion cost (non-power)' },
   { key: 'otherConversionStandard', label: 'Other conversion cost · standard (₹/MT)', group: 'Costs', mills: ALL,
     feeds: 'Standard conversion cost, cost variance' },
-  { key: 'netMaterialPerMt', label: 'Net material value (₹/MT)', group: 'Costs', mills: NOT_HSM,
+  { key: 'netMaterialPerMt', label: 'Net material value (₹/MT)', group: 'Costs', mills: ALL,
     feeds: 'Yield material loss and variance' },
   { key: 'contributionPerMt', label: 'Incremental contribution (₹/MT)', group: 'Costs', mills: ALL,
     feeds: 'Output margin' },

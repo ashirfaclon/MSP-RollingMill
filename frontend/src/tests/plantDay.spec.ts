@@ -1,5 +1,5 @@
 /**
- * The plant day: a date is 06:00 IST → 06:00 IST next day, never midnight to midnight.
+ * The plant day: a date is 08:00 IST → 08:00 IST next day, never midnight to midnight.
  */
 import { test, expect } from '@playwright/test';
 import { cycleLabel, dayCount, plantDate, plantDayStartMs, shiftsLabel } from '@/lib/plantDay';
@@ -7,16 +7,16 @@ import { presetDates } from '@/state/globalSel';
 
 const at = (d: string, hhmm: string) => Date.parse(`${d}T${hhmm}:00+05:30`);
 
-test('selecting 24 Sep means 24 Sep 06:00 → 25 Sep 06:00', () => {
-  expect(plantDayStartMs('2026-09-24')).toBe(at('2026-09-24', '06:00'));
-  expect(cycleLabel('2026-09-24', '2026-09-24')).toBe('24 Sep 06:00 IST → 25 Sep 06:00 IST');
-  expect(cycleLabel('2026-09-22', '2026-09-28')).toBe('22 Sep 06:00 IST → 29 Sep 06:00 IST');
+test('selecting 24 Sep means 24 Sep 08:00 → 25 Sep 08:00', () => {
+  expect(plantDayStartMs('2026-09-24')).toBe(at('2026-09-24', '08:00'));
+  expect(cycleLabel('2026-09-24', '2026-09-24')).toBe('24 Sep 08:00 IST → 25 Sep 08:00 IST');
+  expect(cycleLabel('2026-09-22', '2026-09-28')).toBe('22 Sep 08:00 IST → 29 Sep 08:00 IST');
   expect(dayCount('2026-09-22', '2026-09-28')).toBe(7);
 });
 
-test('an instant before 06:00 belongs to the previous plant date', () => {
-  expect(plantDate(at('2026-09-25', '05:59'))).toBe('2026-09-24');
-  expect(plantDate(at('2026-09-25', '06:00'))).toBe('2026-09-25');
+test('an instant before 08:00 belongs to the previous plant date', () => {
+  expect(plantDate(at('2026-09-25', '07:59'))).toBe('2026-09-24');
+  expect(plantDate(at('2026-09-25', '08:00'))).toBe('2026-09-25');
   expect(plantDate(at('2026-09-25', '23:59'))).toBe('2026-09-25');
 });
 

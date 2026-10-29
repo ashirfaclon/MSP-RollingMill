@@ -6,7 +6,7 @@
  *     noise removed — production.ts);
  *   – running hours: from the Dicharged_Billet counter. The mill is running while billets
  *     keep leaving the furnace less than RUN_GAP_MS apart; a longer gap is a stop. Each
- *     gap of at most RUN_GAP_MS counts as running time, split at 06:00 into plant days.
+ *     gap of at most RUN_GAP_MS counts as running time, split at 08:00 into plant days.
  *
  * Checked 6 Oct 2026 against the hours operators enter in the ERP log sheet
  * (NET_RUNNING_HRS): 23 Sep 7.7 vs 7.70, 24 Sep 8.5 vs 8.36, 25 Sep 5.3 vs 5.55. The ERP
@@ -32,7 +32,7 @@ export const RUN_GAP_MS = 10 * 60_000;
 export interface Run { date: string; start: number; end: number; billets: number }
 
 /**
- * Runs from billet-counter increases. Pure. A run is cut at each day start (HSM 06:00; RMD
+ * Runs from billet-counter increases. Pure. A run is cut at each day start (HSM 08:00; RMD
  * passes 08:00) so every piece belongs to one plant day; a lone billet with no neighbour
  * within the gap adds no time.
  */
@@ -103,7 +103,7 @@ async function compute(env: Env, from: string, to: string, grain: Grain, nowMs: 
   const dates = dateRange(from, to);
   const fromMs = plantDayStart(from);
   const toMs = Math.min(plantDayStart(to) + DAY_MS, nowMs);
-  // Read a gap early so a run already going at the first 06:00 is counted from 06:00.
+  // Read a gap early so a run already going at the first 08:00 is counted from 08:00.
   const [prod, billets] = await Promise.all([
     productionComparison(env, from, to, 'day', nowMs),
     readCounter(env, HSM_DISCHARGED_BILLET, fromMs - RUN_GAP_MS, toMs),

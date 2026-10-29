@@ -32,7 +32,7 @@ async function pickWeek(page: Page) {
   await page.goto('/hsm/visualization');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
-  // Plant dates 22 → 28 Sep = 22 Sep 06:00 → 29 Sep 06:00.
+  // Plant dates 22 → 28 Sep = 22 Sep 08:00 → 29 Sep 08:00.
   await dialog.getByLabel('Start Date').fill('2026-09-22');
   await dialog.getByLabel('End Date').fill('2026-09-28');
   await dialog.getByRole('button', { name: 'Apply' }).click();
@@ -49,16 +49,16 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   await pickWeek(page);
   // Before rejection, both sides. ERP: PRODUCTION_MT 1,076.51 ÷ INPUT_MT 1,121.34 = 96.00 %.
   await expect(yieldCard.locator('.rm-card-pair-item').nth(0)).toContainText('96.0');
-  // Influx: net output 1,096.25 (counter 1,141.08 − by-products 44.83) ÷ input 1,138.38 = 96.30 %.
+  // Influx: net output 1,095.45 (counter 1,140.28 − by-products 44.83) ÷ input 1,137.57 = 96.30 %.
   await expect(yieldCard.locator('.rm-card-pair-item').nth(1)).toContainText('96.3');
   // ERP entered and losses booked for all 7 days: the note is Influx − ERP, 96.30 − 96.00.
   await expect(yieldCard.locator('.rm-card-note')).toHaveText('Delta 0.3 %');
   // Finished exit = the Production card's Influx figure: Σ Total_Production_Ton increases, 22–28 Sep.
   const exit = page.getByRole('button', { name: /Finished exit/ });
-  await expect(exit).toContainText('1,141.1 MT');
+  await expect(exit).toContainText('1,140.3 MT');
   // Order allocation: the production total only — no Made To Order / Made To Stock split.
   const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
-  await expect(split.locator('.rm-alloc-total')).toHaveText('1,141.1 MT');
+  await expect(split.locator('.rm-alloc-total')).toHaveText('1,140.3 MT');
   await expect(split).not.toContainText('Made To');
   await expect(page.getByRole('region', { name: 'Headline KPIs' }).locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/]);
 
@@ -105,7 +105,7 @@ test('mass yield drawer: ERP and Influx on the dashboard period — totals, two 
   // The dashboard's period, no other to choose from.
   await expect(drawer.getByRole('group', { name: 'Period' })).toHaveCount(0);
 
-  // ERP 1,076.51 ÷ 1,121.34 = 96.00 %; Influx (1,141.08 − 44.83) ÷ 1,138.38 = 96.30 %; delta 0.30.
+  // ERP 1,076.51 ÷ 1,121.34 = 96.00 %; Influx (1,140.28 − 44.83) ÷ 1,137.57 = 96.30 %; delta 0.30.
   const stats = drawer.locator('.pd-stats');
   for (const v of ['96.00', '96.30', '0.30']) await expect(stats).toContainText(v);
   const table = drawer.getByRole('table', { name: 'Mass yield by period' });
@@ -157,8 +157,9 @@ test('billets drawer: ERP input pieces against the Dicharged_Billet counter', as
   const drawer = page.getByRole('dialog', { name: 'Billets · ERP vs Influx' });
   await expect(drawer).toBeVisible();
   const row = drawer.getByRole('table', { name: 'Billets by period' }).getByRole('row', { name: /^22 Sep\b/ });
+  // 22 Sep (08:00 → 08:00): ERP 303 billets, the counter 303.
   await expect(row).toContainText('303');
-  await expect(row).toContainText('302');
+  await expect(row).not.toContainText('302');
   await page.waitForTimeout(700);
   await drawer.screenshot({ path: `${SHOTS}/drill-billets.png` });
 });
@@ -264,15 +265,15 @@ test('finished stock: ERP stock ledger to the period end — the drawer from Ord
 
 test('running rate: Influx production ÷ running hours from billets, ERP rate beside it', async ({ page }) => {
   await pickWeek(page);
-  // 22–28 Sep: 1,141.08 MT over 52.12 running hours = 21.89 TPH.
+  // 22–28 Sep (08:00 → 08:00): 1,140.28 MT over 51.97 running hours = 21.94 TPH.
   const btn = page.getByRole('button', { name: /Running rate/ });
-  await expect(btn).toContainText('21.89 TPH');
+  await expect(btn).toContainText('21.94 TPH');
   await btn.click();
   const drawer = page.getByRole('dialog', { name: 'Running rate · ERP vs Influx' });
   await expect(drawer.getByRole('group', { name: 'Period' })).toHaveCount(0);
   const table = drawer.getByRole('table', { name: 'Running rate by period' });
   await expect(table.locator('thead th')).toHaveText(['Period', 'ERP (TPH)', 'Influx (TPH)', 'Delta (TPH)']);
-  await expect(table.locator('tfoot')).toContainText('21.89');
+  await expect(table.locator('tfoot')).toContainText('21.94');
   await expect(table.locator('tbody tr')).toHaveCount(7);
   // The runs list and the extra ERP columns are gone.
   await expect(drawer.getByRole('table', { name: 'Mill runs' })).toHaveCount(0);
@@ -289,8 +290,8 @@ test('power consumption: the logbook form summed by the date entered, entry by e
   // 22–28 Sep: Σ POWER_CONSUMED of all 62 entries of "Electrical HSM → Power Consumption" = 174,916.99 kWh.
   const card = page.getByRole('button', { name: 'Power consumption', exact: true });
   await expect(card.locator('.rm-card-value')).toContainText('174.92', { timeout: 60_000 });
-  // Specific energy = 174,916.99 kWh ÷ 1,141.08 MT (the Production card's Total) = 153.29 kWh/MT.
-  await expect(page.getByRole('button', { name: 'Specific energy', exact: true }).locator('.rm-card-value')).toContainText('153.3');
+  // Specific energy = 174,916.99 kWh ÷ 1,140.28 MT (the Production card's Total) = 153.40 kWh/MT.
+  await expect(page.getByRole('button', { name: 'Specific energy', exact: true }).locator('.rm-card-value')).toContainText('153.4');
   await card.click();
   const drawer = page.getByRole('dialog', { name: 'Power consumption · logbook' });
   // Seven days: grouped by day.
@@ -326,10 +327,10 @@ test('power consumption: the logbook form summed by the date entered, entry by e
   // Specific energy opens its own drawer: power ÷ Influx production.
   await page.getByRole('button', { name: 'Specific energy', exact: true }).click();
   const se = page.getByRole('dialog', { name: 'Specific energy · power ÷ production' });
-  await expect(se.locator('.pd-stats')).toContainText('153.3');
+  await expect(se.locator('.pd-stats')).toContainText('153.4');
   // One line: no legend to toggle.
   await expect(se.getByRole('group', { name: 'Show or hide series' })).toHaveCount(0);
-  await expect(se.getByRole('table', { name: 'Specific energy by period' }).locator('tfoot')).toContainText('1,141.1');
+  await expect(se.getByRole('table', { name: 'Specific energy by period' }).locator('tfoot')).toContainText('1,140.3');
   await expect(se.getByRole('region', { name: 'Formula' })).toContainText('Specific energy = Power (kWh) ÷ Influx production (MT)');
   await page.waitForTimeout(700);
   await se.screenshot({ path: `${SHOTS}/drill-specific-energy.png` });
@@ -347,15 +348,15 @@ test('production by shift: targets from the rolling plan as filled, plan gap ove
   await expect(panel.locator('.chip')).toHaveText('Plan 1,592 MT');
   await expect(panel.locator('.panel-sub')).toHaveCount(0);
   // Output: the Production card's 1–8 Oct figure split by where the counter ticked — mostly at night.
-  await expect(panel.locator('.rm-shift-val')).toHaveText(['329.2 MT / 1,592', '1,143.3 MT / 0']);
-  // Gap = production on 1–8 Oct (1,472.47) − 1,592 = −119.53: 119.5 MT short — shown without a sign.
-  await expect(panel).toContainText('119.5 MT');
-  await expect(panel).not.toContainText('-119.5');
-  // Compliance over the planned days: Day 329.2 ÷ 1,592 = 20.7 %; Night has a 0 target → NA.
-  await expect(panel.locator('.rm-shift-comp')).toHaveText(['20.7%', 'NA']);
+  await expect(panel.locator('.rm-shift-val')).toHaveText(['200.5 MT / 1,592', '1,274.2 MT / 0']);
+  // Gap = production on 1–8 Oct (1,474.65, 08:00 → 08:00) − 1,592 = −117.35: short — shown without a sign.
+  await expect(panel).toContainText(/117\.[34] MT/);
+  await expect(panel).not.toContainText('-117.');
+  // Compliance over the planned days: Day 200.5 ÷ 1,592 = 12.6 %; Night has a 0 target → NA.
+  await expect(panel.locator('.rm-shift-comp')).toHaveText(['12.6%', 'NA']);
   await panel.screenshot({ path: `${SHOTS}/wired-shift-plan.png` });
 
-  // The toggle turns the card over to the whole day: one bar, 1,472.47 ÷ 1,592 = 92.5 %.
+  // The toggle turns the card over to the whole day: one bar, 1,474.65 ÷ 1,592 = 92.6 %.
   const flip = page.locator('.rm-flip');
   await panel.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' }).click();
   await expect(flip).toHaveClass(/is-flipped/);
@@ -363,8 +364,8 @@ test('production by shift: targets from the rolling plan as filled, plan gap ove
   const back = page.locator('.rm-flip-face--back section.panel');
   await expect(back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' })).toHaveAttribute('aria-pressed', 'true');
   await expect(back.locator('.rm-shift-name')).toHaveText(['Total']);
-  await expect(back.locator('.rm-shift-val')).toHaveText(['1,472.5 MT']);
-  await expect(back.locator('.rm-shift-comp')).toHaveText(['92.5%']);
+  await expect(back.locator('.rm-shift-val')).toHaveText([/^1,474\.[67] MT$/]);
+  await expect(back.locator('.rm-shift-comp')).toHaveText(['92.6%']);
   await page.waitForTimeout(700);   // the turn
   await back.screenshot({ path: `${SHOTS}/wired-shift-whole-day.png` });
   // The drill-down follows the view: whole day, with compliance per day.
@@ -377,11 +378,11 @@ test('production by shift: targets from the rolling plan as filled, plan gap ove
   const d1 = dt.getByRole('row', { name: /^1 Oct/ });
   for (const v of ['134.4', '140.0', '96.0%', '5.6']) await expect(d1).toContainText(v);
   await expect(d1).not.toContainText('-5.6');
-  // 8 Oct: 203.3 of 184 → 110.5 %.
+  // 8 Oct: 205.5 of 184 → 111.7 %.
   const d8 = dt.getByRole('row', { name: /^8 Oct/ });
-  for (const v of ['203.3', '184.0', '110.5%']) await expect(d8).toContainText(v);
-  for (const v of ['1,472.5', '1,592.0', '92.5%', '119.5']) await expect(dt.locator('tfoot')).toContainText(v);
-  await expect(dt.locator('tfoot')).not.toContainText('-119.5');
+  for (const v of ['205.5', '184.0', '111.7%']) await expect(d8).toContainText(v);
+  for (const v of [/1,474\.[67]/, '1,592.0', '92.6%', /117\.[34]/]) await expect(dt.locator('tfoot')).toContainText(v);
+  await expect(dt.locator('tfoot')).not.toContainText('-117.');
   await expect(dd.getByRole('region', { name: 'Formula' })).toContainText('Compliance = production ÷ plan × 100');
   await page.waitForTimeout(700);
   await dd.screenshot({ path: `${SHOTS}/drill-shift-whole-day.png` });
@@ -1136,8 +1137,9 @@ test('RMD asset health: gearbox oil in litres — level × the tank\'s inside le
   await card.click();
   const d = page.getByRole('dialog', { name: 'Route · gearbox oil' });
   const t = d.getByRole('table', { name: 'Oil tank level' });
-  await expect(t.locator('thead th')).toHaveText(['Tank', 'Level (in)', 'Oil (L)', 'Capacity (L)', 'Full', 'Date']);
-  for (const v of ['13.5', '367', '932', '39%']) await expect(t.getByRole('row', { name: /^OC stand 3–4/ })).toContainText(v);
+  await expect(t.locator('thead th')).toHaveText(['Tank', 'Level (in)', 'Oil (L)', 'Capacity (L)', 'Date']);
+  for (const v of ['13.5', '367', '932']) await expect(t.getByRole('row', { name: /^OC stand 3–4/ })).toContainText(v);
+  await expect(t.getByRole('row', { name: /^OC stand 3–4/ })).not.toContainText('%');   // no "Full" column
   // Intermill: 16 in → 513 L of 1,275.
   for (const v of ['16.0', '513', '1,275']) await expect(t.getByRole('row', { name: /^Intermill/ })).toContainText(v);
   await expect(d.getByRole('region', { name: 'Formula' })).toContainText('Oil (L) = level (inches) × 0.0254 × inside length × inside width');
@@ -1213,19 +1215,19 @@ test('HSM condition analytics: as the HSM sheet — actual rate = ERP production
   const main = page.getByRole('main');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
   await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText(['Actual rate', 'Output opportunity', 'Specific energy', 'Conversion cost', 'Cost variance', 'Yield material loss', 'Output margin']);
-  // 1–8 Oct: ERP PRODUCTION_MT 1,390.43 ÷ 60.28 running hours (billet counter) = 23.07 TPH.
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(0)).toHaveText(/^23\.07\s*TPH$/, { timeout: 90_000 });
+  // 1–8 Oct (08:00 → 08:00): ERP PRODUCTION_MT 1,390.43 ÷ 60.46 running hours (billet counter) = 23.00 TPH.
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(0)).toHaveText(/^23\.00\s*TPH$/, { timeout: 90_000 });
   for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   // Specific energy: the Electrical HSM → Power Consumption form ÷ ERP production (no EMS meter) — the Visualization card.
   await expect(cards.getByRole('button', { name: 'Specific energy', exact: true }).locator('.rm-card-value')).toHaveText(/^(NA|[\d,.]+)\s*kWh\/MT$/, { timeout: 60_000 });
   // Header: the ERP's most produced size, grade and route NA, running hours.
   await expect(main.getByRole('heading', { level: 2 })).toHaveText(/^274–276 × \d\.\d\d mm/);
-  await expect(main.locator('.ah-fact', { hasText: 'Running hours' }).locator('dd')).toHaveText('60.3 h');
+  await expect(main.locator('.ah-fact', { hasText: 'Running hours' }).locator('dd')).toHaveText('60.5 h');
   // Mimic: only the finished exit (= actual rate) has a source.
   const mimic = main.getByRole('list', { name: 'Condition groups' });
   await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit']);
   // Billet infeed and the stand groups live from the Visualization mimic's tags; exit = the actual rate.
-  await expect(mimic.locator('.rm-zone-value')).toHaveText([/^(NA|\d+ billets)$/, /\S/, /\S/, '23.07 TPH'], { timeout: 60_000 });
+  await expect(mimic.locator('.rm-zone-value')).toHaveText([/^(NA|\d+ billets)$/, /\S/, /\S/, '23.00 TPH'], { timeout: 60_000 });
   await page.screenshot({ path: `${SHOTS}/hsm-condition-analytics.png`, fullPage: true });
   // The rate opens its days, with sources.
   await cards.getByRole('button', { name: 'Actual rate', exact: true }).click();
@@ -1332,17 +1334,17 @@ test('HSM checklists: production variance — per day, the production figures fi
   const v = page.getByRole('dialog', { name: 'Production variance checklist' });
   await expect(v.getByLabel('Shift')).toHaveCount(0);
   await v.getByLabel('Date').fill('2026-10-20');
-  // 20 Oct: Influx 210.29, ERP 195.97 → variance 14.32 MT, 7.31 %.
-  await expect(v.getByLabel('Production (Influx / HMI)')).toHaveValue('210.29', { timeout: 60_000 });
+  // 20 Oct (08:00 → 08:00): Influx 211.57, ERP 195.97 → variance 15.60 MT, 7.96 %.
+  await expect(v.getByLabel('Production (Influx / HMI)')).toHaveValue('211.57', { timeout: 60_000 });
   await expect(v.getByLabel('Production (ERP)')).toHaveValue('195.97');
-  await expect(v.getByLabel('Variance (Influx − ERP)')).toHaveValue('14.32');
-  await expect(v.getByLabel('Variance %')).toHaveValue('7.31 %');
+  await expect(v.getByLabel('Variance (Influx − ERP)')).toHaveValue('15.60');
+  await expect(v.getByLabel('Variance %')).toHaveValue('7.96 %');
   // The reasons start empty and are typed by the user.
   for (const r of ['Miss roll', 'Finish end cut', 'Mill scale']) await expect(v.getByLabel(r)).toHaveValue('');
   await expect(v.getByLabel('End cut', { exact: true })).toHaveValue('');
   await v.getByLabel('Mill scale').fill('2.63');
   await v.getByLabel('End cut', { exact: true }).fill('3.43');
-  await expect(v.getByLabel('Reasons against variance')).toContainText('Not explained 8.26 MT');
+  await expect(v.getByLabel('Reasons against variance')).toContainText('Not explained 9.54 MT');
   await expect(v.getByRole('button', { name: 'Save' })).toBeDisabled();
   await page.waitForTimeout(500);
   await v.screenshot({ path: `${SHOTS}/hsm-checklist-variance.png` });
@@ -1471,7 +1473,7 @@ for (const c of [
 for (const c of [
   { mill: 'rmd', n: 9 },
   { mill: 'lsm', n: 9 },
-  { mill: 'hsm', n: 6 },   // HSM's costing sheet gives actual tariff, other conversion and material values
+  { mill: 'hsm', n: 9 },   // the same nine fields for every mill — the config replaces the Excel sheets
 ] as const) test(`${c.mill.toUpperCase()} condition analytics: CA inputs — the month's targets and costs, ${c.n} fields`, async ({ page }) => {
   await page.goto(`/${c.mill}/condition-analytics`);
   const costing = page.getByRole('main').locator('section.panel', { hasText: 'Costing & impact' });

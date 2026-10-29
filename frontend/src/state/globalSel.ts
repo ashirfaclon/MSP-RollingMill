@@ -6,7 +6,7 @@
  * here: they live in the URL (see config/navigation.ts).
  *
  * Plant time is IST throughout. The duration is held as PLANT DATES, and a plant date is the
- * cycle 06:00 → 06:00 next day (lib/plantDay.ts) — there is no time of day to choose.
+ * cycle 08:00 → 08:00 next day (lib/plantDay.ts) — there is no time of day to choose.
  */
 import { useSyncExternalStore } from 'react';
 import { SEL_STORAGE_KEY } from './storageKey';
@@ -114,7 +114,7 @@ export function useGlobalSel(): GlobalSel {
 
 /**
  * The plant dates (inclusive) a preset covers at `nowMs`. "Today" is the plant day running
- * now — at 03:00 IST that is still yesterday's date, whose cycle ends at 06:00.
+ * now — at 03:00 IST that is still yesterday's date, whose cycle ends at 08:00.
  * `custom` has none — the caller supplies it.
  */
 export function presetDates(preset: DurationPreset, nowMs: number, hour?: number): { from: string; to: string } | null {

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The day-start hour of the mill on screen — HSM 06:00, RMD 09:00 — read from the URL
+ * The day-start hour of the mill on screen — HSM 08:00, RMD 09:00 — read from the URL
  * (/hsm/…, /rmd/…), so the Duration filter, "Today" and every cycle label follow the mill.
  */
 import { usePathname } from 'next/navigation';

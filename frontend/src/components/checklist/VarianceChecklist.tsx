@@ -57,7 +57,7 @@ export default function VarianceChecklist({ open, onClose }: { open: boolean; on
         </div>
 
         <div className="ck-group">
-          <div className="ck-group-head"><h3 className="rm-k">Production</h3><span className="ck-auto">Filled by the dashboard · whole plant day 06:00–06:00</span></div>
+          <div className="ck-group-head"><h3 className="rm-k">Production</h3><span className="ck-auto">Filled by the dashboard · whole plant day 08:00–08:00</span></div>
           <div className="ck-grid ck-grid--wide">
             <label className="ck-f"><span>Production (Influx / HMI)</span><input readOnly value={mt(influx)} placeholder="NA" /></label>
             <label className="ck-f"><span>Production (ERP)</span><input readOnly value={mt(erp)} placeholder="NA" /></label>

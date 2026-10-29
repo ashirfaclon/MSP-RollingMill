@@ -45,7 +45,7 @@ export function useProduction(params: { from: string; to: string; grain: Grain }
 /** ERP cut-over for the strip mill: the log sheet has live entries from this date. */
 export const ERP_START_DATE = '2025-11-30';
 
-/** The Duration filter as plant dates (each 06:00 → 06:00) plus its label; `today` is the current plant date. */
+/** The Duration filter as plant dates (each 08:00 → 08:00) plus its label; `today` is the current plant date. */
 export function useSelection(): { dates: { from: string; to: string } | null; label: string; today: string | null } {
   const sel = useGlobalSel();
   const now = useMinute();
@@ -54,6 +54,6 @@ export function useSelection(): { dates: { from: string; to: string } | null; la
   const label = sel.duration === 'custom' && dates
     ? (dates.from === dates.to ? dm(dates.from) : `${dm(dates.from)} – ${dm(dates.to)}`)
     : DURATION_LABELS[sel.duration];
-  // The plant day running now: before 06:00 IST it is still yesterday's date.
+  // The plant day running now: before 08:00 IST it is still yesterday's date.
   return { dates, label, today: now ? plantDate(now, hour) : null };
 }

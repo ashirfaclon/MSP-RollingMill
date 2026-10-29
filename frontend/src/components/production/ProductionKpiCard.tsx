@@ -4,7 +4,7 @@
  * The Production headline card: two figures for the period chosen in the Duration filter,
  * side by side —
  *   ERP    — the production log sheet (PRODUCTION_MT), entered 1–2 days late (no note about it);
- *   INFLUX — the mill counter Total_Production_Ton, reset events less noise, per 06:00
+ *   INFLUX — the mill counter Total_Production_Ton, reset events less noise, per 08:00
  *            plant day. Live — today counts up as the mill rolls. Publishes from 21 Sep 2026.
  * Clicking it opens the ERP-vs-Influx drawer, where the two are compared day by day.
  */

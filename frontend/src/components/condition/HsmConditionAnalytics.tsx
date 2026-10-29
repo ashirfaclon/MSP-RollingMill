@@ -9,7 +9,7 @@
  *                        running hours), over the days that have both; opens per day;
  *   Finished exit        "Row 10" — the actual running rate;
  *   Billet infeed, Roughing / Finishing group   the Visualization mimic's Influx tags (the user,
- *                        26 Oct 2026): billets since 06:00, RM / FM drives on (On_Off);
+ *                        26 Oct 2026): billets since 08:00, RM / FM drives on (On_Off);
  *   Specific energy      the logbook Electrical HSM → Power Consumption ÷ ERP production, over the
  *                        days with both (the plant has no EMS meter; the user, 26 Oct 2026);
  *   Conversion cost,     the plant's monthly costing sheet (2026 Costing - SEP26.xlsx, 27 Oct 2026):
@@ -88,7 +88,7 @@ export default function HsmConditionAnalytics() {
     return { title, value: on ? g.stateLabel : 'NA', foot: on ? `${g.on} of ${g.total} on` : 'drives on / off', tone: g ? TONE[g.state] : 'flow', stands: on ? id : null };
   };
   const zones: { title: string; value: string; foot: string; tone: string; stands: 'roughing' | 'finishing' | null }[] = [
-    { title: 'Billet infeed', value: mimic.billetsToday === null ? 'NA' : `${mimic.billetsToday} billets`, foot: 'Today · since 06:00 IST', tone: 'flow', stands: null },
+    { title: 'Billet infeed', value: mimic.billetsToday === null ? 'NA' : `${mimic.billetsToday} billets`, foot: 'Today · since 08:00 IST', tone: 'flow', stands: null },
     groupZone('roughing', 'Roughing group'),
     groupZone('finishing', 'Finishing group'),
     { title: 'Finished exit', value: tph === null ? 'NA' : `${fixed(tph, 2)} TPH`, foot: 'actual rate', tone: 'flow', stands: null },
@@ -219,7 +219,7 @@ function RateContent({ days, rate }: { days: RateDay[]; rate: ReturnType<typeof 
         formula={[
           'Actual rate = Σ ERP production ÷ Σ running hours, over the days that have both',
           'Running hours = time the mill discharges billets less than 10 min apart (a longer gap is a stop)',
-          'Day = 06:00 IST → 06:00 IST',
+          'Day = 08:00 IST → 08:00 IST',
         ]}
       />
     </>

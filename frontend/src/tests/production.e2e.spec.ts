@@ -3,7 +3,7 @@
  * ERP cache / historian. Skips itself on a machine without the plant connections.
  *
  * Reference figures were verified by hand on 30 Sep 2026 for the Hot Strip Mill (ERP division
- * S1 log sheet vs PROD_TRAN; Influx counter increases per 06:00 plant day).
+ * S1 log sheet vs PROD_TRAN; Influx counter increases per 08:00 plant day).
  */
 import { test as base, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
@@ -30,7 +30,7 @@ test.skip(!live, 'needs backend/.env and a synced ERP cache');
 async function pickCustom(page: Page) {
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
-  // Plant dates 22 → 28 Sep = 22 Sep 06:00 → 29 Sep 06:00.
+  // Plant dates 22 → 28 Sep = 22 Sep 08:00 → 29 Sep 08:00.
   await dialog.getByLabel('Start Date').fill('2026-09-22');
   await dialog.getByLabel('End Date').fill('2026-09-28');
   await dialog.getByRole('button', { name: 'Apply' }).click();
@@ -48,10 +48,10 @@ test('the Production card shows ERP and Influx production for the Duration filte
   await pickCustom(page);
   // 22–28 Sep. ERP log sheet PRODUCTION_MT: 1,076.51.
   await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('1,076.5');
-  // Influx counter reset events less noise: 216.80 + 155.00 + 174.05 + 116.57 + 131.95 + 181.34 + 165.37 = 1,141.08
-  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('1,141.1');
-  // The ERP covers every day of the period: the note gives Influx − ERP, 1,141.08 − 1,076.51 = 64.57.
-  await expect(card.locator('.rm-card-note')).toHaveText('Delta 64.6 MT');
+  // Influx counter reset events less noise: 217.94 + 154.03 + 172.43 + 120.62 + 133.57 + 178.91 + 162.78 = 1,140.28 (08:00 → 08:00 days)
+  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('1,140.3');
+  // The ERP covers every day of the period: the note gives Influx − ERP, 1,140.28 − 1,076.51 = 63.77.
+  await expect(card.locator('.rm-card-note')).toHaveText('Delta 63.8 MT');
   await card.screenshot({ path: `${SHOTS}/production-card.png` });
 });
 
@@ -69,7 +69,7 @@ test('clicking the card opens the ERP-vs-Influx drawer on the dashboard period �
 
   // Three totals — the same figures as the card.
   await expect(drawer.locator('.pd-stats')).toContainText('1,076.51');
-  await expect(drawer.locator('.pd-stats')).toContainText('1,141.08');
+  await expect(drawer.locator('.pd-stats')).toContainText('1,140.28');
   await expect(drawer.locator('.pd-stats')).toContainText('Delta');
   await expect(drawer.getByText('Days compared')).toHaveCount(0);
 
@@ -77,10 +77,10 @@ test('clicking the card opens the ERP-vs-Influx drawer on the dashboard period �
   await expect(table.locator('thead th')).toHaveText(['Period', 'ERP (MT)', 'Influx (MT)', 'Delta (MT)']);
   const row = (label: string) => table.getByRole('row', { name: new RegExp(`^${label}\\b`) });
   await expect(row('22 Sep')).toContainText('202.40');
-  await expect(row('22 Sep')).toContainText('216.80');
-  await expect(row('22 Sep')).toContainText('14.40');
+  await expect(row('22 Sep')).toContainText('217.94');
+  await expect(row('22 Sep')).toContainText('15.54');
   await expect(row('28 Sep')).toContainText('152.21');
-  await expect(row('28 Sep')).toContainText('165.37');
+  await expect(row('28 Sep')).toContainText('162.78');
   await expect(table.locator('tbody tr')).toHaveCount(7);
   await expect(table.locator('tfoot')).toContainText('1,076.51');
 

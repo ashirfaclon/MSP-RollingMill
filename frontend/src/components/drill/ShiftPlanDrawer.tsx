@@ -243,13 +243,13 @@ const SOURCES: SourceSystem[] = [
 ];
 
 const FORMULA = [
-  'Day = 06:00 IST → 18:00 IST, Night = 18:00 IST → 06:00 IST',
+  'Day = 08:00 IST → 20:00 IST, Night = 20:00 IST → 08:00 IST',
   "Shift output = counter increases in the shift's window, scaled so Day + Night = the day's production",
   'Plan gap = production − plan  (days the plan covers); + = ahead of plan, no sign = short',
 ];
 
 const DAY_FORMULA = [
-  'Output = Σ counter increases over the day (06:00 IST → 06:00 IST), all shifts',
+  'Output = Σ counter increases over the day (08:00 IST → 08:00 IST), all shifts',
   'Compliance = production ÷ plan × 100  (days the plan covers)',
   'Plan gap = production − plan  (days the plan covers); + = ahead of plan, no sign = short',
 ];

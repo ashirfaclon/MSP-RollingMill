@@ -4,8 +4,8 @@
  * Duration picker: preset list on the left, start/end date and a month calendar on the
  * right, Cancel / Apply at the foot. Ported from pellet-frontend.
  *
- * Dates only — no time of day. Every date is a plant day, 06:00 IST to 06:00 IST the next
- * day (lib/plantDay.ts): picking 24 Sep means 24 Sep 06:00 → 25 Sep 06:00. The cycle each
+ * Dates only — no time of day. Every date is a plant day, 08:00 IST to 08:00 IST the next
+ * day (lib/plantDay.ts): picking 24 Sep means 24 Sep 08:00 → 25 Sep 08:00. The cycle each
  * choice covers is shown beside the dates and on the trigger, so nobody has to remember it.
  *
  * A preset fills the dates so you can see what it resolves to before applying; editing a
@@ -30,7 +30,7 @@ const ORDER: DurationPreset[] = [
 export default function DateRangePicker() {
   const sel = useGlobalSel();
   const now = useMinute();
-  /** The mill's day start (HSM 06:00, RMD 09:00): every date and label below follows it. */
+  /** The mill's day start (HSM 08:00, RMD 09:00): every date and label below follows it. */
   const hour = useDayStartHour();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -125,7 +125,7 @@ export default function DateRangePicker() {
   }, [month]);
 
   // The trigger: the preset's name (if any) and the cycle it covers, e.g.
-  // "Today · 1 Oct 06:00 IST → 2 Oct 06:00 IST", or just the cycle for a custom range.
+  // "Today · 1 Oct 08:00 IST → 2 Oct 08:00 IST", or just the cycle for a custom range.
   const active = selectedDates(sel, now, hour);
   const cycle = active ? cycleLabel(active.from, active.to, hour) : '';
   const name = sel.duration === 'custom' ? null : DURATION_LABELS[sel.duration];

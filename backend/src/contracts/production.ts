@@ -51,7 +51,7 @@ export interface ProductionComparison {
   dayBoundary: string;
   erp: { connection: 'up' | 'down'; message: string; syncedAt: string | null; lastDate: string | null };
   influx: { connection: 'up' | 'down'; message: string; firstReadingAt: string | null; lastReadingAt: string | null };
-  /** The counter's reset events, split at each 06:00 — a day's figure is the total of its events. */
+  /** The counter's reset events, split at each 08:00 — a day's figure is the total of its events. */
   events: {
     date: string; start: string; end: string;
     startValue: number; endValue: number; value: number; noise: number;
@@ -114,7 +114,7 @@ export interface PlanDay {
   byShift: Record<string, number>;
   /** Influx production for the plant day (the Production card's Total), MT. */
   actualMt: number | null;
-  /** That production split by shift (Day 06–18, Night 18–06); null when there is none. */
+  /** That production split by shift (Day 08–20, Night 20–08); null when there is none. */
   actualByShift: Record<string, number> | null;
 }
 

@@ -261,22 +261,21 @@ function BearingTrend({ trend }: { trend: { at: string; maxC: number }[] }) {
   );
 }
 
-/** Oil tank level: the reading (inches), the oil in litres, the capacity and how full. */
+/** Oil tank level: the reading (inches), the oil in litres and the capacity (no "Full" column — the user, 29 Oct 2026). */
 function TankLevelTable({ rows }: { rows: RmdReading[] }) {
   return (
     <div className="pd-table-wrap">
       <table className="grid pd-table" aria-label="Oil tank level">
-        <thead><tr><th>Tank</th><th className="r">Level (in)</th><th className="r">Oil (L)</th><th className="r">Capacity (L)</th><th className="r">Full</th><th>Date</th></tr></thead>
+        <thead><tr><th>Tank</th><th className="r">Level (in)</th><th className="r">Oil (L)</th><th className="r">Capacity (L)</th><th>Date</th></tr></thead>
         <tbody>
           {rows.length === 0
-            ? <tr><td colSpan={6} className="v-na">NA</td></tr>
+            ? <tr><td colSpan={5} className="v-na">NA</td></tr>
             : rows.map((r, i) => (
               <tr key={i}>
                 <td><b>{r.equipment}</b></td>
                 <td className="num r">{fixed(r.value, 1)}</td>
                 <td className="num r v-val">{fixed(r.litres ?? null, 0)}</td>
                 <td className="num r">{fixed(r.capacityL ?? null, 0)}</td>
-                <td className="num r">{r.litres != null && r.capacityL ? `${fixed((r.litres / r.capacityL) * 100, 0)}%` : '—'}</td>
                 <td>{r.at}</td>
               </tr>
             ))}

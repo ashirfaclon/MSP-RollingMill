@@ -22,7 +22,7 @@ import { runTime, type OperatingInput, type RunDetection, type RunTime } from '.
 import { resolveStock, type Stock, type StockInput } from './stock';
 import { resolveOrders, type OrderInput, type Orders } from './orders';
 
-/** Two 12-hour shifts per plant day: Day 06:00–18:00, Night 18:00–06:00 IST. */
+/** Two 12-hour shifts per plant day: Day 08:00–20:00, Night 20:00–08:00 IST. */
 export type ShiftName = 'Day' | 'Night';
 
 export interface ShiftInput {

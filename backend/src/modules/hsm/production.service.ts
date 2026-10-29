@@ -4,7 +4,7 @@
  *   ERP     Production Log Sheet, summed per date (erp/cache.ts). The confirmed figure,
  *           entered 1.5+ days late.
  *   Influx  Total_Production_Ton, a running total the operator resets now and then: a plant
- *           day's (06:00 → 06:00 IST) production is the total of its RESET EVENTS, each
+ *           day's (08:00 → 08:00 IST) production is the total of its RESET EVENTS, each
  *           = counter before the reset − counter at the event's start (counterEvents.ts).
  *           The counter is coils × the set billet weight (no losses deducted), the ERP
  *           figure is weighed finished strip, so the variance is mostly mill loss.
@@ -27,7 +27,8 @@ import type { ByProductKey, ByProducts, DayValue, Grain, PeriodRow, ProductionCo
 export type { ByProductKey, ByProducts, DayValue, Grain, PeriodRow, ProductionComparison };
 
 /** The plant day, as used for the Influx side of the comparison. */
-export const PLANT_DAY_START_HOUR = 6;
+/** HSM's day starts with its Day shift, 08:00 IST (the plant, 29 Oct 2026; was 08:00). */
+export const PLANT_DAY_START_HOUR = 8;
 const IST_MS = 330 * 60_000;
 export const DAY_MS = 86_400_000;
 const H_MS = 3_600_000;
@@ -44,7 +45,7 @@ export function dateRange(from: string, to: string): string[] {
   for (let i = dayIndex(from); i <= dayIndex(to); i += 1) out.push(fromIndex(i));
   return out;
 }
-/** Start of plant day D (06:00 IST on D), epoch ms. */
+/** Start of plant day D (08:00 IST on D), epoch ms. */
 export const plantDayStart = (d: string) => Date.parse(`${d}T00:00:00Z`) - IST_MS + PLANT_DAY_START_HOUR * H_MS;
 
 /* ------------------------------- per day -------------------------------- */

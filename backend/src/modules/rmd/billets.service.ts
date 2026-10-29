@@ -1,7 +1,7 @@
 /**
  * RMD billets in, from the Influx counters — one per line (M1, M2), per RMD plant day, grouped
  * by day / week / month. RMD runs a 24-hour cycle of two shifts, 09:00–21:00 and 21:00–09:00
- * IST (the plant, 28 Oct 2026; was 08:00 from 9 Oct), so its day is 09:00 → 09:00 IST — not HSM's 06:00. A day's
+ * IST (the plant, 28 Oct 2026; was 08:00 from 9 Oct), so its day is 09:00 → 09:00 IST — not HSM's 08:00. A day's
  * billets are the sum of the counter's increases in it (resets dropped, as for HSM). This is
  * the denominator of RMD's mass yield; the numerator (ERP finished production) is not wired.
  */

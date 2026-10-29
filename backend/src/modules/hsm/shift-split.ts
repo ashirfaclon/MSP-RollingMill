@@ -1,7 +1,7 @@
 /**
- * Production per shift: Day 06:00–18:00, Night 18:00–06:00 IST, within each plant day.
+ * Production per shift: Day 08:00–20:00, Night 20:00–08:00 IST, within each plant day.
  *
- * A counter run can cross 18:00, so the split is made from the counter's individual ticks
+ * A counter run can cross 20:00, so the split is made from the counter's individual ticks
  * (each coil), noise-filtered by the same billet rule as the Production card. Each plant
  * day's split is then scaled to that day's Production-card figure, so Day + Night always
  * equals the card exactly; ticks only decide the shares.
@@ -16,7 +16,7 @@ export type ShiftName = (typeof SHIFTS)[number];
 const H_MS = 3_600_000;
 const IST_MS = 330 * 60_000;
 
-/** Day 06:00–18:00 IST, else Night. */
+/** Day 08:00–20:00 IST, else Night. */
 export const shiftOf = (t: number): ShiftName => {
   const h = new Date(t + IST_MS).getUTCHours();
   return h >= PLANT_DAY_START_HOUR && h < PLANT_DAY_START_HOUR + 12 ? 'Day' : 'Night';

@@ -1,7 +1,7 @@
 /**
  * Power consumption from the IOsense logbook, for every mill. A day's figure is the SUM of
  * the kWh consumed over every entry the plant dated that day, all meters together. The
- * form's own date is used as entered: no 06:00 shift, no correction, so the dashboard shows
+ * form's own date is used as entered: no 08:00 shift, no correction, so the dashboard shows
  * exactly what is being filled in.
  *
  *   HSM  one form, "Electrical HSM → Power Consumption" (electrical-hsm/power-consumption):
@@ -19,7 +19,7 @@
  *
  * Specific energy = that power ÷ the mill's production for the same period, kWh/MT — HSM's
  * Production card (the Influx counter); RMD's ERP log sheet (PRODUCT_PRIME_SLENGTH_MT); LSM's
- * (PRODUTION_MT). Power is summed by the form's date, production by the 06:00
+ * (PRODUTION_MT). Power is summed by the form's date, production by the 08:00
  * plant day — the same date, a few hours apart.
  *
  * Each request reads the mill's forms fresh from the logbook (one call per form, shared for

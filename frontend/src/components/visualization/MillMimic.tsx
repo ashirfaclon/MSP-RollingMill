@@ -43,7 +43,7 @@ export default function MillMimic() {
     {
       key: 'infeed', kind: 'count' as const, title: 'Billet infeed',
       value: d?.billetsToday === null || d?.billetsToday === undefined ? 'NA' : `${d.billetsToday} billets`,
-      foot: 'Today · since 06:00 IST', open: () => setOpen('billets'), openLabel: 'Billets per day, ERP vs mill counter',
+      foot: 'Today · since 08:00 IST', open: () => setOpen('billets'), openLabel: 'Billets per day, ERP vs mill counter',
     },
     ...(d?.groups ?? []).map((g) => ({
       key: g.id, kind: 'group' as const, title: g.label, g,
@@ -85,7 +85,7 @@ export default function MillMimic() {
                       <span className="rm-zone-value num v-val">{z.value}</span>
                     )}
                   </span>
-                  {/* Always present (empty for most) so the zones line up. Infeed keeps "since 06:00": it is today-only, whatever the Duration. */}
+                  {/* Always present (empty for most) so the zones line up. Infeed keeps "since 08:00": it is today-only, whatever the Duration. */}
                   <span className="rm-zone-foot">{z.foot || '\u00a0'}</span>
                 </button>
               </li>

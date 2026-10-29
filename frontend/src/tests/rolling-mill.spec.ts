@@ -287,12 +287,12 @@ test('light theme applies, persists across reload, and switches back', async ({ 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
-test('duration picker: dates only, each a 06:00 → 06:00 plant day, cycle shown', async ({ page }) => {
+test('duration picker: dates only, each a 08:00 → 08:00 plant day, cycle shown', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const trigger = page.getByRole('button', { name: /Duration/ });
   await expect(trigger).toContainText('Today');
   // The cycle of the running plant day sits beside the preset name.
-  await expect(trigger).toContainText(/\d{1,2} \w{3} 06:00 IST → \d{1,2} \w{3} 06:00 IST/);
+  await expect(trigger).toContainText(/\d{1,2} \w{3} 08:00 IST → \d{1,2} \w{3} 08:00 IST/);
 
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
@@ -308,26 +308,26 @@ test('duration picker: dates only, each a 06:00 → 06:00 plant day, cycle shown
   await expect(dialog).toBeHidden();
   await expect(trigger).toContainText('Previous 7 Days');
 
-  // One date = that date 06:00 → the next date 06:00.
+  // One date = that date 08:00 → the next date 08:00.
   await trigger.click();
   await dialog.getByLabel('Start Date').fill('2026-09-24');
   await dialog.getByLabel('End Date').fill('2026-09-24');
   await expect(dialog.getByRole('button', { name: 'Custom' })).toHaveClass(/on/);
-  await expect(dialog.locator('.dr-f-cycle').nth(0)).toHaveText('from 06:00 IST');
-  await expect(dialog.locator('.dr-f-cycle').nth(1)).toHaveText('to 25 Sep 06:00 IST');
-  await expect(dialog.getByRole('status')).toContainText('24 Sep 06:00 IST → 25 Sep 06:00 IST · 1 plant day');
+  await expect(dialog.locator('.dr-f-cycle').nth(0)).toHaveText('from 08:00 IST');
+  await expect(dialog.locator('.dr-f-cycle').nth(1)).toHaveText('to 25 Sep 08:00 IST');
+  await expect(dialog.getByRole('status')).toContainText('24 Sep 08:00 IST → 25 Sep 08:00 IST · 1 plant day');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  await expect(trigger).toContainText('24 Sep 06:00 IST → 25 Sep 06:00 IST');
+  await expect(trigger).toContainText('24 Sep 08:00 IST → 25 Sep 08:00 IST');
 
-  // A range: 16 → 17 Sep = 16 Sep 06:00 IST → 18 Sep 06:00 IST, two plant days; survives a reload.
+  // A range: 16 → 17 Sep = 16 Sep 08:00 IST → 18 Sep 08:00 IST, two plant days; survives a reload.
   await trigger.click();
   await dialog.getByLabel('Start Date').fill('2026-09-16');
   await dialog.getByLabel('End Date').fill('2026-09-17');
-  await expect(dialog.getByRole('status')).toContainText('16 Sep 06:00 IST → 18 Sep 06:00 IST · 2 plant days');
+  await expect(dialog.getByRole('status')).toContainText('16 Sep 08:00 IST → 18 Sep 08:00 IST · 2 plant days');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  await expect(trigger).toContainText('16 Sep 06:00 IST → 18 Sep 06:00 IST');
+  await expect(trigger).toContainText('16 Sep 08:00 IST → 18 Sep 08:00 IST');
   await page.reload();
-  await expect(trigger).toContainText('16 Sep 06:00 IST → 18 Sep 06:00 IST');
+  await expect(trigger).toContainText('16 Sep 08:00 IST → 18 Sep 08:00 IST');
 
   // An end before the start cannot be applied.
   await trigger.click();

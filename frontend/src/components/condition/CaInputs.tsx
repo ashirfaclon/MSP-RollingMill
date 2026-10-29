@@ -41,7 +41,6 @@ export default function CaInputs({ mill, open, onClose }: { mill: CaMill; open: 
             </div>
           </section>
         ))}
-        {mill === 'hsm' && <p className="ck-sum">Actual tariff, other conversion and material values come from the HSM costing sheet.</p>}
         <div className="ck-actions">
           <button type="button" className="ck-save" disabled>Save inputs</button>
           <span>Preview — saving is not connected yet.</span>
