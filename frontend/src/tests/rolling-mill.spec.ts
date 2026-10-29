@@ -373,12 +373,12 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   // No coverage notes on the ERP cards; today's entry comes a day late, so NA — wired, nothing entered yet, and the card says so.
   await expect(strip.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-note')).toHaveText('No entries recorded yet');
   // Mill flow, live: infeed, the two status zones and the exit (ERP production); no roughing group.
-  const mimic = page.getByRole('list', { name: 'Mill process flow' });
-  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit']);
-  await expect(mimic.getByRole('button', { name: /Billet infeed/ })).toContainText('Today · since 09:00 IST');
-  await expect(mimic.getByRole('button', { name: /Finished exit/ })).toBeVisible();
-  await expect(mimic.getByRole('button', { name: /Route \/ diverter/ }).locator('.rm-dot')).toHaveCount(14);   // L1 S1–S8 + L2 S1–S6
-  await expect(mimic.getByRole('button', { name: /Finishing group/ }).locator('.rm-dot')).toHaveCount(10);   // 5 per line
+  const mimic = page.locator('section.panel', { hasText: 'Mill mimic' }).getByRole('img', { name: /^RMD mill:/ });
+  await expect(mimic.locator('.mx-group')).toHaveText([/^Line 1 · Route \/ diverter · \d+ of 8 on$/, /^Line 1 · Finishing · \d+ of 5 on$/, /^Line 2 · Route \/ diverter · \d+ of 6 on$/, /^Line 2 · Finishing · \d+ of 5 on$/], { timeout: 60_000 });
+  await expect(mimic.locator('.mx-node', { hasText: 'Billet infeed' })).toContainText(/SINCE (\d+ \w+ )?09:00 IST/);
+  await expect(mimic.locator('.mx-node', { hasText: 'Finished exit' })).toBeVisible();
+  await expect(mimic.locator('image.mx-sprite--dark[href^="/twin/stand"]')).toHaveCount(14);   // L1 S1–S8 + L2 S1–S6
+  await expect(mimic.locator('.mx-lamp')).toHaveCount(24);   // + 5 finishing machines per line
   // No output per shift in the ERP: the whole day only — no By shift view, no switch (the user, 28 Oct 2026).
   const shifts = page.locator('section.panel', { hasText: 'Production · whole day' });
   await expect(shifts.getByRole('group', { name: 'Shift view' })).toHaveCount(0);
@@ -421,7 +421,7 @@ for (const mill of ['lsm', 'rms'] as const) {
     for (const i of [2, 3]) await expect(strip.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
     await expect(strip.getByRole('button')).toHaveCount(4);   // Production, Mass yield, Power consumption, Specific energy
     // No mill mimic on LSM or RMS.
-    await expect(page.getByRole('list', { name: 'Mill process flow' })).toHaveCount(0);
+    await expect(page.getByRole('img', { name: /^(HSM|RMD) mill:/ })).toHaveCount(0);
     await expect(page.locator('section.panel', { hasText: 'Mill mimic' })).toHaveCount(0);
     for (const title of [/Production (by shift|· whole day)/, 'Order allocation', 'Material & operating balance', 'Finished stock by size']) {
       await expect(page.locator('section.panel', { hasText: title }).first()).toBeVisible();

@@ -5,6 +5,7 @@
 import type { FastifyInstance } from 'fastify';
 import { loadEnv } from '../../config/env';
 import { HttpError } from '../../shared/http-error';
+import { sharedFresh } from '../../shared/shared-fresh';
 import { searchParams } from '../../shared/request';
 import { HSM_DISCHARGED_BILLET } from '../../integrations/historian/tags';
 import { parseGrain, parseRange } from './params';
@@ -20,6 +21,8 @@ import { planReport } from './plan.service';
 import { hsmCosting } from './costing/costing.service';
 
 /** Billets into the mill: ERP log sheet INPUT_PCS vs the Influx Dicharged_Billet counter. */
+/** The historian writes about every 10 s; a 5 s share never hides a new reading for long. */
+const LIVE_FRESH_MS = 5_000;
 const BILLETS: CounterSpec = { key: 'billets', tag: HSM_DISCHARGED_BILLET, erp: (r) => r.v?.INPUT_PCS ?? null };
 const STAND_HOURS = [2, 6, 12, 24, 72];
 
@@ -111,7 +114,8 @@ export async function hsmRoutes(app: FastifyInstance) {
   });
 
   /** Live state: billets since the plant day began, and each stand's latest drive readings. */
-  app.get('/live', { config: { errorCode: 'hsm_live_failed' } }, async () => hsmLive(loadEnv()));
+  /** Live now — one historian read per 5 s however many screens poll it (sharedFresh). */
+  app.get('/live', { config: { errorCode: 'hsm_live_failed' } }, async () => sharedFresh('hsm-live', LIVE_FRESH_MS, () => hsmLive(loadEnv())));
 
   /** Stand trend: `group` roughing | finishing, `metric` current | rpm | force | onOff, `hours` 2–72. */
   app.get('/stands', { config: { errorCode: 'hsm_stands_failed' } }, async (req) => {

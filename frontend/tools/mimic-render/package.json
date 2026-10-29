@@ -1,0 +1,7 @@
+{
+  "name": "mimic-render",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Offline 3D render rig for the HSM and RMD process twins. Not part of the app bundle.",
+  "dependencies": { "three": "^0.186.0" }
+}

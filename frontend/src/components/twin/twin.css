@@ -1,0 +1,220 @@
+/*
+ * The process twins' skin (process-twin-guide §7, mill-mimic-improvement-spec). Scoped to
+ * `.mx-*`, so nothing outside the Mill mimic panel is touched; the names are the CPP mimic's,
+ * so its rules carry over.
+ *
+ *   - Equipment is neutral (the baked sprites). Colour is spent on two things only: the hot
+ *     steel moving through the mill, and what is wrong.
+ *   - Movement is data: every duration is set inline from a live rate; this file only says
+ *     what movement looks like.
+ *   - Text has three roles — name, sub-label, reading — each in its own lane above or below
+ *     the machine. Nothing is written on top of a glyph.
+ */
+
+.mx-host {
+  position: relative;
+  width: 100%;
+  display: flex;
+  outline: none;
+}
+
+.mx {
+  width: 100%;
+  height: 100%;
+  display: block;
+
+  /* The one fluid: hot steel. */
+  --mx-steel: #ff7a33;
+  --mx-lo: #16304b;
+
+  --mx-ink: #e7f1fb;
+  --mx-ink-2: #a9c4de;
+  --mx-ink-3: #7b9cbb;
+}
+
+/* Light: the dim ink is darkened to #546d88 — the guide's #6a839f is 3.8:1 on the panel, under the 4.5:1 floor (spec §7). */
+:root[data-theme="light"] .mx {
+  --mx-steel: #e2540b;
+  --mx-lo: #bccbdd;
+
+  --mx-ink: #142c47;
+  --mx-ink-2: #44607f;
+  --mx-ink-3: #546d88;
+}
+
+/* -------------------------------- the pass line ------------------------- */
+
+.mx-pipe-bed {
+  fill: none;
+  stroke: var(--mx-lo);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.55;
+}
+
+.mx-pipe-line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The travelling dashes: short round dashes on a long gap read as the bar moving. */
+.mx-pipe-flow {
+  fill: none;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-dasharray: 1.4 12;
+  animation: mx-flow linear infinite;
+}
+
+@keyframes mx-flow { to { stroke-dashoffset: -26.8; } }
+
+.mx-pipe--steel .mx-pipe-line { stroke: var(--mx-steel); }
+.mx-pipe--steel .mx-pipe-flow { stroke: var(--mx-steel); filter: url(#mx-glow); }
+
+/* An idle branch recedes: the subordinate-circuit style (guide §7); no dashes. */
+.mx-pipe--idle .mx-pipe-bed { opacity: 0.16; stroke-width: 3.4; }
+.mx-pipe--idle .mx-pipe-line { opacity: 0.35 !important; stroke-width: 1.4 !important; }
+/* A run whose diverter signal is stale: a dashed casing, nothing moving. */
+.mx-pipe--unknown .mx-pipe-bed { stroke-dasharray: 4 4; opacity: 0.4; }
+.mx-pipe--unknown .mx-pipe-line { opacity: 0.3 !important; stroke-width: 1.4 !important; }
+
+/* ------------------------------- typography -------------------------------- */
+
+.mx-name {
+  fill: var(--mx-ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.mx-sub {
+  fill: var(--mx-ink-3);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+}
+
+.mx-read {
+  fill: var(--mx-ink);
+  font-size: 12.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.mx-read--sm { font-size: 11px; }
+.mx-read.is-na { fill: var(--mx-ink-3); font-size: 11px; }
+.mx-read-unit { fill: var(--mx-ink-3); font-size: 8px; font-weight: 700; }
+/* Stale: grey, with its age. Suspect: amber with its "?". A total over a period: the quieter ink. */
+.mx-read--stale { fill: var(--mx-ink-3); }
+.mx-read-age { fill: var(--mx-ink-3); font-size: 8px; font-weight: 700; }
+.mx-read--suspect { fill: var(--warn); }
+.mx-read--total { fill: var(--mx-ink-2); }
+
+.mx-group {
+  fill: var(--mx-ink-2);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.mx-group-line { stroke: var(--mx-ink-3); stroke-width: 1; opacity: 0.45; }
+
+/* The route-inconsistency banner (spec C1): amber, once, never hidden. */
+.mx-banner { fill: var(--warn); font-size: 10px; font-weight: 800; letter-spacing: 0.3px; }
+.mx-banner-box { fill: color-mix(in srgb, var(--warn) 12%, transparent); stroke: color-mix(in srgb, var(--warn) 45%, transparent); stroke-width: 1; }
+
+/* ---------------------------- status indicators ---------------------------- */
+
+.mx-lamp-halo { fill: var(--na); opacity: 0.14; }
+.mx-lamp-core { fill: var(--na); }
+.mx-lamp-ring { fill: none; stroke: var(--mx-ink-3); stroke-width: 1.6; }
+.mx-lamp-ring--dashed { stroke-dasharray: 2.2 2; }
+.mx-lamp--running .mx-lamp-core { fill: var(--ok); }
+.mx-lamp--running .mx-lamp-halo { fill: var(--ok); opacity: 0.2; }
+.mx-lamp--warning .mx-lamp-core { fill: var(--warn); }
+.mx-lamp--warning .mx-lamp-halo { fill: var(--warn); opacity: 0.22; }
+.mx-lamp--fault .mx-lamp-core { fill: var(--risk); }
+.mx-lamp--fault .mx-lamp-halo { fill: var(--risk); opacity: 0.24; }
+.mx-lamp--stopped .mx-lamp-halo, .mx-lamp--unknown .mx-lamp-halo { opacity: 0.08; }
+
+/* The reference bar under a reading (spec C3). */
+.mx-bar-track { fill: var(--mx-ink-3); opacity: 0.25; }
+.mx-bar-fill { fill: var(--na); }
+.mx-bar--ok .mx-bar-fill { fill: var(--ok); }
+.mx-bar--warn .mx-bar-fill { fill: var(--warn); }
+.mx-bar--risk .mx-bar-fill { fill: var(--risk); }
+.mx-bar-tick { fill: var(--mx-ink); }
+.mx-bar.is-stale { opacity: 0.3; }
+
+/* ------------------------------ selection ---------------------------------- */
+
+.mx-node { cursor: pointer; transition: opacity 160ms ease; }
+.mx-node:focus-visible { outline: none; }
+.mx-node:focus-visible .mx-name { text-decoration: underline; }
+.mx-select { fill: none; stroke: var(--mx-ink); stroke-width: 2; }
+
+/* Unrelated equipment steps back to 0.25 (spec C4); it never disappears, because the shape of
+   the mill is half of what the drawing says. */
+.mx-host.is-sel .mx-node.is-off { opacity: 0.25; }
+.mx-host.is-sel .mx-pipe:not(.is-on) { opacity: 0.14; }
+.mx-host.is-sel .mx-pipe.is-on .mx-pipe-line { stroke-width: 3.2; }
+
+.mx-clear {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-hi);
+  background: color-mix(in srgb, var(--panel-2) 88%, transparent);
+  color: var(--text-3);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mx-clear:hover { color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mx-pipe-flow { animation: none; }
+}
+
+/* ==================== Baked equipment sprites ============================= */
+
+.mx-sprite--light { display: none; }
+:root[data-theme="light"] .mx-sprite--dark { display: none; }
+:root[data-theme="light"] .mx-sprite--light { display: block; }
+
+/* On a white panel even mid-tone steel loses its shadow side; this puts the form back. */
+:root[data-theme="light"] .mx-sprite--light { filter: contrast(1.1) saturate(1.15) brightness(0.97); }
+
+/* OUT OF SERVICE: the whole machine turns red and glows — readable across a control room. */
+.mx-sprite.is-fault {
+  filter:
+    grayscale(1) sepia(1) saturate(3.4) hue-rotate(-52deg) brightness(0.82)
+    drop-shadow(0 0 7px rgba(255, 70, 70, 0.34));
+  opacity: 0.94;
+}
+
+:root[data-theme="light"] .mx-sprite--light.is-fault {
+  filter:
+    grayscale(1) sepia(1) saturate(4.2) hue-rotate(-50deg) brightness(0.74)
+    drop-shadow(0 0 7px rgba(200, 30, 30, 0.3));
+}
+
+/* Not running: the same object, stood down. */
+.mx-sprite.is-idle { filter: saturate(0.3) brightness(0.92); opacity: 0.62; }
+:root[data-theme="light"] .mx-sprite.is-idle { filter: saturate(0.25) brightness(1.02); opacity: 0.52; }
+
+/* ------------------------------ the live pill ------------------------------ */
+
+.mx-pill { position: relative; }
+.mx-pill-list {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 220px; max-width: 360px;
+  padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-hi);
+  background: var(--panel-2); color: var(--text); font-size: 11px; line-height: 1.5; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.mx-pill-list b { display: block; font-size: 9.5px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-3); margin-top: 4px; }
+.mx-pill-list b:first-child { margin-top: 0; }

@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>mimic render rig</title>
+    <style>body { margin: 0; background: #111; }</style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./node_modules/three/build/three.module.js",
+          "three/examples/jsm/": "./node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import { renderMachine, MACHINES } from './scene.js';
+      window.MACHINES = MACHINES;
+      window.renderMachine = renderMachine;
+      window.rigReady = true;
+    </script>
+  </body>
+</html>

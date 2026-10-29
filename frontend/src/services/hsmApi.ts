@@ -28,11 +28,12 @@ export type {
 const DEDUPE_MS = 10_000;
 const inflight = new Map<string, { at: number; p: Promise<unknown> }>();
 
-export async function fetchJson<T>(url: string): Promise<T> {
-  const hit = inflight.get(url);
+/** With `signal` (the live store's polling) the request is the caller's own: no sharing, abortable. */
+export async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const hit = signal ? undefined : inflight.get(url);
   if (hit && Date.now() - hit.at < DEDUPE_MS) return hit.p as Promise<T>;
   const p = (async () => {
-    const res = await fetch(`${API_BASE}${url}`, { cache: 'no-store', headers: authHeader() });
+    const res = await fetch(`${API_BASE}${url}`, { cache: 'no-store', headers: authHeader(), signal });
     // The backend refuses every call without a valid session — back to the sign-in screen.
     if (res.status === 401) { sessionRejected(); throw new Error('Signed out'); }
     const type = res.headers.get('content-type') ?? '';
@@ -42,6 +43,7 @@ export async function fetchJson<T>(url: string): Promise<T> {
     if (!res.ok) throw new Error(body?.message ?? 'The request could not be completed');
     return body as T;
   })();
+  if (signal) return p;
   inflight.set(url, { at: Date.now(), p });
   p.catch(() => inflight.delete(url));
   if (inflight.size > 64) inflight.delete(inflight.keys().next().value!);

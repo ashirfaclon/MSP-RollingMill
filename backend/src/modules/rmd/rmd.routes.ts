@@ -20,7 +20,10 @@ import { rmdPlan } from './plan.service';
 import { rmdAssetForms } from './asset.service';
 import { isDate } from '../hsm/production.service';
 import { HttpError } from '../../shared/http-error';
+import { sharedFresh } from '../../shared/shared-fresh';
 
+/** The historian writes about every 10 s; a 5 s share never hides a new reading for long. */
+const LIVE_FRESH_MS = 5_000;
 const ZONES = ['route', 'finishing'] as const;
 const HOURS = [2, 6, 24, 72];
 
@@ -40,7 +43,8 @@ export async function rmdRoutes(app: FastifyInstance) {
   });
 
   /** The mill flow now: billets since 09:00 IST and every running-status point. */
-  app.get('/live', { config: { errorCode: 'rmd_live_failed' } }, async () => rmdLive(loadEnv()));
+  /** Live now — one historian read per 5 s however many screens poll it (sharedFresh). */
+  app.get('/live', { config: { errorCode: 'rmd_live_failed' } }, async () => sharedFresh('rmd-live', LIVE_FRESH_MS, () => rmdLive(loadEnv())));
 
   /** One zone's points: running share per interval over the last 2 / 6 / 24 / 72 h. */
   app.get('/stations', { config: { errorCode: 'rmd_stations_failed' } }, async (req) => {

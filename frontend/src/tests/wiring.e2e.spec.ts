@@ -54,8 +54,8 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   // ERP entered and losses booked for all 7 days: the note is Influx − ERP, 96.30 − 96.00.
   await expect(yieldCard.locator('.rm-card-note')).toHaveText('Delta 0.3 %');
   // Finished exit = the Production card's Influx figure: Σ Total_Production_Ton increases, 22–28 Sep.
-  const exit = page.getByRole('button', { name: /Finished exit/ });
-  await expect(exit).toContainText('1,140.3 MT');
+  const exit = page.locator('.mx-node', { hasText: 'Finished exit' }).locator('.mx-read');
+  await expect(exit).toContainText('1,140.3');
   // Order allocation: the production total only — no Made To Order / Made To Stock split.
   const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
   await expect(split.locator('.rm-alloc-total')).toHaveText('1,140.3 MT');
@@ -167,12 +167,12 @@ test('billets drawer: ERP input pieces against the Dicharged_Billet counter', as
 test('mill mimic is live: billets today, stand groups, and the stands drawer', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const mimic = page.locator('section.panel', { hasText: 'Mill mimic' });
-  await expect(mimic.getByRole('button', { name: /Billet infeed/ })).toContainText(/\d+ billets|NA/);
+  await expect(mimic.locator('.mx-node', { hasText: 'Billet infeed' }).locator('.mx-read')).toContainText(/\d+ billets|NA/, { timeout: 60_000 });
   await expect(mimic.getByText('Intermediate group')).toHaveCount(0);
-  await expect(mimic.locator('.rm-dot')).toHaveCount(11);   // RM 1–5 + FM 1–6
+  await expect(mimic.locator('.mx-lamp')).toHaveCount(11);   // RM 1–5 + FM 1–6, one lamp each
   await mimic.screenshot({ path: `${SHOTS}/wired-mimic.png` });
 
-  await mimic.getByRole('button', { name: /Finishing group/ }).click();
+  await mimic.locator('.mx-node', { hasText: 'FM1' }).click();
   // Opens on the group clicked, with no group switch inside.
   const drawer = page.getByRole('dialog', { name: 'Finishing group · FM 1–6' });
   await expect(drawer).toBeVisible();
@@ -186,7 +186,7 @@ test('mill mimic is live: billets today, stand groups, and the stands drawer', a
   await page.waitForTimeout(700);
   await drawer.screenshot({ path: `${SHOTS}/drill-stands.png` });
   await page.keyboard.press('Escape');
-  await mimic.getByRole('button', { name: /Roughing group/ }).click();
+  await mimic.locator('.mx-node', { hasText: 'RM1' }).click();
   const rough = page.getByRole('dialog', { name: 'Roughing group · RM 1–5' });
   await expect(rough.getByRole('table', { name: 'Stand readings now' }).locator('tbody tr')).toHaveCount(5);
   await expect(rough.getByRole('region', { name: 'Data source' })).toContainText('Motor_Curren5');
@@ -472,8 +472,8 @@ test('RMD: mass yield from the ERP log sheet (Prime + SL ÷ INPUT_MT); billets i
 
 test('RMD mill flow: route / diverter and finishing open their points, live, with source and formula', async ({ page }) => {
   await page.goto('/rmd/visualization');
-  const mimic = page.getByRole('list', { name: 'Mill process flow' });
-  await mimic.getByRole('button', { name: /Route \/ diverter/ }).click();
+  const mimic = page.locator('section.panel', { hasText: 'Mill mimic' });
+  await mimic.locator('.mx-node', { hasText: 'S1' }).first().click();
   const route = page.getByRole('dialog', { name: 'Route / diverter · L1 S1–S8, L2 S1–S6' });
   await expect(route.getByRole('table', { name: 'Running status now' }).locator('tbody tr')).toHaveCount(14);
   await expect(route.getByRole('region', { name: 'Data source' })).toContainText("Unit = 'CR Mill1/2'");
@@ -482,7 +482,7 @@ test('RMD mill flow: route / diverter and finishing open their points, live, wit
   await route.screenshot({ path: `${SHOTS}/rmd-drill-route.png` });
   await page.keyboard.press('Escape');
 
-  await mimic.getByRole('button', { name: /Finishing group/ }).click();
+  await mimic.locator('.mx-node', { hasText: 'PRI' }).click();
   const fin = page.getByRole('dialog', { name: 'Finishing group · line 1 and line 2' });
   const rows = fin.getByRole('table', { name: 'Running status now' }).locator('tbody tr');
   await expect(rows).toHaveCount(10);
@@ -490,7 +490,7 @@ test('RMD mill flow: route / diverter and finishing open their points, live, wit
   await page.keyboard.press('Escape');
 
   // Billet infeed opens billets in per line (no yield in this view).
-  await mimic.getByRole('button', { name: /Billet infeed/ }).click();
+  await mimic.locator('.mx-node', { hasText: 'Billet infeed' }).click();
   const inf = page.getByRole('dialog', { name: 'Billet infeed · Influx' });
   await expect(inf.locator('.pd-stats')).not.toContainText('Mass yield');
   await expect(inf.getByRole('table', { name: 'Billets in by period' })).toBeVisible();
@@ -514,7 +514,7 @@ test('RMD: production and losses from the ERP log sheet (FA-SKJ), and what they 
   await expect(prime.locator('.rm-card-value')).toContainText('1,668.2');
   await page.locator('.rm-strip').screenshot({ path: `${SHOTS}/rmd-production-card.png` });
   // Everything else stays on PRODUCT_PRIME_SLENGTH_MT.
-  await expect(page.getByRole('list', { name: 'Mill process flow' }).getByRole('button', { name: /Finished exit/ })).toContainText('1,689.9 MT');
+  await expect(page.locator('section.panel', { hasText: 'Mill mimic' }).locator('.mx-node', { hasText: 'Finished exit' }).locator('.mx-read')).toContainText('1,689.9');
   await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('1,689.9 MT');
   // Running rate now calculates: production ÷ running hours.
   await expect(page.locator('section.panel', { hasText: 'Production · whole day' }).locator('.rm-foot')).toContainText(/Running rate\s*\d+\.\d{2} TPH/);
