@@ -16,7 +16,8 @@
  *                      06:00, RM / FM drives on (On_Off), the production counter for the period.
  * The stand name places a reading in its group (RM → roughing, FM → finishing). The drive group is
  * chosen in the header (the user, 28 Oct 2026) — roughing, finishing, auxiliary (MID's pumps); the
- * mimic only shows the live state. Vibration from MID; PM items on ERP PM; the rest have
+ * mimic only shows the live state. Vibration from MID. No PM items: HSM's equipment is not in the
+ * ERP's PM module (the user, 29 Oct 2026). The rest have
  * no source in the sheet.
  */
 import { Fragment, useMemo, useState } from 'react';
@@ -36,7 +37,6 @@ import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
 import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
-import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, pmFacts, usePm } from './ErpPm';
 import './asset.css';
 
 /** HSM has no intermediate group (the user, 26 Oct 2026; the historian has only RM 1–5 and FM 1–6). */
@@ -64,9 +64,6 @@ export default function AssetHealth() {
   const { dates } = useSelection();
   const [vibOpen, setVibOpen] = useState(false);
   const mid = useMid('hsm', group);
-  const pm = usePm('hsm');
-  const pmFact = pmFacts(pm);
-  const [pmOpen, setPmOpen] = useState(false);
 
   const loadUrl = rangeUrl('/api/hsm/mill-load', dates);
   const loadS = useApi<HsmMillLoadReport>(loadUrl);
@@ -100,13 +97,13 @@ export default function AssetHealth() {
           ? <span className="chip chip--info ah-status">{liveGroup.stateLabel}</span>
           : <span className="chip chip--na ah-status">No live data</span>)}
         <dl className="ah-asset-facts">
-          {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', pmFact.nextPm], ['Open work orders', pmFact.openWorkOrders]] as const).map(([k, v]) => (
+          {([['Last inspection', midDate(mid.date)]] as const).map(([k, v]) => (
             <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className={`num ${v ? 'v-val' : 'v-na'}`}>{v ?? 'NA'}</dd></div>
           ))}
         </dl>
       </Panel>
 
-      <section className="rm-strip ah-strip" aria-label="Condition KPIs">
+      <section className="rm-strip ah-strip ah-strip--five" aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${drive} group`} mid={mid} />
@@ -131,8 +128,6 @@ export default function AssetHealth() {
         {NA('Gearbox oil', '', 'hold')}
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod"
           noEntries={!!rateS.data && rateS.dataUrl === rateUrl && runH == null} />
-        <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
-        <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={runH} title="HSM" />
       </section>
 
       <Panel title="Grouped asset mimic">
@@ -170,10 +165,7 @@ export default function AssetHealth() {
         </Panel>
       </div>
 
-      <div className="rm-row">
-        <Panel title="ERP PM & work-order history" className="rm-panel" bodyClass="rm-body ah-list">
-          <ErpPmRows pm={pm} runH={runH} onOpen={() => setPmOpen(true)} />
-        </Panel>
+      <div className="rm-row ah-row--one">
         <Panel title="Remarks" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
           <MidRemarks mid={mid} />
         </Panel>

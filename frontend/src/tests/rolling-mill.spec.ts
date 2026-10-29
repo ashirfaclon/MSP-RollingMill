@@ -162,21 +162,19 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; the h
   const main = page.getByRole('main');
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Finishing drive group');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/, /^PM on time/]);
+  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/]);   // no PM items on HSM
   // As the HSM sheet: bearing temp and motor current from the Mill Load Log Sheet (NA until real
   // entries), run hours from the ERP; the rest NA.
-  for (const i of [3, 5]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
+  for (const i of [3]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^(NA|\d[\d,]*)%$/);
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
-  for (const t of ['Grouped asset mimic', 'Condition trends', 'ERP PM & work-order history', 'Remarks']) {
+  for (const t of ['Grouped asset mimic', 'Condition trends', 'Remarks']) {
     await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
   }
-  // Never a sample figure: the NA blocks stay NA.
-  for (const t of ['ERP PM & work-order history']) {
-    const vals = await main.locator('section.panel', { hasText: t }).locator('.num').allInnerTexts();
-    expect(vals.every((v) => v.trim().startsWith('NA'))).toBe(true);
-  }
+  // No PM items on HSM (the user, 29 Oct 2026): no ERP PM panel, no Next PM / Open work orders.
+  await expect(main.locator('section.panel', { hasText: 'ERP PM & work-order history' })).toHaveCount(0);
+  await expect(main.locator('.ah-fact dt')).toHaveText(['Last inspection']);
   // The sheet gives no source for the mimic: every zone NA.
   await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit']);
   // The Visualization mimic's Influx tags: billets today, drives on per group, the production counter.

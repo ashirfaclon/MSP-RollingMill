@@ -9,6 +9,8 @@
 
 /* Six condition cards in one row. */
 .rm-strip.ah-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+/* HSM: no PM on time card (no equipment in the ERP's PM module). */
+.rm-strip.ah-strip.ah-strip--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
 /* A row with one panel (Condition trends): full width. */
 .rm-row.ah-row--one { grid-template-columns: minmax(0, 1fr); }

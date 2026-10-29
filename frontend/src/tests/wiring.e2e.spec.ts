@@ -1407,8 +1407,7 @@ for (const c of [
 });
 
 for (const c of [
-  // 1 Aug – 27 Oct 2026, ERP PM (EQPT_* tables), whole mill. HSM (division S1) has no equipment in the ERP: NA throughout.
-  { mill: 'hsm', pct: /^NA/, done: 'NA', mtbf: /^NA$/, mttr: 'NA', action: 'NA', wo: 'NA' },
+  // 1 Aug – 27 Oct 2026, ERP PM (EQPT_* tables), whole mill. Not on HSM (no equipment in the ERP's PM module).
   // RMD: 1,563 PM due, 1 done on time; 1 breakdown (Flying Shear Building, 2.05 h, not closed).
   { mill: 'rmd', pct: /^0\.1\s*%$/, done: '1 of 1,563', mtbf: /^[\d,]+\.\d h$/, mttr: '2.05 h', action: '1', wo: '0' },
   // LSM: 35 due, 1 done late; its only breakdown is remarked "TEST" — left out.
@@ -1426,7 +1425,7 @@ for (const c of [
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
   await expect(cards.locator('.rm-card', { hasText: 'PM on time' }).locator('.rm-card-value')).toHaveText(c.pct, { timeout: 60_000 });
   await expect(main.locator('.ah-fact', { hasText: 'Open work orders' }).locator('dd')).toHaveText(c.wo);
-  await expect(main.locator('.ah-fact', { hasText: 'Next PM' }).locator('dd')).toHaveText(c.mill === 'hsm' ? 'NA' : /^\d{1,2} \w{3} \d{4}$/);
+  await expect(main.locator('.ah-fact', { hasText: 'Next PM' }).locator('dd')).toHaveText(/^\d{1,2} \w{3} \d{4}$/);
   const panel = main.locator('section.panel', { hasText: 'ERP PM & work-order history' });
   const val = (k: string) => panel.locator('.ah-row', { hasText: k }).locator('.num');
   await expect(val('PM completed on time')).toHaveText(c.done);
@@ -1434,10 +1433,6 @@ for (const c of [
   await expect(val('MTTR')).toHaveText(c.mttr);
   await expect(val('Open action')).toHaveText(c.action);
   await panel.screenshot({ path: `${SHOTS}/${c.mill}-erp-pm.png` });
-  if (c.mill === 'hsm') {
-    await expect(panel.getByRole('button')).toHaveCount(0);
-    return;
-  }
   await cards.getByRole('button', { name: 'PM on time', exact: true }).click();
   const d = page.getByRole('dialog', { name: `${c.mill.toUpperCase()} · ERP PM` });
   await expect(d.getByRole('table', { name: 'PM due per month' }).locator('thead th')).toHaveText(['Month', 'Due', 'Done on time', 'Done late', 'Not done']);
