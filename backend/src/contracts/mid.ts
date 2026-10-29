@@ -1,4 +1,4 @@
-/** GET /api/mid/:mill — MID vibration monitoring (MID Logbook Form Spec shapes), per visit. */
+/** GET /api/mid/:mill — MID condition monitoring (the MID logbook forms), per visit. */
 
 export type MidSection = 'roughing' | 'route' | 'finishing' | 'auxiliary';
 export type MidStatus = 'Good' | 'Acceptable' | 'Un-acceptable';
@@ -32,6 +32,17 @@ export interface MidVisit {
   machines: MidMachine[];
 }
 
+/** Form TEMPERATURE READING — one thermography reading of an equipment (one phase). */
+export interface MidTemperature {
+  equipment: string;
+  phase: string | null;
+  loadMw: number | null;
+  designC: number | null;
+  maxC: number | null;
+  status: MidStatus | null;
+  remarks: string | null;
+}
+
 export interface MidReport {
   mill: string;
   /** Period end: visits up to and including this date. */
@@ -42,6 +53,8 @@ export interface MidReport {
   visits: MidVisit[];
   /** The last visit up to `to`. */
   latest: MidVisit | null;
+  /** The last thermography visit up to `to` (Temperature Reading form); null when none. */
+  temperature: { date: string; readings: MidTemperature[] } | null;
   /** Report cells left out (typed as a date / time instead of a number). */
   skipped: { date: string; machine: string; point: string; field: string; raw: string }[];
 }

@@ -1,18 +1,23 @@
 /**
- * MID vibration monitoring per mill, in the shapes of the MID logbook forms (MID Logbook Form Spec):
- * Form 1 VIBRATION READING (one row per point) and Form 2 MACHINE CONDITION (one row per machine).
+ * MID condition monitoring per mill, from the MID logbook forms (the user, 29 Oct 2026):
+ * VIBRATION READING (one entry per point, with MID's status and remarks) and TEMPERATURE READING
+ * (one entry per thermography reading).
  *
- * Until the forms go live, the rows are MID's Excel reports, converted once by
- * scripts/import-mid-reports.py into mid-reports.json (the user, 27 Oct 2026). When the forms
- * are made, their entries join here as a second source, a logbook entry replacing a report row of
- * the same date, mill, machine and point; the screens read the same report either way.
+ * MID's Excel reports, converted once by scripts/import-mid-reports.py into mid-reports.json, stay
+ * as the earlier visits: a machine filed in the logbook for a date replaces that machine's report
+ * rows of the same date. A machine's status is the worst of its points', its diagnosis their remarks.
  */
-import type { MidMachine, MidPoint, MidReport, MidStatus, MidVisit } from '../../contracts';
+import type { Env } from '../../config/env';
+import type { MidMachine, MidPoint, MidReport, MidStatus, MidTemperature, MidVisit } from '../../contracts';
+import { fetchFormEntries, num, type InsightEntry } from '../../integrations/logbook/client';
+import { isDate } from '../hsm/production.service';
+import { MID_TEMPERATURE_FORM, MID_VIBRATION_FORM, tagOf } from '../forms-db/forms';
 import { sectionOf } from './sections';
 import reports from './mid-reports.json';
 
 interface ReadingRow extends MidPoint { date: string; mill: string; machine: string }
 interface ConditionRow { date: string; mill: string; machine: string; status: string; diagnosis: string | null }
+interface TemperatureRow extends MidTemperature { date: string; mill: string }
 
 const READINGS = reports.readings as ReadingRow[];
 const CONDITIONS = reports.conditions as ConditionRow[];
@@ -22,7 +27,78 @@ const highest = (points: MidPoint[]) => {
   return v.length ? Math.max(...v) : null;
 };
 
-export function midReport(mill: string, to: string, readings = READINGS, conditions = CONDITIONS): MidReport {
+const STATUSES: MidStatus[] = ['Good', 'Acceptable', 'Un-acceptable'];
+const statusOf = (v: unknown) => (STATUSES.includes(v as MidStatus) ? (v as MidStatus) : null);
+const text = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+/** Visits are filed after the day: read two years of submissions. */
+const LOOK_BACK_MS = 730 * 86_400_000;
+
+/** The logbook's entries of one form for a mill, oldest submission first (a re-filed entry wins). */
+async function entries(env: Env, form: string, mill: string): Promise<{ date: string; v: Record<string, unknown> }[]> {
+  const read = await fetchFormEntries(tagOf(form), Date.now() - LOOK_BACK_MS, env);
+  if (!read.ok) return [];
+  const at = (r: InsightEntry) => String(r.createdAt ?? r.invocationTime ?? '');
+  return [...read.rows].sort((a, b) => at(a).localeCompare(at(b)))
+    .map((r) => ({ v: r.result ?? {}, date: String(r.result?.date ?? '').slice(0, 10) }))
+    .filter((e) => isDate(e.date) && String(e.v.mill ?? '').toLowerCase() === mill);
+}
+
+/** The report with the MID logbook forms' entries laid over the Excel reports. Logbook down: the reports alone. */
+export async function midReportLive(env: Env, mill: string, to: string): Promise<MidReport> {
+  const [vib, temp] = await Promise.all([
+    entries(env, MID_VIBRATION_FORM, mill).catch(() => []),
+    entries(env, MID_TEMPERATURE_FORM, mill).catch(() => []),
+  ]);
+  // One reading per date, machine, component and point: the latest filed.
+  const points = new Map<string, ReadingRow & { status: MidStatus | null; remarks: string | null }>();
+  for (const { date, v } of vib) {
+    const machine = text(v.machine); const component = text(v.component); const point = text(v.point);
+    if (!machine || !component || !point) continue;
+    points.set([date, machine, component, point].join('|'), {
+      date, mill, machine, part: null, component, point,
+      horizontal: num(v['horizontal-mm-s-rms']), vertical: num(v['vertical-mm-s-rms']), axial: num(v['axial-mm-s-rms']),
+      status: statusOf(v.status), remarks: text(v.remarks),
+    });
+  }
+  const logged = [...points.values()];
+  const key = (r: { date: string; machine: string }) => `${r.date}|${r.machine}`;
+  const filed = new Set(logged.map(key));
+  const conditions = new Map<string, ConditionRow>();
+  for (const r of logged) {
+    const c = conditions.get(key(r));
+    const worse = !c || (r.status !== null && STATUSES.indexOf(r.status) > STATUSES.indexOf(c.status as MidStatus));
+    const notes = [...new Set([...(c?.diagnosis ? c.diagnosis.split(' · ') : []), ...(r.remarks ? [r.remarks] : [])])];
+    conditions.set(key(r), {
+      date: r.date, mill, machine: r.machine,
+      status: (worse ? r.status : c!.status) ?? '', diagnosis: notes.length ? notes.join(' · ') : null,
+    });
+  }
+  // One reading per date, equipment and phase: the latest filed.
+  const thermo = new Map<string, TemperatureRow>();
+  for (const { date, v } of temp) {
+    const equipment = text(v.equipment);
+    if (!equipment) continue;
+    thermo.set([date, equipment, text(v.phase)].join('|'), {
+      date, mill, equipment, phase: text(v.phase), loadMw: num(v['load-during-monitoring-mw']),
+      designC: num(v['design-temperature-c']), maxC: num(v['max-temperature-recorded-c']), status: statusOf(v.status), remarks: text(v.remarks),
+    });
+  }
+  const temperatures = [...thermo.values()];
+  const report = midReport(
+    mill, to,
+    [...READINGS.filter((r) => !(r.mill === mill && filed.has(key(r)))), ...logged],
+    [...CONDITIONS.filter((c) => !(c.mill === mill && filed.has(key(c)))), ...conditions.values()],
+    temperatures,
+  );
+  const dates = (rows: { date: string }[]) => [...new Set(rows.map((r) => r.date).filter((d) => d <= to))].sort();
+  report.sources.push(
+    ...dates(logged).map((date) => ({ kind: 'logbook' as const, name: 'MID Logbook → Vibration Reading', date })),
+    ...dates(temperatures).map((date) => ({ kind: 'logbook' as const, name: 'MID Logbook → Temperature Reading', date })),
+  );
+  return report;
+}
+
+export function midReport(mill: string, to: string, readings = READINGS, conditions = CONDITIONS, temperatures: TemperatureRow[] = []): MidReport {
   const rows = readings.filter((r) => r.mill === mill && r.date <= to);
   const dates = [...new Set(rows.map((r) => r.date))].sort();
   const visits: MidVisit[] = dates.map((date) => {
@@ -36,7 +112,7 @@ export function midReport(mill: string, to: string, readings = READINGS, conditi
         const c = conditions.find((x) => x.mill === mill && x.date === date && x.machine === machine);
         return {
           machine, section: sectionOf(mill, machine),
-          status: (c?.status as MidStatus | undefined) ?? null,
+          status: statusOf(c?.status),
           diagnosis: c?.diagnosis ?? null,
           maxMmS: highest(points),
           points,
@@ -44,11 +120,17 @@ export function midReport(mill: string, to: string, readings = READINGS, conditi
       }),
     };
   });
+  const thermo = temperatures.filter((t) => t.mill === mill && t.date <= to);
+  const thermoDate = thermo.map((t) => t.date).sort().at(-1) ?? null;
   return {
     mill, to,
     sources: reports.source.filter((s) => s.mill === mill && s.date <= to).map((s) => ({ kind: 'report' as const, name: s.file, date: s.date })),
     visits,
     latest: visits.at(-1) ?? null,
+    temperature: thermoDate === null ? null : {
+      date: thermoDate,
+      readings: thermo.filter((t) => t.date === thermoDate).map(({ date: _d, mill: _m, ...t }) => t),
+    },
     skipped: reports.skipped.filter((s) => s.mill === mill && s.date <= to).map(({ date, machine, point, field, raw }) => ({ date, machine, point, field, raw })),
   };
 }

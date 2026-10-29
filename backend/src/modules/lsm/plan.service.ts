@@ -21,6 +21,8 @@ import { MSG } from '../../shared/messages';
 import { dateRange, round2 } from '../hsm/production.service';
 import { RMD_SHIFTS, rmdPlanDays, summarisePlan, type PlanMonth } from '../rmd/plan.service';
 import { lsmProductionByDay } from './production.service';
+import { planSource, savedPlanDays, withSavedPlan } from '../forms-db/plan.store';
+import type { ConfigMill } from '../forms-db/forms';
 // TODO(plan-feature): HARDCODED — the LSM plan for October 2026 (8,750 MT) from the plant's Excel
 // (PRODUCTION PLAN FOR LSM Oct-2026.xlsx, shared 16 Oct 2026). Remove this import and
 // plan/lsm-plan-2026-10.json once the plan-import feature supplies the plan.
@@ -79,20 +81,24 @@ export function shiftTotals(days: RmdPlanDay[]): NonNullable<LsmPlanReport['tota
  * Production Sheet form (LSM, RMS): the ERP day split by the shifts' prime pieces.
  */
 export async function planWithShifts(env: Env, from: string, to: string, opts: {
-  months: Map<string, PlanMonth>; actual: (dates: string[]) => Map<string, number | null>; form: string; source: string;
+  months: Map<string, PlanMonth>; actual: (dates: string[]) => Map<string, number | null>; form: string; source: string; mill: ConfigMill;
 }): Promise<LsmPlanReport> {
   const dates = dateRange(from, to);
-  const read = await fetchFormEntries(opts.form, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
+  const [read, saved] = await Promise.all([
+    fetchFormEntries(opts.form, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env),
+    // The plan saved on the dashboard (logbook Production Plan) wins over the import, date by date.
+    savedPlanDays(env, opts.mill, from, to).catch(() => new Map()),
+  ]);
   const pcs = read.ok ? primeByShift(read.rows) : new Map<string, Record<string, number>>();
-  const days = rmdPlanDays(dates, opts.actual(dates), opts.months)
+  const days = withSavedPlan(rmdPlanDays(dates, opts.actual(dates), opts.months), saved)
     .map((d) => ({ ...d, actualByShift: splitByShift(d, pcs.get(d.date)) }));
   return {
-    from, to, source: opts.source, days,
+    from, to, source: planSource(saved, opts.source), days,
     totals: { ...summarisePlan(days), shifts: shiftTotals(days) },
     shiftSource: { form: opts.form, connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
   };
 }
 
 export function lsmPlan(env: Env, from: string, to: string): Promise<LsmPlanReport> {
-  return planWithShifts(env, from, to, { months: MONTHS, actual: (dates) => lsmProductionByDay(env, dates), form: LSM_SHEET_FORM, source: oct2026.source });
+  return planWithShifts(env, from, to, { months: MONTHS, actual: (dates) => lsmProductionByDay(env, dates), form: LSM_SHEET_FORM, source: oct2026.source, mill: 'lsm' });
 }

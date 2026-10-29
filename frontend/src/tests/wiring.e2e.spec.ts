@@ -904,13 +904,26 @@ test('RMD asset health: roughing group — the 20" and 16" R stands\' gearbox oi
   await cards.screenshot({ path: `${SHOTS}/rmd-gearbox-oil-temp.png` });
   await view.getByRole('button', { name: 'Level' }).click();
   await expect(oil.locator('.rm-card-value')).toHaveText(/^887\s*L$/);
+  // The drill-down shows the card's view only (the plant, 29 Oct 2026): Level → oil levels alone.
   await oil.click();
-  const d = page.getByRole('dialog', { name: 'Roughing · gearbox oil' });
+  const d = page.getByRole('dialog', { name: 'Roughing · oil level' });
   const t = d.getByRole('table', { name: 'Oil tank level' });
   await expect(t.locator('tbody tr td:first-child')).toHaveText(['20" R stand', '16" R stand']);
+  await expect(d.getByRole('table', { name: 'Oil tank temperature' })).toHaveCount(0);
   await expect(d.getByRole('region', { name: 'Formula' })).toContainText('20" / 16" R stand 1.63 × 1.26 × 1.30 (2,670 L)');
   await page.waitForTimeout(600);
   await d.screenshot({ path: `${SHOTS}/rmd-roughing-oil.png` });
+  await page.keyboard.press('Escape');
+  // Temp → oil temperatures alone: 1 Oct 20" 46.5, 16" 51 °C.
+  await view.getByRole('button', { name: 'Temp' }).click();
+  await oil.click();
+  const dt = page.getByRole('dialog', { name: 'Roughing · oil temperature' });
+  const tt = dt.getByRole('table', { name: 'Oil tank temperature' });
+  await expect(tt.locator('tbody tr td:first-child')).toHaveText(['20" R stand', '16" R stand']);
+  await expect(dt.getByRole('table', { name: 'Oil tank level' })).toHaveCount(0);
+  await expect(dt.getByRole('region', { name: 'Formula' })).toContainText('45–65 °C');
+  await page.waitForTimeout(600);
+  await dt.screenshot({ path: `${SHOTS}/rmd-roughing-oil-temp.png` });
   await page.keyboard.press('Escape');
   // The 20" / 16" bearing forms were last filled on 23 Aug 2026: no reading in October — NA, and the card says why.
   const bearing = cards.locator('.rm-card', { hasText: 'Bearing temp' });
@@ -1135,7 +1148,7 @@ test('RMD asset health: gearbox oil in litres — level × the tank\'s inside le
   const card = cards.getByRole('button', { name: 'Gearbox oil', exact: true });
   await expect(card.locator('.rm-card-value')).toHaveText(/^367\s*L$/, { timeout: 90_000 });
   await card.click();
-  const d = page.getByRole('dialog', { name: 'Route · gearbox oil' });
+  const d = page.getByRole('dialog', { name: 'Route · oil level' });
   const t = d.getByRole('table', { name: 'Oil tank level' });
   await expect(t.locator('thead th')).toHaveText(['Tank', 'Level (in)', 'Oil (L)', 'Capacity (L)', 'Date']);
   for (const v of ['13.5', '367', '932']) await expect(t.getByRole('row', { name: /^OC stand 3–4/ })).toContainText(v);
@@ -1327,7 +1340,13 @@ test('RMS asset health: as the RMS sheet — run hours from the ERP (NET_RUNNING
   await page.screenshot({ path: `${SHOTS}/rms-asset-health.png`, fullPage: true });
 });
 
-test('HSM checklists: production variance — per day, the production figures filled by the dashboard, the reasons typed; shift setup has every field of the plant sheet', async ({ page }) => {
+test('HSM checklists: production variance — per day, the production figures filled by the dashboard, the reasons typed; shift setup has every field of the plant sheet; both save to the logbook', async ({ page }) => {
+  // The saves are caught here: a test run writes nothing to the logbook.
+  const posts: { url: string; body: unknown }[] = [];
+  await page.route('**/api/forms/hsm/*', (route) => {
+    posts.push({ url: route.request().url(), body: route.request().postDataJSON() });
+    return route.fulfill({ json: { ok: true, form: 'f', entries: 1 } });
+  });
   await page.goto('/hsm/visualization');
   const panel = page.getByRole('main').locator('section.panel', { hasText: 'Checklists' });
   await panel.getByRole('button', { name: /Production variance checklist/ }).click();
@@ -1345,7 +1364,9 @@ test('HSM checklists: production variance — per day, the production figures fi
   await v.getByLabel('Mill scale').fill('2.63');
   await v.getByLabel('End cut', { exact: true }).fill('3.43');
   await expect(v.getByLabel('Reasons against variance')).toContainText('Not explained 9.54 MT');
-  await expect(v.getByRole('button', { name: 'Save' })).toBeDisabled();
+  await v.getByRole('button', { name: 'Save' }).click();
+  await expect(v.getByRole('status')).toHaveText('Saved to the logbook (Production Variance Checklist).');
+  expect(posts.at(-1)).toEqual({ url: expect.stringMatching(/\/api\/forms\/hsm\/variance$/), body: { date: '2026-10-20', missRoll: null, finishEndcut: null, millScale: 2.63, endCut: 3.43 } });
   await page.waitForTimeout(500);
   await v.screenshot({ path: `${SHOTS}/hsm-checklist-variance.png` });
   await page.keyboard.press('Escape');
@@ -1353,6 +1374,20 @@ test('HSM checklists: production variance — per day, the production figures fi
   const s = page.getByRole('dialog', { name: 'Shift setup checklist' });
   await expect(s.locator('.ck-group-head h3')).toHaveText(['RM guide setting', 'FM guide setting', 'Vertical edger gap · pinch roll gap', 'Roll type', 'Work roll dia']);
   await expect(s.locator('.ck-f > span')).toHaveCount(5 + 5 + 6 + 3 + 5 + 11 + 1);
+  await s.getByLabel('Date').fill('2026-10-21');
+  await s.locator('label', { has: page.locator('span', { hasText: /^Shift$/ }) }).locator('select').selectOption('Night');
+  await s.getByLabel('Shift in-charge').fill('A. Kumar');
+  // Typing stays in the field (a number box keeps focus over several keys).
+  const r1 = s.locator('.ck-group', { hasText: 'RM guide setting' }).getByLabel('R1');
+  await r1.pressSequentially('125');
+  await expect(r1).toHaveValue('125');
+  await s.locator('.ck-group', { hasText: 'Roll type' }).getByLabel('R2').selectOption('Plain');
+  await s.locator('.ck-group', { hasText: 'Work roll dia' }).getByLabel('F6').fill('412.5');
+  await s.getByRole('button', { name: 'Save' }).click();
+  await expect(s.getByRole('status')).toHaveText('Saved to the logbook (Shift Setup Checklist).');
+  expect(posts.at(-1)).toEqual({ url: expect.stringMatching(/\/api\/forms\/hsm\/setup$/), body: { values: {
+    Date: '2026-10-21', Shift: 'Night', 'Shift in-charge': 'A. Kumar', 'RM guide setting R1': 125, 'Roll type R2': 'Plain', 'Work roll dia F6': 412.5,
+  } } });
   await page.waitForTimeout(500);
   await s.screenshot({ path: `${SHOTS}/hsm-checklist-setup.png` });
 });
@@ -1403,7 +1438,7 @@ for (const c of [
   await cards.getByRole('button', { name: 'Vibration RMS', exact: true }).click();
   const d = page.getByRole('dialog', { name: c.drawer });
   await expect(d.getByRole('table', { name: 'MID machines' }).locator('thead th')).toHaveText(['Machine', 'Highest (mm/s)', 'Status', 'Diagnosis']);
-  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('MID logbook forms');
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('MID Logbook → Vibration Reading');
   await page.waitForTimeout(600);
   await d.screenshot({ path: `${SHOTS}/${c.mill}-mid-vibration.png` });
 });
@@ -1448,7 +1483,14 @@ for (const c of [
   // RMD: the FY plan's October, 8,220.638 MT (Prime + SL) over 31 days; HSM: the Oct 1–18 rolling plan.
   { mill: 'rmd', total: /^8220\.\d+$/ },   // Σ the daily targets (265.18 × 31)
   { mill: 'hsm', total: /^\d+(\.\d+)?$/ },
-] as const) test(`${c.mill.toUpperCase()}: production plan config — opens on the current plan, month total, shutdowns, Day / Night per day`, async ({ page }) => {
+] as const) test(`${c.mill.toUpperCase()}: production plan config — opens on the current plan, month total, shutdowns, Day / Night per day; Save posts the month`, async ({ page }) => {
+  // The save is caught here: a test run writes nothing to the logbook.
+  let posted: { month: string; monthPlanMt: number; days: { date: string; shutdown: boolean; dayMt: number; nightMt: number }[] } | null = null;
+  await page.route(`**/api/forms/plan/${c.mill}`, (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    posted = route.request().postDataJSON();
+    return route.fulfill({ json: { ok: true, form: 'f', entries: 31 } });
+  });
   await page.goto(`/${c.mill}/visualization`);
   await page.getByRole('button', { name: 'Edit plan' }).click();
   const d = page.getByRole('dialog', { name: `${c.mill.toUpperCase()} · production plan` });
@@ -1465,16 +1507,38 @@ for (const c of [
   await expect(table.getByLabel('1 Oct Day shift target', { exact: true })).toHaveValue('50');
   await expect(table.getByLabel('2 Oct Day shift target', { exact: true })).toBeDisabled();
   await expect(table.locator('tfoot')).toContainText('3,000.00');
-  await expect(d.getByRole('button', { name: 'Save plan' })).toBeDisabled();
+  // A plan that does not split evenly still adds up exactly: 1,000 over 60 shifts = 40 × 16.67 + 20 × 16.66.
+  await d.getByLabel('Month plan (MT)').fill('1000');
+  await d.getByRole('button', { name: 'Spread over working days' }).click();
+  await expect(table.locator('tfoot td').last()).toHaveText('1,000.00');
+  await expect(d.locator('.pc-warn')).toHaveCount(0);
+  await d.getByLabel('Month plan (MT)').fill('3000');
+  await d.getByRole('button', { name: 'Spread over working days' }).click();
   await page.waitForTimeout(600);
   await d.screenshot({ path: `${SHOTS}/${c.mill}-plan-config.png` });
+  await d.getByRole('button', { name: 'Save plan' }).click();
+  await expect(d.getByRole('status')).toHaveText('Saved — 31 days to the logbook (Production Plan).');
+  expect(posted!.month).toBe('2026-10');
+  expect(posted!.monthPlanMt).toBe(3000);
+  expect(posted!.days).toHaveLength(31);
+  expect(posted!.days.slice(0, 2)).toEqual([
+    { date: '2026-10-01', shutdown: false, dayMt: 50, nightMt: 50 },
+    { date: '2026-10-02', shutdown: true, dayMt: 0, nightMt: 0 },
+  ]);
 });
 
 for (const c of [
   { mill: 'rmd', n: 9 },
   { mill: 'lsm', n: 9 },
   { mill: 'hsm', n: 9 },   // the same nine fields for every mill — the config replaces the Excel sheets
-] as const) test(`${c.mill.toUpperCase()} condition analytics: CA inputs — the month's targets and costs, ${c.n} fields`, async ({ page }) => {
+] as const) test(`${c.mill.toUpperCase()} condition analytics: CA inputs — the month's targets and costs, ${c.n} fields; Save needs every field`, async ({ page }) => {
+  // The save is caught here: a test run writes nothing to the logbook.
+  let posted: { month: string; values: Record<string, number> } | null = null;
+  await page.route(`**/api/forms/ca/${c.mill}`, (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    posted = route.request().postDataJSON();
+    return route.fulfill({ json: { ok: true, form: 'f', entries: 1 } });
+  });
   await page.goto(`/${c.mill}/condition-analytics`);
   const costing = page.getByRole('main').locator('section.panel', { hasText: 'Costing & impact' });
   await costing.getByRole('button', { name: 'Edit inputs' }).click();
@@ -1484,7 +1548,53 @@ for (const c of [
   await expect(d.getByRole('region', { name: 'Targets' }).locator('.ck-f > span')).toHaveText(['Benchmark running rate (MT/h)', 'Benchmark specific energy (kWh/MT)', 'Standard mass yield (%)']);
   await d.getByLabel('Incremental contribution (₹/MT)').fill('1200');
   await expect(d.getByLabel('Incremental contribution (₹/MT)')).toHaveValue('1200');
-  await expect(d.getByRole('button', { name: 'Save inputs' })).toBeDisabled();
   await page.waitForTimeout(600);
   await d.screenshot({ path: `${SHOTS}/${c.mill}-ca-inputs.png` });
+  const inputs = d.locator('.ck-group input');
+  await inputs.first().fill('');
+  await d.getByRole('button', { name: 'Save inputs' }).click();
+  await expect(d.getByRole('status')).toHaveText(/^Fill every field/);
+  expect(posted).toBeNull();
+  for (let i = 0; i < c.n; i += 1) await inputs.nth(i).fill(String(10 + i));
+  await d.getByRole('button', { name: 'Save inputs' }).click();
+  await expect(d.getByRole('status')).toHaveText('Saved to the logbook (CA Inputs).');
+  expect(Object.values(posted!.values).sort((a, b) => a - b)).toEqual(Array.from({ length: c.n }, (_, i) => 10 + i));
+});
+
+test('RMD condition analytics: with the month\'s CA inputs saved, the costing cards and rows show the figures (the CA report caught here)', async ({ page }) => {
+  const inputs = {
+    benchmarkRateTph: 30, benchmarkKwhPerMt: 100, standardYieldPct: 96, tariffActual: 6, tariffStandard: 5,
+    otherConversionActualRs: 310000, otherConversionStandard: 500, netMaterialPerMt: 40000, contributionPerMt: 1200,
+  };
+  const actual = { mt: 2500, runH: 100, rateTph: 25, kwh: 275000, kwhPerMt: 110, billetInputMt: 2600, yieldPct: 95 };
+  const kpis = {
+    opportunityMt: 500, conversionRs: 1750000, conversionPerMt: 700, standardPerMt: 1000, variancePerMt: -300,
+    variance: { tariffRs: 275000, energyRs: 125000, otherRs: -1150000, totalRs: -750000 },
+    yieldLossRs: 1040000, marginRs: 600000, otherActualPerMt: 40,
+  };
+  await page.route('**/api/ca/rmd?*', (route) => route.fulfill({ json: {
+    mill: 'rmd', from: '2026-10-01', to: '2026-10-10', missing: [], inputs, actual, kpis,
+    months: [{ month: '2026-10', from: '2026-10-01', to: '2026-10-10', share: 10 / 31, inputs, actual, kpis }],
+  } }));
+  await page.goto('/rmd/condition-analytics');
+  const main = page.getByRole('main');
+  const cards = main.getByRole('region', { name: 'Condition KPIs' });
+  const value = (name: string) => cards.getByRole('button', { name, exact: true }).locator('.rm-card-value');
+  await expect(value('Output opportunity')).toHaveText(/^500\.0\s*MT$/, { timeout: 60_000 });
+  await expect(value('Conversion cost')).toHaveText(/^700\s*₹\/MT$/);
+  await expect(value('Cost variance')).toHaveText(/^−300\s*₹\/MT$/);
+  await expect(value('Yield material loss')).toHaveText(/^10,40,000\s*₹$/);
+  await expect(value('Output margin')).toHaveText(/^6,00,000\s*₹$/);
+  const matched = main.locator('section.panel', { hasText: 'Matched-run performance' });
+  await expect(matched).toContainText('25.00 vs 30.00 TPH');
+  await expect(matched).toContainText('110.0 vs 100.0 kWh/MT');
+  const costing = main.locator('section.panel', { hasText: 'Costing & impact' });
+  await expect(costing).toContainText('₹6.00/kWh · standard ₹5.00');
+  await expect(costing).toContainText('95.00 % vs 96.00 % standard');
+  await cards.getByRole('button', { name: 'Cost variance', exact: true }).click();
+  const d = page.getByRole('dialog', { name: 'CA costing' });
+  await expect(d.getByRole('table', { name: 'Cost variance, three ways' }).locator('tbody tr')).toHaveCount(4);
+  await expect(d.getByRole('table', { name: 'CA costing per month' }).locator('tbody tr')).toHaveCount(1);
+  await page.waitForTimeout(600);
+  await d.screenshot({ path: `${SHOTS}/rmd-ca-costing.png` });
 });

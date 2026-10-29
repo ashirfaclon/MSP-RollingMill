@@ -26,5 +26,5 @@ const MONTHS = new Map<string, PlanMonth>(plan2026.months.map((m) => [m.month, {
 }]));
 
 export function rmsPlan(env: Env, from: string, to: string): Promise<LsmPlanReport> {
-  return planWithShifts(env, from, to, { months: MONTHS, actual: (dates) => rmsProductionByDay(env, dates), form: RMS_SHEET_FORM, source: plan2026.source });
+  return planWithShifts(env, from, to, { months: MONTHS, actual: (dates) => rmsProductionByDay(env, dates), form: RMS_SHEET_FORM, source: plan2026.source, mill: 'rms' });
 }

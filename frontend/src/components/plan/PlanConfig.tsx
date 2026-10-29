@@ -8,13 +8,14 @@
  *   calendar days − shutdowns), and the day-by-day Day / Night targets — spread evenly from the
  *   month (half per shift), or written day by day (HSM runs one shift for about 15 days at a time).
  * Left out, as the dashboard reads none of it: sizes, billet-size splits, MT/h, hours, remarks.
- * Opens on the current plan (/api/:mill/plan). Saving is not connected yet.
+ * Opens on the month as last saved (/api/forms/plan/:mill), else on the plan in use (/api/:mill/plan).
+ * Save writes the month to the mill's logbook form (one entry per date); every screen then reloads.
  */
 import { useEffect, useMemo, useState } from 'react';
 import DrillDrawer from '@/components/drill/DrillDrawer';
 import { fixed } from '@/lib/num';
 import { DAY_START_HOUR, dm, shiftsLabel } from '@/lib/plantDay';
-import { rangeUrl, useApi } from '@/services/hsmApi';
+import { postJson, rangeUrl, useApi, type FormSaveResult, type SavedPlan } from '@/services/hsmApi';
 import '@/components/checklist/checklist.css';
 import './plan.css';
 
@@ -44,21 +45,52 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
   const url = open ? rangeUrl(`/api/${mill}/plan`, { from: dates[0], to: dates[dates.length - 1] }) : null;
   const s = useApi<{ days: PlanDayIn[] }>(url);
   const current = s.data && s.dataUrl === url ? s.data : null;
+  // The month as last saved to the logbook (Production Plan form), when it has been.
+  const savedUrl = open ? `/api/forms/plan/${mill}?month=${month}` : null;
+  const sv = useApi<SavedPlan>(savedUrl);
+  const saved = sv.data && sv.dataUrl === savedUrl ? sv.data : null;
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState('');
+  /** The month the form was filled for: refreshes never overwrite what is being typed. */
+  const [filledFor, setFilledFor] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ kind: 'saving' | 'saved' | 'error'; text: string } | null>(null);
 
-  // Opens on the plan the dashboard uses now, month by month.
+  // Opens on the month as saved; else on the plan the dashboard uses now. Once per month.
   useEffect(() => {
-    if (!current) return;
-    const byDate = new Map(current.days.map((d) => [d.date, d]));
-    const next = dates.map((date) => {
-      const d = byDate.get(date);
-      return { date, off: false, day: d?.byShift.Day != null ? r2(d.byShift.Day) : '', night: d?.byShift.Night != null ? r2(d.byShift.Night) : '' };
-    });
-    setRows(next);
-    const sum = current.days.reduce((a, d) => a + (d.planMt ?? 0), 0);
-    setTotal(sum ? r2(sum) : '');
-  }, [current, dates]);
+    if (filledFor === month || !current || (!saved && !sv.error)) return;
+    if (saved?.saved) {
+      const byDate = new Map(saved.days.map((d) => [d.date, d]));
+      setRows(dates.map((date) => {
+        const d = byDate.get(date);
+        return d ? { date, off: d.shutdown, day: r2(d.dayMt), night: r2(d.nightMt) } : { date, off: false, day: '', night: '' };
+      }));
+      setTotal(saved.monthPlanMt === null ? '' : r2(saved.monthPlanMt));
+    } else {
+      const byDate = new Map(current.days.map((d) => [d.date, d]));
+      setRows(dates.map((date) => {
+        const d = byDate.get(date);
+        return { date, off: false, day: d?.byShift.Day != null ? r2(d.byShift.Day) : '', night: d?.byShift.Night != null ? r2(d.byShift.Night) : '' };
+      }));
+      const sum = current.days.reduce((a, d) => a + (d.planMt ?? 0), 0);
+      setTotal(sum ? r2(sum) : '');
+    }
+    setFilledFor(month);
+    setStatus(null);
+  }, [current, saved, sv.error, dates, month, filledFor]);
+
+  const save = async () => {
+    if (entered === null) { setStatus({ kind: 'error', text: 'Enter the month plan first.' }); return; }
+    setStatus({ kind: 'saving', text: 'Saving…' });
+    try {
+      const r = await postJson<FormSaveResult>(`/api/forms/plan/${mill}`, {
+        month, monthPlanMt: entered,
+        days: rows.map((x) => ({ date: x.date, shutdown: x.off, dayMt: num(x.day) ?? 0, nightMt: num(x.night) ?? 0 })),
+      });
+      setStatus({ kind: 'saved', text: `Saved — ${r.entries} days to the logbook (Production Plan).` });
+    } catch (e) {
+      setStatus({ kind: 'error', text: (e as Error).message });
+    }
+  };
 
   const working = rows.filter((r) => !r.off).length;
   const dayT = rows.reduce((a, r) => a + (num(r.day) ?? 0), 0);
@@ -69,8 +101,13 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
   const setRow = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const spread = () => {
     if (entered === null || !working) return;
-    const half = r2(entered / working / 2);
-    setRows((rs) => rs.map((r) => (r.off ? { ...r, day: '0', night: '0' } : { ...r, day: half, night: half })));
+    // In paise of a tonne (0.01 MT), so the shifts add up to the month plan exactly: the cent left
+    // over by rounding goes to the first shifts, one each (1000 over 60 shifts: 40 × 16.67, 20 × 16.66).
+    const cents = Math.round(entered * 100);
+    const base = Math.floor(cents / (working * 2));
+    let extra = cents - base * working * 2;
+    const next = () => String((base + (extra-- > 0 ? 1 : 0)) / 100);
+    setRows(rows.map((r) => (r.off ? { ...r, day: '0', night: '0' } : { ...r, day: next(), night: next() })));
   };
 
   return (
@@ -118,8 +155,10 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
         {off && <p className="pc-warn" role="status">The days add up to {fixed(dayT + nightT, 2)} MT, not the month plan {fixed(entered, 2)} MT.</p>}
 
         <div className="ck-actions">
-          <button type="button" className="ck-save" disabled>Save plan</button>
-          <span>Preview — saving is not connected yet.</span>
+          <button type="button" className="ck-save" onClick={save} disabled={status?.kind === 'saving' || !rows.length}>Save plan</button>
+          {status
+            ? <span role="status" className={status.kind === 'error' ? 'ck-msg-error' : undefined}>{status.text}</span>
+            : <span>{saved?.saved ? 'Opened on the plan as last saved.' : 'Not saved for this month yet.'}</span>}
         </div>
       </div>
     </DrillDrawer>

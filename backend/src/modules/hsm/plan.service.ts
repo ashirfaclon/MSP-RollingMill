@@ -17,6 +17,7 @@ import type { PlanDay, PlanReport } from '../../contracts';
 import october2026 from './plan/rolling-plan-2026-10.json';
 import { dateRange, productionComparison, round2 } from './production.service';
 import { SHIFTS, productionTicks, splitByShift } from './shift-split';
+import { planSource, savedPlanDays, withSavedPlan } from '../forms-db/plan.store';
 
 interface PlanRow { date: string; shift: string; thicknessMm: number | null; widthMm: number | null; mt: number }
 interface PlanFile { month: string; source: string; rows: PlanRow[] }
@@ -43,13 +44,15 @@ export function planDays(dates: string[], rows: PlanRow[] = ROWS): Omit<PlanDay,
 
 export async function planReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PlanReport> {
   const dates = dateRange(from, to);
-  const [prod, ticks] = await Promise.all([
+  const [prod, ticks, saved] = await Promise.all([
     productionComparison(env, from, to, 'day', nowMs).catch(() => null),
     productionTicks(env, from, to, nowMs).catch(() => null),
+    // The plan saved on the dashboard (logbook Production Plan) wins over the import, date by date.
+    savedPlanDays(env, 'hsm', from, to).catch(() => new Map()),
   ]);
   const actualByDay = new Map((prod?.days ?? []).map((d) => [d.date, d.influxMt]));
   const split = splitByShift(ticks ?? [], new Map(dates.map((d) => [d, ticks ? actualByDay.get(d) ?? null : null])));
-  const days: PlanDay[] = planDays(dates).map((d) => ({
+  const days: PlanDay[] = withSavedPlan(planDays(dates), saved).map((d) => ({
     ...d, actualMt: actualByDay.get(d.date) ?? null, actualByShift: split.get(d.date) ?? null,
   }));
   const actualByShift: Record<string, number> = Object.fromEntries(SHIFTS.map((s) => [s, 0]));
@@ -62,7 +65,7 @@ export async function planReport(env: Env, from: string, to: string, nowMs = Dat
   const actuals = planned.map((d) => d.actualMt);
   const actualMt = planned.length && actuals.every((a) => a !== null) ? sum(actuals as number[]) : null;
   return {
-    from, to, source: SOURCE, days,
+    from, to, source: planSource(saved, SOURCE), days,
     totals: {
       planMt, byShift, plannedDays: planned.length, days: days.length, actualMt,
       gapMt: planMt !== null && actualMt !== null ? round2(actualMt - planMt) : null,

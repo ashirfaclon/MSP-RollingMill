@@ -23,10 +23,12 @@ export default function FlipKpiCard<T extends string>({ label, series, faces, on
   label: string;
   series: CardProps['series'];
   faces: [FlipFace<T>, FlipFace<T>];
-  onOpen?: () => void;
+  /** Opens the drill-down for the view shown (RMD: oil level or oil temperature on their own). */
+  onOpen?: (view: T) => void;
   openLabel?: string;
 }) {
   const [view, setView] = useState<T>(faces[0].id);
+  const open = onOpen ? () => onOpen(view) : undefined;
   return (
     <div className={`ah-card-switch${view === faces[1].id ? ' is-flipped' : ''}`}>
       <div className="ah-flip-inner">
@@ -34,7 +36,7 @@ export default function FlipKpiCard<T extends string>({ label, series, faces, on
           const hidden = f.id !== view;
           return (
             <div key={f.id} className={`ah-flip-face${i ? ' ah-flip-face--back' : ''}`} aria-hidden={hidden} inert={hidden}>
-              <KpiCard label={label} note="" series={series} {...f.card} {...(onOpen ? { onOpen, openLabel } : {})} />
+              <KpiCard label={label} note="" series={series} {...f.card} {...(open ? { onOpen: open, openLabel } : {})} />
             </div>
           );
         })}

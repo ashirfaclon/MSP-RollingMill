@@ -21,7 +21,7 @@ export type {
   Grain, LogPeriod, LogSheetReport, SizeReport, SizeRow, OrdersReport, OrderPeriod, OpenLine, ErpMeta, StockReport,
   HsmLive, StandNow, GroupNow, ElectricalDelaysReport, ElectricalDelay, StandTrend, StandMetric, YieldComparison, YieldPeriod, RunningRateReport, RatePeriod, RateDay,
   PowerReport, PowerDay, PowerEntry, PlanReport, PlanDay, RmdBilletsReport, RmdBilletPeriod,
-  RmdLive, RmdStationNow, RmdZoneNow, RmdZoneId, RmdStationTrend, RmdCurrentTrend, RmdConditionReport, RmdConditionGroup, RmdMillSpeedReport, RmdChemistryReport, RmdChemSample, RmdRunningRateReport, RmdRatePeriod, RmdProductionReport, RmdProductionPeriod, RmdStockReport, RmdPlanReport, RmdPlanDay, RmdAssetForms, RmdReading, LsmProductionReport, LsmProductionPeriod, LsmStockReport, LsmDriveReport, LsmDriveReading, LsmMillLoadReport, LsmMillLoadReading, FormRunningRateReport, HsmMillLoadReport, HsmMillLoadEntry, CostingReport, CostingMonth, CostLine, MidReport, MidMachine, MidVisit, MidSection, MidStatus, PmReport, PmMonth, PmBreakdown, RmsStockReport, RmsProductionReport, RmsProductionPeriod,
+  RmdLive, RmdStationNow, RmdZoneNow, RmdZoneId, RmdStationTrend, RmdCurrentTrend, RmdConditionReport, RmdConditionGroup, RmdMillSpeedReport, RmdChemistryReport, RmdChemSample, RmdRunningRateReport, RmdRatePeriod, RmdProductionReport, RmdProductionPeriod, RmdStockReport, RmdPlanReport, RmdPlanDay, RmdAssetForms, RmdReading, LsmProductionReport, LsmProductionPeriod, LsmStockReport, LsmDriveReport, LsmDriveReading, LsmMillLoadReport, LsmMillLoadReading, FormRunningRateReport, HsmMillLoadReport, HsmMillLoadEntry, CostingReport, CostingMonth, CostLine, MidReport, MidMachine, MidVisit, MidSection, MidStatus, PmReport, PmMonth, PmBreakdown, SavedPlan, SavedCaInputs, FormSaveResult, CaReport, RmsStockReport, RmsProductionReport, RmsProductionPeriod,
 } from '@contracts';
 
 
@@ -77,10 +77,32 @@ export function useApi<T>(url: string | null, refreshMs = 60_000): ApiState<T> {
     };
     run();
     const timer = setInterval(run, refreshMs);
-    return () => { alive = false; clearInterval(timer); };
+    // A save (postJson) reloads every screen at once, so the saved figures show straight away.
+    window.addEventListener(SAVED_EVENT, run);
+    return () => { alive = false; clearInterval(timer); window.removeEventListener(SAVED_EVENT, run); };
   }, [url, refreshMs]);
 
   return state;
+}
+
+const SAVED_EVENT = 'rm-data-saved';
+
+/**
+ * POST a JSON body (the config popups' saves). On success the request cache is emptied and every
+ * open screen reloads its data. Throws the backend's message on a refusal.
+ */
+export async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${url}`, {
+    method: 'POST', cache: 'no-store', headers: { ...authHeader(), 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (res.status === 401) { sessionRejected(); throw new Error('Signed out'); }
+  const type = res.headers.get('content-type') ?? '';
+  if (!type.includes('application/json')) throw new Error('The data service is not reachable from this page');
+  const out = await res.json();
+  if (!res.ok) throw new Error(out?.message ?? 'The save could not be completed');
+  inflight.clear();
+  window.dispatchEvent(new Event(SAVED_EVENT));
+  return out as T;
 }
 
 export const rangeUrl = (path: string, p: { from: string; to: string; grain?: string } | null) =>

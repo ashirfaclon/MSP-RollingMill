@@ -15,6 +15,7 @@ import type { Env } from '../../config/env';
 import type { RmdPlanDay, RmdPlanReport } from '../../contracts';
 import { dateRange, round2 } from '../hsm/production.service';
 import { rmdProductionByDay } from './production.service';
+import { planSource, savedPlanDays, withSavedPlan } from '../forms-db/plan.store';
 // TODO(plan-feature): HARDCODED — the RMD month-wise plan FY 2026-27 (Apr 2026 – Mar 2027, Prime +
 // Short length, on line + off line, 142,240.9 MT) from the plant's Excel (RMD Month Wise production
 // plan FY 26-27 (1).xlsx, shared 12 Oct 2026). Remove this import and plan/rmd-plan-2026-27.json
@@ -79,8 +80,10 @@ export function summarisePlan(days: RmdPlanDay[]): RmdPlanReport['totals'] {
   };
 }
 
-export function rmdPlan(env: Env, from: string, to: string): RmdPlanReport {
+export async function rmdPlan(env: Env, from: string, to: string): Promise<RmdPlanReport> {
   const dates = dateRange(from, to);
-  const days = rmdPlanDays(dates, rmdProductionByDay(env, dates));
-  return { from, to, source: RMD_PLAN_SOURCE, days, totals: summarisePlan(days) };
+  // The plan saved on the dashboard (logbook Production Plan) wins over the FY import, date by date.
+  const saved = await savedPlanDays(env, 'rmd', from, to).catch(() => new Map());
+  const days = withSavedPlan(rmdPlanDays(dates, rmdProductionByDay(env, dates)), saved);
+  return { from, to, source: planSource(saved, RMD_PLAN_SOURCE), days, totals: summarisePlan(days) };
 }

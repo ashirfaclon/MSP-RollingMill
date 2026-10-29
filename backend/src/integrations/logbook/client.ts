@@ -148,6 +148,7 @@ export interface InsightRow {
   resultName?: string;
   tags?: string[];
   result?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   invocationTime?: string;
   createdAt?: string;
 }
@@ -400,6 +401,116 @@ async function readForm(env: Env, auth: string, insightId: string, tag: string, 
     return { ok: true, rows };
   } catch {
     return { ok: false, message: MSG.LOGBOOK_UNREACHABLE };
+  }
+}
+
+/* ------------------------------ writing entries ------------------------------ */
+
+export type FormWrite =
+  | { ok: true; saved: number; added: number; updated: number; removed: number }
+  | { ok: false; saved: number; message: string };
+
+/** Submissions this far back are read before a save (the dashboard's forms are all newer). */
+const WRITE_LOOK_BACK_MS = 3 * 365 * 86_400_000;
+
+/**
+ * Save entries to one form as a table with one row per key (the user, 29 Oct 2026 — the form is the
+ * dashboard's database): `keyOf` gives an entry's key (the plan's date, CA inputs' month, …).
+ *   - a key already in the form: its newest row is updated in place (functionID updateInsightResult,
+ *     PUT …/insightResult/update/singleInsightResult, mode "set" — the whole `result` replaced), and
+ *     any older rows of the same key are deleted (…/insightResult/delete/{insight}/{id}). The update
+ *     is stamped as the logbook app stamps its own corrections — metadata.editedAt, editedBy and the
+ *     `edits` history (last 20): the app's Records page only re-reads a row whose editedAt moved;
+ *   - a new key: one entry added (addInsightResult, POST …/insightResult/add), in the shape the
+ *     logbook app submits — `resultName` and `tags` = the form's tag, the values in `result`,
+ *     `metadata.formId`; applicationType "Insight", no applicationID (it is cast to an ObjectId).
+ * The form is read fresh first; if that read fails nothing is written, so a save never doubles rows.
+ * Stops at the first refusal and says how many were saved. The form's read cache is cleared after.
+ */
+export async function saveFormEntries(
+  formId: string, results: Record<string, unknown>[], keyOf: (result: Record<string, unknown>) => string,
+  filledBy: string, env = loadEnv(),
+): Promise<FormWrite> {
+  const auth = currentBearer(env);
+  if (!auth) return { ok: false, saved: 0, message: droppedReason ?? MSG.LOGBOOK_NO_SESSION };
+  const insightId = env.logbookInsightId;
+  if (!insightId) return { ok: false, saved: 0, message: MSG.LOGBOOK_NOT_MAPPED };
+  const tag = formId.replace('__', '/');
+  const metadata = { formId, source: 'msp-steel-logbook', filledBy, dataSource: [] };
+  let saved = 0; let added = 0; let updated = 0; let removed = 0;
+  const refused = (status: number, errors: unknown) => {
+    const authFail = isAuthFailure(status, errors);
+    if (authFail) dropSession(MSG.LOGBOOK_SESSION_EXPIRED);
+    return { ok: false as const, saved, message: authFail ? MSG.LOGBOOK_SESSION_EXPIRED : `${MSG.LOGBOOK_WRITE_REFUSED}: ${String(errors ?? status)}` };
+  };
+  const call = async (method: string, path: string, body?: unknown) => {
+    const res = await fetch(`${env.iosenseBase}/api/account/bruce/insightResult/${path}`, {
+      method, headers: headers(env, auth), body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    const out = (await res.json().catch(() => ({}))) as { success?: boolean; errors?: unknown };
+    return { res, out };
+  };
+  try {
+    const read = await readForm(env, auth, insightId, tag, Math.floor((Date.now() - WRITE_LOOK_BACK_MS) / 86_400_000) * 86_400_000);
+    if (!read.ok) return { ok: false, saved: 0, message: read.message };
+    // Each key's rows, newest first.
+    const at = (r: InsightEntry) => String(r.createdAt ?? r.invocationTime ?? '');
+    const rows = new Map<string, InsightEntry[]>();
+    for (const r of [...read.rows].sort((a, b) => at(b).localeCompare(at(a)))) {
+      const k = keyOf(r.result ?? {});
+      if (!k || !r._id) continue;
+      rows.set(k, [...(rows.get(k) ?? []), r]);
+    }
+    for (const result of results) {
+      const [row, ...older] = rows.get(keyOf(result)) ?? [];
+      if (row) {
+        const prev = row.metadata ?? {};
+        const now = new Date().toISOString();
+        const fields = Object.keys(result).filter((k) => String(result[k] ?? '') !== String(row.result?.[k] ?? ''));
+        const edits = Array.isArray(prev.edits) ? prev.edits : [];
+        const stamped = { ...prev, ...metadata, editedAt: now, editedBy: filledBy, edits: [...edits, { at: now, by: filledBy, fields }].slice(-20) };
+        const { res, out } = await call('PUT', 'update/singleInsightResult', { mode: 'set', updatedFields: { _id: row._id, insightID: insightId, result, metadata: stamped } });
+        if (!out.success) return refused(res.status, out.errors);
+        updated += 1;
+        for (const o of older) {
+          const d = await call('DELETE', `delete/${encodeURIComponent(insightId)}/${encodeURIComponent(o._id!)}`);
+          if (!d.out.success && d.res.status !== 404) return refused(d.res.status, d.out.errors);
+          removed += 1;
+        }
+      } else {
+        const { res, out } = await call('POST', 'add', {
+          insightID: insightId, resultName: tag, applicationType: 'Insight', tags: [tag], result, metadata, invocationTime: new Date().toISOString(),
+        });
+        if (!out.success) return refused(res.status, out.errors);
+        added += 1;
+      }
+      saved += 1;
+    }
+    return { ok: true, saved, added, updated, removed };
+  } catch {
+    return { ok: false, saved, message: MSG.LOGBOOK_UNREACHABLE };
+  } finally {
+    for (const k of forms.keys()) if (k.startsWith(`${tag}|`)) forms.delete(k);
+  }
+}
+
+/** Delete one row of a form by its id (…/insightResult/delete/{insight}/{id}); gone already counts as done. */
+export async function deleteFormEntry(formId: string, id: string, env = loadEnv()): Promise<{ ok: boolean; message?: string }> {
+  const auth = currentBearer(env);
+  if (!auth) return { ok: false, message: droppedReason ?? MSG.LOGBOOK_NO_SESSION };
+  const insightId = env.logbookInsightId;
+  if (!insightId) return { ok: false, message: MSG.LOGBOOK_NOT_MAPPED };
+  const tag = formId.replace('__', '/');
+  try {
+    const res = await fetch(`${env.iosenseBase}/api/account/bruce/insightResult/delete/${encodeURIComponent(insightId)}/${encodeURIComponent(id)}`, {
+      method: 'DELETE', headers: headers(env, auth), signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    const out = (await res.json().catch(() => ({}))) as { success?: boolean; errors?: unknown };
+    return out.success || res.status === 404 ? { ok: true } : { ok: false, message: String(out.errors ?? res.status) };
+  } catch {
+    return { ok: false, message: MSG.LOGBOOK_UNREACHABLE };
+  } finally {
+    for (const k of forms.keys()) if (k.startsWith(`${tag}|`)) forms.delete(k);
   }
 }
 

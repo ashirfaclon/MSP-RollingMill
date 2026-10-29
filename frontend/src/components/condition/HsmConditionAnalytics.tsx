@@ -17,15 +17,18 @@
  *   costing rows         and net material rates — for a period whose months all have a sheet;
  *   Product header       ERP size (PROD_TRAN receipts, the most produced strip size, and how
  *                        many others) and the running hours; grade and route are not in the ERP data.
- * Waiting on the plant / ERP: matched (stable-run) baselines and target kWh/MT, standard cost and
- * tariff, output margin / contribution, approved limits, the stand map and route layout, the machine
- * inspection form.
+ *   CA costing           the month's CA inputs (Edit inputs, logbook CA Inputs — the config replaces
+ *                        the costing sheet) with the figures above (CaCosting): output opportunity,
+ *                        conversion cost, cost variance, yield material loss, output margin, matched-run
+ *                        and costing rows. A period with no inputs keeps the costing sheet where it has one.
+ * Waiting on the plant / ERP: approved limits, the stand map and route layout, the machine inspection form.
  */
 import { Fragment, useMemo, useState } from 'react';
 import CaInputs from './CaInputs';
+import { CaCard, CaCostRows, CaDrawer, CaMatchedRows, inr, useCa } from './CaCosting';
 import '@/components/plan/plan.css';
 import Panel from '@/components/Panel';
-import KpiCard, { type Series } from '@/components/visualization/KpiCard';
+import KpiCard from '@/components/visualization/KpiCard';
 import HsmSpecificEnergy from './HsmSpecificEnergy';
 import HsmCostingDrawer from './HsmCostingDrawer';
 import FlowArrow from '@/components/visualization/FlowArrow';
@@ -41,11 +44,14 @@ import '@/components/rmd/rmd.css';
 import '@/components/asset/asset.css';
 import './condition.css';
 
-const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
+const CA_SOURCES: [string, string][] = [
+  ['Production', 'ERP log sheet L6P · PRODUCTION_MT; billet input and mass yield (the Mass yield card)'],
+  ['Running hours', 'Influx Dicharged_Billet (billets ≤ 10 min apart), over the days with ERP production'],
+  ['Power', 'Logbook Electrical HSM → Power Consumption, ÷ ERP production over the days with both'],
+];
 const Row = ({ k, v = null }: { k: string; v?: string | null }) => (
   <div className="ah-row"><span className="rm-k">{k}</span><span className={`num ${v === null ? 'v-na' : 'v-val'}`}>{v ?? 'NA'}</span></div>
 );
-const inr = (v: number, dp = 0) => `₹${v.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
 
 /** ERP MT ÷ historian running hours over the days that have both (ERP entries come a day late). */
 export function actualRate(days: RateDay[]) {
@@ -66,6 +72,10 @@ export default function HsmConditionAnalytics() {
   const [open, setOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const [inputsOpen, setInputsOpen] = useState(false);
+  const [caOpen, setCaOpen] = useState(false);
+  const ca = useCa('hsm');
+  const openCa = () => setCaOpen(true);
+  const openSheet = () => setCostOpen(true);
   const costUrl = rangeUrl('/api/hsm/costing', dates);
   const costS = useApi<CostingReport>(costUrl);
   const cost = costS.data && costS.dataUrl === costUrl ? costS.data : null;
@@ -123,29 +133,25 @@ export default function HsmConditionAnalytics() {
           onOpen={() => setOpen(true)}
           openLabel="Actual running rate per day"
         />
-        {NA('Output opportunity', 'MT', 'order')}
+        <CaCard id="opportunity" ca={ca} onOpen={openCa} />
         <HsmSpecificEnergy />
-        <KpiCard label="Conversion cost" value={cp ? fixed(cp.conversionPerMt, 0) : 'NA'} unit="₹/MT" note="" series="prod"
-          noEntries={cost && !cp ? 'No costing sheet for this period' : false}
-          loading={!costS.data && !costS.error} onOpen={() => setCostOpen(true)} openLabel="The plant's costing sheet, line by line" />
-        {NA('Cost variance', '₹/MT', 'hold')}
-        <KpiCard label="Yield material loss" value={cp ? fixed(cp.materialLossRs / 1e5, 2) : 'NA'} unit="₹ lakh" note="" series="hold"
-          noEntries={cost && !cp ? 'No costing sheet for this period' : false}
-          onOpen={() => setCostOpen(true)} openLabel="The plant's costing sheet, line by line" />
-        {NA('Output margin', '₹', 'order')}
+        <CaCard id="conversion" ca={ca} onOpen={openCa} fallback={{ value: cp?.conversionPerMt ?? null, onOpen: openSheet }} />
+        <CaCard id="variance" ca={ca} onOpen={openCa} />
+        <CaCard id="yieldLoss" ca={ca} onOpen={openCa} unitYield="₹ lakh" fallback={{ value: cp?.materialLossRs ?? null, onOpen: openSheet }} />
+        <CaCard id="margin" ca={ca} onOpen={openCa} />
       </section>
 
       <div className="rm-row">
         <Panel title="Matched-run performance" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
-          {['Production rate · actual vs matched', 'Energy per MT · actual vs matched'].map((k) => <Row key={k} k={k} />)}
+          <CaMatchedRows ca={ca} />
         </Panel>
         <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top" right={<button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={() => setInputsOpen(true)} title="Targets and costs for the month">Edit inputs</button>}>
-          <Row k="Tariff" v={cp ? `${inr(cp.tariffPerKwh, 2)}/kWh` : null} />
-          <Row k="Contribution" />
-          <Row k="Net material" v={burning !== null && scrap !== null ? `${inr(burning)}/MT burning loss · ${inr(scrap)}/MT other losses` : null} />
-          <Row k="Other conversion · actual / standard" v={cp ? `${inr(cp.otherConversionPerMt)}/MT · standard NA` : null} />
           {/* No repeats of the Conversion cost, Cost variance and Output margin cards (the user, 28 Oct 2026). */}
-          <Row k="Yield material variance" />
+          <CaCostRows ca={ca} sheet={{
+            tariff: cp ? `${inr(cp.tariffPerKwh, 2)}/kWh` : null,
+            net: burning !== null && scrap !== null ? `${inr(burning)}/MT burning loss · ${inr(scrap)}/MT other losses` : null,
+            other: cp ? `${inr(cp.otherConversionPerMt)}/MT · standard NA` : null,
+          }} />
         </Panel>
       </div>
 
@@ -178,6 +184,7 @@ export default function HsmConditionAnalytics() {
         loading={!rateS.data && !rateS.error} error={rateS.error} hasData={!!rateR}>
         {rateR && rate && <RateContent days={rateR.days} rate={rate} />}
       </DrillDrawer>
+      <CaDrawer open={caOpen} onClose={() => setCaOpen(false)} mill="hsm" ca={ca} sources={CA_SOURCES} />
       <CaInputs mill="hsm" open={inputsOpen} onClose={() => setInputsOpen(false)} />
     </div>
   );

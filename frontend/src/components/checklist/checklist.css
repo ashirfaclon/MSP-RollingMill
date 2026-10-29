@@ -37,6 +37,10 @@
   border: 1px solid var(--border); background: var(--panel-3); color: var(--muted-2); cursor: not-allowed;
 }
 .ck-actions span { font-size: 11px; color: var(--muted-2); }
+/* A save that is wired: an active button. */
+.ck-save:not(:disabled) { cursor: pointer; color: var(--text); background: var(--panel-2); border-color: var(--info); }
+.ck-save:not(:disabled):hover { background: var(--panel-3); }
+.ck-actions .ck-msg-error { color: var(--bad, #e5484d); }
 
 @media (max-width: 760px) {
   .ck-launch { grid-template-columns: minmax(0, 1fr); }

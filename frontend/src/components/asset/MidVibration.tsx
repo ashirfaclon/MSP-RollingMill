@@ -3,7 +3,8 @@
 /**
  * MID vibration on an Asset Health screen: the drill-down (each machine of the section at the last visit,
  * its status and diagnosis, then every point's H / V / A) and the Condition trend (the section's highest
- * reading per visit). The rows are MID's monthly reports until the MID logbook forms go live.
+ * reading per visit), and the Remarks panel. The rows are the MID logbook forms — Vibration Reading and
+ * Temperature Reading — over MID's earlier Excel reports.
  */
 import { useMemo } from 'react';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
@@ -59,16 +60,33 @@ export function MidVibrationDrawer({ open, onClose, title, mid }: { open: boolea
               </tbody>
             </table>
           </div>
+          {r.temperature && (
+            <div className="pd-table-wrap">
+              <table className="grid pd-table" aria-label="MID thermography">
+                <thead><tr><th>Equipment ({day(r.temperature.date)})</th><th>Phase</th><th className="r">Max (°C)</th><th className="r">Design (°C)</th><th>Status</th><th>Remarks</th></tr></thead>
+                <tbody>
+                  {r.temperature.readings.map((t) => (
+                    <tr key={`${t.equipment}-${t.phase}`}>
+                      <td>{t.equipment}</td><td>{t.phase ?? '—'}</td>
+                      <td className="num r v-val">{mm(t.maxC)}</td><td className="num r">{mm(t.designC)}</td>
+                      <td className={t.status ? TONE[t.status] : 'v-na'}>{t.status ?? '—'}</td><td>{t.remarks ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <SourceBox
             sources={[{ name: 'MID', rows: [
               ['Data', r.sources.length ? r.sources.map((s) => `${s.name} (${day(s.date)})`).join(', ') : 'no MID visit up to the period end'],
-              ['Shape', 'MID logbook forms: Vibration Reading (per point) and Machine Condition (per machine)'],
+              ['Form', 'MID Logbook → Vibration Reading (per point) and Temperature Reading (per equipment and phase)'],
               ...(r.skipped.length ? [['Left out', r.skipped.map((s) => `${s.machine} ${s.point} ${s.field}: "${s.raw}" (not a number)`).join('; ')] as [string, string]] : []),
             ] }]}
             formula={[
               'The last MID visit up to the end of the period',
               'Highest reading = the highest of horizontal, vertical and axial velocity over the section\'s machines (mm/s RMS)',
-              'Status and diagnosis = MID\'s verdict and remark for each machine',
+              'Status = the worst of MID\'s verdicts on the machine\'s points; diagnosis = their remarks',
+              'Thermography = the readings of the last Temperature Reading visit up to the end of the period',
             ]}
           />
         </>
@@ -101,23 +119,29 @@ export function MidVibrationTrend({ mid }: { mid: MidView }) {
 const REMARK_ORDER: Record<MidStatus, number> = { 'Un-acceptable': 0, Acceptable: 1, Good: 2 };
 
 /**
- * The Remarks panel: each machine's remark at the last MID visit, one line each — the whole mill, not the
- * selected group (HSM's and RMD's remarks are on auxiliary pumps, which no mimic zone selects).
+ * The Remarks panel: each remark of the last MID visits, one line each — every machine's (Vibration Reading)
+ * and every thermography reading's (Temperature Reading). The whole mill, not the selected group (HSM's
+ * and RMD's remarks are on auxiliary pumps, which no group selects).
  */
 export function MidRemarks({ mid }: { mid: MidView }) {
-  const rows = (mid.report?.latest?.machines ?? [])
-    .filter((m) => m.diagnosis)
+  const rows = [
+    ...(mid.report?.latest?.machines ?? []).map((m) => ({ key: m.machine, head: m.machine, status: m.status, text: m.diagnosis })),
+    ...(mid.report?.temperature?.readings ?? []).map((t) => ({
+      key: `t-${t.equipment}-${t.phase}`, head: t.phase ? `${t.equipment} · ${t.phase}` : t.equipment, status: t.status, text: t.remarks,
+    })),
+  ]
+    .filter((m) => m.text)
     .sort((x, y) => (x.status ? REMARK_ORDER[x.status] : 3) - (y.status ? REMARK_ORDER[y.status] : 3));
   if (!rows.length) return <div className="ah-row"><span className="num v-na">NA</span></div>;
   return (
     <ul className="ah-remarks" aria-label="Remarks">
       {rows.map((m) => (
-        <li className="ah-remark" key={m.machine}>
+        <li className="ah-remark" key={m.key}>
           <span className="ah-remark-head">
-            <b>{m.machine}</b>
+            <b>{m.head}</b>
             <span className={`ah-remark-status ${m.status ? TONE[m.status] : 'v-na'}`}>{m.status ?? 'NA'}</span>
           </span>
-          <span className="ah-remark-text">{m.diagnosis}</span>
+          <span className="ah-remark-text">{m.text}</span>
         </li>
       ))}
     </ul>

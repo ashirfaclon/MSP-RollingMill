@@ -15,6 +15,8 @@ import { lsmRoutes } from './modules/lsm/lsm.routes';
 import { rmsRoutes } from './modules/rms/rms.routes';
 import { midRoutes } from './modules/mid/mid.routes';
 import { pmRoutes } from './modules/pm/pm.routes';
+import { formsDbRoutes } from './modules/forms-db/forms-db.routes';
+import { caRoutes } from './modules/ca/ca.routes';
 import { sourcesRoutes } from './modules/sources/sources.routes';
 import { systemRoutes, type Lifecycle } from './modules/system/system.routes';
 
@@ -60,6 +62,8 @@ export async function buildApp({ config, lifecycle = { shuttingDown: false } }: 
     await api.register(rmsRoutes, { prefix: '/rms' });
     await api.register(midRoutes, { prefix: '/mid' });
     await api.register(pmRoutes, { prefix: '/pm' });
+    await api.register(formsDbRoutes, { prefix: '/forms' });
+    await api.register(caRoutes, { prefix: '/ca' });
   }, { prefix: '/api' });
 
   return app;

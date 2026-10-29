@@ -95,6 +95,8 @@ export default function RmdAssetHealth() {
   const bearingTone = toneOf(bearing?.latest ?? []);
   const oilTone = toneOf(oil?.temperature ?? []);
   const oilTempC = oil?.temperature.length ? Math.max(...oil.temperature.map((r) => r.value)) : null;
+  /** The card's view when it was opened: the drill-down shows that one only. */
+  const [oilView, setOilView] = useState<'level' | 'temp'>('level');
 
   return (
     <div className="rm-viz ah">
@@ -154,7 +156,7 @@ export default function RmdAssetHealth() {
             { id: 'temp', label: 'Temp', title: 'The hottest oil tank (°C)',
               card: { value: oilTempC !== null ? fixed(oilTempC, 0) : 'NA', unit: '°C', tone: oilTempC !== null ? oilTone : undefined, noEntries: !!fg && !!forms && oilTempC === null } },
           ]}
-          {...(oil ? { onOpen: () => setOpen('oil'), openLabel: 'Each oil tank: level and temperature' } : {})}
+          {...(oil ? { onOpen: (v: 'level' | 'temp') => { setOilView(v); setOpen('oil'); }, openLabel: 'Each oil tank, for the view shown' } : {})}
         />
         <KpiCard label="Run hours" value={run === null ? 'NA' : fixed(run, 1)} unit="h" note="" series="prod" noEntries={!!totals && run === null}
           onOpen={() => setOpen('run')} openLabel="Run hours per day, from the ERP log sheet" />
@@ -214,23 +216,37 @@ export default function RmdAssetHealth() {
           ['Field', 'Flywheel / Reduction gear / Pinion gear, D and ND side (°C) — each form\'s latest entry in the period'],
         ]} formula={['Bearing temp = the hottest of those readings', 'Limits: bearings 45–65 °C, flywheel 45–80 °C (plant)']} />}
       </DrillDrawer>
-      <DrillDrawer open={open === 'oil'} onClose={() => setOpen(null)} title={`${NAME[group]} · gearbox oil`} sub="RMD · oil tanks"
+      {/* One screen per view of the card (the plant, 29 Oct 2026): oil level, or oil temperature. */}
+      <DrillDrawer open={open === 'oil'} onClose={() => setOpen(null)}
+        title={`${NAME[group]} · ${oilView === 'level' ? 'oil level' : 'oil temperature'}`} sub={oilView === 'level' ? 'RMD · oil tanks · in · L' : 'RMD · oil tanks · °C'}
         loading={!forms} error={f.error} hasData={!!forms}>
-        {oil && (
+        {oil && oilView === 'level' && (
           <>
             <TankLevelTable rows={oil.level} />
-            <ReadingsTable rows={oil.temperature} unit="°C" label="Oil tank temperature" max={null} source={[
-              ['Forms', 'Rolling Mill Division (TMT) → Mechanical → Oil Tank → Oil Tank Level (inches, every 15 days), Oil Tank Temperature (°C)'],
-              ['Field', 'one value per tank — the latest entry in the period'],
-            ]} formula={[
-              'Oil (L) = level (inches) × 0.0254 × inside length × inside width (m) × 1000 — box tanks, flat bottom, level from the bottom',
-              fg === 'roughing'
-                ? 'Tank size (L × W × D, m): 20" / 16" R stand 1.63 × 1.26 × 1.30 (2,670 L)'
-                : 'Tank size (L × W × D, m): Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)',
-              'Gearbox oil = the oil in the tank lowest against its capacity',
-              'Limits: oil tank temperature 45–65 °C (plant); level — none yet',
-            ]} />
+            <SourceBox
+              sources={[{ name: 'Logbook', rows: [
+                ['Form', 'Rolling Mill Division (TMT) → Mechanical → Oil Tank → Oil Tank Level (inches, every 15 days)'],
+                ['Field', 'one value per tank — the latest entry in the period'],
+              ] }]}
+              formula={[
+                'Oil (L) = level (inches) × 0.0254 × inside length × inside width (m) × 1000 — box tanks, flat bottom, level from the bottom',
+                fg === 'roughing'
+                  ? 'Tank size (L × W × D, m): 20" / 16" R stand 1.63 × 1.26 × 1.30 (2,670 L)'
+                  : 'Tank size (L × W × D, m): Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)',
+                'Gearbox oil (Level) = the oil in the tank lowest against its capacity',
+                'Limits: level — none given yet',
+              ]}
+            />
           </>
+        )}
+        {oil && oilView === 'temp' && (
+          <ReadingsTable rows={oil.temperature} unit="°C" label="Oil tank temperature" max={null} source={[
+            ['Form', 'Rolling Mill Division (TMT) → Mechanical → Oil Tank → Oil Tank Temperature (°C)'],
+            ['Field', 'one value per tank — the latest entry in the period'],
+          ]} formula={[
+            'Gearbox oil (Temp) = the hottest oil tank',
+            'Limits: oil tank temperature 45–65 °C (plant)',
+          ]} />
         )}
       </DrillDrawer>
     </div>

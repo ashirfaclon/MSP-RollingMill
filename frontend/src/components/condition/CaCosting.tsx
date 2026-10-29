@@ -1,0 +1,174 @@
+'use client';
+
+/**
+ * Condition Analytics costing on every mill's CA screen (/api/ca/:mill): the month's CA inputs, saved
+ * on the dashboard, with the mill's production, running hours, power and yield — Output opportunity,
+ * Conversion cost, Cost variance, Yield material loss, Output margin, the Matched-run rows and the
+ * Costing & impact rows. A month of the period without inputs: "No CA inputs for <month>".
+ * One drill-down for all of them: the period month by month, with the formulas.
+ */
+import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
+import SourceBox from '@/components/drill/SourceBox';
+import KpiCard, { type Series } from '@/components/visualization/KpiCard';
+import { fixed } from '@/lib/num';
+import { rangeUrl, useApi, type CaReport } from '@/services/hsmApi';
+import { useSelection } from '@/services/hsmProduction';
+
+export type CaMillId = 'hsm' | 'rmd' | 'lsm' | 'rms';
+export interface CaView { report: CaReport | null; loading: boolean; error: string | null }
+
+export function useCa(mill: CaMillId): CaView {
+  const { dates } = useSelection();
+  const url = rangeUrl(`/api/ca/${mill}`, dates);
+  const s = useApi<CaReport>(url);
+  return { report: s.data && s.dataUrl === url ? s.data : null, loading: !s.data && !s.error, error: s.error };
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthLabel = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
+export const inr = (v: number, dp = 0) =>
+  `${v < 0 ? '−' : ''}₹${Math.abs(v).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
+const signed = (v: number, dp = 0) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fixed(Math.abs(v), dp)}`;
+
+/** Why a card is empty: a month without inputs, else nothing recorded at the source. */
+function emptyNote(ca: CaView, v: number | null): boolean | string {
+  const r = ca.report;
+  if (!r || v !== null) return false;
+  if (r.missing.length) return `No CA inputs for ${r.missing.map(monthLabel).join(', ')}`;
+  return true;
+}
+
+export type CaCardId = 'opportunity' | 'conversion' | 'variance' | 'yieldLoss' | 'margin';
+
+/** One of the five CA cards. `fallback`: HSM's costing sheet, for a period with no CA inputs. */
+export function CaCard({ id, ca, onOpen, unitYield = '₹', fallback }: {
+  id: CaCardId; ca: CaView; onOpen: () => void; unitYield?: '₹' | '₹ lakh';
+  fallback?: { value: number | null; onOpen: () => void };
+}) {
+  const k = ca.report?.kpis ?? null;
+  const spec: Record<CaCardId, { label: string; unit: string; series: Series; v: number | null; show: (v: number) => string }> = {
+    opportunity: { label: 'Output opportunity', unit: 'MT', series: 'order', v: k?.opportunityMt ?? null, show: (v) => fixed(v, 1) },
+    conversion: { label: 'Conversion cost', unit: '₹/MT', series: 'prod', v: k?.conversionPerMt ?? null, show: (v) => fixed(v, 0) },
+    variance: { label: 'Cost variance', unit: '₹/MT', series: 'hold', v: k?.variancePerMt ?? null, show: (v) => signed(v, 0) },
+    yieldLoss: {
+      label: 'Yield material loss', unit: unitYield, series: 'hold', v: k?.yieldLossRs ?? null,
+      show: (v) => (unitYield === '₹ lakh' ? fixed(v / 1e5, 2) : fixed(v, 0)),
+    },
+    margin: { label: 'Output margin', unit: '₹', series: 'order', v: k?.marginRs ?? null, show: (v) => fixed(v, 0) },
+  };
+  const c = spec[id];
+  const useFallback = c.v === null && fallback && fallback.value !== null;
+  const v = useFallback ? fallback!.value : c.v;
+  return (
+    <KpiCard label={c.label} value={v === null ? 'NA' : c.show(v)} unit={c.unit} note="" series={c.series}
+      loading={ca.loading} noEntries={useFallback ? false : emptyNote(ca, c.v)}
+      onOpen={useFallback ? fallback!.onOpen : onOpen} openLabel={useFallback ? 'The plant\'s costing sheet, line by line' : 'CA costing, month by month'} />
+  );
+}
+
+const Row = ({ k, v }: { k: string; v: string | null }) => (
+  <div className="ah-row"><span className="rm-k">{k}</span><span className={`num ${v === null ? 'v-na' : 'v-val'}`}>{v ?? 'NA'}</span></div>
+);
+
+/** Matched-run performance: actual vs the month's benchmark (one plant-entered benchmark, not size-matched). */
+export function CaMatchedRows({ ca }: { ca: CaView }) {
+  const r = ca.report;
+  const i = r?.inputs ?? null;
+  const a = r?.actual ?? null;
+  return (
+    <>
+      <Row k="Production rate · actual vs matched" v={i && a?.rateTph != null ? `${fixed(a.rateTph, 2)} vs ${fixed(i.benchmarkRateTph, 2)} TPH` : null} />
+      <Row k="Energy per MT · actual vs matched" v={i && a?.kwhPerMt != null ? `${fixed(a.kwhPerMt, 1)} vs ${fixed(i.benchmarkKwhPerMt, 1)} kWh/MT` : null} />
+    </>
+  );
+}
+
+/** Costing & impact rows from the inputs. `sheet`: HSM's costing-sheet rows, when there are no inputs. */
+export function CaCostRows({ ca, sheet }: { ca: CaView; sheet?: Partial<Record<'tariff' | 'net' | 'other', string | null>> }) {
+  const r = ca.report;
+  const i = r?.inputs ?? null;
+  const k = r?.kpis ?? null;
+  const y = r?.actual.yieldPct ?? null;
+  return (
+    <>
+      <Row k="Tariff" v={i ? `${inr(i.tariffActual, 2)}/kWh · standard ${inr(i.tariffStandard, 2)}` : sheet?.tariff ?? null} />
+      <Row k="Contribution" v={i ? `${inr(i.contributionPerMt)}/MT` : null} />
+      <Row k="Net material" v={i ? `${inr(i.netMaterialPerMt)}/MT` : sheet?.net ?? null} />
+      <Row k="Other conversion · actual / standard"
+        v={i && k?.otherActualPerMt != null ? `${inr(k.otherActualPerMt)}/MT · ${inr(i.otherConversionStandard)}/MT` : sheet?.other ?? null} />
+      <Row k="Yield material variance" v={i && y !== null ? `${fixed(y, 2)} % vs ${fixed(i.standardYieldPct, 2)} % standard` : null} />
+    </>
+  );
+}
+
+const n = (v: number | null, dp = 0) => (v === null ? '—' : fixed(v, dp));
+
+export function CaDrawer({ open, onClose, mill, ca, sources }: {
+  open: boolean; onClose: () => void; mill: CaMillId; ca: CaView;
+  /** The mill's own sources for production, hours, power and yield. */
+  sources: [string, string][];
+}) {
+  const r = ca.report;
+  const k = r?.kpis ?? null;
+  return (
+    <DrillDrawer open={open} onClose={onClose} title="CA costing" sub={`${mill.toUpperCase()} · month by month`} loading={ca.loading} error={ca.error} hasData={!!r}>
+      {r && k && (
+        <>
+          <Stats items={[
+            { label: 'Conversion cost', value: k.conversionPerMt === null ? 'NA' : fixed(k.conversionPerMt, 0), unit: '₹/MT', tone: k.conversionPerMt === null ? 'v-na' : undefined },
+            { label: 'Standard', value: k.standardPerMt === null ? 'NA' : fixed(k.standardPerMt, 0), unit: '₹/MT', tone: k.standardPerMt === null ? 'v-na' : undefined },
+            { label: 'Output opportunity', value: k.opportunityMt === null ? 'NA' : fixed(k.opportunityMt, 1), unit: 'MT', tone: k.opportunityMt === null ? 'v-na' : undefined },
+          ]} />
+          {k.variance && (
+            <div className="pd-table-wrap">
+              <table className="grid pd-table" aria-label="Cost variance, three ways">
+                <thead><tr><th>Cost variance</th><th className="r">₹</th><th className="r">₹/MT</th></tr></thead>
+                <tbody>
+                  {([['Tariff', k.variance.tariffRs], ['Energy use', k.variance.energyRs], ['Other conversion', k.variance.otherRs], ['Total', k.variance.totalRs]] as const).map(([label, rs]) => (
+                    <tr key={label}><td>{label === 'Total' ? <b>{label}</b> : label}</td><td className="num r">{inr(rs)}</td>
+                      <td className="num r v-val">{r.actual.mt ? signed(rs / r.actual.mt, 0) : '—'}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="pd-table-wrap">
+            <table className="grid pd-table" aria-label="CA costing per month">
+              <thead><tr>
+                <th>Month</th><th>Inputs</th><th className="r">MT</th><th className="r">Run h</th><th className="r">TPH</th><th className="r">kWh/MT</th><th className="r">Yield %</th>
+                <th className="r">Conv. ₹/MT</th><th className="r">Opportunity MT</th><th className="r">Yield loss ₹</th><th className="r">Margin ₹</th>
+              </tr></thead>
+              <tbody>
+                {r.months.map((m) => (
+                  <tr key={m.month}>
+                    <td><b>{monthLabel(m.month)}</b>{m.share < 1 ? ` · ${fixed(m.share * 100, 0)} %` : ''}</td>
+                    <td className={m.inputs ? '' : 'v-na'}>{m.inputs ? 'Saved' : 'None'}</td>
+                    <td className="num r">{n(m.actual.mt, 1)}</td><td className="num r">{n(m.actual.runH, 1)}</td><td className="num r">{n(m.actual.rateTph, 2)}</td>
+                    <td className="num r">{n(m.actual.kwhPerMt, 1)}</td><td className="num r">{n(m.actual.yieldPct, 2)}</td>
+                    <td className="num r v-val">{n(m.kpis.conversionPerMt)}</td><td className="num r">{n(m.kpis.opportunityMt, 1)}</td>
+                    <td className="num r">{n(m.kpis.yieldLossRs)}</td><td className="num r">{n(m.kpis.marginRs)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <SourceBox
+            sources={[
+              { name: 'Logbook', rows: [['Form', `CA Inputs → ${mill.toUpperCase()} CA Inputs (saved on the dashboard, latest of each month)`]] },
+              { name: 'Mill', rows: sources },
+            ]}
+            formula={[
+              'Output opportunity = max(0, benchmark rate − actual rate) × running hours — a potential: billets and orders for the extra tonnes are not checked',
+              'Conversion cost = kWh/MT × actual tariff + other conversion (the month\'s ₹ × its share of days in the period) ÷ production',
+              'Standard = benchmark kWh/MT × standard tariff + standard other conversion; Cost variance = conversion cost − standard',
+              'Variance, three ways: kWh/MT × (actual − standard tariff); (kWh/MT − benchmark) × standard tariff; other conversion actual − standard',
+              'Yield material loss = max(0, standard yield − actual yield) × billet input × net material value',
+              'Output margin = output opportunity × incremental contribution',
+              'More than one month: each month with its own inputs, then ₹ and MT added up',
+            ]}
+          />
+        </>
+      )}
+    </DrillDrawer>
+  );
+}

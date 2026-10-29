@@ -7,15 +7,17 @@
  *                    the Visualization running rate; opens its drill-down;
  *   Specific energy  LSM "app sheet" / RMS "calculated": the logbook Daily Power Consumption Record
  *                    ÷ ERP production — the Visualization card.
- * Output opportunity and conversion cost are "calculated" but need a target rate and cost figures;
- * the rest of the cost rows have no source. The full screen stays, NA where there is no source —
- * matched-run performance too — except the mill mimic: none on LSM or RMS (the user, 23 and 26 Oct 2026).
+ *   Costing          the month's CA inputs (Edit inputs, logbook CA Inputs) with the figures above
+ *                    (CaCosting): output opportunity, conversion cost, cost variance, yield material
+ *                    loss, output margin, matched-run performance, costing & impact.
+ * No mill mimic on LSM or RMS (the user, 23 and 26 Oct 2026).
  */
 import { useState } from 'react';
 import CaInputs from '@/components/condition/CaInputs';
+import { CaCard, CaCostRows, CaDrawer, CaMatchedRows, useCa } from '@/components/condition/CaCosting';
 import '@/components/plan/plan.css';
 import Panel from '@/components/Panel';
-import KpiCard, { type Series } from '@/components/visualization/KpiCard';
+import KpiCard from '@/components/visualization/KpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import { FormRunningRateDrawer } from '@/components/production/FormRunningRate';
 import { fixed } from '@/lib/num';
@@ -24,8 +26,11 @@ import { rangeUrl, useApi, type FormRunningRateReport } from '@/services/hsmApi'
 import '@/components/visualization/visualization.css';
 import '@/components/asset/asset.css';
 
-const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
-const Row = ({ k }: { k: string }) => <div className="ah-row"><span className="rm-k">{k}</span><span className="num v-na">NA</span></div>;
+const caSources = (mill: 'lsm' | 'rms'): [string, string][] => [
+  ['Production', `ERP Production Log Sheet · ${mill === 'lsm' ? 'PRODUTION_MT' : 'PRODUCTION_MT'}, INPUT_MT, mass yield`],
+  ['Running hours', `Logbook ${mill.toUpperCase()} Production Sheet (each run, start → end)`],
+  ['Power', `Logbook ${mill === 'lsm' ? 'Electrical Logbook' : 'RMS Electrical Logbook'} → Daily Power Consumption Record`],
+];
 
 export default function FormMillConditionAnalytics({ mill }: { mill: 'lsm' | 'rms' }) {
   const { dates } = useSelection();
@@ -34,6 +39,9 @@ export default function FormMillConditionAnalytics({ mill }: { mill: 'lsm' | 'rm
   const rate = rateS.data && rateS.dataUrl === url ? rateS.data.totals.rateTph : null;
   const [open, setOpen] = useState(false);
   const [inputsOpen, setInputsOpen] = useState(false);
+  const [caOpen, setCaOpen] = useState(false);
+  const ca = useCa(mill);
+  const openCa = () => setCaOpen(true);
 
   return (
     <div className="rm-viz">
@@ -49,25 +57,26 @@ export default function FormMillConditionAnalytics({ mill }: { mill: 'lsm' | 'rm
           onOpen={() => setOpen(true)}
           openLabel="Running rate per day"
         />
-        {NA('Output opportunity', 'MT', 'order')}
+        <CaCard id="opportunity" ca={ca} onOpen={openCa} />
         <SpecificEnergyCard mill={mill} />
-        {NA('Conversion cost', '₹/MT', 'prod')}
-        {NA('Cost variance', '₹/MT', 'hold')}
-        {NA('Yield material loss', '₹', 'hold')}
-        {NA('Output margin', '₹', 'order')}
+        <CaCard id="conversion" ca={ca} onOpen={openCa} />
+        <CaCard id="variance" ca={ca} onOpen={openCa} />
+        <CaCard id="yieldLoss" ca={ca} onOpen={openCa} />
+        <CaCard id="margin" ca={ca} onOpen={openCa} />
       </section>
 
       <div className="rm-row">
         <Panel title="Matched-run performance" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
-          {['Production rate · actual vs matched', 'Energy per MT · actual vs matched'].map((k) => <Row key={k} k={k} />)}
+          <CaMatchedRows ca={ca} />
         </Panel>
         <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top" right={<button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={() => setInputsOpen(true)} title="Targets and costs for the month">Edit inputs</button>}>
           {/* No repeats of the Conversion cost, Cost variance and Output margin cards (the user, 28 Oct 2026). */}
-          {['Tariff', 'Contribution', 'Net material', 'Other conversion · actual / standard', 'Yield material variance'].map((k) => <Row key={k} k={k} />)}
+          <CaCostRows ca={ca} />
         </Panel>
       </div>
 
       <FormRunningRateDrawer mill={mill} open={open} onClose={() => setOpen(false)} />
+      <CaDrawer open={caOpen} onClose={() => setCaOpen(false)} mill={mill} ca={ca} sources={caSources(mill)} />
       <CaInputs mill={mill} open={inputsOpen} onClose={() => setInputsOpen(false)} />
     </div>
   );

@@ -2,7 +2,7 @@
 
 /**
  * HSM Visualization · Checklists — the two checklists the plant shared (Rolling_Mill_Checklists_Data.xlsx),
- * each opening its fill-in form. Preview: the forms work, saving is not connected yet.
+ * each opening its fill-in form, saved to the logbook (HSM Checklists forms).
  */
 import { useState } from 'react';
 import Panel from '@/components/Panel';

@@ -1,0 +1,111 @@
+/**
+ * Production plan in its logbook form (Production Plan Form Spec): one entry per date with every
+ * column of the dashboard's Edit plan popup. Saving a month writes all its dates; for each date the
+ * latest entry wins. The plan services lay the saved dates over their imported plans, so a date
+ * the plant has saved shows its targets and the rest keep the import until it is replaced.
+ */
+import type { Env } from '../../config/env';
+import type { PlanSaveBody, SavedPlan } from '../../contracts';
+import { saveFormEntries, fetchFormEntries, num, type FormWrite, type InsightEntry } from '../../integrations/logbook/client';
+import { HttpError } from '../../shared/http-error';
+import { dateRange, isDate, round2 } from '../hsm/production.service';
+import { PLAN_FORM, PLAN_KEYS as K, tagOf, type ConfigMill } from './forms';
+
+const DAY_MS = 86_400_000;
+/** Plans are saved ahead of their month: read a year of submissions. */
+const LOOK_BACK_MS = 400 * DAY_MS;
+
+export interface SavedPlanDay { date: string; shutdown: boolean; dayMt: number; nightMt: number; monthPlanMt: number | null; at: string }
+
+const mmYyyy = (month: string) => `${month.slice(5, 7)}-${month.slice(0, 4)}`;
+const monthDates = (month: string) => {
+  const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+  return dateRange(`${month}-01`, `${month}-${String(last).padStart(2, '0')}`);
+};
+
+/** The entries the dashboard writes for one month, every column filled. Throws on a bad body. */
+export function planEntries(body: PlanSaveBody): Record<string, unknown>[] {
+  if (!/^\d{4}-\d{2}$/.test(String(body?.month))) throw new HttpError(400, 'bad_month', 'month must be YYYY-MM');
+  const dates = monthDates(body.month);
+  const days = Array.isArray(body.days) ? body.days : [];
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  if (days.length !== dates.length || !dates.every((d) => byDate.has(d))) {
+    throw new HttpError(400, 'bad_days', 'days must be every date of the month, once');
+  }
+  const ok = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+  if (!ok(body.monthPlanMt)) throw new HttpError(400, 'bad_plan', 'monthPlanMt must be a number ≥ 0');
+  const rows = dates.map((date) => {
+    const d = byDate.get(date)!;
+    if (!isDate(date) || !ok(d.dayMt) || !ok(d.nightMt)) throw new HttpError(400, 'bad_day', `${date}: Day and Night must be numbers ≥ 0`);
+    const shutdown = d.shutdown === true;
+    return { date, shutdown, day: shutdown ? 0 : round2(d.dayMt), night: shutdown ? 0 : round2(d.nightMt) };
+  });
+  const monthDay = round2(rows.reduce((a, r) => a + r.day, 0));
+  const monthNight = round2(rows.reduce((a, r) => a + r.night, 0));
+  const workingDays = rows.filter((r) => !r.shutdown).length;
+  return rows.map((r) => ({
+    [K.month]: mmYyyy(body.month),
+    [K.monthPlan]: round2(body.monthPlanMt),
+    [K.workingDays]: workingDays,
+    [K.date]: r.date,
+    [K.shutdown]: r.shutdown ? 'Yes' : 'No',
+    [K.day]: r.day,
+    [K.night]: r.night,
+    [K.dayTotal]: round2(r.day + r.night),
+    [K.monthDay]: monthDay,
+    [K.monthNight]: monthNight,
+    [K.monthTotal]: round2(monthDay + monthNight),
+  }));
+}
+
+export function savePlan(env: Env, mill: ConfigMill, body: PlanSaveBody, filledBy: string): Promise<FormWrite> {
+  // One row per date: a date saved before is updated, not added again.
+  return saveFormEntries(PLAN_FORM[mill], planEntries(body), (r) => String(r[K.date] ?? ''), filledBy, env);
+}
+
+/** The latest saved entry of each date (dates from `from` to `to`); empty when none or the logbook is down. */
+export async function savedPlanDays(env: Env, mill: ConfigMill, from: string, to: string): Promise<Map<string, SavedPlanDay>> {
+  const read = await fetchFormEntries(tagOf(PLAN_FORM[mill]), Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
+  const out = new Map<string, SavedPlanDay>();
+  if (!read.ok) return out;
+  const at = (r: InsightEntry) => String(r.createdAt ?? r.invocationTime ?? '');
+  for (const r of [...read.rows].sort((a, b) => at(a).localeCompare(at(b)))) {
+    const v = r.result ?? {};
+    const date = String(v[K.date] ?? '').slice(0, 10);
+    if (!isDate(date) || date < from || date > to) continue;
+    const day = num(v[K.day]);
+    const night = num(v[K.night]);
+    if (day === null || night === null) continue;
+    out.set(date, { date, shutdown: String(v[K.shutdown]) === 'Yes', dayMt: day, nightMt: night, monthPlanMt: num(v[K.monthPlan]), at: at(r) });
+  }
+  return out;
+}
+
+/** The month as last saved, for the popup to open on. */
+export async function savedPlan(env: Env, mill: ConfigMill, month: string): Promise<SavedPlan> {
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new HttpError(400, 'bad_month', 'month must be YYYY-MM');
+  const dates = monthDates(month);
+  const saved = await savedPlanDays(env, mill, dates[0], dates[dates.length - 1]);
+  const days = dates.flatMap((d) => (saved.has(d) ? [saved.get(d)!] : []));
+  return {
+    month,
+    saved: days.length > 0,
+    monthPlanMt: days.length ? days[days.length - 1].monthPlanMt : null,
+    days: days.map(({ date, shutdown, dayMt, nightMt }) => ({ date, shutdown, dayMt, nightMt })),
+    savedAt: days.length ? days.map((d) => d.at).sort().at(-1)! : null,
+  };
+}
+
+/** Lay the saved dates over a plan's days: their target is Day + Night, per shift as saved. */
+export function withSavedPlan<T extends { date: string; planMt: number | null; byShift: Record<string, number> }>(
+  days: T[], saved: Map<string, SavedPlanDay>,
+): T[] {
+  return days.map((d) => {
+    const s = saved.get(d.date);
+    return s ? { ...d, planMt: round2(s.dayMt + s.nightMt), byShift: { Day: s.dayMt, Night: s.nightMt } } : d;
+  });
+}
+
+/** The plan's source line: the dashboard's saved plan first, when the period has any. */
+export const planSource = (saved: Map<string, SavedPlanDay>, imported: string) =>
+  saved.size ? `Production plan saved on the dashboard (logbook Production Plan) · otherwise ${imported}` : imported;

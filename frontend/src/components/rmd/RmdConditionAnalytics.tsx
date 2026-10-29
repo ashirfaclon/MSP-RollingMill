@@ -11,15 +11,16 @@
  *                      the CR Mill1/2 stands' running status now; finishing = the finishing drives'
  *                      current and speed while running; finished exit = actual rate. Finishing
  *                      opens each drive.
- * Waiting on the plant: the benchmark (matched) rate — output opportunity, matched-run performance;
- * the cost figures — conversion cost, cost variance, yield material loss, output margin, costing &
- * impact.
+ *   Costing            the month's CA inputs (Edit inputs, logbook CA Inputs) with the figures above
+ *                      (CaCosting): output opportunity, conversion cost, cost variance, yield material
+ *                      loss, output margin, matched-run performance, costing & impact.
  */
 import { Fragment, useState } from 'react';
 import CaInputs from '@/components/condition/CaInputs';
+import { CaCard, CaCostRows, CaDrawer, CaMatchedRows, useCa } from '@/components/condition/CaCosting';
 import '@/components/plan/plan.css';
 import Panel from '@/components/Panel';
-import KpiCard, { type Series } from '@/components/visualization/KpiCard';
+import KpiCard from '@/components/visualization/KpiCard';
 import FlowArrow from '@/components/visualization/FlowArrow';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import DrillDrawer from '@/components/drill/DrillDrawer';
@@ -32,8 +33,11 @@ import '@/components/visualization/visualization.css';
 import './rmd.css';
 import '@/components/asset/asset.css';
 
-const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
-const Row = ({ k }: { k: string }) => <div className="ah-row"><span className="rm-k">{k}</span><span className="num v-na">NA</span></div>;
+const CA_SOURCES: [string, string][] = [
+  ['Production', 'ERP Production Log Sheet · PRODUCT_PRIME_SLENGTH_MT (Prime + SL), INPUT_MT, mass yield'],
+  ['Running hours', 'Influx billet counters, M1 + M2 (billets ≤ 10 min apart)'],
+  ['Power', 'Logbook TMT Electrical Department → Power Reading VCB 1 / 2 / 3'],
+];
 
 export default function RmdConditionAnalytics() {
   const { dates } = useSelection();
@@ -47,7 +51,9 @@ export default function RmdConditionAnalytics() {
   const rate = rateS.data && rateS.dataUrl === rateUrl ? rateS.data.totals : null;
   const billets = billetsS.data && billetsS.dataUrl === billetsUrl ? billetsS.data.totals.totalPcs : null;
   const cond = condS.data && condS.dataUrl === condUrl ? condS.data : null;
-  const [open, setOpen] = useState<'rate' | 'finishing' | null>(null);
+  const [open, setOpen] = useState<'rate' | 'finishing' | 'ca' | null>(null);
+  const ca = useCa('rmd');
+  const openCa = () => setOpen('ca');
   const [inputsOpen, setInputsOpen] = useState(false);
 
   const perHour = billets !== null && rate?.runH ? billets / rate.runH : null;
@@ -83,21 +89,21 @@ export default function RmdConditionAnalytics() {
           onOpen={() => setOpen('rate')}
           openLabel="Running rate per day"
         />
-        {NA('Output opportunity', 'MT', 'order')}
+        <CaCard id="opportunity" ca={ca} onOpen={openCa} />
         <SpecificEnergyCard mill="rmd" />
-        {NA('Conversion cost', '₹/MT', 'prod')}
-        {NA('Cost variance', '₹/MT', 'hold')}
-        {NA('Yield material loss', '₹', 'hold')}
-        {NA('Output margin', '₹', 'order')}
+        <CaCard id="conversion" ca={ca} onOpen={openCa} />
+        <CaCard id="variance" ca={ca} onOpen={openCa} />
+        <CaCard id="yieldLoss" ca={ca} onOpen={openCa} />
+        <CaCard id="margin" ca={ca} onOpen={openCa} />
       </section>
 
       <div className="rm-row">
         <Panel title="Matched-run performance" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
-          {['Production rate · actual vs matched', 'Energy per MT · actual vs matched'].map((k) => <Row key={k} k={k} />)}
+          <CaMatchedRows ca={ca} />
         </Panel>
         <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top" right={<button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={() => setInputsOpen(true)} title="Targets and costs for the month">Edit inputs</button>}>
           {/* No repeats of the Conversion cost, Cost variance and Output margin cards (the user, 28 Oct 2026). */}
-          {['Tariff', 'Contribution', 'Net material', 'Other conversion · actual / standard', 'Yield material variance'].map((k) => <Row key={k} k={k} />)}
+          <CaCostRows ca={ca} />
         </Panel>
       </div>
 
@@ -130,6 +136,7 @@ export default function RmdConditionAnalytics() {
         loading={!condS.data && !condS.error} error={condS.error} hasData={!!cond}>
         {fin && <DrivesTable g={fin} sources={FINISHING_SOURCES} />}
       </DrillDrawer>
+      <CaDrawer open={open === 'ca'} onClose={() => setOpen(null)} mill="rmd" ca={ca} sources={CA_SOURCES} />
       <CaInputs mill={'rmd'} open={inputsOpen} onClose={() => setInputsOpen(false)} />
     </div>
   );
