@@ -9,6 +9,8 @@
  * Clicking it opens the ERP-vs-Influx drawer, where the two are compared day by day.
  */
 import { useState, type ReactNode } from 'react';
+import { useLastEntry } from '@/services/lastEntry';
+import type { ProductionComparison } from '@/services/hsmProduction';
 import KpiCard, { NO_ENTRIES } from '@/components/visualization/KpiCard';
 import ProductionDrawer from './ProductionDrawer';
 import { COUNTER_START_DATE, dm, useProduction, useSelection } from '@/services/hsmProduction';
@@ -20,6 +22,9 @@ export default function ProductionKpiCard() {
   const [open, setOpen] = useState(false);
   const { data, loading, error } = useProduction(dates ? { ...dates, grain: 'day' } : null);
   const current = data && dates && data.from === dates.from && data.to === dates.to ? data : null;
+  /* No ERP entry in the period: the ERP half shows the last day booked (the user, 30 Oct 2026). */
+  const last = useLastEntry<ProductionComparison>('/api/hsm/production', !!current && !current.totals.erpDays, current?.erp.lastDate, dates?.from, 'grain=day');
+  const lastErp = last.data?.totals.erpDays ? last.data.totals.erpMt : null;
 
   let erp: number | null = null;
   let influx: number | null = null;
@@ -39,7 +44,8 @@ export default function ProductionKpiCard() {
         </span>
       );
     }
-    // ERP not entered for the period yet (the counter has figures): say so under the pair.
+    // ERP not entered for the period yet (the counter has figures): the last day booked, else say so.
+    else if (!t.erpDays && lastErp !== null && last.date) note = <span className="rm-card-last">ERP · last entry · {dm(last.date)}</span>;
     else if (!t.erpDays) note = <span className="rm-card-empty">ERP · {NO_ENTRIES}</span>;
     else note = '';
   }
@@ -49,7 +55,7 @@ export default function ProductionKpiCard() {
       <KpiCard
         label="Production"
         value={fmt1(influx)}
-        pair={current ? [{ source: 'ERP', value: fmt1(erp) }, { source: 'Influx', value: fmt1(influx) }] : undefined}
+        pair={current ? [{ source: 'ERP', value: fmt1(erp ?? lastErp) }, { source: 'Influx', value: fmt1(influx) }] : undefined}
         unit="MT"
         note={note}
         series="prod"

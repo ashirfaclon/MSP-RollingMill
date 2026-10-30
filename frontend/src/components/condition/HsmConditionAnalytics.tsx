@@ -24,6 +24,7 @@
  * Waiting on the plant / ERP: approved limits, the stand map and route layout, the machine inspection form.
  */
 import { Fragment, useMemo, useState } from 'react';
+import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import CaInputs from './CaInputs';
 import { CaCard, CaCostRows, CaDrawer, CaMatchedRows, inr, useCa } from './CaCosting';
 import '@/components/plan/plan.css';
@@ -84,6 +85,8 @@ export default function HsmConditionAnalytics() {
   const scrap = rates?.find((l) => l.name !== 'Burning loss')?.rate ?? null;
 
   const rate = useMemo(() => (rateR ? actualRate(rateR.days) : null), [rateR]);
+  /* No day with both ERP production and running hours in the period: the last day the ERP has (the user, 30 Oct 2026). */
+  const rateLast = useLastEntry<RunningRateReport>('/api/hsm/running-rate', !!rateR && rate?.tph == null, rateR?.erp.lastDate, dates?.from, 'grain=day');
   const tph = rate?.tph ?? null;
   const top = sizes?.length ? [...sizes].sort((a, b) => b.producedMt - a.producedMt)[0] : null;
   const runH = rateR?.totals.runH ?? null;
@@ -110,6 +113,7 @@ export default function HsmConditionAnalytics() {
           label="Actual rate"
           value={tph === null ? 'NA' : fixed(tph, 2)}
           noEntries={!!rateR && tph === null}
+          lastEntry={lastFigure(tph, rateLast, (d) => actualRate(d.days).tph, (n) => fixed(n, 2))}
           unit="TPH"
           note=""
           series="prod"

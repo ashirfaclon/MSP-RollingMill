@@ -12,6 +12,8 @@ import { MSG } from '../../shared/messages';
 
 export const CHEMISTRY_FORM = 'sms/ccm-lolipop-sample';
 const LOOK_BACK_MS = 31 * 86_400_000;
+/** How far back to look for the last entry when the period and its month before have none. */
+const LAST_ENTRY_LOOK_BACK_MS = 183 * 86_400_000;
 
 /** An RMD sample, or null for another mill's, a test entry or one without a date. */
 export function toSample(r: InsightEntry): (RmdChemSample & { submitted: string }) | null {
@@ -36,9 +38,23 @@ export function toSample(r: InsightEntry): (RmdChemSample & { submitted: string 
   };
 }
 
+/** The latest Date up to `to` with an RMD sample analysed (any of C, Mn, S, P, Si); null with none. */
+export function lastSampleDate(samples: RmdChemSample[], to: string): string | null {
+  return samples.filter((s) => [s.c, s.mn, s.s, s.p, s.si].some((v) => v !== null) && s.date <= to)
+    .reduce<string | null>((a, s) => (a === null || s.date > a ? s.date : a), null);
+}
+
 export async function rmdChemistry(env: Env, from: string, to: string): Promise<RmdChemistryReport> {
-  const read = await fetchFormEntries(CHEMISTRY_FORM, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
-  const samples = (read.ok ? read.rows.map(toSample).filter((s): s is NonNullable<typeof s> => s !== null) : [])
+  const startMs = Date.parse(`${from}T00:00:00+05:30`);
+  const read = await fetchFormEntries(CHEMISTRY_FORM, startMs - LOOK_BACK_MS, env);
+  const all = read.ok ? read.rows.map(toSample).filter((s): s is NonNullable<typeof s> => s !== null) : [];
+  /* The last day with a sample, up to the period end — from what was read, else once more further back. */
+  let lastDate = lastSampleDate(all, to);
+  if (lastDate === null && read.ok) {
+    const older = await fetchFormEntries(CHEMISTRY_FORM, startMs - LAST_ENTRY_LOOK_BACK_MS, env).catch(() => null);
+    if (older?.ok) lastDate = lastSampleDate(older.rows.map(toSample).filter((s): s is NonNullable<typeof s> => s !== null), to);
+  }
+  const samples = all
     .filter((s) => s.date >= from && s.date <= to)
     // Newest first: by the form's Date, then by when it was submitted.
     .sort((a, b) => (a.date !== b.date ? b.date.localeCompare(a.date) : b.submitted.localeCompare(a.submitted)))
@@ -48,5 +64,6 @@ export async function rmdChemistry(env: Env, from: string, to: string): Promise<
     logbook: { connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
     latest: samples[0] ?? null,
     samples,
+    lastDate,
   };
 }

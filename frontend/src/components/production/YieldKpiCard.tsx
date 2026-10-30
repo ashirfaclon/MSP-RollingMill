@@ -14,6 +14,8 @@
  * The drawer shows both per day.
  */
 import { useState, type ReactNode } from 'react';
+import { useLastEntry } from '@/services/lastEntry';
+import { dm } from '@/lib/plantDay';
 import KpiCard, { NO_ENTRIES } from '@/components/visualization/KpiCard';
 import MassYieldDrawer, { yieldDelta } from '@/components/drill/MassYieldDrawer';
 import { fixed } from '@/lib/num';
@@ -29,8 +31,12 @@ export function useYield() {
 
 export default function YieldKpiCard() {
   const { current, error } = useYield();
+  const { dates } = useSelection();
   const [open, setOpen] = useState(false);
   const t = current?.totals;
+  /* No ERP entry in the period: the ERP half shows the last day booked (the user, 30 Oct 2026). */
+  const last = useLastEntry<YieldComparison>('/api/hsm/yield', !!t && !t.erpDays, current?.erp.lastDate, dates?.from, 'grain=day');
+  const lastErp = last.data?.totals.erpDays ? last.data.totals.erpYieldPct : null;
 
   let note: ReactNode = error ? 'Data unavailable' : 'Loading…';
   if (t && current) {
@@ -44,11 +50,12 @@ export default function YieldKpiCard() {
           Delta <b className={`num ${Math.abs(d) < 0.05 ? 'v-ok' : 'v-warn'}`}>{fixed(d, 1)} %</b>
         </span>
       );
-    } else if (!t.erpDays) note = <span className="rm-card-empty">ERP · {NO_ENTRIES}</span>;
+    } else if (!t.erpDays && lastErp !== null && last.date) note = <span className="rm-card-last">ERP · last entry · {dm(last.date)}</span>;
+    else if (!t.erpDays) note = <span className="rm-card-empty">ERP · {NO_ENTRIES}</span>;
     else note = '';
   }
   const pct = (v: number | null | undefined) => (v === null || v === undefined ? 'NA' : fixed(v, 1));
-  const erp = t?.erpDays ? t.erpYieldPct : null;
+  const erp = t?.erpDays ? t.erpYieldPct : lastErp;
 
   return (
     <>

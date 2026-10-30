@@ -103,6 +103,11 @@ export interface PowerReport {
   totals: { kwh: number | null; entries: number; byEquipment: Record<string, number>; productionMt: number | null; kwhPerMt: number | null };
   /** Every entry in the range, newest date first. */
   entries: PowerEntry[];
+  /**
+   * The latest date up to `to` with a power entry (the form's date); null when none in the last six
+   * months. The card shows that day when the period has none (the user, 30 Oct 2026).
+   */
+  lastDate: string | null;
 }
 
 /** GET /api/hsm/plan — the rolling plan (targets) per day and shift, as filled in by the plant. */

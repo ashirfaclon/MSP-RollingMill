@@ -13,6 +13,9 @@
  * No mill mimic on LSM or RMS (the user, 23 and 26 Oct 2026).
  */
 import { useState } from 'react';
+import { useRmsProduction } from '@/components/rms/RmsProductionDrawer';
+import { useLsmProduction } from '@/components/lsm/LsmProductionDrawer';
+import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import CaInputs from '@/components/condition/CaInputs';
 import { CaCard, CaCostRows, CaDrawer, CaMatchedRows, useCa } from '@/components/condition/CaCosting';
 import '@/components/plan/plan.css';
@@ -37,6 +40,10 @@ export default function FormMillConditionAnalytics({ mill }: { mill: 'lsm' | 'rm
   const url = rangeUrl(`/api/${mill}/running-rate`, dates ? { ...dates, grain: 'day' } : null);
   const rateS = useApi<FormRunningRateReport>(url);
   const rate = rateS.data && rateS.dataUrl === url ? rateS.data.totals.rateTph : null;
+  /* No rate in the period (production not booked yet): the last day the ERP has (the user, 30 Oct 2026). */
+  const lsmLast = useLsmProduction(mill === 'lsm' ? dates : null).data?.erp.lastDate;
+  const rmsLast = useRmsProduction(mill === 'rms' ? dates : null).data?.erp.lastDate;
+  const rateLast = useLastEntry<FormRunningRateReport>(`/api/${mill}/running-rate`, !!rateS.data && rateS.dataUrl === url && rate === null, mill === 'lsm' ? lsmLast : rmsLast, dates?.from, 'grain=day');
   const [open, setOpen] = useState(false);
   const [inputsOpen, setInputsOpen] = useState(false);
   const [caOpen, setCaOpen] = useState(false);
@@ -50,6 +57,7 @@ export default function FormMillConditionAnalytics({ mill }: { mill: 'lsm' | 'rm
           label="Actual rate"
           value={rate === null ? 'NA' : fixed(rate, 2)}
           noEntries={!!rateS.data && rateS.dataUrl === url && rate === null}
+          lastEntry={lastFigure(rate, rateLast, (d) => d.totals.rateTph, (n) => fixed(n, 2))}
           unit="TPH"
           note=""
           series="prod"

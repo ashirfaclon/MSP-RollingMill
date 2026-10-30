@@ -239,6 +239,11 @@ export interface RmdBearingGroup {
   /** The hottest bearing of each entry, oldest first (by Date, then when filled); at = the Date. */
   trend: { at: string; equipment: string; maxC: number }[];
   entries: number;
+  /**
+   * The latest Date up to `to` with a bearing reading of the group; null when none in the last six
+   * months. The card shows that day when the period has none (the user, 30 Oct 2026).
+   */
+  lastDate: string | null;
 }
 
 export interface RmdOilGroup {
@@ -248,6 +253,12 @@ export interface RmdOilGroup {
   temperature: RmdReading[];
   /** The tank lowest against its capacity (litres ÷ capacity). */
   minLevel: RmdReading | null;
+  /**
+   * The latest Date up to `to` with a level / a temperature of one of the group's tanks; null when
+   * none in the last six months. The card shows that day when the period has none (the user, 30 Oct 2026).
+   */
+  levelLastDate: string | null;
+  temperatureLastDate: string | null;
 }
 
 export interface RmdAssetForms {
@@ -328,4 +339,9 @@ export interface RmdChemistryReport {
   latest: RmdChemSample | null;
   /** Every sample of the period, newest first. */
   samples: RmdChemSample[];
+  /**
+   * The latest date up to `to` with an RMD sample analysed (any of C, Mn, S, P, Si) (the form's Date); null when none in the last six
+   * months. The card shows that day when the period has none (the user, 30 Oct 2026).
+   */
+  lastDate: string | null;
 }

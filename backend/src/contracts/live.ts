@@ -109,4 +109,9 @@ export interface HsmMillLoadReport {
   latest: HsmMillLoadEntry[];
   /** Every reading of the period, oldest first. */
   entries: HsmMillLoadEntry[];
+  /**
+   * The latest date up to `to` with a load or motor temperature reading (the form's Date); null when none in the last six
+   * months. The card shows that day when the period has none (the user, 30 Oct 2026).
+   */
+  lastDate: string | null;
 }

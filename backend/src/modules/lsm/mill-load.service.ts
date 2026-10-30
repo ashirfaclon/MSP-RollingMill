@@ -15,6 +15,8 @@ import { round2 } from '../hsm/production.service';
 
 export const LSM_MILL_LOAD_FORM = 'electrical-logbook/mill-load-log-sheet';
 const LOOK_BACK_MS = 31 * 86_400_000;
+/** How far back to look for the last entry when the period and its month before have none. */
+const LAST_ENTRY_LOOK_BACK_MS = 183 * 86_400_000;
 const PASS_FIELD = /^stand-(\d+)-pass-(\d+)-amp$/;
 
 export function toReading(r: InsightEntry): LsmMillLoadReading | null {
@@ -43,15 +45,30 @@ export function toReading(r: InsightEntry): LsmMillLoadReading | null {
 const order = (a: LsmMillLoadReading, b: LsmMillLoadReading) =>
   a.date !== b.date ? a.date.localeCompare(b.date) : (a.time ?? '').localeCompare(b.time ?? '');
 
+/** The latest date up to `to` with a pass load; null with none. */
+export function lastReadingDate(readings: LsmMillLoadReading[], to: string): string | null {
+  return readings.filter((e) => e.meanA !== null && e.date <= to)
+    .reduce<string | null>((a, e) => (a === null || e.date > a ? e.date : a), null);
+}
+
 export async function lsmMillLoad(env: Env, from: string, to: string): Promise<LsmMillLoadReport> {
-  const read = await fetchFormEntries(LSM_MILL_LOAD_FORM, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
-  const entries = (read.ok ? read.rows.map(toReading).filter((e): e is LsmMillLoadReading => e !== null) : [])
+  const startMs = Date.parse(`${from}T00:00:00+05:30`);
+  const read = await fetchFormEntries(LSM_MILL_LOAD_FORM, startMs - LOOK_BACK_MS, env);
+  const all = read.ok ? read.rows.map(toReading).filter((e): e is LsmMillLoadReading => e !== null) : [];
+  const entries = all
     .filter((e) => e.date >= from && e.date <= to)
     .sort(order);
+  /* The last day with a reading, up to the period end — from what was read, else once more further back. */
+  let lastDate = lastReadingDate(all, to);
+  if (lastDate === null && read.ok) {
+    const older = await fetchFormEntries(LSM_MILL_LOAD_FORM, startMs - LAST_ENTRY_LOOK_BACK_MS, env).catch(() => null);
+    if (older?.ok) lastDate = lastReadingDate(older.rows.map(toReading).filter((e): e is LsmMillLoadReading => e !== null), to);
+  }
   return {
     from, to, form: LSM_MILL_LOAD_FORM,
     logbook: { connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
     latest: entries.at(-1) ?? null,
     entries,
+    lastDate,
   };
 }

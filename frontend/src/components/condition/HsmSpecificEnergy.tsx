@@ -7,6 +7,8 @@
  * day late). Opens each day.
  */
 import { useMemo, useState } from 'react';
+import { lastFigure, useLastEntry } from '@/services/lastEntry';
+import { bothLast } from '@/components/production/SpecificEnergyCard';
 import KpiCard from '@/components/visualization/KpiCard';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
@@ -30,11 +32,14 @@ export default function HsmSpecificEnergy() {
   const kwh = both.reduce((a, d) => a + d.kwh!, 0);
   const mt = both.reduce((a, d) => a + d.erpMt!, 0);
   const perMt = mt > 0 ? kwh / mt : null;
+  /* No day with both in the period: the last day that has both power and ERP production (the user, 30 Oct 2026). */
+  const last = useLastEntry<PowerReport>('/api/hsm/power', !!power && !!prod.data && perMt === null, bothLast(power?.lastDate, prod.data?.erp.lastDate), dates?.from);
 
   return (
     <>
       <KpiCard label="Specific energy" value={perMt === null ? 'NA' : fixed(perMt, 1)} unit="kWh/MT" note="" series="hold"
         noEntries={!!power && !!prod.data && perMt === null}
+        lastEntry={lastFigure(perMt, last, (d) => d.totals.kwhPerMt, (n) => fixed(n, 1))}
         loading={!power && !powerS.error} onOpen={() => setOpen(true)} openLabel="Power and ERP production per day" />
       <DrillDrawer open={open} onClose={() => setOpen(false)} title="Specific energy" sub="HSM · kWh/MT"
         loading={!power && !powerS.error} error={powerS.error} hasData={!!power}>

@@ -85,6 +85,8 @@ const DAY_MS = 86_400_000;
 export const specificEnergy = (kwh: number | null, mt: number | null) => (kwh === null || !mt ? null : round2(kwh / mt));
 /** Entries typed up to a month after their date are counted. */
 const LOOK_BACK_MS = 31 * DAY_MS;
+/** How far back to look for the last entry when the period and its month before have none. */
+const LAST_ENTRY_LOOK_BACK_MS = 183 * DAY_MS;
 
 type Row = PowerEntry & { createdMs: number };
 
@@ -115,7 +117,7 @@ async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs
     return {
       ...base, logbook: { connection: 'down', message: MSG.LOGBOOK_NOT_MAPPED, readSince: null }, equipment: [],
       days: dates.map((date) => ({ date, kwh: null, entries: 0, byEquipment: {}, productionMt: null, kwhPerMt: null })),
-      totals: { kwh: null, entries: 0, byEquipment: {}, productionMt: null, kwhPerMt: null }, entries: [],
+      totals: { kwh: null, entries: 0, byEquipment: {}, productionMt: null, kwhPerMt: null }, entries: [], lastDate: null,
     };
   }
   const sinceMs = plantDayStart(from) - LOOK_BACK_MS;
@@ -136,6 +138,13 @@ async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs
   });
   const byEquipment: Record<string, number> = {};
   for (const d of days) for (const [k, v] of Object.entries(d.byEquipment)) byEquipment[k] = round2((byEquipment[k] ?? 0) + v);
+  /* The last day with a reading, up to the period end — from what was read, else once more further back. */
+  const latest = (rs: Row[]) => rs.filter((e) => e.kwh !== null && e.date && e.date <= to).reduce<string | null>((a, e) => (a === null || e.date > a ? e.date : a), null);
+  let lastDate = latest(rows);
+  if (lastDate === null && read.ok) {
+    const older = await fetchFormsEntries(formsOf(mill), plantDayStart(from) - LAST_ENTRY_LOOK_BACK_MS, env, nowMs).catch(() => null);
+    if (older?.ok) lastDate = latest(older.rows.map(toRow).filter((r): r is Row => r !== null));
+  }
   const withKwh = days.filter((d) => d.kwh !== null);
   return {
     ...base,
@@ -153,6 +162,7 @@ async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs
     entries: inRange
       .sort((a, b) => (a.date === b.date ? b.createdMs - a.createdMs : b.date.localeCompare(a.date)))
       .map(({ createdMs: _c, ...e }) => e),
+    lastDate,
   };
 }
 

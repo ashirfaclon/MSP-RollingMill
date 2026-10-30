@@ -7,6 +7,7 @@
  * twice with identical figures counts once.
  */
 import { useMemo } from 'react';
+import { useLastEntry } from '@/services/lastEntry';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { fmtNum, type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
@@ -24,7 +25,10 @@ const pct = (v: number | null) => (v === null ? '—' : `${fmtNum(v, 1)}%`);
 export function useRmsProduction(dates: { from: string; to: string } | null) {
   const url = rangeUrl('/api/rms/production', dates ? { ...dates, grain: 'day' } : null);
   const s = useApi<RmsProductionReport>(url);
-  return { data: s.data && s.dataUrl === url ? s.data : null, error: s.error };
+  const data = s.data && s.dataUrl === url ? s.data : null;
+  /* No ERP entry in the period: the last day the log sheet has (the user, 30 Oct 2026). */
+  const last = useLastEntry<RmsProductionReport>('/api/rms/production', !!data && data.erp.connection === 'up' && data.totals.entryDays === 0, data?.erp.lastDate, dates?.from, 'grain=day');
+  return { data, error: s.error, last };
 }
 
 export default function RmsProductionDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {

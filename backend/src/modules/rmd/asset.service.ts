@@ -27,6 +27,8 @@ import { MSG } from '../../shared/messages';
 export type AssetGroup = 'roughing' | 'route';
 const DAY_MS = 86_400_000;
 const LOOK_BACK_MS = 31 * DAY_MS;
+/** How far back to look for the last entry when the period and its month before have none. */
+const LAST_ENTRY_LOOK_BACK_MS = 183 * DAY_MS;
 const PREFIX = 'tmt-mechanical/';
 
 /** Bearing forms → equipment, group and how each field reads as "equipment · point". */
@@ -113,7 +115,7 @@ const later = (a: Entry, b: Entry) =>
   a.date !== b.date ? a.date > b.date : (a.time ?? '') !== (b.time ?? '') ? (a.time ?? '') > (b.time ?? '') : a.createdMs > b.createdMs;
 const order = (a: Entry, b: Entry) => (later(a, b) ? 1 : later(b, a) ? -1 : 0);
 
-export function bearingGroup(entries: Entry[], group: AssetGroup): RmdBearingGroup {
+export function bearingGroup(entries: Entry[], group: AssetGroup): Omit<RmdBearingGroup, 'lastDate'> {
   const mine = entries.filter((e) => BEARING_FORMS[e.form]?.group === group);
   // Per form, the latest entry; the group's latest reading is all of those together.
   const latestByForm = new Map<string, Entry>();
@@ -137,7 +139,7 @@ export function bearingGroup(entries: Entry[], group: AssetGroup): RmdBearingGro
   return { latest, max, trend, entries: mine.length };
 }
 
-export function oilGroup(entries: Entry[], group: AssetGroup): RmdOilGroup {
+export function oilGroup(entries: Entry[], group: AssetGroup): Omit<RmdOilGroup, 'levelLastDate' | 'temperatureLastDate'> {
   const tanks = TANKS.filter(([, g]) => g === group);
   const latest = (form: string) => entries.filter((e) => e.form === form)
     .reduce<Entry | null>((m, e) => (m === null || later(e, m) ? e : m), null);
@@ -157,15 +159,49 @@ export function oilGroup(entries: Entry[], group: AssetGroup): RmdOilGroup {
   return { level, temperature, minLevel: min };
 }
 
+/** What a card of a group reads: its bearings, its tanks' level, its tanks' temperature. */
+type Kind = 'bearing' | 'level' | 'temperature';
+export type RmdLastDates = Record<AssetGroup, Record<Kind, string | null>>;
+
+/** Whether an entry has a reading of that kind for the group: a bearing of its stands, or one of its tanks. */
+function carries(e: Entry, group: AssetGroup, kind: Kind): boolean {
+  if (kind === 'bearing') {
+    return BEARING_FORMS[e.form]?.group === group && Object.entries(e.res).some(([f, v]) => bearingOf(e.form, f) !== null && num(v) !== null);
+  }
+  const [form, suffix] = kind === 'level' ? ['oil-tank-level', ''] : ['oil-tank-temperature', '-c'];
+  return e.form === form && TANKS.some(([stem, g]) => g === group && num(e.res[stem + suffix]) !== null);
+}
+
+/** Per group and kind, the latest Date up to `to` with a reading; null with none. */
+export function lastDates(entries: Entry[], to: string): RmdLastDates {
+  const last = (group: AssetGroup, kind: Kind) => entries.filter((e) => e.date && e.date <= to && carries(e, group, kind))
+    .reduce<string | null>((a, e) => (a === null || e.date > a ? e.date : a), null);
+  const of = (g: AssetGroup) => ({ bearing: last(g, 'bearing'), level: last(g, 'level'), temperature: last(g, 'temperature') });
+  return { roughing: of('roughing'), route: of('route') };
+}
+
 export async function rmdAssetForms(env: Env, from: string, to: string): Promise<RmdAssetForms> {
-  const read = await fetchFormsEntries(TAGS, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
+  const startMs = Date.parse(`${from}T00:00:00+05:30`);
+  const read = await fetchFormsEntries(TAGS, startMs - LOOK_BACK_MS, env);
   const rows = read.ok ? read.rows.map(toEntry).filter((e): e is Entry => e !== null) : [];
   const inPeriod = rows.filter((e) => e.date >= from && e.date <= to);
+  /*
+   * Each card's last day with a reading, up to the period end — from what was read, else (when any
+   * card has none) once more further back; that read holds everything the first one did.
+   */
+  let last = lastDates(rows, to);
+  const missing = Object.values(last).some((k) => Object.values(k).some((d) => d === null));
+  if (missing && read.ok) {
+    const older = await fetchFormsEntries(TAGS, startMs - LAST_ENTRY_LOOK_BACK_MS, env).catch(() => null);
+    if (older?.ok) last = lastDates(older.rows.map(toEntry).filter((e): e is Entry => e !== null), to);
+  }
+  const bearing = (g: AssetGroup): RmdBearingGroup => ({ ...bearingGroup(inPeriod, g), lastDate: last[g].bearing });
+  const oil = (g: AssetGroup): RmdOilGroup => ({ ...oilGroup(inPeriod, g), levelLastDate: last[g].level, temperatureLastDate: last[g].temperature });
   return {
     from, to,
     logbook: { connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
-    bearing: { roughing: bearingGroup(inPeriod, 'roughing'), route: bearingGroup(inPeriod, 'route') },
-    oil: { roughing: oilGroup(inPeriod, 'roughing'), route: oilGroup(inPeriod, 'route') },
+    bearing: { roughing: bearing('roughing'), route: bearing('route') },
+    oil: { roughing: oil('roughing'), route: oil('route') },
   };
 }
 

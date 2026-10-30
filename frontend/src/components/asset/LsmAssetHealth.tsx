@@ -16,6 +16,7 @@
  * LSM (the user, 23 Oct 2026). Vibration from MID; PM items on ERP PM.
  */
 import { useMemo, useState } from 'react';
+import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import LsmMillLoadDrawer from './LsmMillLoadDrawer';
 import FlipKpiCard from './FlipKpiCard';
 import Panel from '@/components/Panel';
@@ -66,13 +67,21 @@ export default function LsmAssetHealth() {
   const drives = driveS.data && driveS.dataUrl === driveUrl ? driveS.data : null;
   const prodUrl = rangeUrl('/api/lsm/production', dates ? { ...dates, grain: 'day' } : null);
   const prodS = useApi<LsmProductionReport>(prodUrl);
-  const runH = prodS.data && prodS.dataUrl === prodUrl ? prodS.data.totals.runningHrs : null;
+  const prodD = prodS.data && prodS.dataUrl === prodUrl ? prodS.data : null;
+  const runH = prodD ? prodD.totals.runningHrs : null;
+  const prodLast = useLastEntry<LsmProductionReport>('/api/lsm/production', !!prodD && prodD.totals.entryDays === 0, prodD?.erp.lastDate, dates?.from, 'grain=day');
 
+  /* The card figures from a drive-temp report: the hottest bearing, the lowest oil level and pressure. */
+  const figures = (r: LsmDriveReport | null) => {
+    const l = r?.latest ?? [];
+    const ts = l.map(hottest).filter((v): v is number => v !== null);
+    return { bearingC: ts.length ? Math.max(...ts) : null, levelIn: lowest(l.map((e) => e.oilLevelIn)), pressure: lowest(l.map((e) => e.oilPressure)) };
+  };
   const latest = drives?.latest ?? [];
-  const temps = latest.map(hottest).filter((v): v is number => v !== null);
-  const bearingC = temps.length ? Math.max(...temps) : null;
-  const levelIn = lowest(latest.map((e) => e.oilLevelIn));
-  const pressure = lowest(latest.map((e) => e.oilPressure));
+  const { bearingC, levelIn, pressure } = figures(drives);
+  /* Nothing filled in the period: the last day each form has (the user, 30 Oct 2026). */
+  const driveLast = useLastEntry<LsmDriveReport>('/api/lsm/drive-temp', !!drives && drives.latest.length === 0, drives?.lastDate, dates?.from);
+  const loadLast = useLastEntry<LsmMillLoadReport>('/api/lsm/mill-load', !!load && currentA === null, load?.lastDate, dates?.from);
   const trend = drives ? drives.entries.filter((e) => hottest(e) !== null) : [];
   const opener = drives ? { onOpen: () => setOpen(true), openLabel: 'Each drive: bearing temperatures and gearbox oil' } : {};
 
@@ -94,8 +103,10 @@ export default function LsmAssetHealth() {
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title="LSM · mill" mid={mid} />
-        <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" noEntries={!!drives && bearingC === null} {...opener} />
+        <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" noEntries={!!drives && bearingC === null}
+          lastEntry={lastFigure(bearingC, driveLast, (d) => figures(d).bearingC, (n) => fixed(n, 0))} {...opener} />
         <KpiCard label="Motor current" value={currentA === null ? 'NA' : fixed(currentA, 0)} unit="A" note="" series="prod" noEntries={!!load && currentA === null}
+          lastEntry={lastFigure(currentA, loadLast, (d) => d.latest?.meanA, (n) => fixed(n, 0))}
           {...(load ? { onOpen: () => setLoadOpen(true), openLabel: 'Each stand and pass: load at the latest reading' } : {})} />
         <LsmMillLoadDrawer open={loadOpen} onClose={() => setLoadOpen(false)} report={load} loading={!loadS.data && !loadS.error} error={loadS.error} />
         {/* Level or pressure (the user, 28 Oct 2026): the card turns over between them. */}
@@ -103,13 +114,14 @@ export default function LsmAssetHealth() {
           label="Gearbox oil"
           series="hold"
           faces={[
-            { id: 'level', label: 'Level', title: 'The lowest oil level (inches, as filled)', card: { value: levelIn === null ? 'NA' : fixed(levelIn, 1), unit: 'in', noEntries: !!drives && levelIn === null } },
-            { id: 'pressure', label: 'Pressure', title: 'The lowest oil pressure (kg/cm²)', card: { value: pressure === null ? 'NA' : fixed(pressure, 1), unit: 'kg/cm²', noEntries: !!drives && pressure === null } },
+            { id: 'level', label: 'Level', title: 'The lowest oil level (inches, as filled)', card: { value: levelIn === null ? 'NA' : fixed(levelIn, 1), unit: 'in', noEntries: !!drives && levelIn === null, lastEntry: lastFigure(levelIn, driveLast, (d) => figures(d).levelIn, (n) => fixed(n, 1)) } },
+            { id: 'pressure', label: 'Pressure', title: 'The lowest oil pressure (kg/cm²)', card: { value: pressure === null ? 'NA' : fixed(pressure, 1), unit: 'kg/cm²', noEntries: !!drives && pressure === null, lastEntry: lastFigure(pressure, driveLast, (d) => figures(d).pressure, (n) => fixed(n, 1)) } },
           ]}
           {...opener}
         />
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod"
-          noEntries={!!prodS.data && prodS.dataUrl === prodUrl && runH == null} />
+          noEntries={!!prodS.data && prodS.dataUrl === prodUrl && runH == null}
+          lastEntry={lastFigure(runH, prodLast, (d) => d.totals.runningHrs, (n) => fixed(n, 1))} />
         <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
         <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={runH} title="LSM" />
       </section>

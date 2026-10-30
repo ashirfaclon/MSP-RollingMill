@@ -31,8 +31,13 @@ export default function RmdKpiStrip() {
   const [yieldOpen, setYieldOpen] = useState(false);
   const [prodOpen, setProdOpen] = useState(false);
   const { dates } = useSelection();
-  const { data, error } = useRmdProduction(dates);
+  const { data, error, last } = useRmdProduction(dates);
   const t = data?.totals;
+  /* A card's last entry: that day's figure, when the period has none. */
+  const lastOf = (v: number | null | undefined, pick: (lt: NonNullable<typeof last.data>['totals']) => number | null, dp = 1) => {
+    const lv = last.data ? pick(last.data.totals) : null;
+    return v == null && lv != null && last.date ? { value: fixed(lv, dp), date: last.date } : null;
+  };
   // Only a connection problem is noted on the card.
   const note = error ? 'ERP data unavailable'
     : data?.erp.connection === 'down' ? data.erp.message
@@ -45,6 +50,7 @@ export default function RmdKpiStrip() {
         label="Production · Prime + SL"
         value={mt1(t?.productionMt)}
         noEntries={up && t?.productionMt == null}
+        lastEntry={lastOf(t?.productionMt, (lt) => lt.productionMt)}
         unit="MT"
         note={note}
         series="prod"
@@ -56,6 +62,7 @@ export default function RmdKpiStrip() {
         label="Production · Prime"
         value={mt1(t?.primeMt)}
         noEntries={up && t?.primeMt == null}
+        lastEntry={lastOf(t?.primeMt, (lt) => lt.primeMt)}
         unit="MT"
         note={note}
         series="prod"
@@ -68,6 +75,7 @@ export default function RmdKpiStrip() {
         label="Mass yield"
         value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
         noEntries={up && t?.massYieldPct == null}
+        lastEntry={lastOf(t?.massYieldPct, (lt) => lt.massYieldPct)}
         unit="%"
         note={note}
         series="order"

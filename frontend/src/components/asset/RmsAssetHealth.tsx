@@ -9,6 +9,7 @@
  * (the user, 23 Oct 2026). No VFD trips card on any mill (the user, 28 Oct 2026).
  */
 import { useState } from 'react';
+import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import { fixed } from '@/lib/num';
@@ -31,7 +32,9 @@ export default function RmsAssetHealth() {
   const [pmOpen, setPmOpen] = useState(false);
   const url = rangeUrl('/api/rms/production', dates ? { ...dates, grain: 'day' } : null);
   const prodS = useApi<RmsProductionReport>(url);
-  const runH = prodS.data && prodS.dataUrl === url ? prodS.data.totals.runningHrs : null;
+  const prodD = prodS.data && prodS.dataUrl === url ? prodS.data : null;
+  const runH = prodD ? prodD.totals.runningHrs : null;
+  const prodLast = useLastEntry<RmsProductionReport>('/api/rms/production', !!prodD && prodD.totals.entryDays === 0, prodD?.erp.lastDate, dates?.from, 'grain=day');
 
   return (
     <div className="rm-viz ah">
@@ -55,7 +58,8 @@ export default function RmsAssetHealth() {
         {NA('Motor current', 'A', 'prod')}
         {NA('Gearbox oil', '', 'hold')}
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" loading={!prodS.data && !prodS.error}
-          noEntries={!!prodS.data && prodS.dataUrl === url && runH == null} />
+          noEntries={!!prodS.data && prodS.dataUrl === url && runH == null}
+          lastEntry={lastFigure(runH, prodLast, (d) => d.totals.runningHrs, (n) => fixed(n, 1))} />
         <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
         <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={runH} title="RMS" />
       </section>

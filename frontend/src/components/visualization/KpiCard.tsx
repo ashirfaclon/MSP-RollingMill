@@ -21,6 +21,7 @@ export type Series =
   | 'diff' | 'bloss' | 'endcut' | 'missroll';
 
 import type { ReactNode } from 'react';
+import { dm } from '@/lib/plantDay';
 import Sparkline, { type SparkData } from './Sparkline';
 
 /** The note of a wired KPI whose source has nothing for the period. */
@@ -51,21 +52,32 @@ export default function KpiCard(props: {
   noEntries?: boolean | string;
   /** The period's readings as a sparkline under the figure (Mill MPS). */
   spark?: SparkData;
+  /**
+   * The period has no entry, but an earlier day does (the user, 30 Oct 2026): that day's figure in
+   * place of NA, and the note says whose it is — "Last entry · 27 Oct". A source that has never
+   * had an entry passes none, and the card says "No entries recorded yet" as before.
+   */
+  lastEntry?: { value: string; date: string; pair?: { source: string; value: string }[] } | null;
 }) {
   const { meterPct } = props;
-  const note = props.noEntries && !props.loading
-    ? <span className="rm-card-empty">{typeof props.noEntries === 'string' ? props.noEntries : NO_ENTRIES}</span>
-    : props.note;
+  const last = props.lastEntry && !props.loading ? props.lastEntry : null;
+  const value = last ? last.value : props.value;
+  const pair = last?.pair ?? props.pair;
+  const note = last
+    ? <span className="rm-card-last" title="No entry in the selected period: the most recent entry is shown">Last entry · {dm(last.date)}</span>
+    : props.noEntries && !props.loading
+      ? <span className="rm-card-empty">{typeof props.noEntries === 'string' ? props.noEntries : NO_ENTRIES}</span>
+      : props.note;
   const body = (
     <>
       <span className="rm-card-label">
         {props.label}
         {/* Two sections share one unit: shown once by the title, so each figure gets the full half. */}
-        {props.pair && props.unit && <span className="rm-card-label-unit">· {props.unit}</span>}
+        {pair && props.unit && <span className="rm-card-label-unit">· {props.unit}</span>}
       </span>
-      {props.pair && !props.loading ? (
+      {pair && !props.loading ? (
         <span className="rm-card-value rm-card-pair num v-val">
-          {props.pair.map((p) => (
+          {pair.map((p) => (
             <span key={p.source} className="rm-card-pair-item">
               {/* Each half is its own section: title on top, then the figure. */}
               <span className="rm-card-src">{p.source}</span>
@@ -77,7 +89,7 @@ export default function KpiCard(props: {
         <span className={`rm-card-value num ${props.tone ?? 'v-val'}`}>
           {props.loading
             ? <span className="skel skel--num-lg" role="status" aria-busy="true" aria-label="Loading" />
-            : props.value}
+            : value}
           <span className="rm-card-unit">{props.unit}</span>
         </span>
       )}

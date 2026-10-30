@@ -6,6 +6,7 @@
  * the period, %C / %Mn / %S / %P / %Si with its furnace number and CCM; it opens every sample.
  */
 import { useState } from 'react';
+import { useLastEntry } from '@/services/lastEntry';
 import DrillDrawer from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { NO_ENTRIES } from '@/components/visualization/KpiCard';
@@ -23,7 +24,10 @@ export default function RmdChemistryCard() {
   const { data, dataUrl, error } = useApi<RmdChemistryReport>(url);
   const r = data && dataUrl === url ? data : null;
   const [open, setOpen] = useState(false);
-  const last = r?.latest ?? null;
+  /* No sample in the period: the last sample before it, said plainly (the user, 30 Oct 2026). */
+  const prev = useLastEntry<RmdChemistryReport>('/api/rmd/chemistry', !!r && !r.latest, r?.lastDate, dates?.from);
+  const fromBefore = !r?.latest && !!prev.data?.latest;
+  const last = r?.latest ?? prev.data?.latest ?? null;
   const loading = !r && !error;
 
   return (
@@ -46,7 +50,8 @@ export default function RmdChemistryCard() {
             )
             : <span className="rm-card-value num v-val">NA</span>}
         <span className="rm-card-note">
-          {last ? `Furnace ${last.furnace || '—'} · CCM ${last.ccm || '—'} · ${dm(last.date)}`
+          {last && fromBefore ? <span className="rm-card-last">Last entry · {dm(last.date)}</span>
+            : last ? `Furnace ${last.furnace || '—'} · CCM ${last.ccm || '—'} · ${dm(last.date)}`
             : r?.logbook.connection === 'down' ? r.logbook.message
             : r ? <span className="rm-card-empty">{NO_ENTRIES}</span> : ''}
         </span>

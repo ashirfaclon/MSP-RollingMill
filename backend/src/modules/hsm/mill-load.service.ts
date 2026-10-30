@@ -15,6 +15,8 @@ import { MSG } from '../../shared/messages';
 
 export const MILL_LOAD_FORM = 'electrical-hsm/mill-load-log-sheet';
 const LOOK_BACK_MS = 31 * 86_400_000;
+/** How far back to look for the last entry when the period and its month before have none. */
+const LAST_ENTRY_LOOK_BACK_MS = 183 * 86_400_000;
 
 /** "RM 4", "rm-4", "R4" → { stand: "RM 4", group: roughing }; "FM 2" → finishing; anything else → no group. */
 export function standOf(raw: unknown): { stand: string; group: HsmMillLoadEntry['group'] } {
@@ -54,15 +56,30 @@ export function latestByStand(entries: HsmMillLoadEntry[]): HsmMillLoadEntry[] {
   return [...by.values()].sort((a, b) => a.stand.localeCompare(b.stand, undefined, { numeric: true }));
 }
 
+/** The latest Date up to `to` with a load or motor temperature reading; null with none. */
+export function lastReadingDate(entries: HsmMillLoadEntry[], to: string): string | null {
+  return entries.filter((e) => (e.loadA !== null || e.deTempC !== null || e.ndeTempC !== null) && e.date <= to)
+    .reduce<string | null>((a, e) => (a === null || e.date > a ? e.date : a), null);
+}
+
 export async function hsmMillLoad(env: Env, from: string, to: string): Promise<HsmMillLoadReport> {
-  const read = await fetchFormEntries(MILL_LOAD_FORM, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
-  const entries = (read.ok ? read.rows.map(toEntry).filter((e): e is HsmMillLoadEntry => e !== null) : [])
+  const startMs = Date.parse(`${from}T00:00:00+05:30`);
+  const read = await fetchFormEntries(MILL_LOAD_FORM, startMs - LOOK_BACK_MS, env);
+  const all = read.ok ? read.rows.map(toEntry).filter((e): e is HsmMillLoadEntry => e !== null) : [];
+  const entries = all
     .filter((e) => e.date >= from && e.date <= to)
     .sort((a, b) => (later(a, b) ? 1 : later(b, a) ? -1 : 0));
+  /* The last day with a reading, up to the period end — from what was read, else once more further back. */
+  let lastDate = lastReadingDate(all, to);
+  if (lastDate === null && read.ok) {
+    const older = await fetchFormEntries(MILL_LOAD_FORM, startMs - LAST_ENTRY_LOOK_BACK_MS, env).catch(() => null);
+    if (older?.ok) lastDate = lastReadingDate(older.rows.map(toEntry).filter((e): e is HsmMillLoadEntry => e !== null), to);
+  }
   return {
     from, to, form: MILL_LOAD_FORM,
     logbook: { connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
     latest: latestByStand(entries),
     entries,
+    lastDate,
   };
 }

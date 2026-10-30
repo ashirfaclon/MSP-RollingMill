@@ -24,6 +24,7 @@
  * 45–65 °C — a card turns red when any of its readings is outside them, green when all are inside.
  */
 import { useMemo, useState } from 'react';
+import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
@@ -84,7 +85,8 @@ export default function RmdAssetHealth() {
   const formsUrl = rangeUrl('/api/rmd/asset-forms', dates);
   const f = useApi<RmdAssetForms>(formsUrl);
   const forms = f.data && f.dataUrl === formsUrl ? f.data : null;
-  const totals = useRmdProduction(dates).data?.totals;
+  const prodR = useRmdProduction(dates);
+  const totals = prodR.data?.totals;
   const run = totals?.runningHrs ?? null;
 
   const zoneLive = zone && live ? live.zones.find((z) => z.id === zone) ?? null : null;
@@ -102,6 +104,13 @@ export default function RmdAssetHealth() {
   const bearingTone = toneOf(bearing?.latest ?? []);
   const oilTone = toneOf(oil?.temperature ?? []);
   const oilTempC = oil?.temperature.length ? Math.max(...oil.temperature.map((r) => r.value)) : null;
+  /* Nothing filled in the period: the last day each form has, per group (the user, 30 Oct 2026). */
+  const bearingMax = bearing?.max?.value ?? null;
+  const oilLevelL = oil?.minLevel?.litres ?? null;
+  const bearingLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!bearing && bearingMax === null, bearing?.lastDate, dates?.from);
+  const levelLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!oil && oilLevelL === null, oil?.levelLastDate, dates?.from);
+  const tempLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!oil && oilTempC === null, oil?.temperatureLastDate, dates?.from);
+  const hottestOil = (d: RmdAssetForms) => { const t = fg ? d.oil[fg].temperature : []; return t.length ? Math.max(...t.map((r) => r.value)) : null; };
   /** The card's view when it was opened: the drill-down shows that one only. */
   const [oilView, setOilView] = useState<'level' | 'temp'>('level');
 
@@ -131,6 +140,7 @@ export default function RmdAssetHealth() {
         {show.bearing && <KpiCard
           label="Bearing temp"
           value={bearing?.max ? fixed(bearing.max.value, 0) : 'NA'}
+          lastEntry={lastFigure(bearingMax, bearingLast, (d) => (fg ? d.bearing[fg].max?.value : null), (n) => fixed(n, 0))}
           noEntries={!!fg && !!forms && !bearing?.max}
           unit="°C"
           note=""
@@ -159,13 +169,16 @@ export default function RmdAssetHealth() {
           series="hold"
           faces={[
             { id: 'level', label: 'Level', title: 'Oil in the tank lowest against its capacity (L)',
-              card: { value: oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA', unit: 'L', noEntries: !!fg && !!forms && oil?.minLevel?.litres == null } },
+              card: { value: oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA', unit: 'L', noEntries: !!fg && !!forms && oil?.minLevel?.litres == null,
+                lastEntry: lastFigure(oilLevelL, levelLast, (d) => (fg ? d.oil[fg].minLevel?.litres : null), (n) => fixed(n, 0)) } },
             { id: 'temp', label: 'Temp', title: 'The hottest oil tank (°C)',
-              card: { value: oilTempC !== null ? fixed(oilTempC, 0) : 'NA', unit: '°C', tone: oilTempC !== null ? oilTone : undefined, noEntries: !!fg && !!forms && oilTempC === null } },
+              card: { value: oilTempC !== null ? fixed(oilTempC, 0) : 'NA', unit: '°C', tone: oilTempC !== null ? oilTone : undefined, noEntries: !!fg && !!forms && oilTempC === null,
+                lastEntry: lastFigure(oilTempC, tempLast, hottestOil, (n) => fixed(n, 0)) } },
           ]}
           {...(oil ? { onOpen: (v: 'level' | 'temp') => { setOilView(v); setOpen('oil'); }, openLabel: 'Each oil tank, for the view shown' } : {})}
         />}
         <KpiCard label="Run hours" value={run === null ? 'NA' : fixed(run, 1)} unit="h" note="" series="prod" noEntries={!!totals && run === null}
+          lastEntry={lastFigure(run, prodR.last, (d) => d.totals.runningHrs, (n) => fixed(n, 1))}
           onOpen={() => setOpen('run')} openLabel="Run hours per day, from the ERP log sheet" />
         <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
         <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={run} title="RMD" />

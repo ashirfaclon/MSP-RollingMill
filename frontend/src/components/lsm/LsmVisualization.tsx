@@ -21,6 +21,7 @@
  * No mill mimic on LSM (the user, 16 Oct 2026).
  */
 import { useState, type KeyboardEvent } from 'react';
+import { lastFigure } from '@/services/lastEntry';
 import { ofInput } from '@/components/production/ofInput';
 import { ProductionTerm } from '@/components/production/productionTerm';
 import { StockAsOf } from '@/components/production/stockAsOf';
@@ -42,7 +43,7 @@ const mt = (v: number | null | undefined) => (v === null || v === undefined ? 'N
 
 export default function LsmVisualization() {
   const { dates } = useSelection();
-  const { data, error } = useLsmProduction(dates);
+  const { data, error, last } = useLsmProduction(dates);
   const t = data?.totals ?? null;
   const [prodOpen, setProdOpen] = useState(false);
   const [yieldOpen, setYieldOpen] = useState(false);
@@ -58,6 +59,7 @@ export default function LsmVisualization() {
           label="Production"
           value={t?.productionMt == null ? 'NA' : fixed(t.productionMt, 1)}
           noEntries={!!data && data.erp.connection === 'up' && t?.productionMt == null}
+          lastEntry={lastFigure(t?.productionMt, last, (d) => d.totals.productionMt, (n) => fixed(n, 1))}
           unit="MT"
           note={note}
           series="prod"
@@ -69,6 +71,7 @@ export default function LsmVisualization() {
           label="Mass yield"
           value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
           noEntries={!!data && data.erp.connection === 'up' && t?.massYieldPct == null}
+          lastEntry={lastFigure(t?.massYieldPct, last, (d) => d.totals.massYieldPct, (n) => fixed(n, 1))}
           unit="%"
           note={note}
           series="order"

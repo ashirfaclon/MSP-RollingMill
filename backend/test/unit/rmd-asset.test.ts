@@ -1,6 +1,6 @@
 /** RMD asset health: the bearing and oil-tank form fields, read as equipment · point. */
 import { describe, expect, test } from 'vitest';
-import { bearingGroup, bearingOf, oilGroup, tankLitres, withLimits, type RmdFormEntry } from '../../src/modules/rmd/asset.service';
+import { bearingGroup, bearingOf, lastDates, oilGroup, tankLitres, withLimits, type RmdFormEntry } from '../../src/modules/rmd/asset.service';
 
 describe('RMD bearing fields', () => {
   test.each([
@@ -66,5 +66,21 @@ describe('RMD bearing and oil groups', () => {
     const g = bearingGroup(late, 'route');
     expect(g.latest[0]).toMatchObject({ value: 70, at: '2026-10-14' });
     expect(g.trend.map((t) => t.at)).toEqual(['2026-10-13', '2026-10-14']);
+  });
+});
+
+describe('RMD last recorded entry', () => {
+  test('per group and card, the latest Date up to the period end with a reading', () => {
+    const rows = [
+      e('20-inch-r-stand', '2026-10-20T08:00:00', { 'flywheel-d-side-c': 50 }),
+      e('20-inch-r-stand', '2026-10-25T08:00:00', { 'flywheel-d-side-c': '' }),        // nothing filled
+      e('intermill', '2026-10-31T08:00:00', { 'flywheel-d-side-c': 60 }),              // after the period
+      e('oil-tank-level', '2026-10-15', { intermill: 9 }),                              // a route tank only
+      e('oil-tank-temperature', '2026-10-22', { '20-r-stand-c': 41 }),
+    ];
+    expect(lastDates(rows, '2026-10-29')).toEqual({
+      roughing: { bearing: '2026-10-20', level: null, temperature: '2026-10-22' },
+      route: { bearing: null, level: '2026-10-15', temperature: null },
+    });
   });
 });

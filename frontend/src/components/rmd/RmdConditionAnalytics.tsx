@@ -16,6 +16,8 @@
  *                      loss, output margin, matched-run performance, costing & impact.
  */
 import { useState } from 'react';
+import { useRmdProduction } from './RmdProductionDrawer';
+import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import RmdMillMimic from './RmdMillMimic';
 import CaInputs from '@/components/condition/CaInputs';
 import { CaCard, CaCostRows, CaDrawer, CaMatchedRows, useCa } from '@/components/condition/CaCosting';
@@ -42,6 +44,9 @@ export default function RmdConditionAnalytics() {
   const rateUrl = rangeUrl('/api/rmd/running-rate', dates ? { ...dates, grain: 'day' } : null);
   const rateS = useApi<RmdRunningRateReport>(rateUrl);
   const rate = rateS.data && rateS.dataUrl === rateUrl ? rateS.data.totals : null;
+  /* No rate in the period (production not booked yet): the last day the ERP has (the user, 30 Oct 2026). */
+  const erpLast = useRmdProduction(dates).data?.erp.lastDate;
+  const rateLast = useLastEntry<RmdRunningRateReport>('/api/rmd/running-rate', !!rate && rate.rateTph == null, erpLast, dates?.from, 'grain=day');
   const [open, setOpen] = useState<'rate' | 'ca' | null>(null);
   const ca = useCa('rmd');
   const openCa = () => setOpen('ca');
@@ -55,6 +60,7 @@ export default function RmdConditionAnalytics() {
           label="Actual rate"
           value={rate?.rateTph == null ? 'NA' : fixed(rate.rateTph, 2)}
           noEntries={!!rate && rate.rateTph == null}
+          lastEntry={lastFigure(rate?.rateTph, rateLast, (d) => d.totals.rateTph, (n) => fixed(n, 2))}
           unit="TPH"
           note=""
           series="prod"

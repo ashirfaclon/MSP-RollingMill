@@ -151,6 +151,11 @@ export interface LsmDriveReport {
   latest: LsmDriveReading[];
   /** Every reading of the period, oldest first. */
   entries: LsmDriveReading[];
+  /**
+   * The latest date up to `to` with a bearing temperature, oil level or oil pressure (its mill day); null when none in the last six
+   * months. The card shows that day when the period has none (the user, 30 Oct 2026).
+   */
+  lastDate: string | null;
 }
 
 /** One pass of an LSM Mill Load Log Sheet reading: the stand, the pass and its load, A. */
@@ -183,4 +188,9 @@ export interface LsmMillLoadReport {
   latest: LsmMillLoadReading | null;
   /** Every reading of the period, oldest first. */
   entries: LsmMillLoadReading[];
+  /**
+   * The latest date up to `to` with a pass load (the form's date); null when none in the last six
+   * months. The card shows that day when the period has none (the user, 30 Oct 2026).
+   */
+  lastDate: string | null;
 }

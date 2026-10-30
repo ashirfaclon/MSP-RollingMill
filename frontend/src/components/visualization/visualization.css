@@ -442,3 +442,6 @@
 }
 .rm-spark-tip.is-left { transform: translateX(-100%); }
 .rm-spark-tip b { font-size: 12px; font-weight: 800; color: var(--text); }
+
+/* A card showing its last entry from before the period: the date said plainly, in the warning tone. */
+.rm-card-last { color: var(--warn); font-weight: 700; }

@@ -15,6 +15,8 @@ import { MSG } from '../../shared/messages';
 
 export const DRIVE_TEMP_FORM = 'lsm-mechanical/drive-temp';
 const LOOK_BACK_MS = 31 * 86_400_000;
+/** How far back to look for the last entry when the period and its month before have none. */
+const LAST_ENTRY_LOOK_BACK_MS = 183 * 86_400_000;
 const DAY_START_HOUR = 9;
 
 /** "2026-10-22T02:00:00" → "2026-10-21": before 09:00 is the previous mill day. */
@@ -57,15 +59,32 @@ export function latestByDrive(entries: LsmDriveReading[]): LsmDriveReading[] {
   return [...by.values()].sort((a, b) => a.drive.localeCompare(b.drive, undefined, { numeric: true }));
 }
 
+/** The latest mill day up to `to` with a bearing temperature, oil level or oil pressure; null with none. */
+export function lastReadingDate(readings: LsmDriveReading[], to: string): string | null {
+  const used = (e: LsmDriveReading) => [e.flywheelDeC, e.flywheelNdeC, e.reductionDeC, e.reductionNdeC, e.pinionDeC, e.pinionNdeC, e.oilPressure, e.oilLevelIn]
+    .some((v) => v !== null);
+  return readings.filter((e) => used(e) && e.date <= to)
+    .reduce<string | null>((a, e) => (a === null || e.date > a ? e.date : a), null);
+}
+
 export async function lsmDriveTemp(env: Env, from: string, to: string): Promise<LsmDriveReport> {
-  const read = await fetchFormEntries(DRIVE_TEMP_FORM, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
-  const entries = (read.ok ? read.rows.map(toReading).filter((e): e is LsmDriveReading => e !== null) : [])
+  const startMs = Date.parse(`${from}T00:00:00+05:30`);
+  const read = await fetchFormEntries(DRIVE_TEMP_FORM, startMs - LOOK_BACK_MS, env);
+  const all = read.ok ? read.rows.map(toReading).filter((e): e is LsmDriveReading => e !== null) : [];
+  const entries = all
     .filter((e) => e.date >= from && e.date <= to)
     .sort((a, b) => a.at.localeCompare(b.at));
+  /* The last day with a reading, up to the period end — from what was read, else once more further back. */
+  let lastDate = lastReadingDate(all, to);
+  if (lastDate === null && read.ok) {
+    const older = await fetchFormEntries(DRIVE_TEMP_FORM, startMs - LAST_ENTRY_LOOK_BACK_MS, env).catch(() => null);
+    if (older?.ok) lastDate = lastReadingDate(older.rows.map(toReading).filter((e): e is LsmDriveReading => e !== null), to);
+  }
   return {
     from, to, form: DRIVE_TEMP_FORM,
     logbook: { connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
     latest: latestByDrive(entries),
     entries,
+    lastDate,
   };
 }

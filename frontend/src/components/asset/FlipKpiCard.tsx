@@ -16,7 +16,7 @@ export interface FlipFace<T extends string> {
   /** The switch's label for this view. */
   label: string;
   title: string;
-  card: Pick<CardProps, 'value' | 'unit' | 'tone' | 'loading' | 'noEntries'>;
+  card: Pick<CardProps, 'value' | 'unit' | 'tone' | 'loading' | 'noEntries' | 'lastEntry'>;
 }
 
 export default function FlipKpiCard<T extends string>({ label, series, faces, onOpen, openLabel }: {

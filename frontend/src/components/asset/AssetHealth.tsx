@@ -21,6 +21,7 @@
  * no source in the sheet.
  */
 import { useMemo, useState } from 'react';
+import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import { useHsmMimic } from '@/components/visualization/useHsmMimic';
@@ -65,15 +66,26 @@ export default function AssetHealth() {
   const load = loadS.data && loadS.dataUrl === loadUrl ? loadS.data : null;
   const rateUrl = rangeUrl('/api/hsm/running-rate', dates ? { ...dates, grain: 'day' } : null);
   const rateS = useApi<RunningRateReport>(rateUrl);
-  const runH = rateS.data && rateS.dataUrl === rateUrl ? rateS.data.totals.erpRunH : null;
+  const rateD = rateS.data && rateS.dataUrl === rateUrl ? rateS.data : null;
+  const runH = rateD ? rateD.totals.erpRunH : null;
+  /* No ERP run hours in the period: the last day booked (the user, 30 Oct 2026). */
+  const rateLast = useLastEntry<RunningRateReport>('/api/hsm/running-rate', !!rateD && runH == null, rateD?.erp.lastDate, dates?.from, 'grain=day');
 
-  const latest = gid && load ? load.latest.filter((e) => e.group === gid) : [];
-  const temps = latest.map(hottest).filter((v): v is number => v !== null);
-  const bearingC = temps.length ? Math.max(...temps) : null;
-  const loads = latest.map((e) => e.loadA).filter((v): v is number => v !== null);
-  const loadA = loads.length ? loads.reduce((a, b) => a + b, 0) / loads.length : null;
-  const pcts = latest.map((e) => loadingPct(e.stand, e.loadA)).filter((v): v is number => v !== null);
-  const loadPct = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null;
+  /* The card figures from a mill-load report, for the group: the hottest DC motor bearing, the mean load. */
+  const figures = (r: HsmMillLoadReport | null) => {
+    const l = gid && r ? r.latest.filter((e) => e.group === gid) : [];
+    const ts = l.map(hottest).filter((v): v is number => v !== null);
+    const ls = l.map((e) => e.loadA).filter((v): v is number => v !== null);
+    const ps = l.map((e) => loadingPct(e.stand, e.loadA)).filter((v): v is number => v !== null);
+    return {
+      latest: l, bearingC: ts.length ? Math.max(...ts) : null,
+      loadA: ls.length ? ls.reduce((a, b) => a + b, 0) / ls.length : null,
+      loadPct: ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null,
+    };
+  };
+  const { latest, bearingC, loadA, loadPct } = figures(load);
+  /* Nothing filled in the period: the last day the Mill Load Log Sheet has (the user, 30 Oct 2026). */
+  const loadLast = useLastEntry<HsmMillLoadReport>('/api/hsm/mill-load', !!gid && !!load && latest.length === 0, load?.lastDate, dates?.from);
   const trend = gid && load ? load.entries.filter((e) => e.group === gid && hottest(e) !== null) : [];
   const canOpen = !!gid && !!load;
   const mimic = useHsmMimic();
@@ -106,6 +118,7 @@ export default function AssetHealth() {
           label="Bearing temp"
           value={bearingC === null ? 'NA' : fixed(bearingC, 0)}
           noEntries={!!gid && !!load && bearingC === null}
+          lastEntry={lastFigure(bearingC, loadLast, (d) => figures(d).bearingC, (n) => fixed(n, 0))}
           unit="°C"
           note=""
           series="hold"
@@ -115,6 +128,7 @@ export default function AssetHealth() {
           label="Motor current"
           value={loadPct === null ? 'NA' : fixed(loadPct, 0)}
           noEntries={!!gid && !!load && loadPct === null}
+          lastEntry={lastFigure(loadPct, loadLast, (d) => figures(d).loadPct, (n) => fixed(n, 0))}
           unit="%"
           note=""
           series="prod"
@@ -122,7 +136,8 @@ export default function AssetHealth() {
         />
         {NA('Gearbox oil', '', 'hold')}
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod"
-          noEntries={!!rateS.data && rateS.dataUrl === rateUrl && runH == null} />
+          noEntries={!!rateS.data && rateS.dataUrl === rateUrl && runH == null}
+          lastEntry={lastFigure(runH, rateLast, (d) => d.totals.erpRunH, (n) => fixed(n, 1))} />
       </section>
 
       <div className="rm-row ah-row--one">

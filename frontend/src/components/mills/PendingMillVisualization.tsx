@@ -18,6 +18,7 @@
  * No mill mimic on RMS (the user, 16 Oct 2026), as on LSM.
  */
 import { useState, type KeyboardEvent } from 'react';
+import { lastFigure } from '@/services/lastEntry';
 import { ofInput } from '@/components/production/ofInput';
 import { ProductionTerm } from '@/components/production/productionTerm';
 import { StockAsOf } from '@/components/production/stockAsOf';
@@ -78,6 +79,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
               label="Mass yield"
               value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
               noEntries={!!prod.data && prod.data.erp.connection === 'up' && t?.massYieldPct == null}
+              lastEntry={lastFigure(t?.massYieldPct, prod.last, (d) => d.totals.massYieldPct, (n) => fixed(n, 1))}
               unit="%"
               note={prodNote}
               series="order"
@@ -93,6 +95,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
               label="Production"
               value={prodMt === null ? 'NA' : fixed(prodMt, 1)}
               noEntries={!!prod.data && prod.data.erp.connection === 'up' && prodMt === null}
+              lastEntry={lastFigure(prodMt, prod.last, (d) => d.totals.productionMt, (n) => fixed(n, 1))}
               unit="MT"
               note={prodNote}
               series="prod"

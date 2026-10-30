@@ -9,6 +9,7 @@
  * Codes exactly as the plant gave them; production is PRODUTION_MT, as the table spells it.
  */
 import { useMemo } from 'react';
+import { useLastEntry } from '@/services/lastEntry';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { fmtNum, type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox, { type SourceSystem } from '@/components/drill/SourceBox';
@@ -24,7 +25,10 @@ const f = (v: number | null) => (v === null ? '—' : fmtNum(v, 2));
 export function useLsmProduction(dates: { from: string; to: string } | null) {
   const url = rangeUrl('/api/lsm/production', dates ? { ...dates, grain: 'day' } : null);
   const s = useApi<LsmProductionReport>(url);
-  return { data: s.data && s.dataUrl === url ? s.data : null, error: s.error };
+  const data = s.data && s.dataUrl === url ? s.data : null;
+  /* No ERP entry in the period: the last day the log sheet has (the user, 30 Oct 2026). */
+  const last = useLastEntry<LsmProductionReport>('/api/lsm/production', !!data && data.erp.connection === 'up' && data.totals.entryDays === 0, data?.erp.lastDate, dates?.from, 'grain=day');
+  return { data, error: s.error, last };
 }
 
 export default function LsmProductionDrawer({ open, onClose, view }: { open: boolean; onClose: () => void; view: LsmProductionView }) {
