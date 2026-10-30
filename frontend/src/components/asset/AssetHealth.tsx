@@ -39,11 +39,16 @@ import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './Mi
 import './asset.css';
 
 /** The drive groups the header selects; each is also its MID section. */
-type Group = 'roughing' | 'finishing' | 'auxiliary';
-const GROUPS: { id: Group; label: string }[] = [{ id: 'roughing', label: 'Roughing' }, { id: 'finishing', label: 'Finishing' }, { id: 'auxiliary', label: 'Auxiliary' }];
-/** The groups whose stands the Mill Load Log Sheet covers. */
-const STANDS: Partial<Record<Group, 'roughing' | 'finishing'>> = { roughing: 'roughing', finishing: 'finishing' };
-const NAME: Record<Group, string> = { roughing: 'Roughing', finishing: 'Finishing', auxiliary: 'Auxiliary' };
+type Group = 'all' | 'roughing' | 'finishing' | 'auxiliary';
+const GROUPS: { id: Group; label: string }[] = [
+  // All: the whole mill — every stand and every MID machine (the user, 31 Oct 2026).
+  { id: 'all', label: 'All' }, { id: 'roughing', label: 'Roughing' }, { id: 'finishing', label: 'Finishing' }, { id: 'auxiliary', label: 'Auxiliary' },
+];
+/** The stand groups of the Mill Load Log Sheet each group covers. */
+const STANDS: Partial<Record<Group, ('roughing' | 'finishing')[]>> = { all: ['roughing', 'finishing'], roughing: ['roughing'], finishing: ['finishing'] };
+const NAME: Record<Group, string> = { all: 'All stands', roughing: 'Roughing', finishing: 'Finishing', auxiliary: 'Auxiliary' };
+/** A Mill Load reading's stand in the selected groups. */
+const inStands = (stands: ('roughing' | 'finishing')[] | null, e: HsmMillLoadEntry) => !!stands && e.group !== null && stands.includes(e.group);
 
 /** The hotter of a reading's DE and NDE temperature; null without either. */
 const hottest = (e: HsmMillLoadEntry) => {
@@ -72,7 +77,7 @@ export default function AssetHealth() {
 
   /* The card figures from a mill-load report, for the group: the hottest DC motor bearing, the mean load. */
   const figures = (r: HsmMillLoadReport | null) => {
-    const l = gid && r ? r.latest.filter((e) => e.group === gid) : [];
+    const l = gid && r ? r.latest.filter((e) => inStands(gid, e)) : [];
     const ts = l.map(hottest).filter((v): v is number => v !== null);
     const ls = l.map((e) => e.loadA).filter((v): v is number => v !== null);
     const ps = l.map((e) => loadingPct(e.stand, e.loadA)).filter((v): v is number => v !== null);
@@ -86,7 +91,7 @@ export default function AssetHealth() {
   /* Nothing filled in the period: the last day the Mill Load Log Sheet has (the user, 30 Oct 2026). */
   const loadLast = useLastEntry<HsmMillLoadReport>('/api/hsm/mill-load', !!gid && !!load && latest.length === 0, load?.lastDate, dates?.from);
   // Every DC motor bearing of the group's stands, each reading (the user, 31 Oct 2026).
-  const trend = useMemo(() => (gid && load ? hsmBearingPoints(load.entries.filter((e) => e.group === gid)) : []), [gid, load]);
+  const trend = useMemo(() => (gid && load ? hsmBearingPoints(load.entries.filter((e) => inStands(gid, e))) : []), [gid, load]);
   const canOpen = !!gid && !!load;
 
   return (
@@ -100,7 +105,7 @@ export default function AssetHealth() {
           /* The MID visit it is from (the user, 31 Oct 2026: was "Last inspection" in the top bar). */
           note={mid.date ? `MID · ${midDate(mid.date)}` : ''}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
-        <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${drive} group`} mid={mid} />
+        <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={group === 'all' ? 'Whole mill' : `${drive} group`} mid={mid} />
         <KpiCard
           label="Bearing temp"
           value={bearingC === null ? 'NA' : fixed(bearingC, 0)}
@@ -130,7 +135,7 @@ export default function AssetHealth() {
         <Panel title="Condition trends" sub="Every machine and every bearing" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
           <BearingTrendAll
-            points={trend.length || !gid || !loadLast.data ? trend : hsmBearingPoints(loadLast.data.entries.filter((e) => e.group === gid))}
+            points={trend.length || !gid || !loadLast.data ? trend : hsmBearingPoints(loadLast.data.entries.filter((e) => inStands(gid, e)))}
             last={!trend.length && gid && loadLast.data ? loadLast.date : null}
             empty={!gid ? 'No bearing temperature source for this group' : !load?.lastDate ? 'No entries recorded yet in the Mill Load Log Sheet' : 'No bearing readings in this period'} />
         </Panel>

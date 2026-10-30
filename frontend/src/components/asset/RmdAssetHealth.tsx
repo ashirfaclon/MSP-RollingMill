@@ -33,7 +33,7 @@ import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
-import { rangeUrl, useApi, type RmdAssetForms, type RmdConditionReport, type RmdLive, type RmdReading } from '@/services/hsmApi';
+import { rangeUrl, useApi, type RmdAssetForms, type RmdBearingGroup, type RmdConditionReport, type RmdLive, type RmdOilGroup, type RmdReading } from '@/services/hsmApi';
 import { dm } from '@/lib/plantDay';
 import { useRmdProduction } from '@/components/rmd/RmdProductionDrawer';
 import RmdCurrentDrawer from './RmdCurrentDrawer';
@@ -47,19 +47,47 @@ import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, usePm } from './ErpPm';
 import './asset.css';
 
 /** The drive groups the header selects; each is also its MID section (the plant's machine list, 27 Oct 2026). */
-type Group = 'roughing' | 'route' | 'finishing' | 'auxiliary';
+type Group = 'all' | 'roughing' | 'route' | 'finishing' | 'auxiliary';
 const GROUPS: { id: Group; label: string }[] = [
+  // All: the whole mill — every group's readings together (the user, 31 Oct 2026).
+  { id: 'all', label: 'All' },
   { id: 'roughing', label: 'Roughing' }, { id: 'route', label: 'Route / diverter' }, { id: 'finishing', label: 'Finishing' }, { id: 'auxiliary', label: 'Auxiliary' },
 ];
 /** The groups with live drives, and the groups with mechanical forms. */
-const LIVE: Partial<Record<Group, 'route' | 'finishing'>> = { route: 'route', finishing: 'finishing' };
-const FORMS: Partial<Record<Group, 'roughing' | 'route'>> = { roughing: 'roughing', route: 'route' };
-const NAME: Record<Group, string> = { roughing: 'Roughing', route: 'Route', finishing: 'Finishing', auxiliary: 'Auxiliary' };
+const LIVE: Partial<Record<Group, ('route' | 'finishing')[]>> = { all: ['route', 'finishing'], route: ['route'], finishing: ['finishing'] };
+const FORMS: Partial<Record<Group, ('roughing' | 'route')[]>> = { all: ['roughing', 'route'], roughing: ['roughing'], route: ['route'] };
+const NAME: Record<Group, string> = { all: 'All groups', roughing: 'Roughing', route: 'Route', finishing: 'Finishing', auxiliary: 'Auxiliary' };
+
+/** Several form groups as one: readings together, the hottest of them, the latest dates. */
+const later = (a: string | null, b: string | null) => (a === null ? b : b === null ? a : a > b ? a : b);
+function mergeBearing(gs: RmdBearingGroup[]): RmdBearingGroup {
+  if (gs.length === 1) return gs[0];
+  return {
+    latest: gs.flatMap((g) => g.latest),
+    max: gs.reduce<RmdBearingGroup['max']>((m, g) => (g.max && (!m || g.max.value > m.value) ? g.max : m), null),
+    trend: gs.flatMap((g) => g.trend).sort((a, b) => a.at.localeCompare(b.at)),
+    history: gs.flatMap((g) => g.history).sort((a, b) => `${a.at} ${a.time ?? ''}`.localeCompare(`${b.at} ${b.time ?? ''}`)),
+    entries: gs.reduce((n, g) => n + g.entries, 0),
+    lastDate: gs.reduce<string | null>((d, g) => later(d, g.lastDate), null),
+  };
+}
+function mergeOil(gs: RmdOilGroup[]): RmdOilGroup {
+  if (gs.length === 1) return gs[0];
+  const share = (r: RmdReading | null) => (r?.litres != null && r.capacityL ? r.litres / r.capacityL : Infinity);
+  return {
+    level: gs.flatMap((g) => g.level),
+    temperature: gs.flatMap((g) => g.temperature),
+    minLevel: gs.reduce<RmdReading | null>((m, g) => (g.minLevel && share(g.minLevel) < share(m) ? g.minLevel : m), null),
+    levelLastDate: gs.reduce<string | null>((d, g) => later(d, g.levelLastDate), null),
+    temperatureLastDate: gs.reduce<string | null>((d, g) => later(d, g.temperatureLastDate), null),
+  };
+}
 /**
  * Which condition cards each group shows (the user, 30 Oct 2026): Roughing has no motor current;
  * Finishing no bearing temperature or gearbox oil; Auxiliary none of the three. Route keeps all.
  */
 const CARDS: Record<Group, { bearing: boolean; current: boolean; oil: boolean }> = {
+  all: { bearing: true, current: true, oil: true },
   roughing: { bearing: true, current: false, oil: true },
   route: { bearing: true, current: true, oil: true },
   finishing: { bearing: false, current: true, oil: false },
@@ -73,8 +101,11 @@ export default function RmdAssetHealth() {
   const [group, setGroup] = useState<Group>('route');
   const show = CARDS[group];
   const [open, setOpen] = useState<'bearing' | 'oil' | 'current' | 'run' | null>(null);
-  const zone = LIVE[group] ?? null;
-  const fg = FORMS[group] ?? null;
+  const zones = LIVE[group] ?? null;
+  const zone = zones?.[0] ?? null;
+  const fgs = FORMS[group] ?? null;
+  const bearingOf = (d: RmdAssetForms) => (fgs ? mergeBearing(fgs.map((g) => d.bearing[g])) : null);
+  const oilOf = (d: RmdAssetForms) => (fgs ? mergeOil(fgs.map((g) => d.oil[g])) : null);
   const { dates } = useSelection();
   const [vibOpen, setVibOpen] = useState(false);
   const mid = useMid('rmd', group);
@@ -90,16 +121,19 @@ export default function RmdAssetHealth() {
   const run = totals?.runningHrs ?? null;
 
   // Live: the group's drives running now, from a fresh reading only.
-  const running = zone && live?.fresh ? live.stations.filter((s) => s.zone === zone && s.on && s.currentA !== null) : [];
+  const running = zones && live?.fresh ? live.stations.filter((s) => (zones as string[]).includes(s.zone) && s.on && s.currentA !== null) : [];
   const currentA = running.length ? running.reduce((a, s) => a + s.currentA!, 0) / running.length : null;
   // Not live: the group's mean current while running over the period — the Condition Analytics figure (CR Mill stands = route).
   const condUrl = rangeUrl('/api/rmd/condition', zone ? dates : null);
   const condS = useApi<RmdConditionReport>(condUrl);
   const cond = condS.data && condS.dataUrl === condUrl ? condS.data : null;
-  const periodA = zone === 'route' ? cond?.stands.meanA : zone === 'finishing' ? cond?.finishing.meanA : null;
+  // One group: its mean; All: the mean of every drive that ran, both groups.
+  const periodA = !cond || !zones ? null : zones.length === 1
+    ? (zone === 'route' ? cond.stands.meanA : cond.finishing.meanA)
+    : (() => { const v = [...cond.stands.drives, ...cond.finishing.drives].map((d) => d.meanA).filter((x): x is number => x !== null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; })();
   const motorA = currentA ?? periodA ?? null;
-  const bearing = fg && forms ? forms.bearing[fg] : null;
-  const oil = fg && forms ? forms.oil[fg] : null;
+  const bearing = forms ? bearingOf(forms) : null;
+  const oil = forms ? oilOf(forms) : null;
   const bearingTone = toneOf(bearing?.latest ?? []);
   const oilTone = toneOf(oil?.temperature ?? []);
   const oilTempC = oil?.temperature.length ? Math.max(...oil.temperature.map((r) => r.value)) : null;
@@ -109,7 +143,7 @@ export default function RmdAssetHealth() {
   const bearingLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!bearing && bearingMax === null, bearing?.lastDate, dates?.from);
   const levelLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!oil && oilLevelL === null, oil?.levelLastDate, dates?.from);
   const tempLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!oil && oilTempC === null, oil?.temperatureLastDate, dates?.from);
-  const hottestOil = (d: RmdAssetForms) => { const t = fg ? d.oil[fg].temperature : []; return t.length ? Math.max(...t.map((r) => r.value)) : null; };
+  const hottestOil = (d: RmdAssetForms) => { const t = oilOf(d)?.temperature ?? []; return t.length ? Math.max(...t.map((r) => r.value)) : null; };
   /** The card's view when it was opened: the drill-down shows that one only. */
   const [oilView, setOilView] = useState<'level' | 'temp'>('level');
 
@@ -127,8 +161,8 @@ export default function RmdAssetHealth() {
         {show.bearing && <KpiCard
           label="Bearing temp"
           value={bearing?.max ? fixed(bearing.max.value, 0) : 'NA'}
-          lastEntry={lastFigure(bearingMax, bearingLast, (d) => (fg ? d.bearing[fg].max?.value : null), (n) => fixed(n, 0))}
-          noEntries={!!fg && !!forms && !bearing?.max}
+          lastEntry={lastFigure(bearingMax, bearingLast, (d) => bearingOf(d)?.max?.value, (n) => fixed(n, 0))}
+          noEntries={!!fgs && !!forms && !bearing?.max}
           unit="°C"
           note=""
           series="hold"
@@ -156,10 +190,10 @@ export default function RmdAssetHealth() {
           series="hold"
           faces={[
             { id: 'level', label: 'Level', title: 'Oil in the tank lowest against its capacity (L)',
-              card: { value: oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA', unit: 'L', noEntries: !!fg && !!forms && oil?.minLevel?.litres == null,
-                lastEntry: lastFigure(oilLevelL, levelLast, (d) => (fg ? d.oil[fg].minLevel?.litres : null), (n) => fixed(n, 0)) } },
+              card: { value: oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA', unit: 'L', noEntries: !!fgs && !!forms && oil?.minLevel?.litres == null,
+                lastEntry: lastFigure(oilLevelL, levelLast, (d) => oilOf(d)?.minLevel?.litres, (n) => fixed(n, 0)) } },
             { id: 'temp', label: 'Temp', title: 'The hottest oil tank (°C)',
-              card: { value: oilTempC !== null ? fixed(oilTempC, 0) : 'NA', unit: '°C', tone: oilTempC !== null ? oilTone : undefined, noEntries: !!fg && !!forms && oilTempC === null,
+              card: { value: oilTempC !== null ? fixed(oilTempC, 0) : 'NA', unit: '°C', tone: oilTempC !== null ? oilTone : undefined, noEntries: !!fgs && !!forms && oilTempC === null,
                 lastEntry: lastFigure(oilTempC, tempLast, hottestOil, (n) => fixed(n, 0)) } },
           ]}
           {...(oil ? { onOpen: (v: 'level' | 'temp') => { setOilView(v); setOpen('oil'); }, openLabel: 'Each oil tank, for the view shown' } : {})}
@@ -177,7 +211,7 @@ export default function RmdAssetHealth() {
           {/* Every bearing of the group's stands, each reading (the user, 31 Oct 2026). */}
           {show.bearing && (() => {
             const now = rmdBearingPoints(bearing?.history ?? []);
-            const before = !now.length && fg && bearingLast.data ? rmdBearingPoints(bearingLast.data.bearing[fg].history) : [];
+            const before = !now.length && bearingLast.data ? rmdBearingPoints(bearingOf(bearingLast.data)?.history ?? []) : [];
             return <BearingTrendAll points={now.length ? now : before} last={!now.length && before.length ? bearingLast.date : null}
               empty={bearing && !bearing.lastDate ? 'No entries recorded yet in the Mill Bearing Temperature forms' : 'No bearing readings in this period'} />;
           })()}
@@ -193,14 +227,14 @@ export default function RmdAssetHealth() {
         </Panel>
       </div>
 
-      {zone && <RmdCurrentDrawer open={open === 'current'} onClose={() => setOpen(null)} zone={zone} />}
+      {zone && <RmdCurrentDrawer open={open === 'current'} onClose={() => setOpen(null)} zone={zone} zones={zones ?? undefined} />}
       <RmdRunHoursDrawer open={open === 'run'} onClose={() => setOpen(null)} />
 
       <DrillDrawer open={open === 'bearing'} onClose={() => setOpen(null)} title={`${NAME[group]} · bearing temperature`} sub="RMD · °C"
         loading={!forms} error={f.error} hasData={!!forms}>
         {bearing && <ReadingsTable rows={bearing.latest} unit="°C" label="Bearing temperatures" max={bearing.max} source={[
           ['Form', 'Rolling Mill Division (TMT) → Mechanical → Mill Bearing Temperature'],
-          ['Forms', fg === 'roughing' ? '20 Inch R Stand, 16 Inch R Stand' : 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)'],
+          ['Forms', (fgs ?? []).map((g) => (g === 'roughing' ? '20 Inch R Stand, 16 Inch R Stand' : 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)')).join(', ')],
           ['Field', 'Flywheel / Reduction gear / Pinion gear, D and ND side (°C) — each form\'s latest entry in the period'],
         ]} formula={['Bearing temp = the hottest of those readings', 'Limits: bearings 45–65 °C, flywheel 45–80 °C (plant)']} />}
       </DrillDrawer>
@@ -218,9 +252,9 @@ export default function RmdAssetHealth() {
               ] }]}
               formula={[
                 'Oil (L) = level (inches) × 0.0254 × inside length × inside width (m) × 1000 — box tanks, flat bottom, level from the bottom',
-                fg === 'roughing'
+                ...(fgs ?? []).map((g) => (g === 'roughing'
                   ? 'Tank size (L × W × D, m): 20" / 16" R stand 1.63 × 1.26 × 1.30 (2,670 L)'
-                  : 'Tank size (L × W × D, m): Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)',
+                  : 'Tank size (L × W × D, m): Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)')),
                 'Gearbox oil (Level) = the oil in the tank lowest against its capacity',
                 'Limits: level — none given yet',
               ]}

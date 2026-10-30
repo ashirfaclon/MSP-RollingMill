@@ -21,14 +21,20 @@ const NAME: Record<RmdZoneId, string> = { route: 'Route', finishing: 'Finishing'
 const LINE_TOKEN: Record<1 | 2, string> = { 1: '--s-prod', 2: '--s-order' };
 const a = (v: number | null | undefined) => (v === null || v === undefined ? '—' : fmtNum(v, 0));
 
-export default function RmdCurrentDrawer({ open, onClose, zone }: { open: boolean; onClose: () => void; zone: RmdZoneId }) {
+/** `zones`: several to choose from (Asset Health's All group) — a switch in the drawer, `zone` first. */
+export default function RmdCurrentDrawer({ open, onClose, zone: first, zones }: { open: boolean; onClose: () => void; zone: RmdZoneId; zones?: RmdZoneId[] }) {
+  const [picked, setPicked] = useState<RmdZoneId | null>(null);
+  const zone = zones && picked && zones.includes(picked) ? picked : first;
   const r = useDrillRange(['selection'], 'selection', { grain: false });
   const base = open ? rangeUrl('/api/rmd/current', r.dates) : null;
   const url = base ? `${base}&zone=${zone}` : null;
   const trend = useApi<RmdCurrentTrend>(url);
   const live = useApi<RmdLive>(open ? '/api/rmd/live' : null, 30_000);
   return (
-    <DrillDrawer open={open} onClose={onClose} title={`${NAME[zone]} · motor current`} sub="RMD · A" controls={r.controls}
+    <DrillDrawer open={open} onClose={onClose} title={`${NAME[zone]} · motor current`} sub="RMD · A"
+      controls={zones && zones.length > 1
+        ? <>{<Seg label="Drive group" value={zone} onChange={setPicked} options={zones.map((z) => ({ id: z, label: NAME[z] }))} />}{r.controls}</>
+        : r.controls}
       loading={trend.loading} stale={!!trend.data && trend.dataUrl !== url} error={trend.error} hasData={!!trend.data}>
       {trend.data && <Content trend={trend.data} live={live.data} zone={zone} />}
     </DrillDrawer>
