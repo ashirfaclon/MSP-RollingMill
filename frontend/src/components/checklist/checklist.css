@@ -37,6 +37,3 @@
 @media (max-width: 760px) {
   .ck-launch { grid-template-columns: minmax(0, 1fr); }
 }
-
-/* The two checklist buttons in the Material & operating balance header (the user, 31 Oct 2026). */
-.ck-head-btns { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }

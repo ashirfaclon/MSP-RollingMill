@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, useState, type KeyboardEvent, type ReactNode } from 'react';
 import Panel from '@/components/Panel';
+import '@/components/plan/plan.css';
 import { Seg } from '@/components/drill/DrillDrawer';
 import { fixed } from '@/lib/num';
 
@@ -44,6 +45,8 @@ export default function ShiftBars(props: {
   shiftData?: boolean | null;
   /** Opens the production plan config (the user, 28 Oct 2026). */
   onEditPlan?: () => void;
+  /** More header buttons after Edit plan (HSM's Production variance checklist). */
+  actions?: ReactNode;
 }) {
   const [view, setView] = useState<View>('shift');
   const dayOnly = props.shiftData === false;
@@ -74,6 +77,8 @@ export default function ShiftBars(props: {
           {props.onEditPlan && (
             <button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={props.onEditPlan} title="Fill in the production plan">Edit plan</button>
           )}
+          {/* Each face of the flip card gets its own copy. */}
+          {props.actions && <Fragment key={v}>{props.actions}</Fragment>}
         </span>
       }
       className="rm-panel"

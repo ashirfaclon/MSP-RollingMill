@@ -14,7 +14,7 @@ import MaterialBalance from './MaterialBalance';
 import StockBySize from './StockBySize';
 import { HSM_SAMPLE } from './hsmSample';
 import { resolveMill, type MillModel } from '@/models/millModel';
-import HsmChecklists from '@/components/checklist/HsmChecklists';
+import ChecklistButton from '@/components/checklist/HsmChecklists';
 import './visualization.css';
 
 /**
@@ -44,15 +44,15 @@ export default function HsmVisualization() {
       {/* No Order allocation panel: production's period is on the Production card, finished stock is
           its own card (the user, 31 Oct 2026). Stock by size takes its place; the balance gets the full width. */}
       <div className="rm-row">
-        <ShiftProduction m={m} />
+        {/* Each checklist in the panel its content belongs to (the user, 31 Oct 2026). */}
+        <ShiftProduction m={m} actions={<ChecklistButton kind="variance" />} />
         <StockBySize />
       </div>
       <div className="rm-row rm-row--full">
-        {/* The checklists: two buttons in its header, not a full-width panel (the user, 31 Oct 2026). */}
-        <MaterialBalance right={<HsmChecklists />} />
+        <MaterialBalance />
       </div>
       {/* The mill mimic sits at the bottom of every page that has one (the user, 30 Oct 2026). */}
-      <MillMimic />
+      <MillMimic actions={<ChecklistButton kind="setup" />} />
     </div>
   );
 }

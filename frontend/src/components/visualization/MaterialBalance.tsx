@@ -37,8 +37,7 @@ const pct = (v: number | null | undefined, of: number | null | undefined) =>
   v === null || v === undefined || !of ? 0 : (v / of) * 100;
 const mt = (v: number | null | undefined) => `${fixed(v, 1)} MT`;
 
-/** `right`: buttons for the panel header (HSM's checklists). */
-export default function MaterialBalance({ right }: { right?: ReactNode }) {
+export default function MaterialBalance() {
   const { current, loading, note } = useErpPeriod();
   const [open, setOpen] = useState(false);
   const openOnKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } };
@@ -67,7 +66,7 @@ export default function MaterialBalance({ right }: { right?: ReactNode }) {
     : 'Losses: not in ERP yet';
 
   return (
-    <Panel title="Material & operating balance" className="rm-panel" bodyClass="rm-body" right={right}>
+    <Panel title="Material & operating balance" className="rm-panel" bodyClass="rm-body">
       <div
         className="rm-mb rm-mb--button"
         role="button"

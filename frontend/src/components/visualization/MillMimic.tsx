@@ -25,8 +25,8 @@ import { useProduction, useSelection } from '@/services/hsmProduction';
 
 export const TONE: Record<GroupNow['state'], string> = { 'all-on': 'ok', partial: 'risk', 'all-off': 'na', 'no-data': 'na' };
 
-/** `children`: rows a screen adds under the drawing (Condition Analytics' notes). */
-export default function MillMimic({ children }: { children?: ReactNode }) {
+/** `children`: rows a screen adds under the drawing (Condition Analytics' notes); `actions`: header buttons (Shift setup checklist). */
+export default function MillMimic({ children, actions }: { children?: ReactNode; actions?: ReactNode }) {
   const live = useLive<HsmLive>('/api/hsm/live', hsmLiveEdges);
   const { dates } = useSelection();
   const prod = useProduction(dates ? { ...dates, grain: 'day' } : null);
@@ -48,7 +48,7 @@ export default function MillMimic({ children }: { children?: ReactNode }) {
 
   return (
     <Panel title="Mill mimic" sub={d ? `${model.totals.on} of ${model.totals.total} stands on` : undefined}
-      right={<LivePill snap={live} model={model} lastReadingAt={d?.lastReadingAt} />}>
+      right={<span className="rm-head-actions">{actions}<LivePill snap={live} model={model} lastReadingAt={d?.lastReadingAt} /></span>}>
       {loading ? (
         <span className="skel skel--block" style={{ height: 150 }} role="status" aria-label="Loading" />
       ) : (

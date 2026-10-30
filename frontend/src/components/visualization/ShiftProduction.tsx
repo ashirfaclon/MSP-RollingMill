@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import type { MillModel } from '@/models/millModel';
 import ShiftPlanDrawer, { type ShiftView } from '@/components/drill/ShiftPlanDrawer';
@@ -20,7 +21,8 @@ import PlanConfig from '@/components/plan/PlanConfig';
  *     shift's target is 0) and, on the card's back face, for the whole day.
  * Running rate is live (RunningRateFoot).
  */
-export default function ShiftProduction({ m }: { m: MillModel }) {
+/** `actions`: more header buttons (the Production variance checklist). */
+export default function ShiftProduction({ m, actions }: { m: MillModel; actions?: ReactNode }) {
   const { dates } = useSelection();
   const url = rangeUrl('/api/hsm/plan', dates);
   const s = useApi<PlanReport>(url);
@@ -39,6 +41,7 @@ export default function ShiftProduction({ m }: { m: MillModel }) {
   return (
     <>
     <ShiftBars
+      actions={actions}
       shifts={m.shifts.map((sh) => ({
         name: sh.name,
         // A planned period with no row for this shift is a 0 target, as filled; no plan at all is NA.
