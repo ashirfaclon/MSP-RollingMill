@@ -2,7 +2,7 @@
 
 /**
  * Specific energy drill-down, for the period chosen on the dashboard: kWh per MT rolled —
- * the logbook's power over the Influx production — per day / week / month, as a line and a table, and
+ * the logbook's power over the ERP production — per day / week / month, as a line and a table, and
  * where both come from.
  */
 import { useMemo } from 'react';
@@ -54,7 +54,7 @@ function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill:
       <Stats items={[
         { label: 'Specific energy', value: n(t.kwhPerMt), unit: 'kWh/MT' },
         { label: 'Power', value: n(t.kwh), unit: 'kWh' },
-        { label: mill === 'hsm' ? 'Production (Influx)' : 'Production (ERP)', value: n(t.productionMt), unit: 'MT' },
+        { label: 'Production (ERP)', value: n(t.productionMt), unit: 'MT' },
       ]} />
 
       {t.entries > 0 ? (
@@ -101,10 +101,10 @@ const SOURCES: Record<PowerMill, SourceSystem[]> = {
       ],
     },
     {
-      name: 'Influx',
+      name: 'ERP',
       rows: [
-        ['Tag', 'Total_Production_Ton'],
-        ['Filter', "_measurement = 'HSM', Unit = 'Finishing Mill', Group = 'General'"],
+        ['Table', 'ATTR_TRAN_DATA_HEAD / BODY, TNATURE PRLOG, series L6P (division S1)'],
+        ['Field', 'PRODUCTION_MT, by VRDATE'],
       ],
     },
   ],
@@ -161,7 +161,7 @@ const SOURCES: Record<PowerMill, SourceSystem[]> = {
 };
 
 const FORMULA: Record<PowerMill, string[]> = {
-  hsm: ['Specific energy = Power (kWh) ÷ Influx production (MT)'],
+  hsm: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
   rmd: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
   lsm: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
   rms: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],

@@ -290,8 +290,8 @@ test('power consumption: the logbook form summed by the date entered, entry by e
   // 22–28 Sep: Σ POWER_CONSUMED of all 62 entries of "Electrical HSM → Power Consumption" = 174,916.99 kWh.
   const card = page.getByRole('button', { name: 'Power consumption', exact: true });
   await expect(card.locator('.rm-card-value')).toContainText('174.92', { timeout: 60_000 });
-  // Specific energy = 174,916.99 kWh ÷ 1,140.28 MT (the Production card's Total) = 153.40 kWh/MT.
-  await expect(page.getByRole('button', { name: 'Specific energy', exact: true }).locator('.rm-card-value')).toContainText('153.4');
+  // Specific energy = 174,916.99 kWh ÷ 1,076.51 MT (ERP production, the user 30 Oct 2026) = 162.49 kWh/MT.
+  await expect(page.getByRole('button', { name: 'Specific energy', exact: true }).locator('.rm-card-value')).toContainText('162.5');
   await card.click();
   const drawer = page.getByRole('dialog', { name: 'Power consumption · logbook' });
   // Seven days: grouped by day.
@@ -324,14 +324,14 @@ test('power consumption: the logbook form summed by the date entered, entry by e
   await drawer.screenshot({ path: `${SHOTS}/drill-power.png` });
   await page.keyboard.press('Escape');
 
-  // Specific energy opens its own drawer: power ÷ Influx production.
+  // Specific energy opens its own drawer: power ÷ ERP production.
   await page.getByRole('button', { name: 'Specific energy', exact: true }).click();
   const se = page.getByRole('dialog', { name: 'Specific energy · power ÷ production' });
-  await expect(se.locator('.pd-stats')).toContainText('153.4');
+  await expect(se.locator('.pd-stats')).toContainText('162.5');
   // One line: no legend to toggle.
   await expect(se.getByRole('group', { name: 'Show or hide series' })).toHaveCount(0);
-  await expect(se.getByRole('table', { name: 'Specific energy by period' }).locator('tfoot')).toContainText('1,140.3');
-  await expect(se.getByRole('region', { name: 'Formula' })).toContainText('Specific energy = Power (kWh) ÷ Influx production (MT)');
+  await expect(se.getByRole('table', { name: 'Specific energy by period' }).locator('tfoot')).toContainText('1,076.5');
+  await expect(se.getByRole('region', { name: 'Formula' })).toContainText('Specific energy = Power (kWh) ÷ ERP production (MT)');
   await page.waitForTimeout(700);
   await se.screenshot({ path: `${SHOTS}/drill-specific-energy.png` });
 });

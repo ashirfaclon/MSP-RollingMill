@@ -2,8 +2,8 @@
 
 /**
  * Specific energy = power consumption (logbook forms, kWh) ÷ production for the Duration
- * period — computed in the backend's power report. HSM divides by the Influx counter, RMD by
- * the ERP log sheet. Opens the drawer that shows both per day.
+ * period — computed in the backend's power report. Every mill divides by its ERP log sheet's
+ * production (the user, 30 Oct 2026). Opens the drawer that shows both per day.
  */
 import { useState } from 'react';
 import KpiCard from '@/components/visualization/KpiCard';

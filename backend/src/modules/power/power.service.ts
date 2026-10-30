@@ -17,8 +17,9 @@
  *
  * An entry whose remark says "test entry" is left out.
  *
- * Specific energy = that power ÷ the mill's production for the same period, kWh/MT — HSM's
- * Production card (the Influx counter); RMD's ERP log sheet (PRODUCT_PRIME_SLENGTH_MT); LSM's
+ * Specific energy = that power ÷ the mill's ERP production for the same period, kWh/MT (the
+ * user, 30 Oct 2026: ERP, never the Influx counter) — HSM's ERP log sheet (PRODUCTION_MT, L6P);
+ * RMD's (PRODUCT_PRIME_SLENGTH_MT); LSM's
  * (PRODUTION_MT). Power is summed by the form's date, production by the 08:00
  * plant day — the same date, a few hours apart.
  *
@@ -155,11 +156,11 @@ async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs
   };
 }
 
-/** HSM: the logbook's power over the Production card's Influx figure. */
+/** HSM: the logbook's power over the ERP log sheet's production (PRODUCTION_MT, L6P). */
 export function powerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
   const production = productionComparison(env, from, to, 'day', nowMs).then((p) => ({
-    byDay: new Map(p.days.map((d) => [d.date, d.influxMt])),
-    total: p.totals.influxMt,
+    byDay: new Map(p.days.map((d) => [d.date, d.erpMt])),
+    total: p.totals.erpMt,
   }));
   return report(env, 'hsm', from, to, nowMs, production);
 }
