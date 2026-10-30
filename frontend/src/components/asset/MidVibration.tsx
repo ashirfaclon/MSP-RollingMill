@@ -223,9 +223,10 @@ const REMARK_ORDER: Record<MidStatus, number> = { 'Un-acceptable': 0, Acceptable
  */
 export function MidRemarks({ mid }: { mid: MidView }) {
   const rows = [
-    ...(mid.report?.latest?.machines ?? []).map((m) => ({ key: m.machine, head: m.machine, status: m.status, text: m.diagnosis })),
+    // Each with the date of the MID visit it is from (the user, 31 Oct 2026).
+    ...(mid.report?.latest?.machines ?? []).map((m) => ({ key: m.machine, head: m.machine, status: m.status, text: m.diagnosis, date: mid.report!.latest!.date })),
     ...(mid.report?.temperature?.readings ?? []).map((t) => ({
-      key: `t-${t.equipment}-${t.phase}`, head: t.phase ? `${t.equipment} · ${t.phase}` : t.equipment, status: t.status, text: t.remarks,
+      key: `t-${t.equipment}-${t.phase}`, head: t.phase ? `${t.equipment} · ${t.phase}` : t.equipment, status: t.status, text: t.remarks, date: mid.report!.temperature!.date,
     })),
   ]
     .filter((m) => m.text)
@@ -237,7 +238,10 @@ export function MidRemarks({ mid }: { mid: MidView }) {
         <li className="ah-remark" key={m.key}>
           <span className="ah-remark-head">
             <b>{m.head}</b>
-            <span className={`ah-remark-status ${m.status ? TONE[m.status] : 'v-na'}`}>{m.status ?? 'NA'}</span>
+            <span className="ah-remark-meta">
+              <span className="ah-remark-date">MID · {day(m.date)}</span>
+              <span className={`ah-remark-status ${m.status ? TONE[m.status] : 'v-na'}`}>{m.status ?? 'NA'}</span>
+            </span>
           </span>
           <span className="ah-remark-text">{m.text}</span>
         </li>
