@@ -169,25 +169,22 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; the h
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^(NA|\d[\d,]*)%$/);
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
-  for (const t of ['Grouped asset mimic', 'Condition trends', 'Remarks']) {
+  for (const t of ['Condition trends', 'Remarks']) {
     await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
   }
   // No PM items on HSM (the user, 29 Oct 2026): no ERP PM panel, no Next PM / Open work orders.
   await expect(main.locator('section.panel', { hasText: 'ERP PM & work-order history' })).toHaveCount(0);
   await expect(main.locator('.ah-fact dt')).toHaveText(['Last inspection']);
-  // The sheet gives no source for the mimic: every zone NA.
-  await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit']);
-  // The Visualization mimic's Influx tags: billets today, drives on per group, the production counter.
-  await expect(main.getByRole('list', { name: 'Drive groups' }).locator('.rm-zone-value')).toHaveText([/^(NA|\d+ billets)$/, /\S/, /\S/, /^(NA|[\d,.]+ MT)$/], { timeout: 60_000 });
-  // The mimic only shows the live state; the header selects the drive group (the user, 28 Oct 2026).
-  await expect(main.getByRole('list', { name: 'Drive groups' }).getByRole('button')).toHaveCount(0);
+  // No mill mimic on Asset Health (the user, 30 Oct 2026): it lives on Visualization.
+  await expect(main.locator('section.panel', { hasText: 'Grouped asset mimic' })).toHaveCount(0);
+  await expect(main.getByRole('list', { name: 'Drive groups' })).toHaveCount(0);
   const groups = main.getByRole('group', { name: 'Drive group' });
   await expect(groups.getByRole('button')).toHaveText(['Roughing', 'Finishing', 'Auxiliary']);
   await groups.getByRole('button', { name: 'Roughing' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Roughing drive group');
   await expect(groups.getByRole('button', { name: 'Roughing' })).toHaveAttribute('aria-pressed', 'true');
   // Status from the RM drives' On_Off: the live state, or "No live data" — never NA.
-  await expect(main.locator('.ah-status')).toHaveText(/^(All on|All off|\d+ of \d+ on|No live data)$/, { timeout: 60_000 });
+  await expect(main.locator('.ah-status')).toHaveText(/^(All (stands )?on|All (stands )?off|\d+ of \d+ on|No live data)$/, { timeout: 60_000 });
   // Auxiliary: MID's pumps (PUMP-04 / 07 / 08 / 12), highest 4.1 mm/s on 21 Apr 2026.
   await groups.getByRole('button', { name: 'Auxiliary' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Auxiliary · pumps');

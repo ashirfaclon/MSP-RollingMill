@@ -20,11 +20,9 @@
  * ERP's PM module (the user, 29 Oct 2026). The rest have
  * no source in the sheet.
  */
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import FlowArrow from '@/components/visualization/FlowArrow';
-import { StandDots, TONE } from '@/components/visualization/MillMimic';
 import { useHsmMimic } from '@/components/visualization/useHsmMimic';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
@@ -39,9 +37,6 @@ import { useMid } from './useMid';
 import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
 import './asset.css';
 
-/** HSM has no intermediate group (the user, 26 Oct 2026; the historian has only RM 1–5 and FM 1–6). */
-const ZONES = ['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit'] as const;
-const ZONE_STANDS: Partial<Record<(typeof ZONES)[number], 'roughing' | 'finishing'>> = { 'Roughing group': 'roughing', 'Finishing group': 'finishing' };
 /** The drive groups the header selects; each is also its MID section. */
 type Group = 'roughing' | 'finishing' | 'auxiliary';
 const GROUPS: { id: Group; label: string }[] = [{ id: 'roughing', label: 'Roughing' }, { id: 'finishing', label: 'Finishing' }, { id: 'auxiliary', label: 'Auxiliary' }];
@@ -129,34 +124,6 @@ export default function AssetHealth() {
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod"
           noEntries={!!rateS.data && rateS.dataUrl === rateUrl && runH == null} />
       </section>
-
-      <Panel title="Grouped asset mimic">
-        <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Drive groups">
-          {ZONES.map((g, i) => {
-            const sg = ZONE_STANDS[g] ?? null;
-            const grp = sg ? mimic.group(sg) : null;
-            const value = g === 'Billet infeed' ? (mimic.billetsToday === null ? 'NA' : `${mimic.billetsToday} billets`)
-              : g === 'Finished exit' ? (mimic.exitMt === null ? 'NA' : `${fixed(mimic.exitMt, 1)} MT`)
-              : grp && grp.state !== 'no-data' ? grp.stateLabel : 'NA';
-            const tone = grp ? `rm-zone--${TONE[grp.state]}` : 'rm-zone--flow';
-            return (
-              <Fragment key={g}>
-                {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
-                <li className="rm-mimic-cell">
-                  <div className={`rm-zone ${tone}`}>
-                    <span className="rm-zone-title">{g}</span>
-                    <span className="rm-zone-body">
-                      <span className={`rm-zone-value num ${value === 'NA' ? 'v-na' : 'v-val'}`}>{value}</span>
-                      {sg && value !== 'NA' && <StandDots stands={mimic.stands(sg)} />}
-                    </span>
-                    <span className="rm-zone-foot">{g === 'Billet infeed' ? 'Today · since 08:00 IST' : ' '}</span>
-                  </div>
-                </li>
-              </Fragment>
-            );
-          })}
-        </ol>
-      </Panel>
 
       <div className="rm-row ah-row--one">
         <Panel title="Condition trends" sub="Bearing temperature, each reading" className="rm-panel" bodyClass="rm-body ah-trends">

@@ -865,16 +865,8 @@ test('RMD asset health: route drive group by default; motor current live, run ho
     await d.screenshot({ path: `${SHOTS}/rmd-asset-bearing-limits.png` });
     await d.getByRole('button', { name: /Close/ }).click();
   }
-  const mimic = main.getByRole('list', { name: 'Drive groups' });
-  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit']);
-  const zone = (t: string) => mimic.locator('.rm-zone', { hasText: t });
-  await expect(zone('Route / diverter').locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);
-  // As the Visualization mimic: billets since 09:00 IST today; exit = ERP Prime + SL 1–8 Oct 1,689.9 MT.
-  await expect(zone('Billet infeed')).toContainText('Today · since 09:00 IST');
-  await expect(zone('Billet infeed').locator('.rm-zone-value')).toHaveText(/^(NA|\d+ billets)$/);
-  await expect(zone('Finished exit').locator('.rm-zone-value')).toHaveText('1,689.9 MT');
-  // The mimic only shows the live state; the drive group is chosen in the header (the user, 28 Oct 2026).
-  await expect(mimic.getByRole('button')).toHaveCount(0);
+  // No mill mimic on Asset Health (the user, 30 Oct 2026): it lives on Visualization.
+  await expect(main.getByRole('list', { name: 'Drive groups' })).toHaveCount(0);
   const groups = main.getByRole('group', { name: 'Drive group' });
   await expect(groups.getByRole('button')).toHaveText(['Roughing', 'Route / diverter', 'Finishing', 'Auxiliary']);
   await expect(groups.getByRole('button', { name: 'Route / diverter' })).toHaveAttribute('aria-pressed', 'true');

@@ -23,10 +23,9 @@
  * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
  * 45–65 °C — a card turns red when any of its readings is outside them, green when all are inside.
  */
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import FlowArrow from '@/components/visualization/FlowArrow';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
@@ -45,9 +44,6 @@ import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './Mi
 import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, pmFacts, usePm } from './ErpPm';
 import './asset.css';
 
-/** The mimic: live zones only — display, not a selector. */
-const ZONES = ['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit'] as const;
-const ZONE_LIVE: Partial<Record<(typeof ZONES)[number], 'route' | 'finishing'>> = { 'Route / diverter': 'route', 'Finishing group': 'finishing' };
 /** The drive groups the header selects; each is also its MID section (the plant's machine list, 27 Oct 2026). */
 type Group = 'roughing' | 'route' | 'finishing' | 'auxiliary';
 const GROUPS: { id: Group; label: string }[] = [
@@ -90,7 +86,6 @@ export default function RmdAssetHealth() {
   const forms = f.data && f.dataUrl === formsUrl ? f.data : null;
   const totals = useRmdProduction(dates).data?.totals;
   const run = totals?.runningHrs ?? null;
-  const prod = totals?.productionMt ?? null;
 
   const zoneLive = zone && live ? live.zones.find((z) => z.id === zone) ?? null : null;
   // Live: the group's drives running now, from a fresh reading only.
@@ -175,31 +170,6 @@ export default function RmdAssetHealth() {
         <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
         <ErpPmDrawer open={pmOpen} onClose={() => setPmOpen(false)} pm={pm} runH={run} title="RMD" />
       </section>
-
-      <Panel title="Grouped asset mimic">
-        <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Drive groups">
-          {ZONES.map((g, i) => {
-            const zl = ZONE_LIVE[g] && live ? live.zones.find((z) => z.id === ZONE_LIVE[g]) ?? null : null;
-            // Billet infeed and finished exit as the Visualization mimic.
-            const value = g === 'Billet infeed' ? (live?.billetsToday == null ? 'NA' : `${live.billetsToday} billets`)
-              : g === 'Finished exit' ? (prod === null ? 'NA' : `${fixed(prod, 1)} MT`)
-              : zl && zl.state !== 'no-data' ? `${zl.on} of ${zl.total} on` : 'NA';
-            const foot = g === 'Billet infeed' ? 'Today · since 09:00 IST' : null;
-            return (
-              <Fragment key={g}>
-                {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
-                <li className="rm-mimic-cell">
-                  <div className="rm-zone rm-zone--flow">
-                    <span className="rm-zone-title">{g}</span>
-                    <span className="rm-zone-body"><span className={`rm-zone-value num ${value === 'NA' ? 'v-na' : 'v-val'}`}>{value}</span></span>
-                    {foot && <span className="rm-zone-foot">{foot}</span>}
-                  </div>
-                </li>
-              </Fragment>
-            );
-          })}
-        </ol>
-      </Panel>
 
       <div className="rm-row ah-row--one">
         <Panel title="Condition trends" sub={show.bearing ? 'Bearing temperature, each reading' : undefined} className="rm-panel" bodyClass="rm-body ah-trends">
