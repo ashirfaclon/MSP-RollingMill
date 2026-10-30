@@ -31,6 +31,12 @@ describe('RMD bearing and oil groups', () => {
     expect(g.max).toMatchObject({ equipment: '16" R stand', point: 'Reduction gear ND side', value: 63 });
     expect(g.latest.map((r) => r.value)).toEqual([63, 55, 58]);   // 16" first; 20" from its 20:00 entry
     expect(g.trend.map((t) => t.maxC)).toEqual([61, 63, 58]);
+    // History: every bearing of every entry, oldest first (the user, 31 Oct 2026).
+    expect(g.history.map((h) => `${h.time?.slice(11, 16)} ${h.equipment} ${h.point} ${h.value}`)).toEqual([
+      '08:00 20" R stand Flywheel D side 50', '08:00 20" R stand Pinion gear D side 61',
+      '09:00 16" R stand Reduction gear ND side 63',
+      '20:00 20" R stand Flywheel D side 55', '20:00 20" R stand Pinion gear D side 58',
+    ]);
   });
   test('oil: roughing tanks only; each level in litres; the lowest against its capacity', () => {
     const o = oilGroup(entries, 'roughing');

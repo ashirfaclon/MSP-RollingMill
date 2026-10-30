@@ -47,9 +47,20 @@
 /* The drive-group selector under the asset name (the mimic only shows the live state). */
 .ah-asset-id .tb-seg { align-self: flex-start; margin-top: 6px; flex-wrap: wrap; }
 
-.ah-trends { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+/* Condition trends: the charts one above the other, each across the panel (the user, 31 Oct 2026). */
+.ah-trends { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
 .ah-trend { display: flex; flex-direction: column; gap: 10px; }
-.ah-trend-head { display: flex; justify-content: space-between; align-items: baseline; }
+.ah-trend-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+/* Condition trends: a button per unit (drive, stand) when its bearings are drawn one unit at a time. */
+.ah-unit-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.ah-unit-chip {
+  font: inherit; font-size: 10.5px; font-weight: 700; line-height: 14px; padding: 3px 9px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
+}
+.ah-unit-chip:hover { border-color: var(--info); color: var(--text); }
+.ah-unit-chip.on { border-color: var(--info); background: color-mix(in srgb, var(--info) 22%, var(--panel-2)); color: var(--text); }
+.ah-unit-chip:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+.ah-trend-date { font-size: 11px; font-weight: 600; color: var(--muted-2); }
 .ah-trend-plot { height: 64px; border-bottom: 1px solid var(--border); background: repeating-linear-gradient(90deg, transparent 0 6px, var(--panel-3) 6px 7px) bottom / 100% 1px no-repeat; }
 
 .ah-list { display: flex; flex-direction: column; }

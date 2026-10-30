@@ -18,17 +18,17 @@
  *                     lowest against its capacity — the level (inches) × the tank's inside length ×
  *                     width; Temp = the hottest tank's oil temperature, against 45–65 °C;
  *   Run hours         ERP log sheet ACTUAL_RUNNING_HRS over the period (whole mill); opens per day;
- *   Condition trends  bearing temperature: the hottest bearing of each entry.
+ *   Condition trends  every MID machine; every bearing of each entry (the user, 31 Oct 2026).
  * Test entries are left out.
  * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
  * 45–65 °C — a card turns red when any of its readings is outside them, green when all are inside.
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import BearingTrendAll, { rmdBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
-import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
@@ -185,9 +185,10 @@ export default function RmdAssetHealth() {
       </section>
 
       <div className="rm-row ah-row--one">
-        <Panel title="Condition trends" sub={show.bearing ? 'Bearing temperature, each reading' : undefined} className="rm-panel" bodyClass="rm-body ah-trends">
+        <Panel title="Condition trends" sub={show.bearing ? 'Every machine and every bearing' : 'Every machine'} className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
-          {show.bearing && <BearingTrend trend={bearing?.trend ?? []} />}
+          {/* Every bearing of the group's stands, each reading (the user, 31 Oct 2026). */}
+          {show.bearing && <BearingTrendAll points={rmdBearingPoints(bearing?.history ?? [])} />}
         </Panel>
       </div>
 
@@ -256,21 +257,6 @@ function toneOf(rows: RmdReading[]): 'v-ok' | 'v-risk' | undefined {
 }
 const LIMIT_TONE = { ok: 'v-ok', low: 'v-risk', high: 'v-risk' } as const;
 
-
-function BearingTrend({ trend }: { trend: { at: string; maxC: number }[] }) {
-  const categories = useMemo(() => trend.map((t) => t.at.slice(5)), [trend]);
-  const series = useMemo<DrillSeries[]>(() => [{ id: 'bt', name: 'Hottest bearing', token: '--s-order', type: 'line', data: trend.map((t) => t.maxC), dp: 0 }], [trend]);
-  const axes = useMemo(() => [{ title: '°C', unit: '°C' }], []);
-  const last = trend.at(-1);
-  return (
-    <div className="ah-trend">
-      <div className="ah-trend-head"><span className="rm-k">Bearing temp · °C</span><span className={`num ${last ? 'v-val' : 'v-na'}`}>{last ? fixed(last.maxC, 0) : 'NA'}</span></div>
-      {trend.length
-        ? <DrillChart series={series} categories={categories} axes={axes} ariaLabel={`Hottest bearing per reading: ${trend.map((t) => `${t.at} ${t.maxC} °C`).join('; ')}`} />
-        : <div className="ah-trend-plot" role="img" aria-label="Bearing temperature: no readings" />}
-    </div>
-  );
-}
 
 /** Oil tank level: the reading (inches), the oil in litres and the capacity (no "Full" column — the user, 29 Oct 2026). */
 function TankLevelTable({ rows }: { rows: RmdReading[] }) {

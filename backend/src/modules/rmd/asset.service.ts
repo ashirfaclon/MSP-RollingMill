@@ -136,7 +136,9 @@ export function bearingGroup(entries: Entry[], group: AssetGroup): Omit<RmdBeari
     const rs = readingsOf(e);
     return rs.length ? { at: e.date, equipment: BEARING_FORMS[e.form].equipment, maxC: Math.max(...rs.map((r) => r.value)) } : null;
   }).filter((x): x is NonNullable<typeof x> => x !== null);
-  return { latest, max, trend, entries: mine.length };
+  // History: every bearing of each entry, oldest first.
+  const history = [...mine].sort(order).flatMap((e) => readingsOf(e).map((r) => ({ at: e.date, time: e.time, equipment: r.equipment, point: r.point, value: r.value })));
+  return { latest, max, trend, history, entries: mine.length };
 }
 
 export function oilGroup(entries: Entry[], group: AssetGroup): Omit<RmdOilGroup, 'levelLastDate' | 'temperatureLastDate'> {

@@ -65,7 +65,7 @@ export default function RmsAssetHealth() {
       </section>
 
       <div className="rm-row ah-row--one">
-        <Panel title="Condition trends" className="rm-panel" bodyClass="rm-body ah-trends">
+        <Panel title="Condition trends" sub="Every machine" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
           <div className="ah-trend">
             <div className="ah-trend-head"><span className="rm-k">Bearing temp · °C</span><span className="num v-na">NA</span></div>

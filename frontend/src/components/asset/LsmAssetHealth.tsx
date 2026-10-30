@@ -16,13 +16,13 @@
  * LSM (the user, 23 Oct 2026). Vibration from MID; PM items on ERP PM.
  */
 import { useMemo, useState } from 'react';
+import BearingTrendAll, { lsmBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import LsmMillLoadDrawer from './LsmMillLoadDrawer';
 import FlipKpiCard from './FlipKpiCard';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
-import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { dm, useSelection } from '@/services/hsmProduction';
@@ -82,7 +82,8 @@ export default function LsmAssetHealth() {
   /* Nothing filled in the period: the last day each form has (the user, 30 Oct 2026). */
   const driveLast = useLastEntry<LsmDriveReport>('/api/lsm/drive-temp', !!drives && drives.latest.length === 0, drives?.lastDate, dates?.from);
   const loadLast = useLastEntry<LsmMillLoadReport>('/api/lsm/mill-load', !!load && currentA === null, load?.lastDate, dates?.from);
-  const trend = drives ? drives.entries.filter((e) => hottest(e) !== null) : [];
+  // Every bearing of every drive, each reading (the user, 31 Oct 2026).
+  const trend = useMemo(() => (drives ? lsmBearingPoints(drives.entries) : []), [drives]);
   const opener = drives ? { onOpen: () => setOpen(true), openLabel: 'Each drive: bearing temperatures and gearbox oil' } : {};
 
   return (
@@ -127,9 +128,9 @@ export default function LsmAssetHealth() {
       </section>
 
       <div className="rm-row ah-row--one">
-        <Panel title="Condition trends" sub="Bearing temperature, each reading" className="rm-panel" bodyClass="rm-body ah-trends">
+        <Panel title="Condition trends" sub="Every machine and every bearing" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
-          <BearingTrend entries={trend} />
+          <BearingTrendAll points={trend} />
         </Panel>
       </div>
 
@@ -207,24 +208,6 @@ export default function LsmAssetHealth() {
           </>
         )}
       </DrillDrawer>
-    </div>
-  );
-}
-
-function BearingTrend({ entries }: { entries: LsmDriveReading[] }) {
-  const categories = useMemo(() => entries.map((e) => `${time(e.at)} ${e.drive}`), [entries]);
-  const series = useMemo<DrillSeries[]>(() => [{ id: 'bt', name: 'Hottest drive bearing', token: '--s-order', type: 'line', data: entries.map(hottest), dp: 0 }], [entries]);
-  const axes = useMemo(() => [{ title: '°C', unit: '°C' }], []);
-  const last = entries.at(-1);
-  return (
-    <div className="ah-trend">
-      <div className="ah-trend-head">
-        <span className="rm-k">Bearing temp · °C</span>
-        <span className={`num ${last ? 'v-val' : 'v-na'}`}>{last ? fixed(hottest(last), 0) : 'NA'}</span>
-      </div>
-      {entries.length
-        ? <DrillChart series={series} categories={categories} axes={axes} ariaLabel={`Hottest drive bearing per reading: ${entries.map((e) => `${e.at} ${e.drive} ${hottest(e)} °C`).join('; ')}`} />
-        : <div className="ah-trend-plot" role="img" aria-label="Bearing temperature: no readings" />}
     </div>
   );
 }

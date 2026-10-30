@@ -95,21 +95,44 @@ export function MidVibrationDrawer({ open, onClose, title, mid }: { open: boolea
   );
 }
 
-/** The Condition trend block: the section's highest reading per MID visit. */
+/** At most this many visits side by side (the latest ones); one colour each, in a fixed order. */
+const VISIT_TOKENS = ['--cat-1', '--cat-2', '--cat-3', '--cat-4'];
+
+/**
+ * The Condition trend block: every machine of the section at each MID visit, not only the highest (the
+ * user, 31 Oct 2026). A bar per machine, highest first, one colour per visit (the last four).
+ */
 export function MidVibrationTrend({ mid }: { mid: MidView }) {
-  const categories = useMemo(() => mid.trend.map((t) => day(t.date)), [mid.trend]);
-  // A bar per visit: MID comes about once a month, and a single visit still shows.
-  const series = useMemo<DrillSeries[]>(() => [{ id: 'vib', name: 'Highest vibration', token: '--s-prod', type: 'column', data: mid.trend.map((t) => t.maxMmS), dp: 1 }], [mid.trend]);
+  const visits = useMemo(() => mid.visits.slice(-VISIT_TOKENS.length), [mid.visits]);
+  // Highest first (the user, 31 Oct 2026): by the latest visit's reading, then any earlier visit's.
+  const machines = useMemo(() => {
+    const best = new Map<string, number[]>();
+    for (const [i, v] of [...visits].reverse().entries()) for (const m of v.machines) {
+      if (m.maxMmS === null) continue;
+      const k = best.get(m.machine) ?? visits.map(() => -1);
+      k[i] = m.maxMmS;
+      best.set(m.machine, k);
+    }
+    const cmp = (a: number[], b: number[]) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return b[i] - a[i]; return 0; };
+    return [...best.entries()].sort((x, y) => cmp(x[1], y[1])).map(([n]) => n);
+  }, [visits]);
+  const series = useMemo<DrillSeries[]>(() => visits.map((v, i) => ({
+    id: v.date, name: day(v.date), token: VISIT_TOKENS[i], type: 'column',
+    data: machines.map((n) => v.machines.find((m) => m.machine === n)?.maxMmS ?? null), dp: 1,
+  })), [visits, machines]);
   const axes = useMemo(() => [{ title: 'mm/s', unit: 'mm/s', min: 0 }], []);
-  const last = mid.trend.at(-1);
+  const last = visits.at(-1);
+  // A row per machine, a little taller with more visits beside each other.
+  const height = Math.max(160, 44 + machines.length * (14 + 6 * visits.length));
   return (
     <div className="ah-trend">
       <div className="ah-trend-head">
         <span className="rm-k">Vibration · mm/s RMS</span>
-        <span className={`num ${last ? 'v-val' : 'v-na'}`}>{last ? fixed(last.maxMmS, 1) : 'NA'}</span>
+        {last && <span className="ah-trend-date">MID visit {day(last.date)}</span>}
       </div>
-      {mid.trend.length
-        ? <DrillChart series={series} categories={categories} axes={axes} ariaLabel={`Highest vibration per MID visit: ${mid.trend.map((t) => `${t.date} ${t.maxMmS} mm/s`).join('; ')}`} />
+      {machines.length
+        ? <DrillChart series={series} categories={machines} axes={axes} horizontal height={height}
+            ariaLabel={`Vibration of every machine, by MID visit: ${visits.map((v) => `${v.date}: ${v.machines.filter((m) => m.maxMmS !== null).map((m) => `${m.machine} ${m.maxMmS} mm/s`).join(', ')}`).join('; ')}`} />
         : <div className="ah-trend-plot" role="img" aria-label="Vibration: no data" />}
     </div>
   );

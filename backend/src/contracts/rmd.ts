@@ -238,6 +238,11 @@ export interface RmdBearingGroup {
   max: RmdReading | null;
   /** The hottest bearing of each entry, oldest first (by Date, then when filled); at = the Date. */
   trend: { at: string; equipment: string; maxC: number }[];
+  /**
+   * Every bearing of every entry in the period, oldest first (by Date, then the entry's time, then when
+   * filled): the Condition trend draws all of them, not only the hottest (the user, 31 Oct 2026).
+   */
+  history: { at: string; time: string | null; equipment: string; point: string; value: number }[];
   entries: number;
   /**
    * The latest Date up to `to` with a bearing reading of the group; null when none in the last six

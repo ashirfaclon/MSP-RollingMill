@@ -21,12 +21,12 @@
  * no source in the sheet.
  */
 import { useMemo, useState } from 'react';
+import BearingTrendAll, { hsmBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard from '@/components/visualization/KpiCard';
 import { useHsmMimic } from '@/components/visualization/useHsmMimic';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
-import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { HSM_RATED_CURRENT_A, loadingPct } from '@/config/hsmMotors';
@@ -85,7 +85,8 @@ export default function AssetHealth() {
   const { latest, bearingC, loadA, loadPct } = figures(load);
   /* Nothing filled in the period: the last day the Mill Load Log Sheet has (the user, 30 Oct 2026). */
   const loadLast = useLastEntry<HsmMillLoadReport>('/api/hsm/mill-load', !!gid && !!load && latest.length === 0, load?.lastDate, dates?.from);
-  const trend = gid && load ? load.entries.filter((e) => e.group === gid && hottest(e) !== null) : [];
+  // Every DC motor bearing of the group's stands, each reading (the user, 31 Oct 2026).
+  const trend = useMemo(() => (gid && load ? hsmBearingPoints(load.entries.filter((e) => e.group === gid)) : []), [gid, load]);
   const canOpen = !!gid && !!load;
   const mimic = useHsmMimic();
   const liveGroup = gid ? mimic.group(gid) : null;
@@ -140,9 +141,9 @@ export default function AssetHealth() {
       </section>
 
       <div className="rm-row ah-row--one">
-        <Panel title="Condition trends" sub="Bearing temperature, each reading" className="rm-panel" bodyClass="rm-body ah-trends">
+        <Panel title="Condition trends" sub="Every machine and every bearing" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
-          <BearingTrend entries={trend} />
+          <BearingTrendAll points={trend} />
         </Panel>
       </div>
 
@@ -197,24 +198,6 @@ export default function AssetHealth() {
           </>
         )}
       </DrillDrawer>
-    </div>
-  );
-}
-
-function BearingTrend({ entries }: { entries: HsmMillLoadEntry[] }) {
-  const categories = useMemo(() => entries.map((e) => `${dm(e.date)}${e.time ? ` ${e.time.slice(11, 16)}` : ''} ${e.stand}`), [entries]);
-  const series = useMemo<DrillSeries[]>(() => [{ id: 'bt', name: 'Hottest DC motor bearing', token: '--s-order', type: 'line', data: entries.map(hottest), dp: 0 }], [entries]);
-  const axes = useMemo(() => [{ title: '°C', unit: '°C' }], []);
-  const last = entries.at(-1);
-  return (
-    <div className="ah-trend">
-      <div className="ah-trend-head">
-        <span className="rm-k">Bearing temp · °C</span>
-        <span className={`num ${last ? 'v-val' : 'v-na'}`}>{last ? fixed(hottest(last), 0) : 'NA'}</span>
-      </div>
-      {entries.length
-        ? <DrillChart series={series} categories={categories} axes={axes} ariaLabel={`Hottest DC motor bearing per reading: ${entries.map((e) => `${e.date} ${e.stand} ${hottest(e)} °C`).join('; ')}`} />
-        : <div className="ah-trend-plot" role="img" aria-label="Bearing temperature: no readings" />}
     </div>
   );
 }

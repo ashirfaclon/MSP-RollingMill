@@ -58,6 +58,9 @@
   --s-prod: #4da3ff;
   --s-order: #34d3b4;
   --s-free: #f5b54a;
+  /* Categorical series, fixed order, for charts with many lines (Condition trends — every bearing,
+     every machine). Validated on the dark panel: lightness, chroma, CVD and contrast all pass. */
+  --cat-1: #3987e5; --cat-2: #d95926; --cat-3: #199e70; --cat-4: #c98500; --cat-5: #d55181; --cat-6: #9085e9;
 
   --radius: 10px;
   --radius-sm: 7px;
@@ -327,6 +330,8 @@ table.grid td.v-gold { color: var(--gold); }
   --s-prod: #1d6fd9;
   --s-order: #0b7a66;
   --s-free: #a15f00;
+  /* The same six hues stepped for the light panel (validated; three sit under 3:1, so legends and tooltips name them). */
+  --cat-1: #2a78d6; --cat-2: #eb6834; --cat-3: #1baf7a; --cat-4: #eda100; --cat-5: #e87ba4; --cat-6: #6250d6;
 
   --shadow: 0 1px 2px rgba(16, 42, 74, 0.05), 0 6px 18px rgba(16, 42, 74, 0.07);
 }

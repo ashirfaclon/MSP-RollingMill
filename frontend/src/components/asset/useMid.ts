@@ -25,6 +25,8 @@ export interface MidView {
   worst: MidMachine | null;
   /** The section's highest reading at each visit. */
   trend: { date: string; maxMmS: number }[];
+  /** Every visit with the section's machines, oldest first: the Condition trend draws every machine (the user, 31 Oct 2026). */
+  visits: { date: string; machines: MidMachine[] }[];
 }
 
 const highest = (ms: MidMachine[]) => {
@@ -46,10 +48,11 @@ export function useMid(mill: 'hsm' | 'rmd' | 'lsm' | 'rms', section: MidSection 
     const trend = (report?.visits ?? [])
       .map((v) => ({ date: v.date, maxMmS: highest(pick(v.machines)) }))
       .filter((t): t is { date: string; maxMmS: number } => t.maxMmS !== null);
+    const visits = (report?.visits ?? []).map((v) => ({ date: v.date, machines: pick(v.machines) })).filter((v) => v.machines.length > 0);
     return {
       report, loading: !s.data && !s.error, error: s.error,
       date: report?.latest?.date ?? null,
-      machines, maxMmS: highest(machines), worst, trend,
+      machines, maxMmS: highest(machines), worst, trend, visits,
     };
   }, [report, section, s.data, s.error]);
 }
