@@ -379,9 +379,11 @@ export function renderMachine(name, theme, size = 1024) {
   cam.position.copy(c).add(dir.clone().multiplyScalar(radius * 12));
   cam.lookAt(c);
 
-  /* One sun, top-left, for every machine in the plant. */
+  /* One sun for every machine in the plant — high and only a little to the left and front, so
+     the shadow it casts stays close under the machine: the trimmed sprite is then the machine's
+     own width, and the drawing can give every machine the room it has (the user, 30 Oct 2026). */
   const key = new THREE.DirectionalLight(0xffffff, p.key);
-  key.position.set(-3.4, 12, 4.6).multiplyScalar(radius * 0.4);
+  key.position.set(-1.1, 12, 2.4).multiplyScalar(radius * 0.4);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
   key.shadow.radius = 6;

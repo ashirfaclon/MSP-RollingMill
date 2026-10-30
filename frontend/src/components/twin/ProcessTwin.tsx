@@ -31,21 +31,22 @@ import './twin.css';
 /* ------------------------------- geometry -------------------------------- */
 
 const VB_W = 1151;
-const PAD = 16;
+const PAD = 10;
 /** Lanes, px. */
-const LANE = { header: 14, name: 14, reading: 16, bar: 6, meta: 12, rowGap: 18 };
+/* Lanes, px — small, so the machines are what the eye lands on (the user, 30 Oct 2026). */
+const LANE = { header: 11, name: 13, reading: 13, bar: 5, meta: 10, rowGap: 14 };
 /** Between machines, and between a row's sections. */
-const GAP = { machine: 8, section: 30, endRun: 24 };
+const GAP = { machine: 6, section: 22, endRun: 18 };
 /** A header's width: the .mx-group face is ~6.1 px a character at 9.5 px plus 1.2 px tracking. */
-const captionW = (t: string) => t.length * 7.3;
+const captionW = (t: string) => t.length * 5.9;
 /** A machine name's width (.mx-name, 11 px bold). */
-const nameW = (t: string) => t.length * 6.8;
+const nameW = (t: string) => t.length * 5.6;
 /** The machine band is sized to the tallest machine at this scale; never more than this (px per metre). */
-const MAX_PX_PER_M = 14;
+const MAX_PX_PER_M = 26;
 /** The infeed table and the exit at the ends, at the same scale. */
 const END = { infeed: 'table', hsm: 'coil', rmd: 'bundle' } as const;
 /** An end column is never narrower than its labels ("SINCE 29 OCT 09:00 IST"), whatever the scale. */
-const END_MIN_W = 132;
+const END_MIN_W = 100;
 
 interface Placed { node: TwinNode; box: Box; sprite: string }
 interface RowPlan {
@@ -236,7 +237,7 @@ export default function ProcessTwin({ model, onOpen, selected, onSelect }: {
             {/* One header per section of THIS row, counting only this row (spec C5). */}
             {rp.sections.map((s) => (
               <g key={s.id}>
-                <text className="mx-group" x={(s.x0 + s.x1) / 2} y={rp.top + 11} textAnchor="middle">
+                <text className="mx-group" x={(s.x0 + s.x1) / 2} y={rp.top + 8} textAnchor="middle">
                   {rp.row.label ? `${rp.row.label} · ` : ''}{s.label} · {s.on} of {s.total} on
                 </text>
                 <path className="mx-group-line" d={`M${s.x0} ${rp.top + LANE.header} H${s.x1}`} />
@@ -246,7 +247,7 @@ export default function ProcessTwin({ model, onOpen, selected, onSelect }: {
             {rp.row.speed && rp.sections[0] && (() => {
               const r = readingText(rp.row.speed.signal, rp.row.speed.spec, model.now, rp.row.speed.dp);
               return (
-                <text className={`mx-sub${r.quality === 'suspect' ? ' mx-read--suspect' : ''}`} x={rp.sections[0].x0 - 10} y={rp.top + 11} textAnchor="end">
+                <text className={`mx-sub${r.quality === 'suspect' ? ' mx-read--suspect' : ''}`} x={rp.sections[0].x0 - 10} y={rp.top + 8} textAnchor="end">
                   {rp.row.label.toUpperCase()} SPEED {r.text.toUpperCase()}{r.quality === 'missing' ? '' : ` ${rp.row.speed.unit.toUpperCase()}`}{r.suffix.toUpperCase()}
                 </text>
               );
