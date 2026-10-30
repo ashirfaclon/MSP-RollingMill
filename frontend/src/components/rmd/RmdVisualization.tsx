@@ -17,6 +17,7 @@
  * split (user, 12 and 17 Oct 2026): Order allocation shows the two totals only.
  */
 import Panel from '@/components/Panel';
+import { StockAsOf } from '@/components/production/stockAsOf';
 import type { Series } from '@/components/visualization/KpiCard';
 import { fixed } from '@/lib/num';
 import { useState, type KeyboardEvent } from 'react';
@@ -89,7 +90,7 @@ function OrderAllocation() {
       </div>
       <div className="rm-alloc-block">
         <div className="rm-alloc-head">
-          <span className="rm-k">Finished stock</span>
+          <span className="rm-k">Finished stock{stockMt !== null && <StockAsOf asOf={stock?.asOf} lastDate={stock?.erp.lastDate} />}</span>
           <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{stockMt === null ? 'NA' : `${fixed(stockMt, 1)} MT`}</span>
         </div>
       </div>

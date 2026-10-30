@@ -402,3 +402,6 @@
 .rm-shifts--button { cursor: pointer; border-radius: var(--radius-sm); margin: -4px; padding: 4px; padding-top: 8px; transition: background-color 130ms ease; }
 .rm-shifts--button:hover { background: color-mix(in srgb, var(--panel-hi) 45%, transparent); }
 .rm-shifts--button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The date a finished-stock figure is from, beside its label: quieter, not upper-cased. */
+.rm-alloc-asof { color: var(--muted-3); font-weight: 600; letter-spacing: 0; text-transform: none; }

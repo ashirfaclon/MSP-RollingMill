@@ -21,6 +21,7 @@
  * No mill mimic on LSM (the user, 16 Oct 2026).
  */
 import { useState, type KeyboardEvent } from 'react';
+import { StockAsOf } from '@/components/production/stockAsOf';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
@@ -93,7 +94,7 @@ export default function LsmVisualization() {
           </div>
           <div className="rm-alloc-block">
             <div className="rm-alloc-head">
-              <span className="rm-k">Finished stock</span>
+              <span className="rm-k">Finished stock{stockMt !== null && <StockAsOf asOf={stock?.asOf} lastDate={stock?.erp.lastDate} />}</span>
               <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{mt(stockMt)}</span>
             </div>
           </div>

@@ -9,6 +9,7 @@ import { useState } from 'react';
 import StockDrawer from '@/components/drill/StockDrawer';
 import { fixed } from '@/lib/num';
 import { useFinishedStock } from './useFinishedStock';
+import { StockAsOf } from './stockAsOf';
 
 export default function FinishedStockBlock() {
   const { data, loading, error } = useFinishedStock();
@@ -17,7 +18,7 @@ export default function FinishedStockBlock() {
   return (
     <div className="rm-alloc-block">
       <button type="button" className="rm-alloc-head rm-alloc-head--button" onClick={() => setOpen(true)} aria-haspopup="dialog" title="Stock received, issued and held, per day">
-        <span className="rm-k">Finished stock</span>
+        <span className="rm-k">Finished stock{data && <StockAsOf asOf={data.asOf} lastDate={data.erp.lastDate} />}</span>
         <span className="rm-alloc-total num v-val">
           {data ? `${fixed(data.totals.stockMt, 1)} MT` : error ? 'NA' : <span className="skel skel--num" role="status" aria-label="Loading" />}
         </span>
