@@ -51,7 +51,16 @@ export const DURATION_LABELS: Record<DurationPreset, string> = {
   previous_year: 'Previous Year',
 };
 
-const DEFAULTS: GlobalSel = { duration: 'today', customFrom: null, customTo: null, theme: 'dark', sidebar: 'expanded' };
+/**
+ * By default the dashboard shows the PREVIOUS plant day (the user, 30 Oct 2026): the plant reads
+ * yesterday's figures, not the day still running — and Reset goes back to it.
+ */
+const DEFAULTS: GlobalSel = { duration: 'yesterday', customFrom: null, customTo: null, theme: 'dark', sidebar: 'expanded' };
+/**
+ * Bumped when the default changes. A selection stored under an older version that still holds the
+ * old default ("today") was never chosen — it was the default — so it moves to the new one.
+ */
+const DEFAULTS_V = 2;
 
 /**
  * A stored selection from before plant dates (an epoch-ms window, or the retired
@@ -62,15 +71,16 @@ function load(): GlobalSel {
   try {
     const raw = localStorage.getItem(SEL_STORAGE_KEY);
     if (!raw) return DEFAULTS;
-    const { customFromMs, customToMs, ...rest } = JSON.parse(raw) as Partial<GlobalSel> & { customFromMs?: number | null; customToMs?: number | null };
+    const { customFromMs, customToMs, defaultsV, ...rest } = JSON.parse(raw) as Partial<GlobalSel> & { customFromMs?: number | null; customToMs?: number | null; defaultsV?: number };
     const sel: GlobalSel = { ...DEFAULTS, ...rest };
+    if ((defaultsV ?? 1) < DEFAULTS_V && sel.duration === 'today') sel.duration = DEFAULTS.duration;
     if (typeof customFromMs === 'number' && typeof customToMs === 'number' && !sel.customFrom) {
       sel.customFrom = plantDate(customFromMs);
       sel.customTo = plantDate(Math.max(customFromMs, customToMs - 1));
     }
-    if (!(sel.duration in DURATION_LABELS)) sel.duration = 'today';
+    if (!(sel.duration in DURATION_LABELS)) sel.duration = DEFAULTS.duration;
     if (sel.duration === 'custom' && !(sel.customFrom && sel.customTo && isDate(sel.customFrom) && isDate(sel.customTo))) {
-      sel.duration = 'today';
+      sel.duration = DEFAULTS.duration;
     }
     return sel;
   } catch { /* SSR or storage blocked: fall through */ }
@@ -86,14 +96,14 @@ export function setGlobalSel(patch: Partial<GlobalSel>) {
   // (and the inline script in app/layout.tsx can set them before first paint).
   if (patch.theme) document.documentElement.dataset.theme = patch.theme;
   if (patch.sidebar) document.documentElement.dataset.sidebar = patch.sidebar;
-  try { localStorage.setItem(SEL_STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
+  try { localStorage.setItem(SEL_STORAGE_KEY, JSON.stringify({ ...state, defaultsV: DEFAULTS_V })); } catch { /* ignore */ }
   listeners.forEach((l) => l());
 }
 
 /** The filters (not the theme or the rail) as they are by default. */
 export const isDefaultFilter = (sel: GlobalSel) => sel.duration === DEFAULTS.duration;
 
-/** Put the filters back to their defaults — Duration "Today". Theme and rail are kept. */
+/** Put the filters back to their defaults — Duration "Yesterday", the previous plant day. Theme and rail are kept. */
 export function resetFilters() {
   setGlobalSel({ duration: DEFAULTS.duration, customFrom: DEFAULTS.customFrom, customTo: DEFAULTS.customTo });
 }

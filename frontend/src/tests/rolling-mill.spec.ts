@@ -287,8 +287,9 @@ test('light theme applies, persists across reload, and switches back', async ({ 
 test('duration picker: dates only, each a 08:00 → 08:00 plant day, cycle shown', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const trigger = page.getByRole('button', { name: /Duration/ });
-  await expect(trigger).toContainText('Today');
-  // The cycle of the running plant day sits beside the preset name.
+  // The default is the previous plant day (the user, 30 Oct 2026).
+  await expect(trigger).toContainText('Yesterday');
+  // Its cycle sits beside the preset name.
   await expect(trigger).toContainText(/\d{1,2} \w{3} 08:00 IST → \d{1,2} \w{3} 08:00 IST/);
 
   await trigger.click();
@@ -367,8 +368,8 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   // Wired: production and mass yield (ERP), power (forms), specific energy (power ÷ ERP production), Mill MPS (Influx) and
   // chemical composition (SMS form) open their drawers.
   for (const name of ['Production · Prime + SL', 'Production · Prime', 'Mass yield', 'Power consumption', 'Specific energy', 'Mill 1 MPS', 'Mill 2 MPS', 'Chemical composition']) await expect(strip.getByRole('button', { name, exact: true })).toBeVisible();
-  // No coverage notes on the ERP cards; today's entry comes a day late, so NA — wired, nothing entered yet, and the card says so.
-  await expect(strip.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-note')).toHaveText('No entries recorded yet');
+  // No coverage notes on the ERP cards: blank, or "No entries recorded yet" until yesterday's log sheet is in.
+  await expect(strip.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-note')).toHaveText(/^(No entries recorded yet)?$/);
   // Mill flow, live: infeed, the two status zones and the exit (ERP production); no roughing group.
   const mimic = page.locator('section.panel', { hasText: 'Mill mimic' }).getByRole('img', { name: /^RMD mill:/ });
   await expect(mimic.locator('.mx-group')).toHaveText([/^Line 1 · Route \/ diverter · \d+ of 8 on$/, /^Line 1 · Finishing · \d+ of 5 on$/, /^Line 2 · Route \/ diverter · \d+ of 6 on$/, /^Line 2 · Finishing · \d+ of 5 on$/], { timeout: 60_000 });
@@ -393,8 +394,8 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   await expect(balance.locator('.rm-mb-figure-v')).toHaveText(['NA', 'NA']);
   await expect(balance).toContainText('Mass difference NA');
   await expect(balance.locator('.rmd-mb-pieces')).toContainText(/\d+ in|NA/);
-  // Finished stock by size: the ERP item ledger (FGYRDP), one row per bar size, smallest first.
-  await expect(page.locator('section.panel', { hasText: 'Finished stock by size' }).locator('.rm-size-name').first()).toHaveText('8 mm');
+  // Finished stock by size: the ERP item ledger (FGYRDP), one row per bar size.
+  await expect(page.locator('section.panel', { hasText: 'Finished stock by size' }).locator('.rm-size-name').first()).toHaveText(/^\d+ mm$/);   // highest stock first (the user, 30 Oct 2026)
   await page.screenshot({ path: `${SHOTS}/rmd-visualization.png`, fullPage: true });
 });
 

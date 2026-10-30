@@ -39,11 +39,10 @@ async function pickCustom(page: Page) {
 test('the Production card shows ERP and Influx production for the Duration filter period', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const card = page.getByRole('button', { name: 'Production', exact: true });
-  // Default period is Today — Influx is live; the ERP is entered 1–2 days late: no ERP entry yet, and the card says so.
+  // Default period is Yesterday (the user, 30 Oct 2026): Influx has the whole day; the ERP may not be in yet.
   await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('ERP');
   await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('Influx');
-  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText(/\d[\d,]*\.\d/);
-  await expect(card.locator('.rm-card-note')).toHaveText('ERP · No entries recorded yet');
+  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText(/\d[\d,]*\.\d|NA/);
 
   await pickCustom(page);
   // 22–28 Sep. ERP log sheet PRODUCTION_MT: 1,076.51.
@@ -133,7 +132,7 @@ test('drawer in the light theme', async ({ page }) => {
   await drawer.screenshot({ path: `${SHOTS}/production-drawer-light.png` });
 });
 
-test('reset puts the global filter back to Today', async ({ page }) => {
+test('reset puts the global filter back to Yesterday', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const reset = page.getByRole('button', { name: 'Reset' });
   await expect(reset).toBeDisabled();
@@ -141,6 +140,6 @@ test('reset puts the global filter back to Today', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Duration/ })).toContainText('22 Sep');
   await expect(reset).toBeEnabled();
   await reset.click();
-  await expect(page.getByRole('button', { name: /Duration/ })).toContainText('Today');
+  await expect(page.getByRole('button', { name: /Duration/ })).toContainText('Yesterday');
   await expect(reset).toBeDisabled();
 });
