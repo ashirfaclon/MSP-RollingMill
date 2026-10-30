@@ -2,8 +2,8 @@
 
 /**
  * RMD Mill MPS — as the plant gave it: CR Mill1/2 · General · MILL1_MPS and MILL2_MPS (m/s).
- * The card shows each mill's last reading of the period (now, for today); it opens both mills'
- * speed over the period.
+ * Two cards, Mill 1 and Mill 2 (the user, 30 Oct 2026): each its last reading of the period (now,
+ * for today) with the period's trend as a sparkline under it; either opens both mills' speed.
  */
 import { useMemo, useState } from 'react';
 import KpiCard from '@/components/visualization/KpiCard';
@@ -23,20 +23,28 @@ export default function RmdMillSpeedCard() {
   const { data, dataUrl, error } = useApi<RmdMillSpeedReport>(url);
   const r = data && dataUrl === url ? data : null;
   const [open, setOpen] = useState(false);
-  return (
-    <>
+  const card = (mill: 'mill1' | 'mill2', label: string, series: 'prod' | 'order') => {
+    const v = r?.latest[mill] ?? null;
+    return (
       <KpiCard
-        label="Mill MPS"
-        value=""
+        key={mill}
+        label={label}
+        value={mps(v)}
         unit="m/s"
         note={r?.historian.connection === 'down' ? r.historian.message : ''}
-        noEntries={!!r && r.historian.connection === 'up' && r.latest.mill1 == null && r.latest.mill2 == null ? 'No readings in this period' : false}
-        series="prod"
+        noEntries={!!r && r.historian.connection === 'up' && v == null ? 'No readings in this period' : false}
+        series={series}
         loading={!r && !error}
-        pair={[{ source: 'Mill 1', value: mps(r?.latest.mill1) }, { source: 'Mill 2', value: mps(r?.latest.mill2) }]}
+        spark={r ? { values: r.trend.map((p) => p[mill]), label: `${label} over the period` } : undefined}
         onOpen={() => setOpen(true)}
         openLabel="Mill 1 and mill 2 speed over the period"
       />
+    );
+  };
+  return (
+    <>
+      {card('mill1', 'Mill 1 MPS', 'prod')}
+      {card('mill2', 'Mill 2 MPS', 'order')}
       <DrillDrawer open={open} onClose={() => setOpen(false)} title="Mill MPS" sub="RMD · m/s"
         loading={!r && !error} error={error} hasData={!!r}>
         {r && <Content r={r} />}

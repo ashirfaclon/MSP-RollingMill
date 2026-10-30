@@ -21,6 +21,7 @@ export type Series =
   | 'diff' | 'bloss' | 'endcut' | 'missroll';
 
 import type { ReactNode } from 'react';
+import Sparkline from './Sparkline';
 
 /** The note of a wired KPI whose source has nothing for the period. */
 export const NO_ENTRIES = 'No entries recorded yet';
@@ -48,6 +49,8 @@ export default function KpiCard(props: {
    * "nothing recorded", not a fault (the user, 28 Oct 2026). Never while loading or on an error.
    */
   noEntries?: boolean | string;
+  /** The period's readings as a sparkline under the figure (Mill MPS). */
+  spark?: { values: (number | null)[]; label: string };
 }) {
   const { meterPct } = props;
   const note = props.noEntries && !props.loading
@@ -80,6 +83,7 @@ export default function KpiCard(props: {
       )}
       {/* Always rendered (empty when there is nothing to flag) so the cards stay aligned. */}
       <span className="rm-card-note" title={typeof props.note === 'string' && props.note ? props.note : undefined}>{note}</span>
+      {props.spark && !props.loading && <Sparkline values={props.spark.values} label={props.spark.label} />}
       {meterPct !== undefined && (
         <span
           className="rm-meter"

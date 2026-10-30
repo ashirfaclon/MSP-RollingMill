@@ -61,14 +61,14 @@
 
 /* Five headline cards (production as two cards; no order / stock cards on RMD): one row, two on a phone. */
 .rm-strip.rmd-strip { grid-template-columns: repeat(8, minmax(0, 1fr)); }
-/* Chemical composition: five elements side by side, so the card takes two columns. */
-.rmd-chem-card { grid-column: span 2; }
-.rmd-chem { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); letter-spacing: -0.3px; }
-.rmd-chem-cell { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow: hidden; container-type: inline-size; }
-.rmd-chem-cell + .rmd-chem-cell { border-left: 1px solid var(--border); padding-left: 6px; }
+/* Chemical composition: one column (the user, 30 Oct 2026) — the five elements in two rows,
+   C · Mn · S over P · Si, so each figure keeps a readable width. */
+.rmd-chem { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 6px; letter-spacing: -0.3px; }
+.rmd-chem-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow: hidden; container-type: inline-size; }
+.rmd-chem-cell:not(:nth-child(3n + 1)) { border-left: 1px solid var(--border); padding-left: 6px; }
 /* Element symbols keep their case (Mn, Si). */
 .rmd-chem-cell .rm-card-src { text-transform: none; letter-spacing: 0.2px; font-size: 10px; }
-.rmd-chem-v { font-size: clamp(13px, 22cqi, 18px); }
+.rmd-chem-v { font-size: clamp(12px, 26cqi, 16px); }
 @media (max-width: 760px) {
   .rm-strip.rmd-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

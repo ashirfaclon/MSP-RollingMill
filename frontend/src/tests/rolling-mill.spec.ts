@@ -366,10 +366,10 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   const strip = page.getByRole('region', { name: 'Headline KPIs' });
   // Production as two cards (Production · Prime + SL, Production · Prime), then HSM's next three, then Mill MPS and
   // chemical composition; no Made To Stock / Stock with order / Free stock.
-  await expect(strip.locator('.rm-card-label')).toHaveText(['Production · Prime + SL', 'Production · Prime', 'Mass yield', 'Power consumption', 'Specific energy', /^Mill MPS/, /^Chemical composition/]);
+  await expect(strip.locator('.rm-card-label')).toHaveText(['Production · Prime + SL', 'Production · Prime', 'Mass yield', 'Power consumption', 'Specific energy', 'Mill 1 MPS', 'Mill 2 MPS', /^Chemical composition/]);
   // Wired: production and mass yield (ERP), power (forms), specific energy (power ÷ ERP production), Mill MPS (Influx) and
   // chemical composition (SMS form) open their drawers.
-  for (const name of ['Production · Prime + SL', 'Production · Prime', 'Mass yield', 'Power consumption', 'Specific energy', 'Mill MPS', 'Chemical composition']) await expect(strip.getByRole('button', { name, exact: true })).toBeVisible();
+  for (const name of ['Production · Prime + SL', 'Production · Prime', 'Mass yield', 'Power consumption', 'Specific energy', 'Mill 1 MPS', 'Mill 2 MPS', 'Chemical composition']) await expect(strip.getByRole('button', { name, exact: true })).toBeVisible();
   // No coverage notes on the ERP cards; today's entry comes a day late, so NA — wired, nothing entered yet, and the card says so.
   await expect(strip.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-note')).toHaveText('No entries recorded yet');
   // Mill flow, live: infeed, the two status zones and the exit (ERP production); no roughing group.

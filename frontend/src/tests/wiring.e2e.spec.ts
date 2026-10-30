@@ -1211,9 +1211,13 @@ test('RMD condition analytics: actual rate and specific energy live, the mimic f
 test('RMD Mill MPS and chemical composition: MILL1_MPS / MILL2_MPS from Influx, the SMS lollipop form for RMD', async ({ page }) => {
   await page.goto('/rmd/visualization');
   const strip = page.getByRole('region', { name: 'Headline KPIs' });
-  // Mill MPS: each mill's last reading today (the historian reads every 10 s).
-  const mps = strip.getByRole('button', { name: 'Mill MPS', exact: true });
-  await expect(mps.locator('.rm-card-pair-v')).toHaveText([/^\d+\.\d{2}$/, /^\d+\.\d{2}$/], { timeout: 60_000 });
+  // Mill 1 and Mill 2 MPS: each mill's last reading today (the historian reads every 10 s), the period's trend under it.
+  for (const name of ['Mill 1 MPS', 'Mill 2 MPS']) {
+    const card = strip.getByRole('button', { name, exact: true });
+    await expect(card.locator('.rm-card-value')).toHaveText(/^\d+\.\d{2}\s*m\/s$/, { timeout: 60_000 });
+    await expect(card.locator('.rm-spark')).toBeAttached();
+  }
+  const mps = strip.getByRole('button', { name: 'Mill 1 MPS', exact: true });
   await mps.click();
   const d = page.getByRole('dialog', { name: 'Mill MPS' });
   await expect(d.getByRole('img', { name: /^Mill speed, mean per \d+ minutes/ })).toBeVisible({ timeout: 60_000 });
