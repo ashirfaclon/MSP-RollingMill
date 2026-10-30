@@ -9,6 +9,7 @@
  * average and its state now; every drive on the same amp scale.
  */
 import { useMemo, useState } from 'react';
+import { axisFloor } from '@/lib/num';
 import './asset.css';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { fmtNum } from '@/components/drill/DrillChart';
@@ -46,11 +47,11 @@ function Content({ trend, live, zone }: { trend: RmdCurrentTrend; live: RmdLive 
   const [pick, setPick] = useState<string | null>(null);
   const sel = drives.find((s) => s.id === pick) ?? drives.find((s) => s.meanA !== null) ?? drives[0] ?? null;
   // One amp scale for every drive of the group, so switching drives keeps the scale.
-  const top = useMemo(() => {
+  const [floor, top] = useMemo(() => {
     const vals = trend.series.flatMap((s) => s.points.map((p) => p[1])).filter((v): v is number => v !== null);
-    return vals.length ? Math.ceil(Math.max(...vals) / 50) * 50 : undefined;
+    return [axisFloor(vals), vals.length ? Math.ceil(Math.max(...vals, 0) / 50) * 50 : undefined];
   }, [trend.series]);
-  const axes = useMemo(() => [{ title: 'A', unit: 'A', min: 0, max: top }], [top]);
+  const axes = useMemo(() => [{ title: 'A', unit: 'A', min: floor, max: top }], [floor, top]);
   const minutes = Math.round(trend.bucketSeconds / 60);
   const name = (label: string) => (zone === 'route' ? `Stand ${label.replace(/^S/, '')}` : label);
   return (

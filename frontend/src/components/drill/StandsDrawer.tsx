@@ -7,6 +7,7 @@
  * it has a time window of its own rather than the Duration filter.
  */
 import { useMemo, useState } from 'react';
+import { axisFloor } from '@/lib/num';
 import DrillDrawer, { Seg, Stats } from './DrillDrawer';
 import DrillChart, { fmtNum, type DrillAxis, type DrillSeries } from './DrillChart';
 import SourceBox, { type SourceSystem } from './SourceBox';
@@ -64,8 +65,9 @@ function Content({ trend, live, group }: { trend: StandTrend; live: HsmLive | nu
     type: 'line' as const, data: s.points, dp: trend.metric === 'onOff' ? 0 : 1,
   })), [trend]);
   const axes = useMemo<DrillAxis[]>(() => [
-    { title: `${METRICS.find((m) => m.id === trend.metric)?.label} (${unit})`, unit, min: 0, max: trend.metric === 'onOff' ? 100 : undefined },
-  ], [trend.metric, unit]);
+    { title: `${METRICS.find((m) => m.id === trend.metric)?.label} (${unit})`, unit,
+      min: trend.metric === 'onOff' ? 0 : axisFloor(trend.series.flatMap((s) => s.points.map((p) => p[1]))), max: trend.metric === 'onOff' ? 100 : undefined },
+  ], [trend.metric, trend.series, unit]);
 
   const stands = live?.stands.filter((s) => s.group === group) ?? [];
   const g = live?.groups.find((x) => x.id === group);

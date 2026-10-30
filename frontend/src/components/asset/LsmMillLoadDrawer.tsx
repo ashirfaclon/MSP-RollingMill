@@ -9,7 +9,7 @@ import { useMemo } from 'react';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
-import { fixed } from '@/lib/num';
+import { axisFloor, fixed } from '@/lib/num';
 import { dm } from '@/services/hsmProduction';
 import type { LsmMillLoadReading, LsmMillLoadReport } from '@/services/hsmApi';
 
@@ -31,7 +31,7 @@ function Content({ r }: { r: LsmMillLoadReport }) {
   const readings = useMemo(() => r.entries.filter((e) => e.meanA !== null), [r.entries]);
   const categories = useMemo(() => readings.map(when), [readings]);
   const series = useMemo<DrillSeries[]>(() => [{ id: 'mean', name: 'Mean load', token: '--s-prod', type: 'line', data: readings.map((e) => e.meanA), dp: 0 }], [readings]);
-  const axes = useMemo(() => [{ title: 'A', unit: 'A', min: 0 }], []);
+  const axes = useMemo(() => [{ title: 'A', unit: 'A', min: axisFloor(readings.map((e) => e.meanA)) }], [readings]);
   return (
     <>
       <Stats items={[

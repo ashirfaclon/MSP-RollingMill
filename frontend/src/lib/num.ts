@@ -18,3 +18,14 @@ export function fixed(v: number | null | undefined, dp = 1): string {
 export function fixedSigned(v: number | null | undefined, dp = 1): string {
   return v === null || v === undefined ? 'NA' : `${v > 0 ? '+' : ''}${fixed(v, dp)}`;
 }
+
+/**
+ * A chart axis's floor: 0, unless a value is below zero — then the next round `step` under the
+ * lowest value, so a negative reading (a motor current going below zero) is drawn, not cut off
+ * at the axis (the user, 30 Oct 2026).
+ */
+export function axisFloor(values: (number | null | undefined)[], step = 10): number {
+  let low = 0;
+  for (const v of values) if (typeof v === 'number' && Number.isFinite(v) && v < low) low = v;
+  return low < 0 ? Math.floor(low / step) * step : 0;
+}
