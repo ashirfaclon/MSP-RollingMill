@@ -38,7 +38,6 @@ export default function RmdVisualization() {
   return (
     <div className="rm-viz">
       <RmdKpiStrip />
-      <RmdMillMimic />
       <div className="rm-row">
         <RmdShiftProduction rate={<RunningRateFoot />} />
         <OrderAllocation />
@@ -47,6 +46,8 @@ export default function RmdVisualization() {
         <MaterialBalance />
         <RmdStockBySize />
       </div>
+      {/* The mill mimic sits at the bottom of every page that has one (the user, 30 Oct 2026). */}
+      <RmdMillMimic />
     </div>
   );
 }

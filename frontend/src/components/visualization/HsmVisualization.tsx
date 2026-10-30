@@ -42,7 +42,6 @@ export default function HsmVisualization() {
   return (
     <div className="rm-viz">
       <KpiStrip m={m} />
-      <MillMimic />
       <div className="rm-row">
         <ShiftProduction m={m} />
         <OrderAllocation />
@@ -52,6 +51,8 @@ export default function HsmVisualization() {
         <StockBySize />
       </div>
       <HsmChecklists />
+      {/* The mill mimic sits at the bottom of every page that has one (the user, 30 Oct 2026). */}
+      <MillMimic />
     </div>
   );
 }

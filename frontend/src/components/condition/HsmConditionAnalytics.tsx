@@ -31,9 +31,7 @@ import Panel from '@/components/Panel';
 import KpiCard from '@/components/visualization/KpiCard';
 import HsmSpecificEnergy from './HsmSpecificEnergy';
 import HsmCostingDrawer from './HsmCostingDrawer';
-import FlowArrow from '@/components/visualization/FlowArrow';
-import { StandDots, TONE } from '@/components/visualization/MillMimic';
-import { useHsmMimic } from '@/components/visualization/useHsmMimic';
+import MillMimic from '@/components/visualization/MillMimic';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
@@ -90,20 +88,6 @@ export default function HsmConditionAnalytics() {
   const top = sizes?.length ? [...sizes].sort((a, b) => b.producedMt - a.producedMt)[0] : null;
   const runH = rateR?.totals.runH ?? null;
 
-  // Billet infeed and the two stand groups: the Visualization mimic's Influx tags (the user, 26 Oct 2026).
-  const mimic = useHsmMimic();
-  const groupZone = (id: 'roughing' | 'finishing', title: string) => {
-    const g = mimic.group(id);
-    const on = g && g.state !== 'no-data';
-    return { title, value: on ? g.stateLabel : 'NA', foot: on ? `${g.on} of ${g.total} on` : 'drives on / off', tone: g ? TONE[g.state] : 'flow', stands: on ? id : null };
-  };
-  const zones: { title: string; value: string; foot: string; tone: string; stands: 'roughing' | 'finishing' | null }[] = [
-    { title: 'Billet infeed', value: mimic.billetsToday === null ? 'NA' : `${mimic.billetsToday} billets`, foot: 'Today · since 08:00 IST', tone: 'flow', stands: null },
-    groupZone('roughing', 'Roughing group'),
-    groupZone('finishing', 'Finishing group'),
-    { title: 'Finished exit', value: tph === null ? 'NA' : `${fixed(tph, 2)} TPH`, foot: 'actual rate', tone: 'flow', stands: null },
-  ];
-
   return (
     <div className="rm-viz ah">
       <Panel className="ah-asset hca-head" bodyClass="ah-asset-body">
@@ -155,30 +139,6 @@ export default function HsmConditionAnalytics() {
         </Panel>
       </div>
 
-      <Panel title="Grouped condition mimic">
-        <ol className="rm-mimic rmd-mimic rmd-mimic--four" aria-label="Condition groups">
-          {zones.map((z, i) => (
-            <Fragment key={z.title}>
-              {i > 0 && <li className="rm-mimic-arrow" aria-hidden><FlowArrow /></li>}
-              <li className="rm-mimic-cell">
-                <div className={`rm-zone rm-zone--${z.tone}`}>
-                  <span className="rm-zone-title">{z.title}</span>
-                  <span className="rm-zone-body">
-                    <span className={`rm-zone-value num ${z.value === 'NA' ? 'v-na' : 'v-val'}`}>{z.value}</span>
-                    {z.stands && <StandDots stands={mimic.stands(z.stands)} />}
-                  </span>
-                  <span className="rm-zone-foot">{z.foot}</span>
-                </div>
-              </li>
-            </Fragment>
-          ))}
-        </ol>
-        <div className="ah-list hca-notes">
-          <Row k="Route active" />
-          <Row k="Investigation note" />
-        </div>
-      </Panel>
-
       <HsmCostingDrawer open={costOpen} onClose={() => setCostOpen(false)} report={cost} loading={!costS.data && !costS.error} error={costS.error} />
       <DrillDrawer open={open} onClose={() => setOpen(false)} title="Actual running rate" sub="HSM · TPH"
         loading={!rateS.data && !rateS.error} error={rateS.error} hasData={!!rateR}>
@@ -186,6 +146,13 @@ export default function HsmConditionAnalytics() {
       </DrillDrawer>
       <CaDrawer open={caOpen} onClose={() => setCaOpen(false)} mill="hsm" ca={ca} sources={CA_SOURCES} />
       <CaInputs mill="hsm" open={inputsOpen} onClose={() => setInputsOpen(false)} />
+      {/* The mill mimic — the same twin as Visualization — at the bottom of the page (the user, 30 Oct 2026). */}
+      <MillMimic>
+        <div className="ah-list hca-notes">
+          <Row k="Route active" />
+          <Row k="Investigation note" />
+        </div>
+      </MillMimic>
     </div>
   );
 }

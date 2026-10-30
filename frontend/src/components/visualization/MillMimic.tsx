@@ -11,7 +11,7 @@
  * The historian has no intermediate stand group — only Roughing RM 1–5 and Finishing
  * FM 1–6 — so the twin shows the groups that exist.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import Panel from '@/components/Panel';
 import ProcessTwin, { type TwinTarget } from '@/components/twin/ProcessTwin';
 import LivePill from '@/components/twin/LivePill';
@@ -25,7 +25,8 @@ import { useProduction, useSelection } from '@/services/hsmProduction';
 
 export const TONE: Record<GroupNow['state'], string> = { 'all-on': 'ok', partial: 'risk', 'all-off': 'na', 'no-data': 'na' };
 
-export default function MillMimic() {
+/** `children`: rows a screen adds under the drawing (Condition Analytics' notes). */
+export default function MillMimic({ children }: { children?: ReactNode }) {
   const live = useLive<HsmLive>('/api/hsm/live', hsmLiveEdges);
   const { dates } = useSelection();
   const prod = useProduction(dates ? { ...dates, grain: 'day' } : null);
@@ -53,6 +54,7 @@ export default function MillMimic() {
       ) : (
         <ProcessTwin model={model} onOpen={openTarget} selected={selected} onSelect={onSelect} />
       )}
+      {children}
       <CounterDrawer open={open === 'billets'} onClose={() => setOpen(null)} config={BILLET_COUNTER} />
       <StandsDrawer open={open === 'stands'} onClose={() => setOpen(null)} group={group} />
       <ProductionDrawer open={open === 'production'} onClose={() => setOpen(null)} />

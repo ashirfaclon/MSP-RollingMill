@@ -9,7 +9,7 @@
  * (liveStore.ts). No roughing group (removed by the user, 22 Oct 2026). Each machine opens
  * the drill-down that shows where its figure comes from.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import Panel from '@/components/Panel';
 import ProcessTwin, { type TwinTarget } from '@/components/twin/ProcessTwin';
 import LivePill from '@/components/twin/LivePill';
@@ -21,7 +21,8 @@ import RmdStationsDrawer from './RmdStationsDrawer';
 import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
 import { useSelection } from '@/services/hsmProduction';
 
-export default function RmdMillMimic() {
+/** `children`: rows a screen adds under the drawing (Condition Analytics' notes). */
+export default function RmdMillMimic({ children }: { children?: ReactNode }) {
   const live = useLive<RmdLive>('/api/rmd/live', rmdLiveEdges);
   const [open, setOpen] = useState<'infeed' | 'exit' | RmdZoneId | null>(null);
   const { dates } = useSelection();
@@ -46,6 +47,7 @@ export default function RmdMillMimic() {
       ) : (
         <ProcessTwin model={model} onOpen={openTarget} selected={selected} onSelect={onSelect} />
       )}
+      {children}
       <RmdBilletsDrawer open={open === 'infeed'} onClose={() => setOpen(null)} />
       <RmdStationsDrawer zone={zone} open={open === 'route' || open === 'finishing'} onClose={() => setOpen(null)} />
       <RmdProductionDrawer view="production" open={open === 'exit'} onClose={() => setOpen(null)} />

@@ -1181,24 +1181,10 @@ test('RMD condition analytics: actual rate and specific energy live, the mimic f
   for (const i of [1, 3, 4, 5, 6]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   for (const t of ['Matched-run performance', 'Costing & impact']) await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
 
-  const mimic = main.getByRole('list', { name: 'Condition groups' });
-  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Route / diverter', 'Finishing group', 'Finished exit']);
-  // Billet infeed: 1,023 billets ÷ 15.6 running hours = 66 a running hour.
-  await expect(mimic.locator('.rm-zone', { hasText: 'Billet infeed' }).locator('.rm-zone-value')).toHaveText('66 billets/h');
-  // Route / diverter = the CR Mill stands' running status now.
-  await expect(mimic.locator('.rm-zone', { hasText: 'Route / diverter' }).locator('.rm-zone-value')).toHaveText(/^(NA|\d+ of 14 on)$/);
-  await expect(mimic.locator('.rm-zone', { hasText: 'Finished exit' }).locator('.rm-zone-value')).toHaveText('16.48 TPH');
-  // Finishing: mean current of the drives that ran, 16 Oct 22.23 A; opens each drive.
-  const fin = mimic.getByRole('button', { name: 'Finishing group' });
-  await expect(fin.locator('.rm-zone-value')).toHaveText('22 A', { timeout: 90_000 });
+  // The mill mimic: the same twin as Visualization, at the bottom of the page (the user, 30 Oct 2026).
+  await expect(main.getByRole('img', { name: /^RMD mill:/ })).toBeVisible({ timeout: 60_000 });
+  await expect(main.locator('section.panel').last()).toContainText('Mill mimic');
   await page.screenshot({ path: `${SHOTS}/rmd-condition-analytics.png`, fullPage: true });
-  await fin.click();
-  const d = page.getByRole('dialog', { name: 'Finishing group · current and speed' });
-  const t = d.getByRole('table', { name: 'Drives: current and speed while running' });
-  await expect(t.locator('thead th')).toHaveText(['Line', 'Drive', 'Current (A)', 'Speed (RPM)']);
-  await expect(t.locator('tbody tr')).toHaveCount(10);
-  await expect(t.getByRole('row', { name: /^Line 2 CS / })).toContainText('825');
-  await expect(d.getByRole('region', { name: 'Formula' })).toContainText('a minute counts when the drive ran all of it');
 });
 
 test('RMD Mill MPS and chemical composition: MILL1_MPS / MILL2_MPS from Influx, the SMS lollipop form for RMD', async ({ page }) => {
@@ -1246,11 +1232,10 @@ test('HSM condition analytics: as the HSM sheet — actual rate = ERP production
   // Header: the ERP's most produced size, grade and route NA, running hours.
   await expect(main.getByRole('heading', { level: 2 })).toHaveText(/^274–276 × \d\.\d\d mm/);
   await expect(main.locator('.ah-fact', { hasText: 'Running hours' }).locator('dd')).toHaveText('60.5 h');
-  // Mimic: only the finished exit (= actual rate) has a source.
-  const mimic = main.getByRole('list', { name: 'Condition groups' });
-  await expect(mimic.locator('.rm-zone-title')).toHaveText(['Billet infeed', 'Roughing group', 'Finishing group', 'Finished exit']);
-  // Billet infeed and the stand groups live from the Visualization mimic's tags; exit = the actual rate.
-  await expect(mimic.locator('.rm-zone-value')).toHaveText([/^(NA|\d+ billets)$/, /\S/, /\S/, '23.00 TPH'], { timeout: 60_000 });
+  // The mill mimic: the same twin as Visualization, at the bottom of the page, the notes under it (the user, 30 Oct 2026).
+  await expect(main.getByRole('img', { name: /^HSM mill:/ })).toBeVisible({ timeout: 60_000 });
+  await expect(main.locator('section.panel').last()).toContainText('Mill mimic');
+  await expect(main.locator('section.panel').last()).toContainText('Investigation note');
   await page.screenshot({ path: `${SHOTS}/hsm-condition-analytics.png`, fullPage: true });
   // The rate opens its days, with sources.
   await cards.getByRole('button', { name: 'Actual rate', exact: true }).click();
