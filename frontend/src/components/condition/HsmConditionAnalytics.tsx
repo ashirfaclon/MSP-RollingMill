@@ -15,8 +15,6 @@
  *   Conversion cost,     the plant's monthly costing sheet (2026 Costing - SEP26.xlsx, 27 Oct 2026):
  *   Yield material loss, conversion cost ₹/MT, the losses' ₹ (MT × ₹/MT), tariff, other conversion
  *   costing rows         and net material rates — for a period whose months all have a sheet;
- *   Product header       ERP size (PROD_TRAN receipts, the most produced strip size, and how
- *                        many others) and the running hours; grade and route are not in the ERP data.
  *   CA costing           the month's CA inputs (Edit inputs, logbook CA Inputs — the config replaces
  *                        the costing sheet) with the figures above (CaCosting): output opportunity,
  *                        conversion cost, cost variance, yield material loss, output margin, matched-run
@@ -37,7 +35,7 @@ import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { dm, useSelection } from '@/services/hsmProduction';
-import { rangeUrl, useApi, type CostingReport, type RateDay, type RunningRateReport, type SizeReport } from '@/services/hsmApi';
+import { rangeUrl, useApi, type CostingReport, type RateDay, type RunningRateReport } from '@/services/hsmApi';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import '@/components/asset/asset.css';
@@ -63,11 +61,8 @@ export function actualRate(days: RateDay[]) {
 export default function HsmConditionAnalytics() {
   const { dates } = useSelection();
   const rateUrl = rangeUrl('/api/hsm/running-rate', dates ? { ...dates, grain: 'day' } : null);
-  const sizesUrl = rangeUrl('/api/hsm/sizes', dates);
   const rateS = useApi<RunningRateReport>(rateUrl);
-  const sizesS = useApi<SizeReport>(sizesUrl);
   const rateR = rateS.data && rateS.dataUrl === rateUrl ? rateS.data : null;
-  const sizes = sizesS.data && sizesS.dataUrl === sizesUrl ? sizesS.data.rows.filter((r) => !r.defective && r.producedMt > 0) : null;
   const [open, setOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const [inputsOpen, setInputsOpen] = useState(false);
@@ -88,26 +83,10 @@ export default function HsmConditionAnalytics() {
   /* No day with both ERP production and running hours in the period: the last day the ERP has (the user, 30 Oct 2026). */
   const rateLast = useLastEntry<RunningRateReport>('/api/hsm/running-rate', !!rateR && rate?.tph == null, rateR?.erp.lastDate, dates?.from, 'grain=day');
   const tph = rate?.tph ?? null;
-  const top = sizes?.length ? [...sizes].sort((a, b) => b.producedMt - a.producedMt)[0] : null;
-  const runH = rateR?.totals.runH ?? null;
 
   return (
     <div className="rm-viz ah">
-      <Panel className="ah-asset hca-head" bodyClass="ah-asset-body">
-        <div className="ah-asset-id">
-          <span className="rm-k">Product · size</span>
-          <h2 className="ah-asset-name">
-            {top ? <>{top.label} mm{sizes!.length > 1 && <span className="hca-more"> +{sizes!.length - 1} more</span>}</> : <span className="v-na">NA</span>}
-          </h2>
-        </div>
-        <span />
-        <dl className="ah-asset-facts">
-          <div className="ah-fact"><dt className="rm-k">Grade</dt><dd className="num v-na">NA</dd></div>
-          <div className="ah-fact"><dt className="rm-k">Route</dt><dd className="num v-na">NA</dd></div>
-          <div className="ah-fact"><dt className="rm-k">Running hours</dt><dd className={`num ${runH === null ? 'v-na' : 'v-val'}`}>{runH === null ? 'NA' : `${fixed(runH, 1)} h`}</dd></div>
-        </dl>
-      </Panel>
-
+      {/* No Product · size / Grade / Route banner on Condition Analytics (the user, 30 Oct 2026). */}
       <section className="rm-strip" aria-label="Condition KPIs">
         <KpiCard
           label="Actual rate"

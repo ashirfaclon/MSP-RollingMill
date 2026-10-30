@@ -11,17 +11,45 @@ import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import { fixed } from '@/lib/num';
-import { rangeUrl, useApi, type CaReport } from '@/services/hsmApi';
-import { useSelection } from '@/services/hsmProduction';
+import { rangeUrl, useApi, type CaReport, type FormRunningRateReport } from '@/services/hsmApi';
+import { addDays, dm, useSelection } from '@/services/hsmProduction';
+import { useLastEntry } from '@/services/lastEntry';
+import { useErpLastDate } from '@/components/production/SpecificEnergyCard';
 
 export type CaMillId = 'hsm' | 'rmd' | 'lsm' | 'rms';
-export interface CaView { report: CaReport | null; loading: boolean; error: string | null }
+export interface CaView {
+  report: CaReport | null; loading: boolean; error: string | null;
+  /** The period has no production yet: the CA figures of the last day the ERP has (the user, 30 Oct 2026). */
+  last: { report: CaReport; date: string } | null;
+  /** LSM / RMS: that day has no running hours either: the CA figures of the last day with a rate. */
+  lastRate: { report: CaReport; date: string } | null;
+}
+
+/**
+ * LSM / RMS running hours come from the logbook production sheet, which can stop before the ERP:
+ * the last day in the 31 days before `from` that has both production and hours, when `need`.
+ */
+export function useLastRateDate(mill: CaMillId, need: boolean, from: string | null | undefined): string | null {
+  const form = mill === 'lsm' || mill === 'rms';
+  const url = form && need && from ? `/api/${mill}/running-rate?from=${addDays(from, -31)}&to=${addDays(from, -1)}&grain=day` : null;
+  const s = useApi<FormRunningRateReport>(url);
+  const rows = url && s.dataUrl === url ? s.data?.rows ?? [] : [];
+  return [...rows].reverse().find((r) => r.rateTph != null)?.key ?? null;
+}
 
 export function useCa(mill: CaMillId): CaView {
   const { dates } = useSelection();
   const url = rangeUrl(`/api/ca/${mill}`, dates);
   const s = useApi<CaReport>(url);
-  return { report: s.data && s.dataUrl === url ? s.data : null, loading: !s.data && !s.error, error: s.error };
+  const report = s.data && s.dataUrl === url ? s.data : null;
+  const erpLast = useErpLastDate(mill);
+  const l = useLastEntry<CaReport>(`/api/ca/${mill}`, !!report && report.actual.mt === null, erpLast, dates?.from);
+  const last = l.data && l.date && l.data.missing.length === 0 ? { report: l.data, date: l.date } : null;
+  const needRate = !!report && report.actual.rateTph === null && (report.actual.mt !== null || (!!last && last.report.actual.rateTph === null));
+  const rateDate = useLastRateDate(mill, needRate, dates?.from);
+  const lr = useLastEntry<CaReport>(`/api/ca/${mill}`, needRate, rateDate, dates?.from);
+  const lastRate = lr.data && lr.date && lr.data.missing.length === 0 ? { report: lr.data, date: lr.date } : null;
+  return { report, loading: !s.data && !s.error, error: s.error, last, lastRate };
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -45,47 +73,68 @@ export function CaCard({ id, ca, onOpen, unitYield = '₹', fallback }: {
   id: CaCardId; ca: CaView; onOpen: () => void; unitYield?: '₹' | '₹ lakh';
   fallback?: { value: number | null; onOpen: () => void };
 }) {
-  const k = ca.report?.kpis ?? null;
-  const spec: Record<CaCardId, { label: string; unit: string; series: Series; v: number | null; show: (v: number) => string }> = {
-    opportunity: { label: 'Output opportunity', unit: 'MT', series: 'order', v: k?.opportunityMt ?? null, show: (v) => fixed(v, 1) },
-    conversion: { label: 'Conversion cost', unit: '₹/MT', series: 'prod', v: k?.conversionPerMt ?? null, show: (v) => fixed(v, 0) },
-    variance: { label: 'Cost variance', unit: '₹/MT', series: 'hold', v: k?.variancePerMt ?? null, show: (v) => signed(v, 0) },
-    yieldLoss: {
-      label: 'Yield material loss', unit: unitYield, series: 'hold', v: k?.yieldLossRs ?? null,
-      show: (v) => (unitYield === '₹ lakh' ? fixed(v / 1e5, 2) : fixed(v, 0)),
-    },
-    margin: { label: 'Output margin', unit: '₹', series: 'order', v: k?.marginRs ?? null, show: (v) => fixed(v, 0) },
+  const pick: Record<CaCardId, (k: CaReport['kpis'] | null) => number | null> = {
+    opportunity: (k) => k?.opportunityMt ?? null,
+    conversion: (k) => k?.conversionPerMt ?? null,
+    variance: (k) => k?.variancePerMt ?? null,
+    yieldLoss: (k) => k?.yieldLossRs ?? null,
+    margin: (k) => k?.marginRs ?? null,
+  };
+  const spec: Record<CaCardId, { label: string; unit: string; series: Series; show: (v: number) => string }> = {
+    opportunity: { label: 'Output opportunity', unit: 'MT', series: 'order', show: (v) => fixed(v, 1) },
+    conversion: { label: 'Conversion cost', unit: '₹/MT', series: 'prod', show: (v) => fixed(v, 0) },
+    variance: { label: 'Cost variance', unit: '₹/MT', series: 'hold', show: (v) => signed(v, 0) },
+    yieldLoss: { label: 'Yield material loss', unit: unitYield, series: 'hold', show: (v) => (unitYield === '₹ lakh' ? fixed(v / 1e5, 2) : fixed(v, 0)) },
+    margin: { label: 'Output margin', unit: '₹', series: 'order', show: (v) => fixed(v, 0) },
   };
   const c = spec[id];
-  const useFallback = c.v === null && fallback && fallback.value !== null;
-  const v = useFallback ? fallback!.value : c.v;
+  const cv = pick[id](ca.report?.kpis ?? null);
+  // The last day with the figure: the ERP's last day, else (rate-based figures) the last day with a rate.
+  const lastSrc = cv === null ? [ca.last, ca.lastRate].find((x) => x && pick[id](x.report.kpis) !== null) ?? null : null;
+  const lv = lastSrc ? pick[id](lastSrc.report.kpis) : null;
+  const useFallback = cv === null && lv === null && fallback && fallback.value !== null;
+  const v = useFallback ? fallback!.value : cv;
   return (
     <KpiCard label={c.label} value={v === null ? 'NA' : c.show(v)} unit={c.unit} note="" series={c.series}
-      loading={ca.loading} noEntries={useFallback ? false : emptyNote(ca, c.v)}
+      loading={ca.loading} noEntries={useFallback ? false : emptyNote(ca, cv)}
+      lastEntry={lv !== null && lastSrc ? { value: c.show(lv), date: lastSrc.date } : null}
       onOpen={useFallback ? fallback!.onOpen : onOpen} openLabel={useFallback ? 'The plant\'s costing sheet, line by line' : 'CA costing, month by month'} />
   );
 }
 
-const Row = ({ k, v }: { k: string; v: string | null }) => (
-  <div className="ah-row"><span className="rm-k">{k}</span><span className={`num ${v === null ? 'v-na' : 'v-val'}`}>{v ?? 'NA'}</span></div>
+const Row = ({ k, v, last }: { k: string; v: string | null; last?: string | null }) => (
+  <div className="ah-row"><span className="rm-k">{k}</span>
+    <span className={`num ${v === null ? 'v-na' : 'v-val'}`}>{v ?? 'NA'}{v !== null && last && <span className="rm-card-last ca-last"> · Last entry · {dm(last)}</span>}</span>
+  </div>
 );
+
+/** The period's report, or the last day's when the period has no production yet; `date` set for the latter. */
+function actualSource(ca: CaView): { r: CaReport | null; date: string | null } {
+  const r = ca.report;
+  if (r && r.actual.mt === null && ca.last) return { r: ca.last.report, date: ca.last.date };
+  return { r, date: null };
+}
 
 /** Matched-run performance: actual vs the month's benchmark (one plant-entered benchmark, not size-matched). */
 export function CaMatchedRows({ ca }: { ca: CaView }) {
-  const r = ca.report;
+  const { r, date } = actualSource(ca);
   const i = r?.inputs ?? null;
   const a = r?.actual ?? null;
+  // No rate that day: the last day with one.
+  const lr = a?.rateTph == null && ca.lastRate ? ca.lastRate : null;
+  const ra = lr ? lr.report.actual : a;
+  const ri = lr ? lr.report.inputs : i;
   return (
     <>
-      <Row k="Production rate · actual vs matched" v={i && a?.rateTph != null ? `${fixed(a.rateTph, 2)} vs ${fixed(i.benchmarkRateTph, 2)} TPH` : null} />
-      <Row k="Energy per MT · actual vs matched" v={i && a?.kwhPerMt != null ? `${fixed(a.kwhPerMt, 1)} vs ${fixed(i.benchmarkKwhPerMt, 1)} kWh/MT` : null} />
+      <Row k="Production rate · actual vs matched" last={lr ? lr.date : date} v={ri && ra?.rateTph != null ? `${fixed(ra.rateTph, 2)} vs ${fixed(ri.benchmarkRateTph, 2)} TPH` : null} />
+      <Row k="Energy per MT · actual vs matched" last={date} v={i && a?.kwhPerMt != null ? `${fixed(a.kwhPerMt, 1)} vs ${fixed(i.benchmarkKwhPerMt, 1)} kWh/MT` : null} />
     </>
   );
 }
 
 /** Costing & impact rows from the inputs. `sheet`: HSM's costing-sheet rows, when there are no inputs. */
 export function CaCostRows({ ca, sheet }: { ca: CaView; sheet?: Partial<Record<'tariff' | 'net' | 'other', string | null>> }) {
-  const r = ca.report;
+  const { r, date } = actualSource(ca);
   const i = r?.inputs ?? null;
   const k = r?.kpis ?? null;
   const y = r?.actual.yieldPct ?? null;
@@ -94,9 +143,9 @@ export function CaCostRows({ ca, sheet }: { ca: CaView; sheet?: Partial<Record<'
       <Row k="Tariff" v={i ? `${inr(i.tariffActual, 2)}/kWh · standard ${inr(i.tariffStandard, 2)}` : sheet?.tariff ?? null} />
       <Row k="Contribution" v={i ? `${inr(i.contributionPerMt)}/MT` : null} />
       <Row k="Net material" v={i ? `${inr(i.netMaterialPerMt)}/MT` : sheet?.net ?? null} />
-      <Row k="Other conversion · actual / standard"
+      <Row k="Other conversion · actual / standard" last={date}
         v={i && k?.otherActualPerMt != null ? `${inr(k.otherActualPerMt)}/MT · ${inr(i.otherConversionStandard)}/MT` : sheet?.other ?? null} />
-      <Row k="Yield material variance" v={i && y !== null ? `${fixed(y, 2)} % vs ${fixed(i.standardYieldPct, 2)} % standard` : null} />
+      <Row k="Yield material variance" last={date} v={i && y !== null ? `${fixed(y, 2)} % vs ${fixed(i.standardYieldPct, 2)} % standard` : null} />
     </>
   );
 }
