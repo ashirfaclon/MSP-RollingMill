@@ -188,7 +188,12 @@ export default function RmdAssetHealth() {
         <Panel title="Condition trends" sub={show.bearing ? 'Every machine and every bearing' : 'Every machine'} className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
           {/* Every bearing of the group's stands, each reading (the user, 31 Oct 2026). */}
-          {show.bearing && <BearingTrendAll points={rmdBearingPoints(bearing?.history ?? [])} />}
+          {show.bearing && (() => {
+            const now = rmdBearingPoints(bearing?.history ?? []);
+            const before = !now.length && fg && bearingLast.data ? rmdBearingPoints(bearingLast.data.bearing[fg].history) : [];
+            return <BearingTrendAll points={now.length ? now : before} last={!now.length && before.length ? bearingLast.date : null}
+              empty={bearing && !bearing.lastDate ? 'No entries recorded yet in the Mill Bearing Temperature forms' : 'No bearing readings in this period'} />;
+          })()}
         </Panel>
       </div>
 

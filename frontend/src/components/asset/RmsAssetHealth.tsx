@@ -68,8 +68,8 @@ export default function RmsAssetHealth() {
         <Panel title="Condition trends" sub="Every machine" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
           <div className="ah-trend">
-            <div className="ah-trend-head"><span className="rm-k">Bearing temp · °C</span><span className="num v-na">NA</span></div>
-            <div className="ah-trend-plot" role="img" aria-label="Bearing temp · °C: no data" />
+            <div className="ah-trend-head"><span className="rm-k">Bearing temp · °C</span></div>
+            <p className="ah-trend-empty">RMS has no bearing temperature source yet</p>
           </div>
         </Panel>
       </div>

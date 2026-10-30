@@ -8,11 +8,10 @@
  */
 import { useMemo } from 'react';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
-import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { dm } from '@/services/hsmProduction';
-import type { MidStatus } from '@/services/hsmApi';
+import type { MidMachine, MidStatus } from '@/services/hsmApi';
 import type { MidView } from './useMid';
 
 const TONE: Record<MidStatus, string> = { Good: 'v-ok', Acceptable: 'v-warn', 'Un-acceptable': 'v-risk' };
@@ -95,45 +94,121 @@ export function MidVibrationDrawer({ open, onClose, title, mid }: { open: boolea
   );
 }
 
-/** At most this many visits side by side (the latest ones); one colour each, in a fixed order. */
-const VISIT_TOKENS = ['--cat-1', '--cat-2', '--cat-3', '--cat-4'];
+/**
+ * Severity zones of ISO 20816-3 (was 10816-3), group 2 machines on flexible foundations: the zone
+ * boundaries MID's own grades sit closest to (its Acceptable readings cluster round 4.5 mm/s, its one
+ * Un-acceptable reading is 7.5). A reference, not the plant's limit; the plant's verdict is MID's grade.
+ */
+const ZONES: { to: number; key: string; name: string }[] = [
+  { to: 2.3, key: 'a', name: 'A · new machine condition' },
+  { to: 4.5, key: 'b', name: 'B · unrestricted operation' },
+  { to: 7.1, key: 'c', name: 'C · restricted operation' },
+  { to: Infinity, key: 'd', name: 'D · damage likely' },
+];
+const BOUNDS = ZONES.slice(0, -1).map((z) => z.to);
+
+interface VibRow { machine: string; value: number; prev: number | null; status: MidStatus | null; parts: { part: string; h: number | null; v: number | null; a: number | null; max: number }[] }
+
+/** Each part's highest H / V / A over its points. */
+function partsOf(m: MidMachine): VibRow['parts'] {
+  const by = new Map<string, VibRow['parts'][number]>();
+  for (const p of m.points) {
+    const name = p.part ?? p.component;
+    const cur = by.get(name) ?? { part: name, h: null, v: null, a: null, max: 0 };
+    const hi = (x: number | null, y: number | null) => (y === null ? x : x === null ? y : Math.max(x, y));
+    cur.h = hi(cur.h, p.horizontal); cur.v = hi(cur.v, p.vertical); cur.a = hi(cur.a, p.axial);
+    cur.max = Math.max(cur.max, p.horizontal ?? 0, p.vertical ?? 0, p.axial ?? 0);
+    by.set(name, cur);
+  }
+  return [...by.values()].sort((x, y) => y.max - x.max);
+}
 
 /**
- * The Condition trend block: every machine of the section at each MID visit, not only the highest (the
- * user, 31 Oct 2026). A bar per machine, highest first, one colour per visit (the last four).
+ * The Condition trend block: every machine of the section at the last MID visit, highest first (the
+ * user, 31 Oct 2026). Each bar is stacked by severity zone — the part of the reading inside A, B, C and
+ * D — on one scale, with a tick at the previous visit's reading; MID's grade beside it. Hover or focus
+ * a row for each part's H / V / A.
  */
 export function MidVibrationTrend({ mid }: { mid: MidView }) {
-  const visits = useMemo(() => mid.visits.slice(-VISIT_TOKENS.length), [mid.visits]);
-  // Highest first (the user, 31 Oct 2026): by the latest visit's reading, then any earlier visit's.
-  const machines = useMemo(() => {
-    const best = new Map<string, number[]>();
-    for (const [i, v] of [...visits].reverse().entries()) for (const m of v.machines) {
-      if (m.maxMmS === null) continue;
-      const k = best.get(m.machine) ?? visits.map(() => -1);
-      k[i] = m.maxMmS;
-      best.set(m.machine, k);
-    }
-    const cmp = (a: number[], b: number[]) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return b[i] - a[i]; return 0; };
-    return [...best.entries()].sort((x, y) => cmp(x[1], y[1])).map(([n]) => n);
-  }, [visits]);
-  const series = useMemo<DrillSeries[]>(() => visits.map((v, i) => ({
-    id: v.date, name: day(v.date), token: VISIT_TOKENS[i], type: 'column',
-    data: machines.map((n) => v.machines.find((m) => m.machine === n)?.maxMmS ?? null), dp: 1,
-  })), [visits, machines]);
-  const axes = useMemo(() => [{ title: 'mm/s', unit: 'mm/s', min: 0 }], []);
-  const last = visits.at(-1);
-  // A row per machine, a little taller with more visits beside each other.
-  const height = Math.max(160, 44 + machines.length * (14 + 6 * visits.length));
+  const last = mid.visits.at(-1) ?? null;
+  const prev = mid.visits.length > 1 ? mid.visits[mid.visits.length - 2] : null;
+  const rows = useMemo<VibRow[]>(() => (last?.machines ?? [])
+    .filter((m) => m.maxMmS !== null)
+    .map((m) => ({
+      machine: m.machine, value: m.maxMmS!, status: m.status, parts: partsOf(m),
+      prev: prev?.machines.find((x) => x.machine === m.machine)?.maxMmS ?? null,
+    }))
+    .sort((a, b) => b.value - a.value), [last, prev]);
+  // One scale for every row: past zone D's start, and past the highest reading unless that is an outlier
+  // (over twice the next): an outlier runs off the end, marked, its figure still exact.
+  const top = rows[0]?.value ?? 0;
+  const next = rows[1]?.value ?? top;
+  const scale = Math.max(9, Math.ceil((top > 2 * next ? next : top) * 1.15));
+  const pct = (v: number) => `${(Math.min(v, scale) / scale) * 100}%`;
+  const zonesUsed = new Set(rows.flatMap((r) => ZONES.filter((z, i) => r.value > (i ? ZONES[i - 1].to : 0)).map((z) => z.key)));
+
   return (
-    <div className="ah-trend">
+    <div className="ah-trend vib">
       <div className="ah-trend-head">
         <span className="rm-k">Vibration · mm/s RMS</span>
-        {last && <span className="ah-trend-date">MID visit {day(last.date)}</span>}
+        {last && <span className="ah-trend-date">MID visit {day(last.date)}{prev ? ` · tick: ${day(prev.date)}` : ''}</span>}
       </div>
-      {machines.length
-        ? <DrillChart series={series} categories={machines} axes={axes} horizontal height={height}
-            ariaLabel={`Vibration of every machine, by MID visit: ${visits.map((v) => `${v.date}: ${v.machines.filter((m) => m.maxMmS !== null).map((m) => `${m.machine} ${m.maxMmS} mm/s`).join(', ')}`).join('; ')}`} />
-        : <div className="ah-trend-plot" role="img" aria-label="Vibration: no data" />}
+      {rows.length === 0 ? (
+        <p className="ah-trend-empty">{mid.report ? 'No MID vibration readings for this section yet' : 'NA'}</p>
+      ) : (
+        <>
+          <div className="vib-legend" aria-label="Severity zones, ISO 20816-3 group 2, flexible foundation">
+            {ZONES.filter((z) => zonesUsed.has(z.key)).map((z) => (
+              <span key={z.key} className="vib-legend-item"><i className={`vib-swatch vib-z-${z.key}`} aria-hidden />{z.name}</span>
+            ))}
+            <span className="vib-legend-src">ISO 20816-3 · group 2, flexible</span>
+          </div>
+          <div className="vib-axis" aria-hidden>
+            <span />
+            <span className="vib-axis-track">
+              <b style={{ left: '0%' }}>0</b>
+              {BOUNDS.filter((b) => b < scale).map((b) => <b key={b} style={{ left: pct(b) }}>{b}</b>)}
+              <b style={{ left: '100%' }}>{scale}</b>
+            </span>
+            <span /><span />
+          </div>
+          <ul className="vib-rows" aria-label={`Vibration of ${rows.length} machines, highest first`}>
+            {rows.map((r) => {
+              const segs = ZONES.map((z, i) => {
+                const from = i ? ZONES[i - 1].to : 0;
+                return { key: z.key, w: Math.max(0, Math.min(r.value, z.to, scale) - Math.min(from, scale)) };
+              }).filter((x) => x.w > 0);
+              const over = r.value > scale;
+              return (
+                <li key={r.machine} className="vib-row" tabIndex={0}
+                  aria-label={`${r.machine}: ${fixed(r.value, 1)} mm/s${r.status ? `, MID ${r.status}` : ''}${r.prev !== null ? `, previous visit ${fixed(r.prev, 1)}` : ''}`}>
+                  <span className="vib-name" title={r.machine}>{r.machine}</span>
+                  <span className="vib-track">
+                    {BOUNDS.filter((b) => b < scale).map((b) => <i key={b} className="vib-guide" style={{ left: pct(b) }} aria-hidden />)}
+                    <span className={`vib-bar${over ? ' vib-bar--over' : ''}`} style={{ width: pct(r.value) }}>
+                      {segs.map((sg) => <i key={sg.key} className={`vib-seg vib-z-${sg.key}`} style={{ flexGrow: sg.w }} />)}
+                    </span>
+                    {r.prev !== null && <i className="vib-prev" style={{ left: pct(r.prev) }} title={`Previous visit ${fixed(r.prev, 1)} mm/s`} aria-hidden />}
+                  </span>
+                  <span className="vib-val num">{fixed(r.value, 1)}</span>
+                  <span className="vib-grade"><i className={`vib-dot ${r.status ? TONE[r.status] : 'v-na'}`} aria-hidden />{r.status ?? 'NA'}</span>
+                  <span className="vib-tip" role="tooltip">
+                    <b>{r.machine}</b>
+                    <table>
+                      <thead><tr><th>Part</th><th>H</th><th>V</th><th>A</th></tr></thead>
+                      <tbody>
+                        {r.parts.map((pt) => (
+                          <tr key={pt.part}><td>{pt.part}</td><td>{mm(pt.h)}</td><td>{mm(pt.v)}</td><td>{mm(pt.a)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

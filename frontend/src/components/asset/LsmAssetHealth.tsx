@@ -130,7 +130,10 @@ export default function LsmAssetHealth() {
       <div className="rm-row ah-row--one">
         <Panel title="Condition trends" sub="Every machine and every bearing" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
-          <BearingTrendAll points={trend} />
+          <BearingTrendAll
+            points={trend.length || !driveLast.data ? trend : lsmBearingPoints(driveLast.data.entries)}
+            last={!trend.length && driveLast.data ? driveLast.date : null}
+            empty={drives && !drives.lastDate ? 'No entries recorded yet in the drive temperature form' : 'No bearing readings in this period'} />
         </Panel>
       </div>
 

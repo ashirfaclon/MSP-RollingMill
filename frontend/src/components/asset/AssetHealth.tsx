@@ -143,7 +143,10 @@ export default function AssetHealth() {
       <div className="rm-row ah-row--one">
         <Panel title="Condition trends" sub="Every machine and every bearing" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
-          <BearingTrendAll points={trend} />
+          <BearingTrendAll
+            points={trend.length || !gid || !loadLast.data ? trend : hsmBearingPoints(loadLast.data.entries.filter((e) => e.group === gid))}
+            last={!trend.length && gid && loadLast.data ? loadLast.date : null}
+            empty={!gid ? 'No bearing temperature source for this group' : !load?.lastDate ? 'No entries recorded yet in the Mill Load Log Sheet' : 'No bearing readings in this period'} />
         </Panel>
       </div>
 

@@ -107,3 +107,61 @@
   .rm-strip.ah-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ah-trends { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- Condition trends · vibration: every machine, highest first, each bar stacked by severity zone ---- */
+.ah-trend-empty { margin: 0; padding: 22px 0; font-size: 12px; font-weight: 600; color: var(--muted-2); text-align: center; border: 1px dashed var(--border); border-radius: var(--radius-sm); }
+.vib { gap: 8px; }
+.vib-z-a { background: var(--ok); }
+.vib-z-b { background: color-mix(in srgb, var(--ok) 40%, var(--warn)); }
+.vib-z-c { background: var(--warn); }
+.vib-z-d { background: var(--risk); }
+.vib-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 10.5px; font-weight: 600; color: var(--text-2); }
+.vib-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.vib-swatch { width: 10px; height: 10px; border-radius: 3px; }
+.vib-legend-src { margin-left: auto; font-size: 10px; color: var(--muted-3); }
+/* Name, bar, value, MID grade: the same columns on every row and on the scale above. */
+.vib-axis, .vib-row { display: grid; grid-template-columns: minmax(110px, 210px) minmax(0, 1fr) 48px 112px; column-gap: 14px; align-items: center; }
+.vib-axis { margin-top: 2px; }
+.vib-axis-track { position: relative; height: 12px; }
+.vib-axis-track b { position: absolute; top: 0; transform: translateX(-50%); font-size: 10px; font-weight: 600; line-height: 12px; color: var(--muted-2); }
+.vib-axis-track b:first-child { transform: none; }
+.vib-axis-track b:last-child { transform: translateX(-100%); }
+.vib-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vib-row { position: relative; margin: 0 -8px; padding: 5px 8px; border-radius: 6px; outline: none; cursor: default; }
+.vib-row:hover, .vib-row:focus-visible { background: color-mix(in srgb, var(--panel-hi) 55%, transparent); }
+.vib-row:focus-visible { box-shadow: inset 0 0 0 1px var(--info); }
+.vib-name { min-width: 0; font-size: 11px; font-weight: 700; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vib-track { position: relative; height: 14px; border-radius: 4px; background: var(--panel-3); }
+/* The zone boundaries, faint, through every row. */
+.vib-guide { position: absolute; top: -5px; bottom: -5px; width: 0; border-left: 1px dashed color-mix(in srgb, var(--muted-3) 55%, transparent); }
+.vib-bar { position: relative; z-index: 1; display: flex; gap: 2px; height: 100%; border-radius: 4px; overflow: hidden; }
+.vib-seg { display: block; height: 100%; flex-basis: 0; min-width: 2px; }
+/* A reading past the scale runs off the end. */
+.vib-bar--over { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent); }
+/* The previous visit's reading. */
+.vib-prev { position: absolute; z-index: 2; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--text); box-shadow: 0 0 0 2px var(--panel); }
+.vib-val { font-size: 12px; font-weight: 800; text-align: right; color: var(--text); }
+.vib-grade { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.vib-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+/* Each part's H / V / A, on hover or focus. */
+.vib-tip {
+  display: none; position: absolute; z-index: 20; top: calc(100% + 2px); left: min(218px, 30%);
+  min-width: 220px; padding: 9px 11px; border-radius: var(--radius-sm);
+  background: var(--panel-2); border: 1px solid var(--border-hi); box-shadow: var(--shadow, 0 8px 24px rgba(0, 0, 0, 0.35));
+  font-size: 11px; color: var(--text-2); pointer-events: none;
+}
+.vib-tip > b { display: block; margin-bottom: 6px; font-size: 11.5px; color: var(--text); }
+.vib-tip table { border-collapse: collapse; width: 100%; }
+.vib-tip th { font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted-2); text-align: right; padding: 0 0 4px 12px; }
+.vib-tip th:first-child, .vib-tip td:first-child { text-align: left; padding-left: 0; }
+.vib-tip td { padding: 2px 0 2px 12px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vib-row:hover .vib-tip, .vib-row:focus-visible .vib-tip { display: block; }
+@media (max-width: 760px) {
+  .vib-axis, .vib-row { grid-template-columns: minmax(80px, 120px) minmax(0, 1fr) 40px; }
+  .vib-grade { display: none; }
+}
+.ah-trend-last { letter-spacing: 0; text-transform: none; }
+/* Bearing temperature, one reading: a bar per bearing in its line colour; the non-drive end hatched (dashed in the line chart). */
+.brg-axis, .brg-row { grid-template-columns: minmax(110px, 210px) minmax(0, 1fr) 56px; }
+.brg-bar { background: var(--series); }
+.brg-bar--nde { background: repeating-linear-gradient(135deg, var(--series) 0 5px, color-mix(in srgb, var(--series) 55%, var(--panel)) 5px 8px); }
