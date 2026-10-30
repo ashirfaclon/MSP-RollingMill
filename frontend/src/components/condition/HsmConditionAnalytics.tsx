@@ -46,9 +46,6 @@ const CA_SOURCES: [string, string][] = [
   ['Running hours', 'Influx Dicharged_Billet (billets ≤ 10 min apart), over the days with ERP production'],
   ['Power', 'Logbook Electrical HSM → Power Consumption, ÷ ERP production over the days with both'],
 ];
-const Row = ({ k, v = null }: { k: string; v?: string | null }) => (
-  <div className="ah-row"><span className="rm-k">{k}</span><span className={`num ${v === null ? 'v-na' : 'v-val'}`}>{v ?? 'NA'}</span></div>
-);
 
 /** ERP MT ÷ historian running hours over the days that have both (ERP entries come a day late). */
 export function actualRate(days: RateDay[]) {
@@ -129,13 +126,9 @@ export default function HsmConditionAnalytics() {
       </DrillDrawer>
       <CaDrawer open={caOpen} onClose={() => setCaOpen(false)} mill="hsm" ca={ca} sources={CA_SOURCES} />
       <CaInputs mill="hsm" open={inputsOpen} onClose={() => setInputsOpen(false)} />
-      {/* The mill mimic — the same twin as Visualization — at the bottom of the page (the user, 30 Oct 2026). */}
-      <MillMimic>
-        <div className="ah-list hca-notes">
-          <Row k="Route active" />
-          <Row k="Investigation note" />
-        </div>
-      </MillMimic>
+      {/* The mill mimic — the same twin as Visualization — at the bottom of the page (the user, 30 Oct 2026).
+          No Route active / Investigation note rows: no source (removed — the user, 31 Oct 2026). */}
+      <MillMimic />
     </div>
   );
 }

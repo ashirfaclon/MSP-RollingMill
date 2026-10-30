@@ -7,14 +7,14 @@
  *   Bearing temp   logbook Rolling Mill Structure (RMS) → RMS Mechanical → Drive Temp (the user, 31 Oct
  *                  2026): the hottest bearing at each drive's latest reading; opens every bearing.
  *   Gearbox oil    the same form: oil temperature and oil pressure, the card turns over between them.
- * Motor current is NA (no source); vibration from MID. No mill mimic on RMS
+ * No Motor current card (no source; removed — the user, 31 Oct 2026); vibration from MID. No mill mimic on RMS
  * (the user, 23 Oct 2026). No VFD trips card on any mill (the user, 28 Oct 2026).
  */
 import { useMemo, useState } from 'react';
 import { midTop, rmsHottest, whenText, withWhere } from './cardWhere';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
-import KpiCard, { type Series } from '@/components/visualization/KpiCard';
+import KpiCard from '@/components/visualization/KpiCard';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmsDriveReading, type RmsDriveReport, type RmsProductionReport } from '@/services/hsmApi';
@@ -29,7 +29,6 @@ import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks, remarkSumma
 import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, usePm } from './ErpPm';
 import './asset.css';
 
-const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
 
 export default function RmsAssetHealth() {
   const { dates } = useSelection();
@@ -68,7 +67,8 @@ export default function RmsAssetHealth() {
   return (
     <div className="rm-viz ah">
       {/* No "Selected asset" panel: last inspection is on the Vibration card, next PM and open work orders in ERP PM (the user, 31 Oct 2026). */}
-      <section className="rm-strip ah-strip" aria-label="Condition KPIs">
+      {/* No Motor current card: RMS has no source for it (the user, 31 Oct 2026). */}
+      <section className="rm-strip ah-strip ah-strip--five" aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           /* The machine with the highest reading, and the MID visit it is from (the user, 31 Oct 2026). */
           note="" where={(() => { const t = midTop(mid.machines, mid.date); return t ? { name: t.where, when: `MID · ${midDate(t.date)}` } : null; })()}
@@ -78,7 +78,6 @@ export default function RmsAssetHealth() {
           noEntries={!!drives && bearingC === null}
           lastEntry={withWhere(lastFigure(bearingC, driveLast, (d) => figures(d).bearingC, (n) => fixed(n, 0)), driveLast.data ? rmsHottest(driveLast.data.latest) : null)}
           where={(() => { const h = rmsHottest(drives?.latest ?? []); return h ? { name: h.where, when: whenText(h) } : null; })()} {...opener} />
-        {NA('Motor current', 'A', 'prod')}
         {/* Temperature or pressure: the card turns over between them. */}
         <FlipKpiCard
           label="Gearbox oil"
