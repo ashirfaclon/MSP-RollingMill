@@ -57,11 +57,23 @@ const GROUPS: { id: Group; label: string }[] = [
 const LIVE: Partial<Record<Group, 'route' | 'finishing'>> = { route: 'route', finishing: 'finishing' };
 const FORMS: Partial<Record<Group, 'roughing' | 'route'>> = { roughing: 'roughing', route: 'route' };
 const NAME: Record<Group, string> = { roughing: 'Roughing', route: 'Route', finishing: 'Finishing', auxiliary: 'Auxiliary' };
+/**
+ * Which condition cards each group shows (the user, 30 Oct 2026): Roughing has no motor current;
+ * Finishing no bearing temperature or gearbox oil; Auxiliary none of the three. Route keeps all.
+ */
+const CARDS: Record<Group, { bearing: boolean; current: boolean; oil: boolean }> = {
+  roughing: { bearing: true, current: false, oil: true },
+  route: { bearing: true, current: true, oil: true },
+  finishing: { bearing: false, current: true, oil: false },
+  auxiliary: { bearing: false, current: false, oil: false },
+};
+const STRIP: Record<number, string> = { 6: '', 5: ' ah-strip--five', 4: ' ah-strip--four', 3: ' ah-strip--three' };
 
 const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
 
 export default function RmdAssetHealth() {
   const [group, setGroup] = useState<Group>('route');
+  const show = CARDS[group];
   const [open, setOpen] = useState<'bearing' | 'oil' | 'current' | 'run' | null>(null);
   const zone = LIVE[group] ?? null;
   const fg = FORMS[group] ?? null;
@@ -117,11 +129,11 @@ export default function RmdAssetHealth() {
         </dl>
       </Panel>
 
-      <section className="rm-strip ah-strip" aria-label="Condition KPIs">
+      <section className={`rm-strip ah-strip${STRIP[3 + Number(show.bearing) + Number(show.current) + Number(show.oil)]}`} aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${NAME[group]} group`} mid={mid} />
-        <KpiCard
+        {show.bearing && <KpiCard
           label="Bearing temp"
           value={bearing?.max ? fixed(bearing.max.value, 0) : 'NA'}
           noEntries={!!fg && !!forms && !bearing?.max}
@@ -130,9 +142,9 @@ export default function RmdAssetHealth() {
           series="hold"
           tone={bearingTone}
           {...(bearing ? { onOpen: () => setOpen('bearing'), openLabel: 'Every bearing at the latest reading, and the trend' } : {})}
-        />
+        />}
         {/* Live while any of the group's drives runs; otherwise the mean while running over the selected dates (the user, 28 Oct 2026). */}
-        <KpiCard
+        {show.current && <KpiCard
           label="Motor current"
           value={motorA === null ? 'NA' : fixed(motorA, 0)}
           unit="A"
@@ -145,9 +157,9 @@ export default function RmdAssetHealth() {
           loading={!!zone && currentA === null && !cond && !condS.error}
           series="prod"
           {...(zone ? { onOpen: () => setOpen('current'), openLabel: 'Each drive\'s current now, and its trend while running' } : {})}
-        />
+        />}
         {/* Level or temperature (the plant, 28 Oct 2026). Limits exist for the temperature only (45–65 °C): no colour on the level. */}
-        <FlipKpiCard
+        {show.oil && <FlipKpiCard
           label="Gearbox oil"
           series="hold"
           faces={[
@@ -157,7 +169,7 @@ export default function RmdAssetHealth() {
               card: { value: oilTempC !== null ? fixed(oilTempC, 0) : 'NA', unit: '°C', tone: oilTempC !== null ? oilTone : undefined, noEntries: !!fg && !!forms && oilTempC === null } },
           ]}
           {...(oil ? { onOpen: (v: 'level' | 'temp') => { setOilView(v); setOpen('oil'); }, openLabel: 'Each oil tank, for the view shown' } : {})}
-        />
+        />}
         <KpiCard label="Run hours" value={run === null ? 'NA' : fixed(run, 1)} unit="h" note="" series="prod" noEntries={!!totals && run === null}
           onOpen={() => setOpen('run')} openLabel="Run hours per day, from the ERP log sheet" />
         <PmOnTimeCard pm={pm} onOpen={() => setPmOpen(true)} />
@@ -190,9 +202,9 @@ export default function RmdAssetHealth() {
       </Panel>
 
       <div className="rm-row ah-row--one">
-        <Panel title="Condition trends" sub="Bearing temperature, each reading" className="rm-panel" bodyClass="rm-body ah-trends">
+        <Panel title="Condition trends" sub={show.bearing ? 'Bearing temperature, each reading' : undefined} className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
-          <BearingTrend trend={bearing?.trend ?? []} />
+          {show.bearing && <BearingTrend trend={bearing?.trend ?? []} />}
         </Panel>
       </div>
 

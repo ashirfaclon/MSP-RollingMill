@@ -11,6 +11,9 @@
 .rm-strip.ah-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 /* HSM: no PM on time card (no equipment in the ERP's PM module). */
 .rm-strip.ah-strip.ah-strip--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* RMD groups with fewer cards (the user, 30 Oct 2026). */
+.rm-strip.ah-strip.ah-strip--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rm-strip.ah-strip.ah-strip--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 /* A row with one panel (Condition trends): full width. */
 .rm-row.ah-row--one { grid-template-columns: minmax(0, 1fr); }

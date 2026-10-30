@@ -877,15 +877,19 @@ test('RMD asset health: route drive group by default; motor current live, run ho
   const groups = main.getByRole('group', { name: 'Drive group' });
   await expect(groups.getByRole('button')).toHaveText(['Roughing', 'Route / diverter', 'Finishing', 'Auxiliary']);
   await expect(groups.getByRole('button', { name: 'Route / diverter' })).toHaveAttribute('aria-pressed', 'true');
-  // Roughing (20" / 16" R stands): no PLC, so no live status or current.
+  // Each group's cards (the user, 30 Oct 2026): Roughing no motor current; Finishing no bearing temp or
+  // gearbox oil; Auxiliary none of the three.
+  const labels = () => cards.locator(':scope > * .rm-card-label').evaluateAll((els) => [...new Set(els.map((e) => (e.firstChild?.textContent ?? '').trim()))]);
   await groups.getByRole('button', { name: 'Roughing' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Roughing drive group');
   await expect(main.locator('.ah-status')).toHaveCount(0);   // no source of a status: no chip
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^NA/);
+  expect(await labels()).toEqual(['Vibration RMS', 'Bearing temp', 'Gearbox oil', 'Run hours', 'PM on time']);
   await groups.getByRole('button', { name: 'Auxiliary' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Auxiliary · pumps');
+  expect(await labels()).toEqual(['Vibration RMS', 'Run hours', 'PM on time']);
   await groups.getByRole('button', { name: 'Finishing' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Finishing drive group');
+  expect(await labels()).toEqual(['Vibration RMS', 'Motor current', 'Run hours', 'PM on time']);
   await page.screenshot({ path: `${SHOTS}/rmd-asset-health.png`, fullPage: true });
 });
 
