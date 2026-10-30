@@ -25,7 +25,7 @@ import { dm } from '@/lib/plantDay';
 import '@/components/visualization/visualization.css';
 import { useMid } from './useMid';
 import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
-import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, pmFacts, usePm } from './ErpPm';
+import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, usePm } from './ErpPm';
 import './asset.css';
 
 const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
@@ -35,7 +35,6 @@ export default function RmsAssetHealth() {
   const [vibOpen, setVibOpen] = useState(false);
   const mid = useMid('rms', 'all');
   const pm = usePm('rms');
-  const pmFact = pmFacts(pm);
   const [pmOpen, setPmOpen] = useState(false);
   const url = rangeUrl('/api/rms/production', dates ? { ...dates, grain: 'day' } : null);
   const prodS = useApi<RmsProductionReport>(url);
@@ -67,20 +66,11 @@ export default function RmsAssetHealth() {
 
   return (
     <div className="rm-viz ah">
-      <Panel className="ah-asset" bodyClass="ah-asset-body">
-        <div className="ah-asset-id">
-          <span className="rm-k">Selected asset</span>
-          <h2 className="ah-asset-name">RMS · mill drives</h2>
-        </div>
-        <dl className="ah-asset-facts">
-          {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', pmFact.nextPm], ['Open work orders', pmFact.openWorkOrders]] as const).map(([k, v]) => (
-            <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className={`num ${v ? 'v-val' : 'v-na'}`}>{v ?? 'NA'}</dd></div>
-          ))}
-        </dl>
-      </Panel>
-
+      {/* No "Selected asset" panel: last inspection is on the Vibration card, next PM and open work orders in ERP PM (the user, 31 Oct 2026). */}
       <section className="rm-strip ah-strip" aria-label="Condition KPIs">
-        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+          /* The MID visit it is from (the user, 31 Oct 2026: was "Last inspection" in the top bar). */
+          note={mid.date ? `MID · ${midDate(mid.date)}` : ''}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title="RMS · mill" mid={mid} />
         <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" loading={loading}

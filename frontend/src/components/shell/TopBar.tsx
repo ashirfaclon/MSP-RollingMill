@@ -9,6 +9,7 @@ import DateRangePicker from './DateRangePicker';
 import MillPicker from './MillPicker';
 import { millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
 import { isDefaultFilter, resetFilters, setGlobalSel, useGlobalSel, type ThemeSel } from '@/state/globalSel';
+import { HEADER_SLOT_ID } from './HeaderSlot';
 import './topbar.css';
 
 export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenId }) {
@@ -23,6 +24,9 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
           <h1 className="tb-title">Rolling Mill <span className="tb-title-sep">/</span> {s.label}</h1>
         </div>
       </div>
+
+      {/* The screen's own controls (HSM / RMD Asset Health: the drive group), filled through HeaderSlot. */}
+      <div id={HEADER_SLOT_ID} className="tb-slot" />
 
       <div className="tb-right">
         {/* Mill switch — keeps the screen, changes the mill. */}

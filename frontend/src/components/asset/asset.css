@@ -1,11 +1,5 @@
 /* HSM · Asset Health — on top of visualization.css (strip, mimic, rows, panels). */
 
-.ah-asset-body { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 24px; }
-.ah-asset-id { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.ah-asset-name { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text); }
-.ah-asset-facts { display: grid; grid-template-columns: repeat(3, auto); gap: 8px 32px; margin: 0; }
-.ah-fact { display: flex; flex-direction: column; gap: 6px; }
-.ah-fact dd { margin: 0; font-size: 18px; font-weight: 800; }
 
 /* Six condition cards in one row. */
 .rm-strip.ah-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
@@ -45,7 +39,6 @@
 .ah-card-switch > .tb-seg .tb-seg-btn { padding: 2px 7px; font-size: 10px; }
 
 /* The drive-group selector under the asset name (the mimic only shows the live state). */
-.ah-asset-id .tb-seg { align-self: flex-start; margin-top: 6px; flex-wrap: wrap; }
 
 /* Condition trends: the charts one above the other, each across the panel (the user, 31 Oct 2026). */
 .ah-trends { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
@@ -99,8 +92,6 @@
 .ah-cur-head .num { font-size: 11px; font-weight: 700; }
 
 @media (max-width: 1180px) {
-  .ah-asset-body { grid-template-columns: minmax(0, 1fr); }
-  .ah-asset-facts { grid-template-columns: repeat(2, auto); }
   .rm-strip.ah-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {

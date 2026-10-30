@@ -24,6 +24,7 @@
  * 45–65 °C — a card turns red when any of its readings is outside them, green when all are inside.
  */
 import { useState } from 'react';
+import HeaderSlot from '@/components/shell/HeaderSlot';
 import BearingTrendAll, { rmdBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
@@ -42,7 +43,7 @@ import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
 import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
-import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, pmFacts, usePm } from './ErpPm';
+import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, usePm } from './ErpPm';
 import './asset.css';
 
 /** The drive groups the header selects; each is also its MID section (the plant's machine list, 27 Oct 2026). */
@@ -78,7 +79,6 @@ export default function RmdAssetHealth() {
   const [vibOpen, setVibOpen] = useState(false);
   const mid = useMid('rmd', group);
   const pm = usePm('rmd');
-  const pmFact = pmFacts(pm);
   const [pmOpen, setPmOpen] = useState(false);
 
   const live = useApi<RmdLive>('/api/rmd/live', 30_000).data;
@@ -89,7 +89,6 @@ export default function RmdAssetHealth() {
   const totals = prodR.data?.totals;
   const run = totals?.runningHrs ?? null;
 
-  const zoneLive = zone && live ? live.zones.find((z) => z.id === zone) ?? null : null;
   // Live: the group's drives running now, from a fresh reading only.
   const running = zone && live?.fresh ? live.stations.filter((s) => s.zone === zone && s.on && s.currentA !== null) : [];
   const currentA = running.length ? running.reduce((a, s) => a + s.currentA!, 0) / running.length : null;
@@ -116,25 +115,13 @@ export default function RmdAssetHealth() {
 
   return (
     <div className="rm-viz ah">
-      <Panel className="ah-asset" bodyClass="ah-asset-body">
-        <div className="ah-asset-id">
-          <span className="rm-k">Selected asset</span>
-          <h2 className="ah-asset-name">RMD · {group === 'auxiliary' ? 'Auxiliary · pumps' : `${NAME[group]} drive group`}</h2>
-          <Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} />
-        </div>
-        {/* Status only where there is a source (the user, 28 Oct 2026): route / finishing drives — none for roughing (no PLC) or the pumps. */}
-        {zone && (zoneLive && zoneLive.state !== 'no-data'
-          ? <span className="chip chip--info ah-status">{zoneLive.stateLabel}</span>
-          : <span className="chip chip--na ah-status">No live data</span>)}
-        <dl className="ah-asset-facts">
-          {([['Last inspection', midDate(mid.date)], ['Next PM · ERP', pmFact.nextPm], ['Open work orders', pmFact.openWorkOrders]] as const).map(([k, v]) => (
-            <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className={`num ${v ? 'v-val' : 'v-na'}`}>{v ?? 'NA'}</dd></div>
-          ))}
-        </dl>
-      </Panel>
+      {/* The drive group: in the top bar, not a "Selected asset" panel (the user, 31 Oct 2026). */}
+      <HeaderSlot><Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} /></HeaderSlot>
 
       <section className={`rm-strip ah-strip${STRIP[3 + Number(show.bearing) + Number(show.current) + Number(show.oil)]}`} aria-label="Condition KPIs">
-        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+          /* The MID visit it is from (the user, 31 Oct 2026: was "Last inspection" in the top bar). */
+          note={mid.date ? `MID · ${midDate(mid.date)}` : ''}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${NAME[group]} group`} mid={mid} />
         {show.bearing && <KpiCard

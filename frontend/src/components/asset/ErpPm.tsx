@@ -62,6 +62,9 @@ export function ErpPmRows({ pm, runH, onOpen }: { pm: PmView; runH: number | nul
     ['MTBF', !r || runH === null ? null : n ? `${fixed(runH / n, 1)} h` : `No failure · ${fixed(runH, 1)} run h`],
     ['MTTR', !r ? null : n && r.mttrH !== null ? `${fixed(r.mttrH, 2)} h` : n ? null : 'No failure'],
     ['Open action', r ? String(r.openActions) : null],
+    // From the top bar (the user, 31 Oct 2026).
+    ['Next PM', r?.nextPm ? day(r.nextPm.date) : r ? 'None scheduled' : null],
+    ['Open work orders', r ? String(r.openWorkOrders) : null],
   ];
   return (
     <>

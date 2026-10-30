@@ -12,8 +12,8 @@
  *                      (Strip_Mill_DC_Motor_Details.xlsx, the plant, 26 Oct 2026), the mean of the
  *                      group's stands at their latest readings; the drill-down shows amps and %.
  *   Run hours          ERP log sheet NET_RUNNING_HRS over the period (whole mill).
- *   Mimic, status   the Visualization mimic's Influx tags (the user, 26 Oct 2026): billets since
- *                      08:00, RM / FM drives on (On_Off), the production counter for the period.
+ *   Last inspection    the MID visit date, under the Vibration card. No top bar: the drive group is
+ *                      switched in the page header (the user, 31 Oct 2026).
  * The stand name places a reading in its group (RM → roughing, FM → finishing). The drive group is
  * chosen in the header (the user, 28 Oct 2026) — roughing, finishing, auxiliary (MID's pumps); the
  * mimic only shows the live state. Vibration from MID. No PM items: HSM's equipment is not in the
@@ -21,11 +21,11 @@
  * no source in the sheet.
  */
 import { useMemo, useState } from 'react';
+import HeaderSlot from '@/components/shell/HeaderSlot';
 import BearingTrendAll, { hsmBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard from '@/components/visualization/KpiCard';
-import { useHsmMimic } from '@/components/visualization/useHsmMimic';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
@@ -88,31 +88,17 @@ export default function AssetHealth() {
   // Every DC motor bearing of the group's stands, each reading (the user, 31 Oct 2026).
   const trend = useMemo(() => (gid && load ? hsmBearingPoints(load.entries.filter((e) => e.group === gid)) : []), [gid, load]);
   const canOpen = !!gid && !!load;
-  const mimic = useHsmMimic();
-  const liveGroup = gid ? mimic.group(gid) : null;
 
   return (
     <div className="rm-viz ah">
-      <Panel className="ah-asset" bodyClass="ah-asset-body">
-        <div className="ah-asset-id">
-          <span className="rm-k">Selected asset</span>
-          <h2 className="ah-asset-name">HSM · {group === 'auxiliary' ? 'Auxiliary · pumps' : `${drive} drive group`}</h2>
-          <Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} />
-        </div>
-        {/* Status only where there is a source (the user, 28 Oct 2026): the RM / FM drives' On_Off — none for the pumps. */}
-        {gid && (liveGroup && liveGroup.state !== 'no-data'
-          ? <span className="chip chip--info ah-status">{liveGroup.stateLabel}</span>
-          : <span className="chip chip--na ah-status">No live data</span>)}
-        <dl className="ah-asset-facts">
-          {([['Last inspection', midDate(mid.date)]] as const).map(([k, v]) => (
-            <div className="ah-fact" key={k}><dt className="rm-k">{k}</dt><dd className={`num ${v ? 'v-val' : 'v-na'}`}>{v ?? 'NA'}</dd></div>
-          ))}
-        </dl>
-      </Panel>
+      {/* The drive group: in the top bar, not a "Selected asset" panel (the user, 31 Oct 2026). */}
+      <HeaderSlot><Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} /></HeaderSlot>
 
       {/* No Gearbox oil card: HSM has no source for it (the user, 31 Oct 2026). */}
       <section className="rm-strip ah-strip ah-strip--four" aria-label="Condition KPIs">
-        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+        <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+          /* The MID visit it is from (the user, 31 Oct 2026: was "Last inspection" in the top bar). */
+          note={mid.date ? `MID · ${midDate(mid.date)}` : ''}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${drive} group`} mid={mid} />
         <KpiCard
