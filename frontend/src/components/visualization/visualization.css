@@ -327,7 +327,13 @@
   .rm-row--full .rm-mb-bar--input { grid-area: input; width: auto; margin-right: 28px; }
   .rm-row--full .rm-mb-labels { grid-area: labels; padding-right: 28px; }
   .rm-row--full .rm-mb-note { grid-area: note; }
-  .rm-row--full .rm-mb-pieces, .rm-row--full .rmd-mb-pieces { grid-area: pieces; }
+  /* The billet count: one line, the figures beside the label; no hairline bar stretched across the page (the user, 31 Oct 2026). */
+  .rm-row--full .rm-mb-pieces, .rm-row--full .rmd-mb-pieces {
+    grid-area: pieces; display: flex; align-items: baseline; justify-content: flex-start; gap: 14px;
+    margin: 4px 0 0; padding: 10px 0 2px; border-top: 1px solid var(--border-soft); border-radius: 0;
+  }
+  .rm-row--full .rm-mb-pieces .rm-mb-bar { display: none; }
+  .rm-row--full .rm-mb-pieces-v { justify-self: auto; font-size: 12.5px; }
   .rm-row--full .rm-mb-losses {
     grid-area: losses; display: grid; grid-template-rows: subgrid; row-gap: 8px;
     margin-top: 0; padding-left: 28px; border-left: 1px solid var(--border-soft);

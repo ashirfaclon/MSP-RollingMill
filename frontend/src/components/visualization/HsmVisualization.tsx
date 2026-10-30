@@ -48,9 +48,9 @@ export default function HsmVisualization() {
         <StockBySize />
       </div>
       <div className="rm-row rm-row--full">
-        <MaterialBalance />
+        {/* The checklists: two buttons in its header, not a full-width panel (the user, 31 Oct 2026). */}
+        <MaterialBalance right={<HsmChecklists />} />
       </div>
-      <HsmChecklists />
       {/* The mill mimic sits at the bottom of every page that has one (the user, 30 Oct 2026). */}
       <MillMimic />
     </div>

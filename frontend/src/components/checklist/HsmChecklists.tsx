@@ -2,30 +2,25 @@
 
 /**
  * HSM Visualization · Checklists — the two checklists the plant shared (Rolling_Mill_Checklists_Data.xlsx),
- * each opening its fill-in form, saved to the logbook (HSM Checklists forms).
+ * each opening its fill-in form, saved to the logbook (HSM Checklists forms). Two small buttons in the
+ * Material & operating balance header, not a panel of their own (the user, 31 Oct 2026).
  */
 import { useState } from 'react';
-import Panel from '@/components/Panel';
 import VarianceChecklist from './VarianceChecklist';
 import SetupChecklist from './SetupChecklist';
+import '@/components/plan/plan.css';
 import './checklist.css';
 
 export default function HsmChecklists() {
   const [open, setOpen] = useState<'variance' | 'setup' | null>(null);
   return (
-    <Panel title="Checklists" className="rm-panel" bodyClass="rm-body">
-      <div className="ck-launch">
-        <button type="button" className="ck-launch-btn" aria-haspopup="dialog" onClick={() => setOpen('variance')}>
-          <b>Production variance checklist</b>
-          <span>Influx vs ERP production and the reasons for the difference</span>
-        </button>
-        <button type="button" className="ck-launch-btn" aria-haspopup="dialog" onClick={() => setOpen('setup')}>
-          <b>Shift setup checklist</b>
-          <span>Guide settings, edger and pinch roll gaps, roll type and work roll dia</span>
-        </button>
-      </div>
+    <span className="ck-head-btns">
+      <button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={() => setOpen('variance')}
+        title="Influx vs ERP production and the reasons for the difference">Production variance checklist</button>
+      <button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={() => setOpen('setup')}
+        title="Guide settings, edger and pinch roll gaps, roll type and work roll dia">Shift setup checklist</button>
       <VarianceChecklist open={open === 'variance'} onClose={() => setOpen(null)} />
       <SetupChecklist open={open === 'setup'} onClose={() => setOpen(null)} />
-    </Panel>
+    </span>
   );
 }
