@@ -572,9 +572,10 @@ test('RMD: finished stock by size from the ERP item ledger (FGYRDP), and a size 
   // Stock at the end of 8 Oct: Σ QTYRECD − Σ QTYISSUED in FGYRDP since the 2023 opening, every SKU of a size summed.
   // No 'Other' row and no miss-roll bars (the plant, 16 Oct 2026).
   const panel = page.locator('section.panel', { hasText: 'Finished stock by size' });
-  await expect(panel.locator('.rm-size-name')).toHaveText(['8 mm', '10 mm', '12 mm', '16 mm', '20 mm', '25 mm', '32 mm']);
-  await expect(panel.locator('.rm-size-total').first()).toHaveText('288.9 MT');
-  await expect(panel.locator('.rm-size-total').nth(2)).toHaveText('793.0 MT');
+  // Highest stock first (the user, 30 Oct 2026).
+  await expect(panel.locator('.rm-size-name')).toHaveText(['12 mm', '10 mm', '16 mm', '25 mm', '8 mm', '20 mm', '32 mm']);
+  await expect(panel.locator('.rm-size-total').first()).toHaveText('793.0 MT');
+  await expect(panel.locator('.rm-size-total').nth(4)).toHaveText('288.9 MT');
   // No with-order / free split, no MTO / MTS anywhere on RMD.
   await expect(panel.locator('.rm-size-stack > i')).toHaveCount(7);
   await panel.screenshot({ path: `${SHOTS}/rmd-stock-by-size.png` });

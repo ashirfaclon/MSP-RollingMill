@@ -10,7 +10,7 @@
  * LSM uses the same panel (mill="lsm"): one row per LSM section, in the plant's names (A 65×65×8,
  * MC 75×40, MB 125×70 …), its lengths and defective item inside — the ERP's Stock Sheet Engine.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Panel from '@/components/Panel';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
@@ -51,7 +51,8 @@ const SOURCE: Record<StockMill, (label: string) => [string, string][]> = {
 
 export default function RmdStockBySize({ mill = 'rmd' }: { mill?: StockMill }) {
   const s = useRmdStock(mill);
-  const data = s.data;
+  /* Highest stock first (the user, 30 Oct 2026), whatever order the ERP lists the sizes in. */
+  const data = useMemo(() => (s.data ? { ...s.data, sizes: [...s.data.sizes].sort((x, y) => y.stockMt - x.stockMt) } : null), [s.data]);
   const [open, setOpen] = useState<Size | null>(null);
   const max = Math.max(...(data?.sizes.map((x) => x.stockMt) ?? []), 0.01);
 
