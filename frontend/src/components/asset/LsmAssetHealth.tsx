@@ -30,7 +30,7 @@ import { rangeUrl, useApi, type LsmDriveReading, type LsmDriveReport, type LsmMi
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
-import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
+import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks, remarkSummary } from './MidVibration';
 import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, usePm } from './ErpPm';
 import './asset.css';
 
@@ -131,7 +131,7 @@ export default function LsmAssetHealth() {
         <Panel title="ERP PM & work-order history" className="rm-panel" bodyClass="rm-body ah-list">
           <ErpPmRows pm={pm} runH={runH} onOpen={() => setPmOpen(true)} />
         </Panel>
-        <Panel title="Remarks" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
+        <Panel title="Remarks" sub={remarkSummary(mid) ?? undefined} className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
           <MidRemarks mid={mid} />
         </Panel>
       </div>

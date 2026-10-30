@@ -68,10 +68,8 @@
 .ah-remark { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .ah-remark:last-child { border-bottom: 0; }
 .ah-remark-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 12px; color: var(--text); }
-.ah-remark-status { font-size: 11px; font-weight: 800; white-space: nowrap; }
 .ah-remark-meta { display: inline-flex; align-items: baseline; gap: 12px; flex: none; }
 .ah-remark-date { font-size: 11px; font-weight: 600; color: var(--muted-2); white-space: nowrap; }
-.ah-remark-text { font-size: 12px; line-height: 1.45; color: var(--muted); }
 .ah-row .num { font-size: 13px; font-weight: 800; }
 
 /* Motor current drill-down: a strip of the line's drives to pick from, then one chart. */
@@ -158,3 +156,10 @@
 .brg-axis, .brg-row { grid-template-columns: minmax(110px, 210px) minmax(0, 1fr) 56px; }
 .brg-bar { background: var(--series); }
 .brg-bar--nde { background: repeating-linear-gradient(135deg, var(--series) 0 5px, color-mix(in srgb, var(--series) 55%, var(--panel)) 5px 8px); }
+
+/* Remarks: Finding · Action · Highest under each machine (the user, 31 Oct 2026). */
+.ah-remark-grade { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.ah-remark-body { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 3px 12px; margin: 2px 0 0; }
+.ah-remark-body dt { font-size: 9.5px; font-weight: 800; letter-spacing: 0.7px; line-height: 18px; text-transform: uppercase; color: var(--muted-2); }
+.ah-remark-body dd { margin: 0; font-size: 12px; line-height: 18px; color: var(--text-2); }
+.ah-remark-body dd.ah-remark-num { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }

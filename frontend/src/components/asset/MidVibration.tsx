@@ -217,35 +217,93 @@ export function MidVibrationTrend({ mid }: { mid: MidView }) {
 const REMARK_ORDER: Record<MidStatus, number> = { 'Un-acceptable': 0, Acceptable: 1, Good: 2 };
 
 /**
- * The Remarks panel: each remark of the last MID visits, one line each — every machine's (Vibration Reading)
- * and every thermography reading's (Temperature Reading). The whole mill, not the selected group (HSM's
- * and RMD's remarks are on auxiliary pumps, which no group selects).
+ * A remark as MID writes it — what was seen, then what to do — as Finding and Action: split at the first
+ * full stop followed by a capital letter. Anything else (one sentence, or more than two) stays whole.
  */
-export function MidRemarks({ mid }: { mid: MidView }) {
-  const rows = [
-    // Each with the date of the MID visit it is from (the user, 31 Oct 2026).
-    ...(mid.report?.latest?.machines ?? []).map((m) => ({ key: m.machine, head: m.machine, status: m.status, text: m.diagnosis, date: mid.report!.latest!.date })),
-    ...(mid.report?.temperature?.readings ?? []).map((t) => ({
-      key: `t-${t.equipment}-${t.phase}`, head: t.phase ? `${t.equipment} · ${t.phase}` : t.equipment, status: t.status, text: t.remarks, date: mid.report!.temperature!.date,
+export function splitRemark(text: string): { finding: string; action: string } | null {
+  const parts = text.trim().split(/(?<=\.)\s+(?=[A-Z])/);
+  return parts.length === 2 ? { finding: parts[0], action: parts[1] } : null;
+}
+
+/** The machine's highest reading: value, part (when the report names one), direction, bearing point. */
+function highestOf(m: MidMachine): string | null {
+  let best: { v: number; part: string | null; axis: string; point: string } | null = null;
+  for (const p of m.points) {
+    for (const [axis, v] of [['horizontal', p.horizontal], ['vertical', p.vertical], ['axial', p.axial]] as const) {
+      if (v === null || (best && v <= best.v)) continue;
+      const part = p.part ?? p.component;
+      best = { v, part: part && !/^other$/i.test(part) ? part : null, axis, point: p.point };
+    }
+  }
+  if (!best) return null;
+  const part = best.part ? ` · ${best.part.charAt(0) + best.part.slice(1).toLowerCase()}` : '';
+  return `${fixed(best.v, 1)} mm/s${part} · ${best.axis}${best.point ? ` · point ${best.point}` : ''}`;
+}
+
+/** "today", "1 day ago", "200 days ago" — from today's local (plant) date. */
+const ago = (d: string) => {
+  const n = Math.round((Date.parse(`${new Date().toLocaleDateString('en-CA')}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000);
+  return n <= 0 ? 'today' : n === 1 ? '1 day ago' : `${n} days ago`;
+};
+
+interface RemarkRow { key: string; head: string; status: MidStatus | null; text: string; date: string; highest: string | null }
+
+function remarkRows(mid: MidView): RemarkRow[] {
+  const r = mid.report;
+  return [
+    ...(r?.latest?.machines ?? []).map((m) => ({ key: m.machine, head: m.machine, status: m.status, text: m.diagnosis ?? '', date: r!.latest!.date, highest: highestOf(m) })),
+    ...(r?.temperature?.readings ?? []).map((t) => ({
+      key: `t-${t.equipment}-${t.phase}`, head: t.phase ? `${t.equipment} · ${t.phase}` : t.equipment, status: t.status, text: t.remarks ?? '',
+      date: r!.temperature!.date,
+      highest: t.maxC === null ? null : `${fixed(t.maxC, 1)} °C${t.designC !== null ? ` · design ${fixed(t.designC, 1)} °C` : ''}`,
     })),
   ]
     .filter((m) => m.text)
     .sort((x, y) => (x.status ? REMARK_ORDER[x.status] : 3) - (y.status ? REMARK_ORDER[y.status] : 3));
+}
+
+/** The Remarks panel's header line: how many remarks, by grade (a grade with none is left out). */
+export function remarkSummary(mid: MidView): string | null {
+  const rows = remarkRows(mid);
+  if (!rows.length) return null;
+  const by = (['Un-acceptable', 'Acceptable', 'Good'] as MidStatus[]).map((st) => [st, rows.filter((x) => x.status === st).length] as const).filter(([, n]) => n > 0);
+  return [`${rows.length} remark${rows.length === 1 ? '' : 's'}`, ...by.map(([st, n]) => `${n} ${st}`)].join(' · ');
+}
+
+/**
+ * The Remarks panel: each remark of the last MID visits — every machine's (Vibration Reading) and every
+ * thermography reading's (Temperature Reading), the whole mill. Each with its visit's date and age, MID's
+ * Finding and Action, and the machine's highest reading (the user, 31 Oct 2026). Nothing typed in: all
+ * from MID's own report.
+ */
+export function MidRemarks({ mid }: { mid: MidView }) {
+  const rows = remarkRows(mid);
   if (!rows.length) return <div className="ah-row"><span className="num v-na">NA</span></div>;
   return (
     <ul className="ah-remarks" aria-label="Remarks">
-      {rows.map((m) => (
-        <li className="ah-remark" key={m.key}>
-          <span className="ah-remark-head">
-            <b>{m.head}</b>
-            <span className="ah-remark-meta">
-              <span className="ah-remark-date">MID · {day(m.date)}</span>
-              <span className={`ah-remark-status ${m.status ? TONE[m.status] : 'v-na'}`}>{m.status ?? 'NA'}</span>
+      {rows.map((m) => {
+        const split = splitRemark(m.text);
+        return (
+          <li className="ah-remark" key={m.key}>
+            <span className="ah-remark-head">
+              <b>{m.head}</b>
+              <span className="ah-remark-meta">
+                <span className="ah-remark-date">MID · {day(m.date)} · {ago(m.date)}</span>
+                <span className="ah-remark-grade"><i className={`vib-dot ${m.status ? TONE[m.status] : 'v-na'}`} aria-hidden />{m.status ?? 'NA'}</span>
+              </span>
             </span>
-          </span>
-          <span className="ah-remark-text">{m.text}</span>
-        </li>
-      ))}
+            <dl className="ah-remark-body">
+              {split ? (
+                <>
+                  <dt>Finding</dt><dd>{split.finding}</dd>
+                  <dt>Action</dt><dd>{split.action}</dd>
+                </>
+              ) : (<><dt>Remark</dt><dd>{m.text}</dd></>)}
+              {m.highest && <><dt>Highest</dt><dd className="ah-remark-num">{m.highest}</dd></>}
+            </dl>
+          </li>
+        );
+      })}
     </ul>
   );
 }

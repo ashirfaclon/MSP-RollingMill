@@ -35,7 +35,7 @@ import { rangeUrl, useApi, type HsmMillLoadEntry, type HsmMillLoadReport, type R
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import { useMid } from './useMid';
-import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks } from './MidVibration';
+import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks, remarkSummary } from './MidVibration';
 import './asset.css';
 
 /** The drive groups the header selects; each is also its MID section. */
@@ -142,7 +142,7 @@ export default function AssetHealth() {
       </div>
 
       <div className="rm-row ah-row--one">
-        <Panel title="Remarks" className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
+        <Panel title="Remarks" sub={remarkSummary(mid) ?? undefined} className="rm-panel" bodyClass="rm-body ah-list ah-list--top">
           <MidRemarks mid={mid} />
         </Panel>
       </div>
