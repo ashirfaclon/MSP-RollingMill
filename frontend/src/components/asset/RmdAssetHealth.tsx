@@ -24,6 +24,7 @@
  * 45–65 °C — a card turns red when any of its readings is outside them, green when all are inside.
  */
 import { useState } from 'react';
+import { midTop, rmdHottest, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
 import BearingTrendAll, { rmdBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
@@ -154,14 +155,15 @@ export default function RmdAssetHealth() {
 
       <section className={`rm-strip ah-strip${STRIP[3 + Number(show.bearing) + Number(show.current) + Number(show.oil)]}`} aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
-          /* The MID visit it is from (the user, 31 Oct 2026: was "Last inspection" in the top bar). */
-          note={mid.date ? `MID · ${midDate(mid.date)}` : ''}
+          /* The machine with the highest reading, and the MID visit it is from (the user, 31 Oct 2026). */
+          note="" where={(() => { const t = midTop(mid.machines, mid.date); return t ? { name: t.where, when: `MID · ${midDate(t.date)}` } : null; })()}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${NAME[group]} group`} mid={mid} />
         {show.bearing && <KpiCard
           label="Bearing temp"
           value={bearing?.max ? fixed(bearing.max.value, 0) : 'NA'}
-          lastEntry={lastFigure(bearingMax, bearingLast, (d) => bearingOf(d)?.max?.value, (n) => fixed(n, 0))}
+          lastEntry={withWhere(lastFigure(bearingMax, bearingLast, (d) => bearingOf(d)?.max?.value, (n) => fixed(n, 0)), bearingLast.data ? rmdHottest(bearingOf(bearingLast.data)) : null)}
+          where={(() => { const h = rmdHottest(bearing); return h ? { name: h.where, when: whenText(h) } : null; })()}
           noEntries={!!fgs && !!forms && !bearing?.max}
           unit="°C"
           note=""

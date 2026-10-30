@@ -21,6 +21,7 @@
  * no source in the sheet.
  */
 import { useMemo, useState } from 'react';
+import { hsmHottest, midTop, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
 import BearingTrendAll, { hsmBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
@@ -102,15 +103,16 @@ export default function AssetHealth() {
       {/* No Gearbox oil card: HSM has no source for it (the user, 31 Oct 2026). */}
       <section className="rm-strip ah-strip ah-strip--four" aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
-          /* The MID visit it is from (the user, 31 Oct 2026: was "Last inspection" in the top bar). */
-          note={mid.date ? `MID · ${midDate(mid.date)}` : ''}
+          /* The machine with the highest reading, and the MID visit it is from (the user, 31 Oct 2026). */
+          note="" where={(() => { const t = midTop(mid.machines, mid.date); return t ? { name: t.where, when: `MID · ${midDate(t.date)}` } : null; })()}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={group === 'all' ? 'Whole mill' : `${drive} group`} mid={mid} />
         <KpiCard
           label="Bearing temp"
           value={bearingC === null ? 'NA' : fixed(bearingC, 0)}
           noEntries={!!gid && !!load && bearingC === null}
-          lastEntry={lastFigure(bearingC, loadLast, (d) => figures(d).bearingC, (n) => fixed(n, 0))}
+          lastEntry={withWhere(lastFigure(bearingC, loadLast, (d) => figures(d).bearingC, (n) => fixed(n, 0)), loadLast.data ? hsmHottest(figures(loadLast.data).latest) : null)}
+          where={(() => { const h = hsmHottest(latest); return h ? { name: h.where, when: whenText(h) } : null; })()}
           unit="°C"
           note=""
           series="hold"

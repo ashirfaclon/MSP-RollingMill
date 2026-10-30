@@ -57,7 +57,12 @@ export default function KpiCard(props: {
    * place of NA, and the note says whose it is — "Last entry · 27 Oct". A source that has never
    * had an entry passes none, and the card says "No entries recorded yet" as before.
    */
-  lastEntry?: { value: string; date: string; pair?: { source: string; value: string }[] } | null;
+  lastEntry?: { value: string; date: string; pair?: { source: string; value: string }[]; where?: { name: string; time?: string | null } } | null;
+  /**
+   * The equipment the figure is from, and when it was entered (the user, 31 Oct 2026): two lines in
+   * place of the note — the name, then "29 Oct 14:20". A last entry's equipment comes with it.
+   */
+  where?: { name: string; when: string } | null;
   /** The days or date the figure is for, beside the label: "1 Oct – 26 Oct 2026", "as of 26 Oct 2026" (the user, 31 Oct 2026). */
   term?: string | null;
 }) {
@@ -65,8 +70,16 @@ export default function KpiCard(props: {
   const last = props.lastEntry && !props.loading ? props.lastEntry : null;
   const value = last ? last.value : props.value;
   const pair = last?.pair ?? props.pair;
+  const whereNote = (name: string, when: ReactNode, title: string) => (
+    <span className="rm-card-where" title={title}><b>{name}</b><span>{when}</span></span>
+  );
   const note = last
-    ? <span className="rm-card-last" title="No entry in the selected period: the most recent entry is shown">Last entry · {dm(last.date)}</span>
+    ? last.where
+      ? whereNote(last.where.name, <span className="rm-card-last">Last entry · {dm(last.date)}{last.where.time ? ` ${last.where.time}` : ''}</span>,
+        `${last.where.name} · last entry ${dm(last.date)}${last.where.time ? ` ${last.where.time}` : ''} (none in the selected period)`)
+      : <span className="rm-card-last" title="No entry in the selected period: the most recent entry is shown">Last entry · {dm(last.date)}</span>
+    : props.where && !props.loading
+      ? whereNote(props.where.name, props.where.when, `${props.where.name} · ${props.where.when}`)
     : props.noEntries && !props.loading
       ? <span className="rm-card-empty">{typeof props.noEntries === 'string' ? props.noEntries : NO_ENTRIES}</span>
       : props.note;
