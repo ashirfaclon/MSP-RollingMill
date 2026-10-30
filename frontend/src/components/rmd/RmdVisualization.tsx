@@ -17,6 +17,7 @@
  * split (user, 12 and 17 Oct 2026): Order allocation shows the two totals only.
  */
 import Panel from '@/components/Panel';
+import { ProductionTerm } from '@/components/production/productionTerm';
 import { StockAsOf } from '@/components/production/stockAsOf';
 import type { Series } from '@/components/visualization/KpiCard';
 import { fixed } from '@/lib/num';
@@ -76,7 +77,8 @@ function RunningRateFoot() {
 
 function OrderAllocation() {
   const { dates } = useSelection();
-  const prod = useRmdProduction(dates).data?.totals.productionMt ?? null;
+  const prodR = useRmdProduction(dates).data;
+  const prod = prodR?.totals.productionMt ?? null;
   // Finished stock: every SKU in FGYRDP at the end of the period — the total of Finished stock by size.
   const stock = useRmdStock().data;
   const stockMt = stock && stock.erp.connection === 'up' ? stock.totalMt : null;
@@ -84,7 +86,7 @@ function OrderAllocation() {
     <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
       <div className="rm-alloc-block">
         <div className="rm-alloc-head">
-          <span className="rm-k">Production</span>
+          <span className="rm-k">Production{prodR && prod !== null && <ProductionTerm from={prodR.from} to={prodR.to} lastDate={prodR.erp.lastDate} />}</span>
           <span className={`rm-alloc-total num ${prod === null ? 'v-na' : 'v-val'}`}>{prod === null ? 'NA' : `${fixed(prod, 1)} MT`}</span>
         </div>
       </div>

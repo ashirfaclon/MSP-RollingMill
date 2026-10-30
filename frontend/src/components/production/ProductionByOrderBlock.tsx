@@ -1,22 +1,26 @@
 'use client';
 
 /**
- * Production split by order linkage, in the Order allocation panel: Made To Order (with an
- * order) and Made To Stock (without). The ERP does not link production to sales orders, so
- * none of it can be shown as made to order: all of it counts as made to stock. The total is the Production card's figure (Influx counter,
- * reset events less noise, for the Duration period), so the two always agree.
+ * Production in the Order allocation panel: the ERP log sheet's production (PRODUCTION_MT,
+ * series L6P) for the Duration period — ERP only, never the Influx counter (the user, 30 Oct
+ * 2026) — with the days it covers. The ERP does not link production to sales orders, so none
+ * of it is split as made to order.
  */
 import { fixed } from '@/lib/num';
-import { useProductionForSelection } from './useProductionForSelection';
+import { useProduction, useSelection } from '@/services/hsmProduction';
+import { ProductionTerm } from './productionTerm';
 
 export default function ProductionByOrderBlock() {
-  const { mt, loading } = useProductionForSelection();
+  const { dates } = useSelection();
+  const { data, loading, error } = useProduction(dates ? { ...dates, grain: 'day' } : null);
+  const now = data && dates && data.from === dates.from && data.to === dates.to ? data : null;
+  const mt = now?.totals.erpMt ?? null;
   return (
     <div className="rm-alloc-block">
       <div className="rm-alloc-head">
-        <span className="rm-k">Production</span>
-        <span className="rm-alloc-total num v-val">
-          {loading ? <span className="skel skel--num" role="status" aria-label="Loading" /> : `${fixed(mt, 1)} MT`}
+        <span className="rm-k">Production{now && mt !== null && <ProductionTerm from={now.from} to={now.to} lastDate={now.erp.lastDate} />}</span>
+        <span className={`rm-alloc-total num ${mt === null && !loading ? 'v-na' : 'v-val'}`}>
+          {!now && loading && !error ? <span className="skel skel--num" role="status" aria-label="Loading" /> : mt === null ? 'NA' : `${fixed(mt, 1)} MT`}
         </span>
       </div>
     </div>

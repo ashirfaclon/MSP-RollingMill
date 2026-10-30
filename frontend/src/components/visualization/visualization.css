@@ -405,3 +405,20 @@
 
 /* The date a finished-stock figure is from, beside its label: quieter, not upper-cased. */
 .rm-alloc-asof { color: var(--muted-3); font-weight: 600; letter-spacing: 0; text-transform: none; }
+
+/* Finished stock by size: subprime in its own colour (the user, 30 Oct 2026), and the tab's total in the title bar. */
+.rm-tone--subprime { --tone: var(--violet); }
+.rm-size--subprime .rm-size-total { color: var(--violet); }
+.rm-sizes-legend { display: flex; justify-content: flex-end; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--muted-2); margin: -4px 0 8px; white-space: nowrap; }
+.rm-sizes-legend i { display: inline-block; width: 10px; height: 6px; border-radius: 3px; background: var(--tone); margin-left: 6px; }
+.rm-sizes-legend i:first-child { margin-left: 0; }
+.rm-sizes-total { font-size: 10.5px; font-weight: 700; color: var(--muted-2); margin-right: 10px; white-space: nowrap; }
+/* The grade tabs keep their own width: squeezed by the header, the last tab ran into the edge. */
+.rm-panel .tb-seg { flex: none; }
+.rm-panel .tb-seg-btn { white-space: nowrap; flex: none; }
+.rm-panel:has(.rm-sizes-total) .panel-title, .rm-panel:has(.rm-sizes-total) .panel-sub { white-space: nowrap; }
+.rm-sizes-total b { font-size: 12px; font-weight: 800; color: var(--text); margin-left: 4px; }
+.rm-size-stack--flush { gap: 0; }
+/* Narrow panel: the header wraps — the tabs go to their own line rather than off the edge. */
+.rm-panel:has(.rm-sizes-total) .panel-head { flex-wrap: wrap; row-gap: 6px; }
+.rm-panel:has(.rm-sizes-total) .panel-head > .tb-seg { margin-left: auto; }

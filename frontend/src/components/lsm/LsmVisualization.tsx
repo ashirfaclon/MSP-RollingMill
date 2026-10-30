@@ -21,6 +21,7 @@
  * No mill mimic on LSM (the user, 16 Oct 2026).
  */
 import { useState, type KeyboardEvent } from 'react';
+import { ProductionTerm } from '@/components/production/productionTerm';
 import { StockAsOf } from '@/components/production/stockAsOf';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
@@ -88,7 +89,7 @@ export default function LsmVisualization() {
         <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
           <div className="rm-alloc-block">
             <div className="rm-alloc-head">
-              <span className="rm-k">Production</span>
+              <span className="rm-k">Production{data && t?.productionMt != null && <ProductionTerm from={data.from} to={data.to} lastDate={data.erp.lastDate} />}</span>
               <span className={`rm-alloc-total num ${t?.productionMt == null ? 'v-na' : 'v-val'}`}>{mt(t?.productionMt)}</span>
             </div>
           </div>

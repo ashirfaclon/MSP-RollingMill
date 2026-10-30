@@ -18,6 +18,7 @@
  * No mill mimic on RMS (the user, 16 Oct 2026), as on LSM.
  */
 import { useState, type KeyboardEvent } from 'react';
+import { ProductionTerm } from '@/components/production/productionTerm';
 import { StockAsOf } from '@/components/production/stockAsOf';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
@@ -116,7 +117,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
         <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
           <div className="rm-alloc-block">
             <div className="rm-alloc-head">
-              <span className="rm-k">Production</span>
+              <span className="rm-k">Production{prod.data && prodMt !== null && <ProductionTerm from={prod.data.from} to={prod.data.to} lastDate={prod.data.erp.lastDate} />}</span>
               <span className={`rm-alloc-total num ${prodMt === null ? 'v-na' : 'v-val'}`}>{prodMt === null ? 'NA' : `${fixed(prodMt, 1)} MT`}</span>
             </div>
           </div>
