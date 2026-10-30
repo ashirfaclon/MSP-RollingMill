@@ -35,7 +35,7 @@ export default function RmdMillSpeedCard() {
         noEntries={!!r && r.historian.connection === 'up' && v == null ? 'No readings in this period' : false}
         series={series}
         loading={!r && !error}
-        spark={r ? { values: r.trend.map((p) => p[mill]), label: `${label} over the period` } : undefined}
+        spark={r ? { values: r.trend.map((p) => p[mill]), times: r.trend.map((p) => Date.parse(p.t)), label: `${label} over the period`, unit: 'm/s', dp: 2 } : undefined}
         onOpen={() => setOpen(true)}
         openLabel="Mill 1 and mill 2 speed over the period"
       />
