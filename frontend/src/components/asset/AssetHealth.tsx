@@ -23,7 +23,7 @@
 import { useMemo, useState } from 'react';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
-import KpiCard, { type Series } from '@/components/visualization/KpiCard';
+import KpiCard from '@/components/visualization/KpiCard';
 import { useHsmMimic } from '@/components/visualization/useHsmMimic';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
@@ -45,7 +45,6 @@ const GROUPS: { id: Group; label: string }[] = [{ id: 'roughing', label: 'Roughi
 const STANDS: Partial<Record<Group, 'roughing' | 'finishing'>> = { roughing: 'roughing', finishing: 'finishing' };
 const NAME: Record<Group, string> = { roughing: 'Roughing', finishing: 'Finishing', auxiliary: 'Auxiliary' };
 
-const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
 /** The hotter of a reading's DE and NDE temperature; null without either. */
 const hottest = (e: HsmMillLoadEntry) => {
   const t = [e.deTempC, e.ndeTempC].filter((v): v is number => v !== null);
@@ -110,7 +109,8 @@ export default function AssetHealth() {
         </dl>
       </Panel>
 
-      <section className="rm-strip ah-strip ah-strip--five" aria-label="Condition KPIs">
+      {/* No Gearbox oil card: HSM has no source for it (the user, 31 Oct 2026). */}
+      <section className="rm-strip ah-strip ah-strip--four" aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" note="" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={`${drive} group`} mid={mid} />
@@ -134,7 +134,6 @@ export default function AssetHealth() {
           series="prod"
           {...(canOpen ? { onOpen: () => setOpen(true), openLabel: 'Each stand: load and DC motor temperatures' } : {})}
         />
-        {NA('Gearbox oil', '', 'hold')}
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod"
           noEntries={!!rateS.data && rateS.dataUrl === rateUrl && runH == null}
           lastEntry={lastFigure(runH, rateLast, (d) => d.totals.erpRunH, (n) => fixed(n, 1))} />
