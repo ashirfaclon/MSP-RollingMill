@@ -21,6 +21,7 @@
  * No mill mimic on LSM (the user, 16 Oct 2026).
  */
 import { useState, type KeyboardEvent } from 'react';
+import { ofInput } from '@/components/production/ofInput';
 import { ProductionTerm } from '@/components/production/productionTerm';
 import { StockAsOf } from '@/components/production/stockAsOf';
 import Panel from '@/components/Panel';
@@ -152,7 +153,9 @@ function MaterialBalance() {
         </span>
         <div className="rm-mb-labels">
           <span className="rm-mb-caption rm-tone--order">Finished <b className={`num ${t?.productionMt == null ? 'v-na' : ''}`}>{mt(t?.productionMt)}</b></span>
-          <span className="rm-mb-caption rm-tone--diff">Mass difference <b className={`num ${t?.massDiffMt == null ? 'v-na' : ''}`}>{mt(t?.massDiffMt)}</b></span>
+          <span className="rm-mb-caption rm-tone--diff">Mass difference <b className={`num ${t?.massDiffMt == null ? 'v-na' : ''}`}>{mt(t?.massDiffMt)}</b>
+            {/* As HSM: each figure with its share of the billet input (the user, 30 Oct 2026). */}
+            {ofInput(t?.massDiffMt, t?.billetInputMt) && <>{' '}<span className="rm-mb-dim num">· {ofInput(t?.massDiffMt, t?.billetInputMt)} of input</span></>}</span>
         </div>
         <div className="rm-mb-losses">
           <span className="rm-mb-bar rm-mb-bar--loss" role="img" aria-label={`Losses ${mt(t?.lossesMt)}: ${losses.map((l) => `${l.label.toLowerCase()} ${mt(l.value)}`).join(', ')}`}>
@@ -164,7 +167,7 @@ function MaterialBalance() {
             {losses.map((l) => (
               <span key={l.key} className={`rm-mb-link rm-tone--${l.series}`}>
                 <i className="rm-dot" aria-hidden />
-                <span>{l.label} <b className={`num ${l.value === null ? 'v-na' : ''}`}>{mt(l.value)}</b></span>
+                <span>{l.label} <b className={`num ${l.value === null ? 'v-na' : ''}`}>{mt(l.value)}</b>{ofInput(l.value, t?.billetInputMt) && <>{' '}<span className="rm-mb-dim num">{ofInput(l.value, t?.billetInputMt)}</span></>}</span>
               </span>
             ))}
           </div>
