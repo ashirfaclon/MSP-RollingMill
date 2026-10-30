@@ -194,3 +194,31 @@ export interface LsmMillLoadReport {
    */
   lastDate: string | null;
 }
+
+/** GET /api/rms/drive-temp — RMS Mechanical → Drive Temp: one reading of one drive (the user, 31 Oct 2026). */
+export interface RmsDriveReading {
+  /** The RMS mill day (09:30 → 09:30 IST) of the form's date-time. */
+  date: string;
+  /** The form's date-time, as filled. */
+  at: string;
+  shift: string;
+  drive: string;
+  /** Every bearing temperature filled, °C: component (Reduction gearbox 1 / 2, Pinion, Flywheel) and point (Input inside …). */
+  bearings: { component: string; point: string; valueC: number }[];
+  /** Gearbox oil temperature, °C. */
+  oilTempC: number | null;
+  /** Gearbox oil pressure, as filled (the form's "oil pressure level"). */
+  oilPressure: number | null;
+}
+export interface RmsDriveReport {
+  from: string;
+  to: string;
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  /** Each drive's latest reading of the period. */
+  latest: RmsDriveReading[];
+  /** Every reading of the period, oldest first. */
+  entries: RmsDriveReading[];
+  /** The latest mill day up to `to` with a reading; null when none in the last six months. */
+  lastDate: string | null;
+}

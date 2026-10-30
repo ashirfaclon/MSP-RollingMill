@@ -13,8 +13,15 @@ import { rmsProduction, rmsProductionByDay } from './production.service';
 import { formRunningRate } from '../lsm/running-rate.service';
 import { rmsPowerReport } from '../power/power.service';
 import { rmsPlan, RMS_SHEET_FORM } from './plan.service';
+import { rmsDriveTemp } from './drive-temp.service';
 
 export async function rmsRoutes(app: FastifyInstance) {
+  /** Asset Health: RMS Mechanical → Drive Temp — bearing temperatures and gearbox oil per drive. */
+  app.get('/drive-temp', { config: { errorCode: 'rms_drive_temp_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return rmsDriveTemp(loadEnv(), from, to);
+  });
+
   /** Production: the ERP Production Log Sheet (division RS, series L5P), per date / week / month. */
   app.get('/production', { config: { errorCode: 'rms_production_failed' } }, async (req) => {
     const q = searchParams(req);

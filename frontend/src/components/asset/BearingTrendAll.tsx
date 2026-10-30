@@ -13,22 +13,25 @@ import { useMemo, useState } from 'react';
 import DrillChart, { type DrillSeries } from '@/components/drill/DrillChart';
 import { dm } from '@/lib/plantDay';
 import { fixed } from '@/lib/num';
-import type { HsmMillLoadEntry, LsmDriveReading } from '@/services/hsmApi';
+import type { HsmMillLoadEntry, LsmDriveReading, RmsDriveReading } from '@/services/hsmApi';
 
 export interface BearingPoint {
   /** Sorts the readings in time: "YYYY-MM-DD HH:MM" (or the date alone). */
   at: string;
   /** The unit the bearing is on: a stand or a drive. */
   unit: string;
-  /** Where on it: "DC motor", "Flywheel", "Reduction gear", "Pinion gear". */
+  /** Where on it: "DC motor", "Flywheel", "Reduction gear", "Pinion gear", "Reduction gearbox 1" … */
   position: string;
-  side: 'DE' | 'NDE';
+  /** The point at that position: "DE" / "NDE", or RMS's "Input inside" … */
+  side: string;
+  /** Drawn dashed (line) or hatched (bar): the non-drive end, or RMS's outside point. */
+  dashed: boolean;
   value: number;
 }
 
 const CAT = ['--cat-1', '--cat-2', '--cat-3', '--cat-4', '--cat-5', '--cat-6'];
-/** Positions keep one colour each wherever they appear. */
-const POSITION_ORDER = ['DC motor', 'Flywheel', 'Reduction gear', 'Pinion gear'];
+/** Positions keep one colour each, in this order of the ones a mill has. */
+const POSITION_ORDER = ['DC motor', 'Flywheel', 'Reduction gear', 'Pinion gear', 'Reduction gearbox 1', 'Reduction gearbox 2', 'Pinion'];
 const posIndex = (p: string) => { const i = POSITION_ORDER.indexOf(p); return i < 0 ? POSITION_ORDER.length : i; };
 
 /** "2026-10-28 09:30" → "28 Oct 09:30"; a date alone → "28 Oct". */
@@ -51,21 +54,23 @@ export default function BearingTrendAll({ points, last = null, empty = 'No beari
     const ats = [...new Set(shown.map((p) => p.at))].sort();
     const idx = new Map(ats.map((a, i) => [a, i]));
     // A line per bearing: unit × position × side.
-    const lines = new Map<string, { unit: string; position: string; side: 'DE' | 'NDE'; data: (number | null)[] }>();
+    const lines = new Map<string, { unit: string; position: string; side: string; dashed: boolean; data: (number | null)[] }>();
     for (const p of shown) {
       const key = `${p.unit}|${p.position}|${p.side}`;
       let l = lines.get(key);
-      if (!l) { l = { unit: p.unit, position: p.position, side: p.side, data: ats.map(() => null) }; lines.set(key, l); }
+      if (!l) { l = { unit: p.unit, position: p.position, side: p.side, dashed: p.dashed, data: ats.map(() => null) }; lines.set(key, l); }
       l.data[idx.get(p.at)!] = p.value;
     }
     const sorted = [...lines.values()].sort((a, b) =>
-      (unit ? posIndex(a.position) - posIndex(b.position) : units.indexOf(a.unit) - units.indexOf(b.unit)) || (a.side === 'DE' ? -1 : 1));
+      (unit ? posIndex(a.position) - posIndex(b.position) : units.indexOf(a.unit) - units.indexOf(b.unit)) || Number(a.dashed) - Number(b.dashed));
+    // A colour per position the mill has (its own order), or per unit when every unit is shown together.
+    const present = [...new Set(points.map((p) => p.position))].sort((a, b) => posIndex(a) - posIndex(b));
     const colourOf = (l: { unit: string; position: string }) =>
-      CAT[(unit ? Math.min(posIndex(l.position), CAT.length - 1) : units.indexOf(l.unit)) % CAT.length];
+      CAT[Math.min(unit ? present.indexOf(l.position) : units.indexOf(l.unit), CAT.length - 1)];
     const s: DrillSeries[] = sorted.map((l) => ({
       id: `${l.unit}|${l.position}|${l.side}`,
       name: unit ? `${l.position} ${l.side}` : `${l.unit} ${l.side}`,
-      token: colourOf(l), type: 'line', dashed: l.side === 'NDE', data: l.data, dp: 0,
+      token: colourOf(l), type: 'line', dashed: l.dashed, data: l.data, dp: 0,
     }));
     return { categories: ats.map(label), series: s };
   }, [points, unit, units]);
@@ -75,7 +80,7 @@ export default function BearingTrendAll({ points, last = null, empty = 'No beari
     <div className="ah-trend">
       <div className="ah-trend-head">
         <span className="rm-k">Bearing temp · °C{last && <span className="rm-card-last ah-trend-last"> · Last entry · {dm(last)}</span>}</span>
-        {perUnit && units.length > 1 && (
+        {perUnit && units.length > 0 && (
           <span className="ah-unit-chips" role="group" aria-label="Unit">
             {units.map((u) => (
               <button key={u} type="button" className={`ah-unit-chip${u === unit ? ' on' : ''}`} aria-pressed={u === unit} onClick={() => setPicked(u)}>{u}</button>
@@ -136,7 +141,7 @@ const atOf = (date: string, time: string | null | undefined) => (hhmm(time) ? `$
 export function hsmBearingPoints(entries: HsmMillLoadEntry[]): BearingPoint[] {
   return entries.flatMap((e) => ([['DE', e.deTempC], ['NDE', e.ndeTempC]] as const)
     .filter(([, v]) => v !== null)
-    .map(([side, v]) => ({ at: atOf(e.date, e.time), unit: e.stand, position: 'DC motor', side, value: v! })));
+    .map(([side, v]) => ({ at: atOf(e.date, e.time), unit: e.stand, position: 'DC motor', side, dashed: side === 'NDE', value: v! })));
 }
 
 /** LSM drive temperature form: each drive's flywheel, reduction gear and pinion, DE and NDE. */
@@ -147,13 +152,22 @@ export function lsmBearingPoints(entries: LsmDriveReading[]): BearingPoint[] {
     ['Reduction gear', 'DE', e.reductionDeC], ['Reduction gear', 'NDE', e.reductionNdeC],
     ['Pinion gear', 'DE', e.pinionDeC], ['Pinion gear', 'NDE', e.pinionNdeC],
   ] as const).filter(([, , v]) => v !== null)
-    .map(([position, side, v]) => ({ at: atOf(e.date, e.at), unit: unit(e.drive), position, side, value: v! })));
+    .map(([position, side, v]) => ({ at: atOf(e.date, e.at), unit: unit(e.drive), position, side, dashed: side === 'NDE', value: v! })));
 }
 
 /** RMD Mill Bearing Temperature forms: "Pinion gear D side" → Pinion gear, DE; "… ND side" → NDE. */
 export function rmdBearingPoints(history: { at: string; time: string | null; equipment: string; point: string; value: number }[]): BearingPoint[] {
   return history.map((h) => {
     const m = /^(.*?)\s+(ND|D) side$/i.exec(h.point);
-    return { at: atOf(h.at, h.time), unit: h.equipment, position: m ? m[1] : h.point, side: m && m[2].toUpperCase() === 'ND' ? 'NDE' : 'DE', value: h.value };
+    const nde = !!m && m[2].toUpperCase() === 'ND';
+    return { at: atOf(h.at, h.time), unit: h.equipment, position: m ? m[1] : h.point, side: nde ? 'NDE' : 'DE', dashed: nde, value: h.value };
   });
+}
+
+/** RMS Drive Temp form: each drive's reduction gearboxes, pinion and flywheel; the outside points dashed. */
+export function rmsBearingPoints(entries: RmsDriveReading[]): BearingPoint[] {
+  const unit = (d: string) => d.replace(/^DRIVE\s*0*(\d+)$/i, 'Drive $1');
+  return entries.flatMap((e) => e.bearings.map((b) => ({
+    at: atOf(e.date, e.at), unit: unit(e.drive), position: b.component, side: b.point, dashed: /outside/i.test(b.point), value: b.valueC,
+  })));
 }
