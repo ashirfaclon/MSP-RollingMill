@@ -16,15 +16,15 @@
  *   Production by shift   the plant's October 2026 plan (8,750 MT), spread to days, half per
  *                         shift, as RMD's; whole day = PRODUTION_MT vs plan.
  *   Running rate          PRODUTION_MT ÷ running hours calculated from the LSM Production Sheet's runs.
- *   Order allocation      the production and finished stock totals; no Made To Order / Stock split
- *                         and no Stock with order / Free stock (dropped on every mill — the user, 27 Oct 2026).
+ *   Finished stock card   the total of Finished stock by size, dated; no Order allocation panel
+ *                         (the user, 31 Oct 2026).
  * No mill mimic on LSM (the user, 16 Oct 2026).
  */
 import { useState, type KeyboardEvent } from 'react';
 import { lastFigure } from '@/services/lastEntry';
 import { ofInput } from '@/components/production/ofInput';
-import { ProductionTerm } from '@/components/production/productionTerm';
-import { StockAsOf } from '@/components/production/stockAsOf';
+import { productionTermText } from '@/components/production/productionTerm';
+import FinishedStockCard from '@/components/production/FinishedStockCard';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
@@ -33,7 +33,7 @@ import '@/components/visualization/visualization.css';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
 import LsmProductionDrawer, { useLsmProduction } from './LsmProductionDrawer';
-import RmdStockBySize, { useRmdStock } from '@/components/rmd/RmdStockBySize';
+import RmdStockBySize from '@/components/rmd/RmdStockBySize';
 import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import '@/components/rmd/rmd.css';
@@ -48,15 +48,13 @@ export default function LsmVisualization() {
   const [prodOpen, setProdOpen] = useState(false);
   const [yieldOpen, setYieldOpen] = useState(false);
   const note = error ? 'ERP data unavailable' : data?.erp.connection === 'down' ? data.erp.message : '';
-  // Finished stock: the total of Finished stock by size (the ERP's Stock Sheet Engine, division LS).
-  const stock = useRmdStock('lsm').data;
-  const stockMt = stock && stock.erp.connection === 'up' ? stock.totalMt : null;
 
   return (
     <div className="rm-viz">
-      <section className="rm-strip rm-strip--four" aria-label="Headline KPIs">
+      <section className="rm-strip rm-strip--five" aria-label="Headline KPIs">
         <KpiCard
           label="Production"
+          term={data ? productionTermText(data.from, data.to, data.erp.lastDate) : null}
           value={t?.productionMt == null ? 'NA' : fixed(t.productionMt, 1)}
           noEntries={!!data && data.erp.connection === 'up' && t?.productionMt == null}
           lastEntry={lastFigure(t?.productionMt, last, (d) => d.totals.productionMt, (n) => fixed(n, 1))}
@@ -81,6 +79,8 @@ export default function LsmVisualization() {
         />
         <PowerKpiCard mill="lsm" />
         <SpecificEnergyCard mill="lsm" />
+        {/* The total of Finished stock by size, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
+        <FinishedStockCard mill="lsm" />
       </section>
       <LsmProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
       <LsmProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
@@ -90,25 +90,11 @@ export default function LsmVisualization() {
           mill="lsm"
           rate={<FormRunningRateFoot mill="lsm" />}
         />
-        <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
-          <div className="rm-alloc-block">
-            <div className="rm-alloc-head">
-              <span className="rm-k">Production{data && t?.productionMt != null && <ProductionTerm from={data.from} to={data.to} lastDate={data.erp.lastDate} />}</span>
-              <span className={`rm-alloc-total num ${t?.productionMt == null ? 'v-na' : 'v-val'}`}>{mt(t?.productionMt)}</span>
-            </div>
-          </div>
-          <div className="rm-alloc-block">
-            <div className="rm-alloc-head">
-              <span className="rm-k">Finished stock{stockMt !== null && <StockAsOf asOf={stock?.asOf} lastDate={stock?.erp.lastDate} />}</span>
-              <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{mt(stockMt)}</span>
-            </div>
-          </div>
-        </Panel>
+        <RmdStockBySize mill="lsm" />
       </div>
 
-      <div className="rm-row">
+      <div className="rm-row rm-row--full">
         <MaterialBalance />
-        <RmdStockBySize mill="lsm" />
       </div>
     </div>
   );

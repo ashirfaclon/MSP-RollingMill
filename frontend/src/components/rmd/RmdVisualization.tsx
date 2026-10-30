@@ -7,19 +7,15 @@
  *   Production by shift   targets from the plant's month-wise FY plan (Prime + SL), half per
  *                         shift; output per shift NA (not in the ERP); whole day = ERP Prime + SL
  *                         vs plan. Running rate = ERP production ÷ running hours (billet counters).
- *   Order allocation      production total from the ERP log sheet; finished stock = the total of
- *                         Finished stock by size (ERP item ledger, FGYRDP, at the period end).
+ *   Finished stock card   the total of Finished stock by size (ERP item ledger, FGYRDP, at the period
+ *                         end), dated; no Order allocation panel (the user, 31 Oct 2026).
  *   Material balance      billet input, finished and the four losses from the ERP log sheet
  *                         (FA-SKJ); billets from Influx.
  *   Finished stock by size  ERP item ledger, FGYRDP, to the period end; a size opens its SKUs.
  *
- * Unlike HSM there is no Made To Order / Made To Stock split and no Stock with order / Free stock
- * split (user, 12 and 17 Oct 2026): Order allocation shows the two totals only.
  */
 import Panel from '@/components/Panel';
 import { ofInput } from '@/components/production/ofInput';
-import { ProductionTerm } from '@/components/production/productionTerm';
-import { StockAsOf } from '@/components/production/stockAsOf';
 import type { Series } from '@/components/visualization/KpiCard';
 import { fixed } from '@/lib/num';
 import { useState, type KeyboardEvent } from 'react';
@@ -30,7 +26,7 @@ import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
 import RmdMillMimic from './RmdMillMimic';
 import RmdShiftProduction from './RmdShiftProduction';
 import RmdRunningRateDrawer from './RmdRunningRateDrawer';
-import RmdStockBySize, { useRmdStock } from './RmdStockBySize';
+import RmdStockBySize from './RmdStockBySize';
 import '@/components/visualization/visualization.css';
 import './rmd.css';
 
@@ -40,11 +36,10 @@ export default function RmdVisualization() {
       <RmdKpiStrip />
       <div className="rm-row">
         <RmdShiftProduction rate={<RunningRateFoot />} />
-        <OrderAllocation />
-      </div>
-      <div className="rm-row">
-        <MaterialBalance />
         <RmdStockBySize />
+      </div>
+      <div className="rm-row rm-row--full">
+        <MaterialBalance />
       </div>
       {/* The mill mimic sits at the bottom of every page that has one (the user, 30 Oct 2026). */}
       <RmdMillMimic />
@@ -72,33 +67,6 @@ function RunningRateFoot() {
       </button>
       <RmdRunningRateDrawer open={open} onClose={() => setOpen(false)} />
     </>
-  );
-}
-
-/* ---------------------------- Order allocation --------------------------- */
-
-function OrderAllocation() {
-  const { dates } = useSelection();
-  const prodR = useRmdProduction(dates).data;
-  const prod = prodR?.totals.productionMt ?? null;
-  // Finished stock: every SKU in FGYRDP at the end of the period — the total of Finished stock by size.
-  const stock = useRmdStock().data;
-  const stockMt = stock && stock.erp.connection === 'up' ? stock.totalMt : null;
-  return (
-    <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
-      <div className="rm-alloc-block">
-        <div className="rm-alloc-head">
-          <span className="rm-k">Production{prodR && prod !== null && <ProductionTerm from={prodR.from} to={prodR.to} lastDate={prodR.erp.lastDate} />}</span>
-          <span className={`rm-alloc-total num ${prod === null ? 'v-na' : 'v-val'}`}>{prod === null ? 'NA' : `${fixed(prod, 1)} MT`}</span>
-        </div>
-      </div>
-      <div className="rm-alloc-block">
-        <div className="rm-alloc-head">
-          <span className="rm-k">Finished stock{stockMt !== null && <StockAsOf asOf={stock?.asOf} lastDate={stock?.erp.lastDate} />}</span>
-          <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{stockMt === null ? 'NA' : `${fixed(stockMt, 1)} MT`}</span>
-        </div>
-      </div>
-    </Panel>
   );
 }
 

@@ -60,7 +60,11 @@
 .rmd-mimic { align-items: stretch; }
 
 /* Five headline cards (production as two cards; no order / stock cards on RMD): one row, two on a phone. */
-.rm-strip.rmd-strip { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+/* Nine: the eight headline cards and Finished stock at the right end (the user, 31 Oct 2026). */
+.rm-strip.rmd-strip { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+/* Nine narrow cards: a card's date on its own line under the label. */
+.rmd-strip .rm-card-term { display: block; margin-top: 2px; }
+.rmd-strip .rm-card-term::before { content: none; }
 /* Chemical composition: one column (the user, 30 Oct 2026) — the five elements in two rows,
    C · Mn · S over P · Si, so each figure keeps a readable width. */
 .rmd-chem { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 6px; letter-spacing: -0.3px; }

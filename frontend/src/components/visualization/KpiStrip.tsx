@@ -2,6 +2,7 @@ import ProductionKpiCard from '@/components/production/ProductionKpiCard';
 import YieldKpiCard from '@/components/production/YieldKpiCard';
 import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
+import FinishedStockCard from '@/components/production/FinishedStockCard';
 import type { MillModel } from '@/models/millModel';
 
 /**
@@ -10,7 +11,7 @@ import type { MillModel } from '@/models/millModel';
  */
 export default function KpiStrip(_: { m: MillModel }) {
   return (
-    <section className="rm-strip rm-strip--four" aria-label="Headline KPIs">
+    <section className="rm-strip rm-strip--five" aria-label="Headline KPIs">
       {/* Live from the ERP, for the Duration filter's period; opens the ERP-vs-Influx drawer. */}
       <ProductionKpiCard />
       {/* Live from the ERP log sheet: Σ production ÷ Σ billet input; opens the yield drawer. */}
@@ -19,6 +20,8 @@ export default function KpiStrip(_: { m: MillModel }) {
       <PowerKpiCard />
       {/* Live: logbook power ÷ the Production card's Total (Influx), kWh/MT. */}
       <SpecificEnergyCard />
+      {/* The ERP stock at the period's end, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
+      <FinishedStockCard mill="hsm" />
     </section>
   );
 }

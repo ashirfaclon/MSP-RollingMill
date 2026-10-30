@@ -10,8 +10,8 @@ export function stockDate(asOf: string | null | undefined, lastDate: string | nu
   return lastDate && lastDate < asOf ? lastDate : asOf;
 }
 
-/** "· as of 29 Oct 2026", beside the Finished stock label; nothing without a date. */
-export function StockAsOf({ asOf, lastDate }: { asOf: string | null | undefined; lastDate: string | null | undefined }) {
+/** "as of 29 Oct 2026", beside the Finished stock card's label; null without a date. */
+export function stockAsOfText(asOf: string | null | undefined, lastDate: string | null | undefined): string | null {
   const d = stockDate(asOf, lastDate);
-  return d ? <span className="rm-alloc-asof"> · as of {dm(d)} {d.slice(0, 4)}</span> : null;
+  return d ? `as of ${dm(d)} ${d.slice(0, 4)}` : null;
 }

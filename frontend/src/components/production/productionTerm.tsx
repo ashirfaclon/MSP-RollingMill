@@ -11,11 +11,10 @@ export function productionTerm(from: string | null | undefined, to: string | nul
   return { from, to: end };
 }
 
-/** "· 1 Oct – 29 Oct 2026", or "· 29 Oct 2026" for one day, beside the Production label. */
-export function ProductionTerm({ from, to, lastDate }: { from: string | null | undefined; to: string | null | undefined; lastDate: string | null | undefined }) {
+/** "1 Oct – 29 Oct 2026", or "29 Oct 2026" for one day: the Production card's period, beside its label. */
+export function productionTermText(from: string | null | undefined, to: string | null | undefined, lastDate: string | null | undefined): string | null {
   const t = productionTerm(from, to, lastDate);
   if (!t) return null;
   const y = t.to.slice(0, 4);
-  const text = t.from === t.to ? `${dm(t.to)} ${y}` : `${dm(t.from)}${t.from.slice(0, 4) === y ? '' : ` ${t.from.slice(0, 4)}`} – ${dm(t.to)} ${y}`;
-  return <span className="rm-alloc-asof"> · {text}</span>;
+  return t.from === t.to ? `${dm(t.to)} ${y}` : `${dm(t.from)}${t.from.slice(0, 4) === y ? '' : ` ${t.from.slice(0, 4)}`} – ${dm(t.to)} ${y}`;
 }

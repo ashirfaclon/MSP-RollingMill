@@ -21,6 +21,8 @@ import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import RmdMillSpeedCard from './RmdMillSpeedCard';
 import RmdChemistryCard from './RmdChemistryCard';
+import FinishedStockCard from '@/components/production/FinishedStockCard';
+import { productionTermText } from '@/components/production/productionTerm';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
 import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
@@ -43,11 +45,14 @@ export default function RmdKpiStrip() {
     : data?.erp.connection === 'down' ? data.erp.message
     : '';
   const up = !!data && data.erp.connection === 'up';
+  // The days the production cards cover (the user, 31 Oct 2026).
+  const term = data ? productionTermText(data.from, data.to, data.erp.lastDate) : null;
 
   return (
     <section className="rm-strip rmd-strip" aria-label="Headline KPIs">
       <KpiCard
         label="Production · Prime + SL"
+        term={term}
         value={mt1(t?.productionMt)}
         noEntries={up && t?.productionMt == null}
         lastEntry={lastOf(t?.productionMt, (lt) => lt.productionMt)}
@@ -60,6 +65,7 @@ export default function RmdKpiStrip() {
       />
       <KpiCard
         label="Production · Prime"
+        term={term}
         value={mt1(t?.primeMt)}
         noEntries={up && t?.primeMt == null}
         lastEntry={lastOf(t?.primeMt, (lt) => lt.primeMt)}
@@ -88,6 +94,8 @@ export default function RmdKpiStrip() {
       <SpecificEnergyCard mill="rmd" />
       <RmdMillSpeedCard />
       <RmdChemistryCard />
+      {/* The ERP stock at the period's end, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
+      <FinishedStockCard mill="rmd" />
     </section>
   );
 }

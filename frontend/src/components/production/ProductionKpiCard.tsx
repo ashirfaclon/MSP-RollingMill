@@ -12,6 +12,7 @@ import { useState, type ReactNode } from 'react';
 import { useLastEntry } from '@/services/lastEntry';
 import type { ProductionComparison } from '@/services/hsmProduction';
 import KpiCard, { NO_ENTRIES } from '@/components/visualization/KpiCard';
+import { productionTermText } from './productionTerm';
 import ProductionDrawer from './ProductionDrawer';
 import { COUNTER_START_DATE, dm, useProduction, useSelection } from '@/services/hsmProduction';
 
@@ -54,6 +55,7 @@ export default function ProductionKpiCard() {
     <>
       <KpiCard
         label="Production"
+        term={current ? productionTermText(current.from, current.to, current.erp.lastDate) : null}
         value={fmt1(influx)}
         pair={current ? [{ source: 'ERP', value: fmt1(erp ?? lastErp) }, { source: 'Influx', value: fmt1(influx) }] : undefined}
         unit="MT"

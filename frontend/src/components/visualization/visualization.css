@@ -38,6 +38,8 @@
 }
 /* A strip of four headline cards (no order / stock split on any mill). */
 .rm-strip.rm-strip--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Five: the four headline figures and Finished stock at the right end (the user, 31 Oct 2026). */
+.rm-strip.rm-strip--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
 /*
  * Each card spans four rows of the strip and adopts them as a subgrid, so label, value,
@@ -114,6 +116,9 @@
 /* ------------------------------- Panels ----------------------------------- */
 
 .rm-row { flex: 1 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* One panel across the page (Material & operating balance — the user, 31 Oct 2026), at its own
+   height: the spare height of a short page goes to the row above (shift production, stock by size). */
+.rm-row.rm-row--full { flex: 0 0 auto; grid-template-columns: minmax(0, 1fr); }
 .rm-panel { display: flex; flex-direction: column; min-width: 0; }
 .rm-body { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
 
@@ -305,6 +310,37 @@
 .rm-mb-pieces-v { font-size: 11.5px; font-weight: 600; color: var(--text-2); justify-self: end; }
 .rm-mb-pieces-v b { font-weight: 800; color: var(--text); }
 
+/*
+ * The balance across the full width: two halves. Left, billet input split into finished and mass
+ * difference; right, the mass difference by loss. The right half shares the left's rows (subgrid),
+ * so the two bars sit on one line and the two legends level, with the billet count across the foot.
+ */
+@media (min-width: 1181px) {
+  .rm-row--full .rm-mb {
+    display: grid; align-content: center;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "head losses" "input losses" "labels losses" "note note" "pieces pieces";
+    column-gap: 0; row-gap: 8px;
+  }
+  .rm-row--full .rm-mb > * { min-width: 0; }
+  .rm-row--full .rm-mb-head { grid-area: head; margin-bottom: 0; padding-right: 28px; }
+  .rm-row--full .rm-mb-bar--input { grid-area: input; width: auto; margin-right: 28px; }
+  .rm-row--full .rm-mb-labels { grid-area: labels; padding-right: 28px; }
+  .rm-row--full .rm-mb-note { grid-area: note; }
+  .rm-row--full .rm-mb-pieces, .rm-row--full .rmd-mb-pieces { grid-area: pieces; }
+  .rm-row--full .rm-mb-losses {
+    grid-area: losses; display: grid; grid-template-rows: subgrid; row-gap: 8px;
+    margin-top: 0; padding-left: 28px; border-left: 1px solid var(--border-soft);
+  }
+  /* The right half's heading, level with Billet input. */
+  .rm-row--full .rm-mb-losses::before {
+    content: "Mass difference · by loss"; align-self: start;
+    font-size: 9.5px; font-weight: 800; letter-spacing: 0.8px; line-height: 12px; text-transform: uppercase; color: var(--muted-2);
+  }
+  .rm-row--full .rm-mb-bar--input, .rm-row--full .rm-mb-bar--loss { height: 26px; align-self: center; }
+  .rm-row--full .rm-mb-legend { margin-top: 0; align-self: start; gap: 4px 18px; }
+}
+
 /* Shared by the Data Model screen's flow panel. */
 .rm-ops {
   margin: 0; padding-top: 10px; border-top: 1px solid var(--border-soft);
@@ -368,7 +404,7 @@
 }
 
 @media (max-width: 760px) {
-  .rm-strip, .rm-strip.rm-strip--four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rm-strip, .rm-strip.rm-strip--four, .rm-strip.rm-strip--five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rm-card-value { font-size: 22px; }
   .rm-mimic { grid-template-columns: minmax(0, 1fr); }
   .rm-mimic-arrow { transform: rotate(90deg); height: 14px; }
@@ -404,7 +440,9 @@
 .rm-shifts--button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* The date a finished-stock figure is from, beside its label: quieter, not upper-cased. */
-.rm-alloc-asof { color: var(--muted-3); font-weight: 600; letter-spacing: 0; text-transform: none; }
+/* A card's period or date beside its label (Production, Finished stock — the user, 31 Oct 2026). */
+.rm-card-term { color: var(--muted-3); font-weight: 600; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+.rm-card-term::before { content: "·"; margin: 0 5px; }
 
 /* Finished stock by size: subprime in its own colour (the user, 30 Oct 2026), and the tab's total in the title bar. */
 .rm-tone--subprime { --tone: var(--violet); }

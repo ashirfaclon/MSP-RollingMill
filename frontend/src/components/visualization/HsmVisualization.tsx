@@ -10,7 +10,6 @@
 import KpiStrip from './KpiStrip';
 import MillMimic from './MillMimic';
 import ShiftProduction from './ShiftProduction';
-import OrderAllocation from './OrderAllocation';
 import MaterialBalance from './MaterialBalance';
 import StockBySize from './StockBySize';
 import { HSM_SAMPLE } from './hsmSample';
@@ -42,13 +41,14 @@ export default function HsmVisualization() {
   return (
     <div className="rm-viz">
       <KpiStrip m={m} />
+      {/* No Order allocation panel: production's period is on the Production card, finished stock is
+          its own card (the user, 31 Oct 2026). Stock by size takes its place; the balance gets the full width. */}
       <div className="rm-row">
         <ShiftProduction m={m} />
-        <OrderAllocation />
-      </div>
-      <div className="rm-row">
-        <MaterialBalance />
         <StockBySize />
+      </div>
+      <div className="rm-row rm-row--full">
+        <MaterialBalance />
       </div>
       <HsmChecklists />
       {/* The mill mimic sits at the bottom of every page that has one (the user, 30 Oct 2026). */}

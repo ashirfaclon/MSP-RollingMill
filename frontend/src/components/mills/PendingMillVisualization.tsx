@@ -12,16 +12,15 @@
  * rate = PRODUCTION_MT ÷ running hours calculated from the RMS Production Sheet's runs.
  * Never a sample number. The KPI list follows the plant's Visualisation sheet for the mill
  * (LSM.xlsx / R.M.S.xlsx); each card and panel is wired once its source is confirmed.
- * Order allocation: the production and finished stock totals; no Made To Order / Stock split and no
- * Stock with order / Free stock (dropped on every mill — the user, 27 Oct 2026).
+ * Finished stock: a card at the end of the strip, dated; no Order allocation panel (the user, 31 Oct 2026).
  * Power, specific energy: the RMS Daily Power Consumption Record (actual kWh, VCB-1) ÷ PRODUCTION_MT.
  * No mill mimic on RMS (the user, 16 Oct 2026), as on LSM.
  */
 import { useState, type KeyboardEvent } from 'react';
 import { lastFigure } from '@/services/lastEntry';
 import { ofInput } from '@/components/production/ofInput';
-import { ProductionTerm } from '@/components/production/productionTerm';
-import { StockAsOf } from '@/components/production/stockAsOf';
+import { productionTermText } from '@/components/production/productionTerm';
+import FinishedStockCard from '@/components/production/FinishedStockCard';
 import Panel from '@/components/Panel';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
@@ -30,7 +29,7 @@ import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
-import RmdStockBySize, { useRmdStock } from '@/components/rmd/RmdStockBySize';
+import RmdStockBySize from '@/components/rmd/RmdStockBySize';
 import RmsProductionDrawer, { useRmsProduction } from '@/components/rms/RmsProductionDrawer';
 import { useSelection } from '@/services/hsmProduction';
 import { fixed } from '@/lib/num';
@@ -53,9 +52,6 @@ const LOSSES: { key: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'r
 const mt = (v: number | null | undefined) => (v === null || v === undefined ? 'NA' : `${fixed(v, 1)} MT`);
 
 export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms' }) {
-  // RMS finished stock: the total of Finished stock by size (the ERP's Stock Sheet Engine, division RS).
-  const stock = useRmdStock(mill === 'rms' ? 'rms' : 'lsm').data;
-  const stockMt = mill === 'rms' && stock && stock.erp.connection === 'up' ? stock.totalMt : null;
   // RMS production: the ERP log sheet (division RS, series L5P).
   const { dates } = useSelection();
   const prod = useRmsProduction(mill === 'rms' ? dates : null);
@@ -71,7 +67,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
   const [prodOpen, setProdOpen] = useState(false);
   return (
     <div className="rm-viz">
-      <section className="rm-strip rm-strip--four" aria-label="Headline KPIs">
+      <section className="rm-strip rm-strip--five" aria-label="Headline KPIs">
         {CARDS.map((c) => c.label === 'Mass yield' && mill === 'rms'
           ? (
             <KpiCard
@@ -93,6 +89,7 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
             <KpiCard
               key={c.label}
               label="Production"
+              term={prod.data ? productionTermText(prod.data.from, prod.data.to, prod.data.erp.lastDate) : null}
               value={prodMt === null ? 'NA' : fixed(prodMt, 1)}
               noEntries={!!prod.data && prod.data.erp.connection === 'up' && prodMt === null}
               lastEntry={lastFigure(prodMt, prod.last, (d) => d.totals.productionMt, (n) => fixed(n, 1))}
@@ -110,6 +107,10 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
           : c.label === 'Specific energy' && mill === 'rms'
           ? <SpecificEnergyCard key={c.label} mill="rms" />
           : <KpiCard key={c.label} label={c.label} value="NA" unit={c.unit} note="" series={c.series} />)}
+        {/* The total of Finished stock by size, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
+        {mill === 'rms'
+          ? <FinishedStockCard mill="rms" />
+          : <KpiCard label="Finished stock" value="NA" unit="MT" note="" series="free" />}
       </section>
       {mill === 'rms' && <RmsProductionDrawer open={prodOpen} onClose={() => setProdOpen(false)} />}
 
@@ -118,23 +119,14 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
           mill={mill}
           rate={<FormRunningRateFoot mill={mill} />}
         />
-        <Panel title="Order allocation" className="rm-panel" bodyClass="rm-body rm-alloc">
-          <div className="rm-alloc-block">
-            <div className="rm-alloc-head">
-              <span className="rm-k">Production{prod.data && prodMt !== null && <ProductionTerm from={prod.data.from} to={prod.data.to} lastDate={prod.data.erp.lastDate} />}</span>
-              <span className={`rm-alloc-total num ${prodMt === null ? 'v-na' : 'v-val'}`}>{prodMt === null ? 'NA' : `${fixed(prodMt, 1)} MT`}</span>
-            </div>
-          </div>
-          <div className="rm-alloc-block">
-            <div className="rm-alloc-head">
-              <span className="rm-k">Finished stock{stockMt !== null && <StockAsOf asOf={stock?.asOf} lastDate={stock?.erp.lastDate} />}</span>
-              <span className={`rm-alloc-total num ${stockMt === null ? 'v-na' : 'v-val'}`}>{stockMt === null ? 'NA' : `${fixed(stockMt, 1)} MT`}</span>
-            </div>
-          </div>
-        </Panel>
+        {mill === 'rms' ? <RmdStockBySize mill="rms" /> : (
+          <Panel title="Finished stock by size" className="rm-panel" bodyClass="rm-body">
+            <p className="rm-empty">NA</p>
+          </Panel>
+        )}
       </div>
 
-      <div className="rm-row">
+      <div className="rm-row rm-row--full">
         <Panel title="Material & operating balance" className="rm-panel" bodyClass="rm-body">
           <div
             className={`rm-mb${mill === 'rms' ? ' rm-mb--button' : ''}`}
@@ -183,11 +175,6 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
             </div>
           </div>
         </Panel>
-        {mill === 'rms' ? <RmdStockBySize mill="rms" /> : (
-          <Panel title="Finished stock by size" className="rm-panel" bodyClass="rm-body">
-            <p className="rm-empty">NA</p>
-          </Panel>
-        )}
       </div>
     </div>
   );

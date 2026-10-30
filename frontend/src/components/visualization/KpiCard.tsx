@@ -58,6 +58,8 @@ export default function KpiCard(props: {
    * had an entry passes none, and the card says "No entries recorded yet" as before.
    */
   lastEntry?: { value: string; date: string; pair?: { source: string; value: string }[] } | null;
+  /** The days or date the figure is for, beside the label: "1 Oct – 26 Oct 2026", "as of 26 Oct 2026" (the user, 31 Oct 2026). */
+  term?: string | null;
 }) {
   const { meterPct } = props;
   const last = props.lastEntry && !props.loading ? props.lastEntry : null;
@@ -71,7 +73,8 @@ export default function KpiCard(props: {
   const body = (
     <>
       <span className="rm-card-label">
-        {props.label}
+        {/* No period beside a last entry: its note already dates the figure. */}
+        <span className="rm-card-label-text">{props.label}{props.term && !last && <span className="rm-card-term">{props.term}</span>}</span>
         {/* Two sections share one unit: shown once by the title, so each figure gets the full half. */}
         {pair && props.unit && <span className="rm-card-label-unit">· {props.unit}</span>}
       </span>
