@@ -61,3 +61,12 @@ export const SETUP_KEYS: string[] = [
 ];
 /** Setup columns that hold text or a choice (the rest are numbers). */
 export const SETUP_TEXT = new Set(['Date', 'Shift', 'Shift in-charge', 'Employee ID', 'Remark', ...R.map((s) => `Roll type ${s}`)]);
+
+/**
+ * Equipment settings (the user, 31 Oct 2026): an edit made on the dashboard to a default of
+ * config/equipment.ts — one entry per motor / tank, the latest wins (Equipment Settings Form Spec).
+ */
+export const HSM_MOTOR_FORM = 'equipment-settings__hsm-motor-ratings';
+export const RMD_TANK_FORM = 'equipment-settings__rmd-oil-tanks';
+export const MOTOR_KEYS = { stand: 'stand', ratedCurrentA: 'rated-current-a' } as const;
+export const TANK_KEYS = { tank: 'tank', name: 'tank-name', lengthM: 'length-m', widthM: 'width-m', depthM: 'depth-m', capacityL: 'capacity-l' } as const;

@@ -3,15 +3,18 @@
  *   POST /plan/:mill, GET /plan/:mill?month   production plan (one entry per date)
  *   POST /ca/:mill,   GET /ca/:mill?month     CA inputs (one entry per month)
  *   POST /hsm/variance, POST /hsm/setup       HSM checklists
+ *   GET/POST /equipment/hsm-motors            HSM stand motors' rated current (defaults + dashboard edits)
+ *   GET/POST /equipment/rmd-tanks             RMD gearbox oil tanks' inside size (defaults + dashboard edits)
  * Writes need a signed-in user (the auth hook); the entry records who saved it.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { loadEnv } from '../../config/env';
 import { searchParams } from '../../shared/request';
 import { HttpError } from '../../shared/http-error';
-import type { CaInputsBody, FormSaveResult, PlanSaveBody, SetupSaveBody, VarianceSaveBody } from '../../contracts';
+import type { CaInputsBody, FormSaveResult, HsmMotorRatingsBody, PlanSaveBody, RmdOilTanksBody, SetupSaveBody, VarianceSaveBody } from '../../contracts';
 import type { FormWrite } from '../../integrations/logbook/client';
-import { CA_FORM, CONFIG_MILLS, PLAN_FORM, SETUP_FORM, VARIANCE_FORM, type ConfigMill } from './forms';
+import { CA_FORM, CONFIG_MILLS, HSM_MOTOR_FORM, PLAN_FORM, RMD_TANK_FORM, SETUP_FORM, VARIANCE_FORM, type ConfigMill } from './forms';
+import { hsmMotorRatings, rmdOilTanks, saveHsmMotorRatings, saveRmdOilTanks } from './equipment.store';
 import { savePlan, savedPlan } from './plan.store';
 import { saveCaInputs, savedCaInputs } from './ca.store';
 import { saveSetup, saveVariance } from './checklist.store';
@@ -46,4 +49,11 @@ export async function formsDbRoutes(app: FastifyInstance) {
     done(VARIANCE_FORM, await saveVariance(loadEnv(), req.body, filledByOf(req))));
   app.post<{ Body: SetupSaveBody }>('/hsm/setup', { config: { errorCode: 'setup_save_failed' } }, async (req) =>
     done(SETUP_FORM, await saveSetup(loadEnv(), req.body, filledByOf(req))));
+
+  app.get('/equipment/hsm-motors', { config: { errorCode: 'motor_ratings_read_failed' } }, async () => hsmMotorRatings(loadEnv()));
+  app.post<{ Body: HsmMotorRatingsBody }>('/equipment/hsm-motors', { config: { errorCode: 'motor_ratings_save_failed' } }, async (req) =>
+    done(HSM_MOTOR_FORM, await saveHsmMotorRatings(loadEnv(), req.body, filledByOf(req))));
+  app.get('/equipment/rmd-tanks', { config: { errorCode: 'oil_tanks_read_failed' } }, async () => rmdOilTanks(loadEnv()));
+  app.post<{ Body: RmdOilTanksBody }>('/equipment/rmd-tanks', { config: { errorCode: 'oil_tanks_save_failed' } }, async (req) =>
+    done(RMD_TANK_FORM, await saveRmdOilTanks(loadEnv(), req.body, filledByOf(req))));
 }

@@ -54,3 +54,26 @@ export interface FormSaveResult {
   form: string;
   entries: number;
 }
+
+/** Who last changed a setting on the dashboard, when; edited = false while the default is in use. */
+interface EditedBy { edited: boolean; editedAt: string | null; editedBy: string | null }
+
+/** GET /api/forms/equipment/hsm-motors — each HSM stand motor's rated current in use (A), and its default. */
+export interface HsmMotorRatings {
+  logbook: { connection: 'up' | 'down'; message: string };
+  rows: ({ stand: string; ratedCurrentA: number; defaultA: number } & EditedBy)[];
+}
+/** POST /api/forms/equipment/hsm-motors */
+export interface HsmMotorRatingsBody { rows: { stand: string; ratedCurrentA: number }[] }
+
+/** GET /api/forms/equipment/rmd-tanks — each RMD gearbox oil tank's inside size in use (m), its capacity (L) and defaults. */
+export interface RmdOilTanks {
+  logbook: { connection: 'up' | 'down'; message: string };
+  rows: ({
+    tank: string; label: string; group: 'roughing' | 'route';
+    lengthM: number; widthM: number; depthM: number; capacityL: number;
+    defaults: { lengthM: number; widthM: number; depthM: number };
+  } & EditedBy)[];
+}
+/** POST /api/forms/equipment/rmd-tanks */
+export interface RmdOilTanksBody { rows: { tank: string; lengthM: number; widthM: number; depthM: number }[] }

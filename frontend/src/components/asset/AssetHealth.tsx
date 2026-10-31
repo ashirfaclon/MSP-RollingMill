@@ -30,7 +30,8 @@ import KpiCard from '@/components/visualization/KpiCard';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
-import { HSM_RATED_CURRENT_A, loadingPct } from '@/config/hsmMotors';
+import { HSM_MOTORS_URL, loadingPct, useHsmMotorRatings } from '@/services/equipment';
+import EquipmentSettings from './EquipmentSettings';
 import { dm, useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type HsmMillLoadEntry, type HsmMillLoadReport, type RunningRateReport } from '@/services/hsmApi';
 import '@/components/visualization/visualization.css';
@@ -77,11 +78,13 @@ export default function AssetHealth() {
   const rateLast = useLastEntry<RunningRateReport>('/api/hsm/running-rate', !!rateD && runH == null, rateD?.erp.lastDate, dates?.from, 'grain=day');
 
   /* The card figures from a mill-load report, for the group: the hottest DC motor bearing, the mean load. */
+  // Rated current per stand: the defaults with any edit made on the dashboard (the user, 31 Oct 2026).
+  const motors = useHsmMotorRatings();
   const figures = (r: HsmMillLoadReport | null) => {
     const l = gid && r ? r.latest.filter((e) => inStands(gid, e)) : [];
     const ts = l.map(hottest).filter((v): v is number => v !== null);
     const ls = l.map((e) => e.loadA).filter((v): v is number => v !== null);
-    const ps = l.map((e) => loadingPct(e.stand, e.loadA)).filter((v): v is number => v !== null);
+    const ps = l.map((e) => loadingPct(motors.rated, e.stand, e.loadA)).filter((v): v is number => v !== null);
     return {
       latest: l, bearingC: ts.length ? Math.max(...ts) : null,
       loadA: ls.length ? ls.reduce((a, b) => a + b, 0) / ls.length : null,
@@ -168,8 +171,8 @@ export default function AssetHealth() {
                       <tr key={e.stand}>
                         <td><b>{e.stand}</b></td>
                         <td className="num r">{e.loadA === null ? '—' : fixed(e.loadA, 0)}</td>
-                        <td className="num r">{HSM_RATED_CURRENT_A[e.stand] ? fixed(HSM_RATED_CURRENT_A[e.stand], 0) : '—'}</td>
-                        <td className="num r v-val">{loadingPct(e.stand, e.loadA) === null ? '—' : fixed(loadingPct(e.stand, e.loadA), 0)}</td>
+                        <td className="num r">{motors.rated.get(e.stand) ? fixed(motors.rated.get(e.stand)!, 0) : '—'}</td>
+                        <td className="num r v-val">{loadingPct(motors.rated, e.stand, e.loadA) === null ? '—' : fixed(loadingPct(motors.rated, e.stand, e.loadA), 0)}</td>
                         <td className="num r">{e.deTempC === null ? '—' : fixed(e.deTempC, 0)}</td>
                         <td className="num r">{e.ndeTempC === null ? '—' : fixed(e.ndeTempC, 0)}</td>
                         <td>{dm(e.date)}{e.time ? ` · ${e.time.slice(11, 16)}` : ''} · {e.shift}</td>
@@ -178,6 +181,17 @@ export default function AssetHealth() {
                 </tbody>
               </table>
             </div>
+            {/* The rated current each loading % is worked out with — editable (the user, 31 Oct 2026). */}
+            {motors.data && (
+              <EquipmentSettings
+                title="Motor rated current"
+                cols={[{ key: 'a', label: 'Rated current (A)', dp: 0, step: '1' }]}
+                rows={motors.data.rows.filter((r) => gid?.some((g) => (g === 'roughing' ? r.stand.startsWith('RM') : r.stand.startsWith('FM'))))
+                  .map((r) => ({ id: r.stand, label: r.stand, values: { a: r.ratedCurrentA }, defaults: { a: r.defaultA }, edited: r.edited, editedAt: r.editedAt, editedBy: r.editedBy }))}
+                saveUrl={HSM_MOTORS_URL}
+                toBody={(changed) => ({ rows: changed.map((c) => ({ stand: c.id, ratedCurrentA: c.values.a })) })}
+              />
+            )}
             <SourceBox
               sources={[{ name: 'Logbook', rows: [
                 ['Form', 'Electrical HSM → Mill Load Log Sheet'],
@@ -185,7 +199,7 @@ export default function AssetHealth() {
               ] }]}
               formula={[
                 'Each stand\'s latest reading of the period; RM stands = roughing, FM stands = finishing',
-                'Loading % = load ÷ rated current × 100 per stand (rated current: Strip_Mill_DC_Motor_Details, R1–R5 630–983 A, F1–F6 1,214–1,807 A)',
+                'Loading % = load ÷ rated current × 100 per stand (rated current: the table above — the plant\'s motor details, editable)',
                 'Motor current = the mean loading % of the group\'s stands',
                 'Bearing temp = the hottest DC motor DE / NDE temperature of the group\'s stands',
               ]}

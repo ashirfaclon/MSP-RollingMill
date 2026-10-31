@@ -24,6 +24,8 @@
  * 45–65 °C — a card turns red when any of its readings is outside them, green when all are inside.
  */
 import { useState } from 'react';
+import { RMD_TANKS_URL, useRmdOilTanks } from '@/services/equipment';
+import EquipmentSettings from './EquipmentSettings';
 import { midTop, rmdHottest, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
 import BearingTrendAll, { rmdBearingPoints } from './BearingTrendAll';
@@ -105,6 +107,8 @@ export default function RmdAssetHealth() {
   const zones = LIVE[group] ?? null;
   const zone = zones?.[0] ?? null;
   const fgs = FORMS[group] ?? null;
+  // Each tank's size in use: the defaults with any edit made on the dashboard (the user, 31 Oct 2026).
+  const tanks = useRmdOilTanks();
   const bearingOf = (d: RmdAssetForms) => (fgs ? mergeBearing(fgs.map((g) => d.bearing[g])) : null);
   const oilOf = (d: RmdAssetForms) => (fgs ? mergeOil(fgs.map((g) => d.oil[g])) : null);
   const { dates } = useSelection();
@@ -247,6 +251,22 @@ export default function RmdAssetHealth() {
         {oil && oilView === 'level' && (
           <>
             <TankLevelTable rows={oil.level} />
+            {/* The tank sizes the litres are worked out with — editable (the user, 31 Oct 2026). */}
+            {tanks.data && (
+              <EquipmentSettings
+                title="Oil tank size"
+                cols={[{ key: 'l', label: 'Length (m)', dp: 2, step: '0.01' }, { key: 'w', label: 'Width (m)', dp: 2, step: '0.01' }, { key: 'd', label: 'Depth (m)', dp: 2, step: '0.01' }]}
+                derivedLabel="Capacity (L)"
+                rows={tanks.data.rows.filter((r) => (fgs as string[] | null)?.includes(r.group)).map((r) => ({
+                  id: r.tank, label: r.label, values: { l: r.lengthM, w: r.widthM, d: r.depthM },
+                  defaults: { l: r.defaults.lengthM, w: r.defaults.widthM, d: r.defaults.depthM },
+                  edited: r.edited, editedAt: r.editedAt, editedBy: r.editedBy,
+                  derived: (v) => (Number.isFinite(v.l * v.w * v.d) ? Math.round(v.l * v.w * v.d * 1000).toLocaleString('en-IN') : '—'),
+                }))}
+                saveUrl={RMD_TANKS_URL}
+                toBody={(changed) => ({ rows: changed.map((c) => ({ tank: c.id, lengthM: c.values.l, widthM: c.values.w, depthM: c.values.d })) })}
+              />
+            )}
             <SourceBox
               sources={[{ name: 'Logbook', rows: [
                 ['Form', 'Rolling Mill Division (TMT) → Mechanical → Oil Tank → Oil Tank Level (inches, every 15 days)'],
@@ -254,9 +274,7 @@ export default function RmdAssetHealth() {
               ] }]}
               formula={[
                 'Oil (L) = level (inches) × 0.0254 × inside length × inside width (m) × 1000 — box tanks, flat bottom, level from the bottom',
-                ...(fgs ?? []).map((g) => (g === 'roughing'
-                  ? 'Tank size (L × W × D, m): 20" / 16" R stand 1.63 × 1.26 × 1.30 (2,670 L)'
-                  : 'Tank size (L × W × D, m): Intermill 1.25 × 1.01 × 1.01 (1,275 L); NC / OC stands 1.26 × 0.85 × 0.87 (932 L)')),
+                'Tank size (L × W × D, m): the table above — the plant\'s tank capacities, editable',
                 'Gearbox oil (Level) = the oil in the tank lowest against its capacity',
                 'Limits: level — none given yet',
               ]}

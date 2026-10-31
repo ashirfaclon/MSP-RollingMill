@@ -20,6 +20,8 @@
  * late, so the read takes everything submitted from a month before the period.
  */
 import type { Env } from '../../config/env';
+import { RMD_OIL_TANK_DEFAULTS } from '../../config/equipment';
+import { capacityL, rmdTankSizes, type TankSize } from '../forms-db/equipment.store';
 import type { RmdAssetForms, RmdBearingGroup, RmdOilGroup, RmdReading } from '../../contracts';
 import { fetchFormsEntries, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
@@ -54,32 +56,20 @@ export function bearingOf(form: string, field: string): { equipment: string; poi
   return { equipment: m[1] ? `${def.equipment} ${m[1]}` : def.equipment, point: POINT[m[2]] };
 }
 
-/** Oil tanks → group and label, by the field stem (level: "20-r-stand", temperature: "20-r-stand-c"). */
-const TANKS: [string, AssetGroup, string][] = [
-  ['20-r-stand', 'roughing', '20" R stand'], ['16-r-stand', 'roughing', '16" R stand'], ['intermill', 'route', 'Intermill'],
-  ['old-continuous-stand-1-2', 'route', 'OC stand 1–2'], ['old-continuous-stand-3-4', 'route', 'OC stand 3–4'], ['old-continuous-stand-5-6', 'route', 'OC stand 5–6'],
-  ['new-continuous-stand-1-2', 'route', 'NC stand 1–2'], ['new-continuous-stand-3-4', 'route', 'NC stand 3–4'],
-  ['new-continuous-stand-5-6', 'route', 'NC stand 5–6'], ['new-continuous-stand-7-8', 'route', 'NC stand 7–8'],
-];
+/** Oil tanks → group and label, by the field stem (level: "20-r-stand", temperature: "20-r-stand-c") — config/equipment.ts. */
+const TANKS: [string, AssetGroup, string][] = RMD_OIL_TANK_DEFAULTS.map((t) => [t.tank, t.group, t.label]);
 
-/**
- * Each tank's inside length × width × depth, m (Oil Tank Capacity.xlsx, the plant, 19 Oct 2026).
- * The tanks are boxes with a flat bottom and the level is the oil depth from the bottom, so the
- * oil is level × length × width; length × width × depth is the capacity the plant gave (2,670 /
- * 1,275 / 932 L).
- */
-const TANK_SIZE_M: Record<string, [number, number, number]> = {
-  '20-r-stand': [1.63, 1.26, 1.3], '16-r-stand': [1.63, 1.26, 1.3], intermill: [1.25, 1.01, 1.01],
-  'old-continuous-stand-1-2': [1.26, 0.85, 0.87], 'old-continuous-stand-3-4': [1.26, 0.85, 0.87], 'old-continuous-stand-5-6': [1.26, 0.85, 0.87],
-  'new-continuous-stand-1-2': [1.26, 0.85, 0.87], 'new-continuous-stand-3-4': [1.26, 0.85, 0.87],
-  'new-continuous-stand-5-6': [1.26, 0.85, 0.87], 'new-continuous-stand-7-8': [1.26, 0.85, 0.87],
-};
+/** The default inside sizes (config/equipment.ts); the sizes in use come from the Equipment settings store. */
+export const DEFAULT_TANK_SIZES = new Map<string, TankSize>(RMD_OIL_TANK_DEFAULTS.map((t) => [t.tank, { lengthM: t.lengthM, widthM: t.widthM, depthM: t.depthM }]));
 const INCH_M = 0.0254;
 
-/** A level reading (inches) in litres, with the tank's capacity. */
-export function tankLitres(stem: string, inches: number): { litres: number; capacityL: number } {
-  const [l, w, d] = TANK_SIZE_M[stem];
-  return { litres: Math.round(inches * INCH_M * l * w * 1000), capacityL: Math.round(l * w * d * 1000) };
+/**
+ * A level reading (inches) in litres, with the tank's capacity. The tanks are boxes with a flat bottom and
+ * the level is the oil depth from the bottom: oil = level × length × width; capacity = length × width × depth.
+ */
+export function tankLitres(stem: string, inches: number, sizes: Map<string, TankSize> = DEFAULT_TANK_SIZES): { litres: number; capacityL: number } {
+  const s = sizes.get(stem) ?? DEFAULT_TANK_SIZES.get(stem)!;
+  return { litres: Math.round(inches * INCH_M * s.lengthM * s.widthM * 1000), capacityL: capacityL(s) };
 }
 
 /** The plant's limits, °C. */
@@ -141,7 +131,7 @@ export function bearingGroup(entries: Entry[], group: AssetGroup): Omit<RmdBeari
   return { latest, max, trend, history, entries: mine.length };
 }
 
-export function oilGroup(entries: Entry[], group: AssetGroup): Omit<RmdOilGroup, 'levelLastDate' | 'temperatureLastDate'> {
+export function oilGroup(entries: Entry[], group: AssetGroup, sizes: Map<string, TankSize> = DEFAULT_TANK_SIZES): Omit<RmdOilGroup, 'levelLastDate' | 'temperatureLastDate'> {
   const tanks = TANKS.filter(([, g]) => g === group);
   const latest = (form: string) => entries.filter((e) => e.form === form)
     .reduce<Entry | null>((m, e) => (m === null || later(e, m) ? e : m), null);
@@ -149,7 +139,7 @@ export function oilGroup(entries: Entry[], group: AssetGroup): Omit<RmdOilGroup,
   const tp = latest('oil-tank-temperature');
   const level = lv ? tanks.flatMap(([stem, , label]) => {
     const v = num(lv.res[stem]);
-    return v === null ? [] : [{ ...withLimits({ equipment: label, point: 'Level', value: v, at: lv.date }, null), ...tankLitres(stem, v) }];
+    return v === null ? [] : [{ ...withLimits({ equipment: label, point: 'Level', value: v, at: lv.date }, null), ...tankLitres(stem, v, sizes) }];
   }) : [];
   const temperature = tp ? tanks.flatMap(([stem, , label]) => {
     const v = num(tp.res[`${stem}-c`]);
@@ -184,7 +174,11 @@ export function lastDates(entries: Entry[], to: string): RmdLastDates {
 
 export async function rmdAssetForms(env: Env, from: string, to: string): Promise<RmdAssetForms> {
   const startMs = Date.parse(`${from}T00:00:00+05:30`);
-  const read = await fetchFormsEntries(TAGS, startMs - LOOK_BACK_MS, env);
+  const [read, sizes] = await Promise.all([
+    fetchFormsEntries(TAGS, startMs - LOOK_BACK_MS, env),
+    // The tank sizes in use: the defaults with any edit made on the dashboard.
+    rmdTankSizes(env).catch(() => DEFAULT_TANK_SIZES),
+  ]);
   const rows = read.ok ? read.rows.map(toEntry).filter((e): e is Entry => e !== null) : [];
   const inPeriod = rows.filter((e) => e.date >= from && e.date <= to);
   /*
@@ -198,7 +192,7 @@ export async function rmdAssetForms(env: Env, from: string, to: string): Promise
     if (older?.ok) last = lastDates(older.rows.map(toEntry).filter((e): e is Entry => e !== null), to);
   }
   const bearing = (g: AssetGroup): RmdBearingGroup => ({ ...bearingGroup(inPeriod, g), lastDate: last[g].bearing });
-  const oil = (g: AssetGroup): RmdOilGroup => ({ ...oilGroup(inPeriod, g), levelLastDate: last[g].level, temperatureLastDate: last[g].temperature });
+  const oil = (g: AssetGroup): RmdOilGroup => ({ ...oilGroup(inPeriod, g, sizes), levelLastDate: last[g].level, temperatureLastDate: last[g].temperature });
   return {
     from, to,
     logbook: { connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
