@@ -234,7 +234,7 @@ const SOURCES: SourceSystem[] = [
     ],
   },
   {
-    name: 'Logbook',
+    name: 'Plan',
     rows: [
       ['Form', 'PRODUCTION PLAN → HSM ROLLING PLAN (saved on the dashboard, Edit plan)'],
       ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],

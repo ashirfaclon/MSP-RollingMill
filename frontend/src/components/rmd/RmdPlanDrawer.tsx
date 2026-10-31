@@ -35,7 +35,7 @@ const MILL: Record<PlanMill, MillPlan> = {
     field: 'PRODUCT_PRIME_SLENGTH_MT',
     dayPlan: 'Day plan = Day (MT) + Night (MT) as saved, Prime + SL',
     shifts: 'Shift target = Day (MT) / Night (MT) as saved  (Day 09:00–21:00 IST, Night 21:00–09:00 IST)',
-    plan: { name: 'Logbook', rows: [
+    plan: { name: 'Plan', rows: [
       ['Form', 'PRODUCTION PLAN → RMD ROLLING PLAN (saved on the dashboard, Edit plan)'],
       ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
     ] },
@@ -51,7 +51,7 @@ const MILL: Record<PlanMill, MillPlan> = {
     field: 'PRODUTION_MT',
     dayPlan: 'Day plan = Day (MT) + Night (MT) as saved',
     shifts: 'Shift target = Day (MT) / Night (MT) as saved  (Day 09:00–21:00 IST, Night 21:00–09:00 IST)',
-    plan: { name: 'Logbook', rows: [
+    plan: { name: 'Plan', rows: [
       ['Form', 'PRODUCTION PLAN → LSM ROLLING PLAN (saved on the dashboard, Edit plan)'],
       ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
     ] },
@@ -77,7 +77,7 @@ const MILL: Record<PlanMill, MillPlan> = {
     field: 'PRODUCTION_MT',
     dayPlan: 'Day plan = Day (MT) + Night (MT) as saved',
     shifts: 'Shift target = Day (MT) / Night (MT) as saved  (Day 09:30–21:30 IST, Night 21:30–09:30 IST)',
-    plan: { name: 'Logbook', rows: [
+    plan: { name: 'Plan', rows: [
       ['Form', 'PRODUCTION PLAN → RMS ROLLING PLAN (saved on the dashboard, Edit plan)'],
       ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
     ] },

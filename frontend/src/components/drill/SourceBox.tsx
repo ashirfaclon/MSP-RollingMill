@@ -19,8 +19,8 @@ export default function SourceBox({ sources, formula }: { sources?: SourceSystem
         <section aria-label="Data source">
           <h3 className="pd-src-title">Data source</h3>
           <div className="pd-src-box">
-            {sources.map((s) => (
-              <div key={s.name} className="pd-src-sys">
+            {sources.map((s, i) => (
+              <div key={`${i}-${s.name}`} className="pd-src-sys">
                 <div className="pd-src-name">{s.name}</div>
                 <dl>
                   {s.rows.map(([k, v]) => (
