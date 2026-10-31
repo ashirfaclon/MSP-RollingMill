@@ -3,13 +3,12 @@ import YieldKpiCard from '@/components/production/YieldKpiCard';
 import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import FinishedStockCard from '@/components/production/FinishedStockCard';
-import type { MillModel } from '@/models/millModel';
 
 /**
  * The headline figures, left to right as on the comp. No Made To Order / Made To Stock and no Stock
  * with order / Free stock cards: the order split is dropped on every mill (the user, 27 Oct 2026).
  */
-export default function KpiStrip(_: { m: MillModel }) {
+export default function KpiStrip() {
   return (
     <section className="rm-strip rm-strip--five" aria-label="Headline KPIs">
       {/* Live from the ERP, for the Duration filter's period; opens the ERP-vs-Influx drawer. */}

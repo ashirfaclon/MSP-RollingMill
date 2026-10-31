@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import type { MillModel } from '@/models/millModel';
 import ShiftPlanDrawer, { type ShiftView } from '@/components/drill/ShiftPlanDrawer';
 import RunningRateFoot from '@/components/production/RunningRateFoot';
 import { useSelection } from '@/services/hsmProduction';
@@ -22,7 +21,10 @@ import PlanConfig from '@/components/plan/PlanConfig';
  * Running rate is live (RunningRateFoot).
  */
 /** `actions`: more header buttons (the Production variance checklist). */
-export default function ShiftProduction({ m, actions }: { m: MillModel; actions?: ReactNode }) {
+/** The HSM shifts, in order (Day 08:00–20:00, Night 20:00–08:00 IST). */
+const SHIFT_NAMES = ['Day', 'Night'] as const;
+
+export default function ShiftProduction({ actions }: { actions?: ReactNode }) {
   const { dates } = useSelection();
   const url = rangeUrl('/api/hsm/plan', dates);
   const s = useApi<PlanReport>(url);
@@ -42,12 +44,12 @@ export default function ShiftProduction({ m, actions }: { m: MillModel; actions?
     <>
     <ShiftBars
       actions={actions}
-      shifts={m.shifts.map((sh) => ({
-        name: sh.name,
+      shifts={SHIFT_NAMES.map((name) => ({
+        name,
         // A planned period with no row for this shift is a 0 target, as filled; no plan at all is NA.
-        planMt: planned ? plan!.totals.byShift[sh.name] ?? 0 : null,
-        outputMt: plan ? plan.totals.actualByShift[sh.name] ?? 0 : null,
-        compliancePct: planned ? comply(plannedOut(sh.name), plan!.totals.byShift[sh.name] ?? 0) : null,
+        planMt: planned ? plan!.totals.byShift[name] ?? 0 : null,
+        outputMt: plan ? plan.totals.actualByShift[name] ?? 0 : null,
+        compliancePct: planned ? comply(plannedOut(name), plan!.totals.byShift[name] ?? 0) : null,
       }))}
       day={{
         planMt: plan?.totals.planMt ?? null,

@@ -35,21 +35,12 @@ export const SCREENS = [
     icon: 'trend',
     mills: ['hsm', 'rmd', 'lsm', 'rms'],
   },
-  {
-    id: 'data-model',
-    label: 'Data Model',
-    sub: 'Flow · Ledgers · Checks',
-    icon: 'database',
-  },
 ] as const satisfies readonly { id: string; label: string; sub: string; icon: IconId; mills?: readonly MillId[] }[];
 
 export type ScreenId = (typeof SCREENS)[number]['id'];
 
-/**
- * Screens left out of the sidebar for now. The page still builds and opens from its direct
- * link (/{mill}/data-model); remove an id here to bring its tab back.
- */
-export const HIDDEN_SCREENS: readonly ScreenId[] = ['data-model'];
+/** Screens left out of the sidebar (none since the sample-only Data Model screen was removed, 31 Oct 2026). */
+export const HIDDEN_SCREENS: readonly ScreenId[] = [];
 
 /** The screens the sidebar lists. */
 export const NAV_SCREENS = SCREENS.filter((s) => !HIDDEN_SCREENS.includes(s.id));

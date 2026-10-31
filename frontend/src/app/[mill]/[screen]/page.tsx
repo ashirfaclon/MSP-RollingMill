@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import AppShell from '@/components/shell/AppShell';
 import HsmVisualization from '@/components/visualization/HsmVisualization';
-import HsmDataModel from '@/components/datamodel/HsmDataModel';
 import RmdVisualization from '@/components/rmd/RmdVisualization';
 import PendingMillVisualization from '@/components/mills/PendingMillVisualization';
 import LsmVisualization from '@/components/lsm/LsmVisualization';
@@ -19,7 +18,6 @@ import { MILLS, SCREENS, hasScreen, isMill, isScreen, millOf, screenOf, type Mil
 /** Screens that exist so far; everything else shows a placeholder. */
 function screenFor(mill: MillId, screen: ScreenId) {
   if (mill === 'hsm' && screen === 'visualization') return <HsmVisualization />;
-  if (mill === 'hsm' && screen === 'data-model') return <HsmDataModel />;
   if (mill === 'hsm' && screen === 'asset-health') return <AssetHealth />;
   if (mill === 'hsm' && screen === 'condition-analytics') return <HsmConditionAnalytics />;
   if (mill === 'rmd' && screen === 'asset-health') return <RmdAssetHealth />;
