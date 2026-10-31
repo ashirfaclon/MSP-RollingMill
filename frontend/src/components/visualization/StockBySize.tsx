@@ -25,6 +25,7 @@ import { Seg } from '@/components/drill/DrillDrawer';
 import { fixed } from '@/lib/num';
 import { dm } from '@/services/hsmProduction';
 import { useFinishedStock } from '@/components/production/useFinishedStock';
+import { stockDate } from '@/components/production/stockAsOf';
 
 /** Below this a size is "nil", not stock — the ERP's own rounding. */
 const MIN_MT = 0.05;
@@ -54,10 +55,13 @@ export default function StockBySize() {
   const { rows } = view(tab);
   const counts = { all: view('all').rows.length, prime: view('prime').rows.length, defective: view('defective').rows.length };
   const max = rows.length ? shown(rows[0], tab) : 1;
-  /* The tab's total: the sizes it lists, added up. */
-  const totalMt = rows.reduce((a, r) => a + shown(r, tab), 0);
+  /* The tab's total: All = the ERP's finished stock, the same figure as the Finished stock card (the user, 31 Oct 2026);
+     Prime / Subprime = the sizes the tab lists, added up. */
+  const totalMt = tab === 'all' && data ? data.totals.stockMt : rows.reduce((a, r) => a + shown(r, tab), 0);
+  /* The date the stock is counted to — as the Finished stock card, on every mill. */
+  const counted = data ? stockDate(data.asOf, data.erp.lastDate) : asOf;
 
-  const sub = `ERP · at end of ${asOf ? dm(asOf) : '—'}${fromLedger && data ? ` · since ${dm(data.basis.from)} ’25` : ''}`;
+  const sub = `ERP · at end of ${counted ? dm(counted) : '—'}${fromLedger && data ? ` · since ${dm(data.basis.from)} ’25` : ''}`;
 
   return (
     <Panel

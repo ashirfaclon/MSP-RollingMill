@@ -18,6 +18,7 @@ import { fmtNum } from '@/components/drill/DrillChart';
 import { fixed } from '@/lib/num';
 import { dm, useSelection } from '@/services/hsmProduction';
 import { useApi, type LsmStockReport, type RmdStockReport } from '@/services/hsmApi';
+import { stockDate } from '@/components/production/stockAsOf';
 
 type StockMill = 'rmd' | 'lsm' | 'rms';
 type Report = RmdStockReport | LsmStockReport;
@@ -57,7 +58,16 @@ export default function RmdStockBySize({ mill = 'rmd' }: { mill?: StockMill }) {
   const max = Math.max(...(data?.sizes.map((x) => x.stockMt) ?? []), 0.01);
 
   return (
-    <Panel title="Finished stock by size" className="rm-panel" bodyClass="rm-body">
+    <Panel
+      title="Finished stock by size"
+      // As HSM's: the date the stock is counted to, and the total of the sizes in the title bar (the user, 31 Oct 2026).
+      sub={data && data.erp.connection === 'up' ? `ERP · at end of ${dm(stockDate(data.asOf, data.erp.lastDate) ?? data.asOf)}` : undefined}
+      right={data && data.erp.connection === 'up' && data.sizes.length > 0
+        ? <span className="rm-sizes-total" aria-label="Total of the sizes listed">Total <b className="num">{fixed(data.totalMt, 1)} MT</b></span>
+        : undefined}
+      className="rm-panel"
+      bodyClass="rm-body"
+    >
       {!data ? (
         s.error ? <p className="rm-empty">{s.error}</p> : <span className="skel skel--block" style={{ height: 150 }} role="status" aria-label="Loading" />
       ) : data.erp.connection === 'down' ? (
