@@ -3,9 +3,9 @@
  * VIBRATION READING (one entry per point, with MID's status and remarks) and TEMPERATURE READING
  * (one entry per thermography reading).
  *
- * MID's Excel reports, converted once by scripts/import-mid-reports.py into mid-reports.json, stay
- * as the earlier visits: a machine filed in the logbook for a date replaces that machine's report
- * rows of the same date. A machine's status is the worst of its points', its diagnosis their remarks.
+ * The logbook is the only source (the user, 31 Oct 2026): MID's four Excel vibration reports (HSM
+ * 21 Apr, RMD 23 Jan, LSM 13 Apr, RMS 10 Jan 2026) were written into the Vibration Reading form
+ * and are no longer read. A machine's status is the worst of its points', its diagnosis their remarks.
  */
 import type { Env } from '../../config/env';
 import type { MidMachine, MidPoint, MidReport, MidStatus, MidTemperature, MidVisit } from '../../contracts';
@@ -13,14 +13,11 @@ import { fetchFormEntries, num, type InsightEntry } from '../../integrations/log
 import { isDate } from '../hsm/production.service';
 import { MID_TEMPERATURE_FORM, MID_VIBRATION_FORM, tagOf } from '../forms-db/forms';
 import { sectionOf } from './sections';
-import reports from './mid-reports.json';
 
 interface ReadingRow extends MidPoint { date: string; mill: string; machine: string }
 interface ConditionRow { date: string; mill: string; machine: string; status: string; diagnosis: string | null }
 interface TemperatureRow extends MidTemperature { date: string; mill: string }
 
-const READINGS = reports.readings as ReadingRow[];
-const CONDITIONS = reports.conditions as ConditionRow[];
 
 const highest = (points: MidPoint[]) => {
   const v = points.flatMap((p) => [p.horizontal, p.vertical, p.axial]).filter((x): x is number => x !== null);
@@ -66,7 +63,6 @@ export async function midReportLive(env: Env, mill: string, to: string): Promise
   }
   const logged = [...points.values()];
   const key = (r: { date: string; machine: string }) => `${r.date}|${r.machine}`;
-  const filed = new Set(logged.map(key));
   const conditions = new Map<string, ConditionRow>();
   for (const r of logged) {
     const c = conditions.get(key(r));
@@ -90,8 +86,8 @@ export async function midReportLive(env: Env, mill: string, to: string): Promise
   const temperatures = [...thermo.values()];
   const report = midReport(
     mill, to,
-    [...READINGS.filter((r) => !(r.mill === mill && filed.has(key(r)))), ...logged],
-    [...CONDITIONS.filter((c) => !(c.mill === mill && filed.has(key(c)))), ...conditions.values()],
+    logged,
+    [...conditions.values()],
     temperatures,
   );
   const dates = (rows: { date: string }[]) => [...new Set(rows.map((r) => r.date).filter((d) => d <= to))].sort();
@@ -102,7 +98,7 @@ export async function midReportLive(env: Env, mill: string, to: string): Promise
   return report;
 }
 
-export function midReport(mill: string, to: string, readings = READINGS, conditions = CONDITIONS, temperatures: TemperatureRow[] = []): MidReport {
+export function midReport(mill: string, to: string, readings: ReadingRow[] = [], conditions: ConditionRow[] = [], temperatures: TemperatureRow[] = []): MidReport {
   const rows = readings.filter((r) => r.mill === mill && r.date <= to);
   const dates = [...new Set(rows.map((r) => r.date))].sort();
   const visits: MidVisit[] = dates.map((date) => {
@@ -128,13 +124,13 @@ export function midReport(mill: string, to: string, readings = READINGS, conditi
   const thermoDate = thermo.map((t) => t.date).sort().at(-1) ?? null;
   return {
     mill, to,
-    sources: reports.source.filter((s) => s.mill === mill && s.date <= to).map((s) => ({ kind: 'report' as const, name: s.file, date: s.date })),
+    sources: [],
     visits,
     latest: visits.at(-1) ?? null,
     temperature: thermoDate === null ? null : {
       date: thermoDate,
       readings: thermo.filter((t) => t.date === thermoDate).map(({ date: _d, mill: _m, ...t }) => t),
     },
-    skipped: reports.skipped.filter((s) => s.mill === mill && s.date <= to).map(({ date, machine, point, field, raw }) => ({ date, machine, point, field, raw })),
+    skipped: [],
   };
 }
