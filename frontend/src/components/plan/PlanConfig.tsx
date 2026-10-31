@@ -21,13 +21,6 @@ import '@/components/checklist/checklist.css';
 import './plan.css';
 
 export type PlanMill = 'hsm' | 'rmd' | 'lsm' | 'rms';
-/** The measure the plan is in — the one its Production card shows, so plan and actual compare. */
-const MEASURE: Record<PlanMill, string> = {
-  hsm: 'Production, as the Production card',
-  rmd: 'Prime + Short length, as the Production · Prime + SL card',
-  lsm: 'PRODUTION_MT, as the Production card',
-  rms: 'PRODUCTION_MT, as the Production card',
-};
 
 interface PlanDayIn { date: string; planMt: number | null; byShift: Record<string, number | null> }
 interface Row { date: string; dayOff: boolean; nightOff: boolean; day: string; night: string }
@@ -123,12 +116,11 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
             <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
           </label>
           <label className="ck-f"><span>Month plan (MT)</span>
-            <input type="number" min={0} step="0.01" inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} aria-describedby="pc-measure" />
+            <input type="number" min={0} step="0.01" inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} />
           </label>
           <div className="ck-f"><span>Working days</span><input readOnly value={`${fixed(workingDays, workingDays % 1 ? 1 : 0)} of ${rows.length}`} aria-label="Working days"
             title={`${working} of ${rows.length * 2} shifts — a shift off counts as half a day`} /></div>
         </div>
-        <p className="pc-hint" id="pc-measure">{MEASURE[mill]}. Tick the shift that is shut down — Day, Night or both for the whole day — and it gets no target.</p>
         <div className="ck-actions pc-actions">
           <button type="button" className="pc-btn" onClick={spread} disabled={entered === null || !working}
             title="Month plan ÷ working shifts, the same to each shift that runs">Spread over working days</button>

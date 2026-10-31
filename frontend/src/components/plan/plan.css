@@ -1,5 +1,4 @@
 /* Production plan config — on top of checklist.css (fields, actions) and the drill tables. */
-.pc-hint { margin: -6px 0 0; font-size: 11px; color: var(--muted-2); }
 .pc-actions { border-top: 0; padding-top: 0; }
 .pc-btn {
   padding: 7px 14px; font: inherit; font-size: 12px; font-weight: 800; border-radius: 7px; cursor: pointer;
