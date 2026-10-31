@@ -15,7 +15,19 @@ const DAY_MS = 86_400_000;
 /** Plans are saved ahead of their month: read a year of submissions. */
 const LOOK_BACK_MS = 400 * DAY_MS;
 
-export interface SavedPlanDay { date: string; shutdown: boolean; dayMt: number; nightMt: number; monthPlanMt: number | null; at: string }
+export interface SavedPlanDay { date: string; dayOff: boolean; nightOff: boolean; dayMt: number; nightMt: number; monthPlanMt: number | null; at: string }
+
+/**
+ * The form's Shutdown dropdown (Production Plan Form Spec): No, Day shift, Night shift, or Yes = the
+ * whole day. A shutdown can be a single shift (the user, 31 Oct 2026); entries saved before keep Yes / No.
+ */
+export const shutdownValue = (dayOff: boolean, nightOff: boolean) =>
+  dayOff && nightOff ? 'Yes' : dayOff ? 'Day shift' : nightOff ? 'Night shift' : 'No';
+export function shutdownOf(v: unknown): { dayOff: boolean; nightOff: boolean } {
+  const s = String(v ?? '').trim().toLowerCase();
+  if (s === 'yes' || s === 'whole day') return { dayOff: true, nightOff: true };
+  return { dayOff: s === 'day shift', nightOff: s === 'night shift' };
+}
 
 const mmYyyy = (month: string) => `${month.slice(5, 7)}-${month.slice(0, 4)}`;
 const monthDates = (month: string) => {
@@ -37,18 +49,20 @@ export function planEntries(body: PlanSaveBody): Record<string, unknown>[] {
   const rows = dates.map((date) => {
     const d = byDate.get(date)!;
     if (!isDate(date) || !ok(d.dayMt) || !ok(d.nightMt)) throw new HttpError(400, 'bad_day', `${date}: Day and Night must be numbers ≥ 0`);
-    const shutdown = d.shutdown === true;
-    return { date, shutdown, day: shutdown ? 0 : round2(d.dayMt), night: shutdown ? 0 : round2(d.nightMt) };
+    const dayOff = d.dayOff === true;
+    const nightOff = d.nightOff === true;
+    return { date, dayOff, nightOff, day: dayOff ? 0 : round2(d.dayMt), night: nightOff ? 0 : round2(d.nightMt) };
   });
   const monthDay = round2(rows.reduce((a, r) => a + r.day, 0));
   const monthNight = round2(rows.reduce((a, r) => a + r.night, 0));
-  const workingDays = rows.filter((r) => !r.shutdown).length;
+  // Working days: a whole-day shutdown takes a day off, a single shift half a day.
+  const workingDays = rows.reduce((a, r) => a + (r.dayOff ? 0 : 0.5) + (r.nightOff ? 0 : 0.5), 0);
   return rows.map((r) => ({
     [K.month]: mmYyyy(body.month),
     [K.monthPlan]: round2(body.monthPlanMt),
     [K.workingDays]: workingDays,
     [K.date]: r.date,
-    [K.shutdown]: r.shutdown ? 'Yes' : 'No',
+    [K.shutdown]: shutdownValue(r.dayOff, r.nightOff),
     [K.day]: r.day,
     [K.night]: r.night,
     [K.dayTotal]: round2(r.day + r.night),
@@ -76,7 +90,7 @@ export async function savedPlanDays(env: Env, mill: ConfigMill, from: string, to
     const day = num(v[K.day]);
     const night = num(v[K.night]);
     if (day === null || night === null) continue;
-    out.set(date, { date, shutdown: String(v[K.shutdown]) === 'Yes', dayMt: day, nightMt: night, monthPlanMt: num(v[K.monthPlan]), at: at(r) });
+    out.set(date, { date, ...shutdownOf(v[K.shutdown]), dayMt: day, nightMt: night, monthPlanMt: num(v[K.monthPlan]), at: at(r) });
   }
   return out;
 }
@@ -91,7 +105,7 @@ export async function savedPlan(env: Env, mill: ConfigMill, month: string): Prom
     month,
     saved: days.length > 0,
     monthPlanMt: days.length ? days[days.length - 1].monthPlanMt : null,
-    days: days.map(({ date, shutdown, dayMt, nightMt }) => ({ date, shutdown, dayMt, nightMt })),
+    days: days.map(({ date, dayOff, nightOff, dayMt, nightMt }) => ({ date, dayOff, nightOff, dayMt, nightMt })),
     savedAt: days.length ? days.map((d) => d.at).sort().at(-1)! : null,
   };
 }

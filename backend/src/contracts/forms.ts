@@ -1,11 +1,17 @@
 /** The dashboard's config forms (logbook forms used as its store): what the popups save and read back. */
 
+/**
+ * One date of a plan. A shutdown can be one shift or the whole day (the user, 31 Oct 2026): a shift
+ * that is off has no target.
+ */
+export interface PlanDayInput { date: string; dayOff: boolean; nightOff: boolean; dayMt: number; nightMt: number }
+
 /** POST /api/forms/plan/:mill — one month's plan; the dashboard writes one entry per date. */
 export interface PlanSaveBody {
   /** YYYY-MM */
   month: string;
   monthPlanMt: number;
-  days: { date: string; shutdown: boolean; dayMt: number; nightMt: number }[];
+  days: PlanDayInput[];
 }
 
 /** GET /api/forms/plan/:mill?month=YYYY-MM — the month as last saved (latest entry per date). */
@@ -13,7 +19,7 @@ export interface SavedPlan {
   month: string;
   saved: boolean;
   monthPlanMt: number | null;
-  days: { date: string; shutdown: boolean; dayMt: number; nightMt: number }[];
+  days: PlanDayInput[];
   savedAt: string | null;
 }
 
