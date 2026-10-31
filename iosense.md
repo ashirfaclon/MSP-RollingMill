@@ -37,7 +37,6 @@ and panels still render the sample model (`hsmSample.ts`).
 | `GET /api/ca/:mill` | The month's CA inputs (logbook `ca-inputs/{mill}-ca-inputs`) with the mill's ERP production, running hours, power form kWh/MT and ERP billet input / mass yield, month by month | Condition Analytics (all mills): output opportunity, conversion cost, cost variance, yield material loss, output margin, matched-run and costing rows |
 | `POST /api/forms/hsm/variance` · `POST /api/forms/hsm/setup` | Logbook forms `hsm-checklists/production-variance-checklist` (production figures filled by the server, as the Production card) and `hsm-checklists/shift-setup-checklist` | HSM Visualization: Checklists |
 | `GET /api/pm/:mill` | ERP PM, read-only, cached by `npm run sync:erp` (`data/erp-pm.json`): `MSPV7ERP1.EQPT_ID_MAST` (equipment by division S1 / RM / LS / RS), `EQPT_PM_TRAN` TNATURE PMREM (PM reminders: due FROM_DATE, done ACTION_VRNO / ACTION_VRDATE) and WOPM (work orders), `EQPT_PM_LOG` TNATURE BKDN (breakdowns) — tables named by the plant, 28 Oct 2026 | Asset Health (all mills): PM on time, Next PM, Open work orders, PM completed on time, MTBF, MTTR, Open action |
-| `GET /api/hsm/costing` | The plant's monthly costing sheet (`backend/src/modules/hsm/costing/months.ts`; Sep 2026) | HSM Condition Analytics: conversion cost, yield material loss, tariff, net material, other conversion |
 
 ## Calls
 

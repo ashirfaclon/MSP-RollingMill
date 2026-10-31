@@ -1,5 +1,6 @@
 /**
- * Condition Analytics costing per mill (the HSM KPI sheet's formulas, the user, 28–29 Oct 2026): the
+ * Condition Analytics costing per mill — the only source of every mill's costing, HSM included (the plant's
+ * September 2026 costing sheet was moved into the CA Inputs form, 31 Oct 2026) — the HSM KPI sheet's formulas (the user, 28–29 Oct 2026): the
  * nine CA inputs the plant saves on the dashboard for each month (logbook CA Inputs form) with what the
  * mill's sources give for the period — production and running hours (the Actual rate card), power
  * (the Specific energy form), billet input and mass yield (the ERP log sheet).
@@ -15,7 +16,6 @@
  */
 import type { Env } from '../../config/env';
 import type { CaActual, CaInputs, CaKpis, CaMonthPart, CaReport } from '../../contracts';
-import { monthsOf } from '../hsm/costing/costing.service';
 import { runningRate } from '../hsm/running-rate.service';
 import { yieldComparison } from '../hsm/yield.service';
 import { lsmProduction, lsmProductionByDay } from '../lsm/production.service';
@@ -28,6 +28,22 @@ import { rmsProduction, rmsProductionByDay } from '../rms/production.service';
 import { RMS_SHEET_FORM } from '../rms/plan.service';
 import { savedCaInputs } from '../forms-db/ca.store';
 import type { ConfigMill } from '../forms-db/forms';
+
+/** Every month (YYYY-MM) the period touches, oldest first. */
+export function monthsOf(from: string, to: string): string[] {
+  const out: string[] = [];
+  let y = Number(from.slice(0, 4));
+  let m = Number(from.slice(5, 7));
+  const end = to.slice(0, 7);
+  for (;;) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    out.push(key);
+    if (key >= end) break;
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  return out;
+}
 
 const KEYS: (keyof CaInputs)[] = [
   'benchmarkRateTph', 'benchmarkKwhPerMt', 'standardYieldPct', 'tariffActual', 'tariffStandard',

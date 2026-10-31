@@ -12,30 +12,26 @@
  *                        26 Oct 2026): billets since 08:00, RM / FM drives on (On_Off);
  *   Specific energy      the logbook Electrical HSM → Power Consumption ÷ ERP production, over the
  *                        days with both (the plant has no EMS meter; the user, 26 Oct 2026);
- *   Conversion cost,     the plant's monthly costing sheet (2026 Costing - SEP26.xlsx, 27 Oct 2026):
- *   Yield material loss, conversion cost ₹/MT, the losses' ₹ (MT × ₹/MT), tariff, other conversion
- *   costing rows         and net material rates — for a period whose months all have a sheet;
- *   CA costing           the month's CA inputs (Edit inputs, logbook CA Inputs — the config replaces
- *                        the costing sheet) with the figures above (CaCosting): output opportunity,
- *                        conversion cost, cost variance, yield material loss, output margin, matched-run
- *                        and costing rows. A period with no inputs keeps the costing sheet where it has one.
+ *   CA costing           the month's CA inputs (Edit inputs, logbook CA Inputs — the only source; the
+ *                        plant's September 2026 costing sheet was moved into it, 31 Oct 2026) with the
+ *                        figures above (CaCosting): output opportunity, conversion cost, cost variance,
+ *                        yield material loss, output margin, matched-run and costing rows — as every mill.
  * Waiting on the plant / ERP: approved limits, the stand map and route layout, the machine inspection form.
  */
 import { Fragment, useMemo, useState } from 'react';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import CaInputs from './CaInputs';
-import { CaCard, CaCostRows, CaDrawer, CaMatchedRows, inr, useCa } from './CaCosting';
+import { CaCard, CaCostRows, CaDrawer, CaMatchedRows, useCa } from './CaCosting';
 import '@/components/plan/plan.css';
 import Panel from '@/components/Panel';
 import KpiCard from '@/components/visualization/KpiCard';
 import HsmSpecificEnergy from './HsmSpecificEnergy';
-import HsmCostingDrawer from './HsmCostingDrawer';
 import MillMimic from '@/components/visualization/MillMimic';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { dm, useSelection } from '@/services/hsmProduction';
-import { rangeUrl, useApi, type CostingReport, type RateDay, type RunningRateReport } from '@/services/hsmApi';
+import { rangeUrl, useApi, type RateDay, type RunningRateReport } from '@/services/hsmApi';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
 import '@/components/asset/asset.css';
@@ -61,20 +57,10 @@ export default function HsmConditionAnalytics() {
   const rateS = useApi<RunningRateReport>(rateUrl);
   const rateR = rateS.data && rateS.dataUrl === rateUrl ? rateS.data : null;
   const [open, setOpen] = useState(false);
-  const [costOpen, setCostOpen] = useState(false);
   const [inputsOpen, setInputsOpen] = useState(false);
   const [caOpen, setCaOpen] = useState(false);
   const ca = useCa('hsm');
   const openCa = () => setCaOpen(true);
-  const openSheet = () => setCostOpen(true);
-  const costUrl = rangeUrl('/api/hsm/costing', dates);
-  const costS = useApi<CostingReport>(costUrl);
-  const cost = costS.data && costS.dataUrl === costUrl ? costS.data : null;
-  const cp = cost?.period ?? null;
-  // Net material rates as the sheet prices the losses (burning loss apart from the scrap-type losses).
-  const rates = cost?.sheets.length === 1 ? cost.sheets[0].losses : null;
-  const burning = rates?.find((l) => l.name === 'Burning loss')?.rate ?? null;
-  const scrap = rates?.find((l) => l.name !== 'Burning loss')?.rate ?? null;
 
   const rate = useMemo(() => (rateR ? actualRate(rateR.days) : null), [rateR]);
   /* No day with both ERP production and running hours in the period: the last day the ERP has (the user, 30 Oct 2026). */
@@ -99,9 +85,9 @@ export default function HsmConditionAnalytics() {
         />
         <CaCard id="opportunity" ca={ca} onOpen={openCa} />
         <HsmSpecificEnergy />
-        <CaCard id="conversion" ca={ca} onOpen={openCa} fallback={{ value: cp?.conversionPerMt ?? null, onOpen: openSheet }} />
+        <CaCard id="conversion" ca={ca} onOpen={openCa} />
         <CaCard id="variance" ca={ca} onOpen={openCa} />
-        <CaCard id="yieldLoss" ca={ca} onOpen={openCa} unitYield="₹ lakh" fallback={{ value: cp?.materialLossRs ?? null, onOpen: openSheet }} />
+        <CaCard id="yieldLoss" ca={ca} onOpen={openCa} unitYield="₹ lakh" />
         <CaCard id="margin" ca={ca} onOpen={openCa} />
       </section>
 
@@ -111,15 +97,10 @@ export default function HsmConditionAnalytics() {
         </Panel>
         <Panel title="Costing & impact" className="rm-panel" bodyClass="rm-body ah-list ah-list--top" right={<button type="button" className="rm-plan-edit" aria-haspopup="dialog" onClick={() => setInputsOpen(true)} title="Targets and costs for the month">Edit inputs</button>}>
           {/* No repeats of the Conversion cost, Cost variance and Output margin cards (the user, 28 Oct 2026). */}
-          <CaCostRows ca={ca} sheet={{
-            tariff: cp ? `${inr(cp.tariffPerKwh, 2)}/kWh` : null,
-            net: burning !== null && scrap !== null ? `${inr(burning)}/MT burning loss · ${inr(scrap)}/MT other losses` : null,
-            other: cp ? `${inr(cp.otherConversionPerMt)}/MT · standard NA` : null,
-          }} />
+          <CaCostRows ca={ca} />
         </Panel>
       </div>
 
-      <HsmCostingDrawer open={costOpen} onClose={() => setCostOpen(false)} report={cost} loading={!costS.data && !costS.error} error={costS.error} />
       <DrillDrawer open={open} onClose={() => setOpen(false)} title="Actual running rate" sub="HSM · TPH"
         loading={!rateS.data && !rateS.error} error={rateS.error} hasData={!!rateR}>
         {rateR && rate && <RateContent days={rateR.days} rate={rate} />}

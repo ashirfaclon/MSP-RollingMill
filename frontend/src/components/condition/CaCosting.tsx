@@ -68,10 +68,9 @@ function emptyNote(ca: CaView, v: number | null): boolean | string {
 
 export type CaCardId = 'opportunity' | 'conversion' | 'variance' | 'yieldLoss' | 'margin';
 
-/** One of the five CA cards. `fallback`: HSM's costing sheet, for a period with no CA inputs. */
-export function CaCard({ id, ca, onOpen, unitYield = '₹', fallback }: {
+/** One of the five CA cards. */
+export function CaCard({ id, ca, onOpen, unitYield = '₹' }: {
   id: CaCardId; ca: CaView; onOpen: () => void; unitYield?: '₹' | '₹ lakh';
-  fallback?: { value: number | null; onOpen: () => void };
 }) {
   const pick: Record<CaCardId, (k: CaReport['kpis'] | null) => number | null> = {
     opportunity: (k) => k?.opportunityMt ?? null,
@@ -92,13 +91,12 @@ export function CaCard({ id, ca, onOpen, unitYield = '₹', fallback }: {
   // The last day with the figure: the ERP's last day, else (rate-based figures) the last day with a rate.
   const lastSrc = cv === null ? [ca.last, ca.lastRate].find((x) => x && pick[id](x.report.kpis) !== null) ?? null : null;
   const lv = lastSrc ? pick[id](lastSrc.report.kpis) : null;
-  const useFallback = cv === null && lv === null && fallback && fallback.value !== null;
-  const v = useFallback ? fallback!.value : cv;
+  const v = cv;
   return (
     <KpiCard label={c.label} value={v === null ? 'NA' : c.show(v)} unit={c.unit} note="" series={c.series}
-      loading={ca.loading} noEntries={useFallback ? false : emptyNote(ca, cv)}
+      loading={ca.loading} noEntries={emptyNote(ca, cv)}
       lastEntry={lv !== null && lastSrc ? { value: c.show(lv), date: lastSrc.date } : null}
-      onOpen={useFallback ? fallback!.onOpen : onOpen} openLabel={useFallback ? 'The plant\'s costing sheet, line by line' : 'CA costing, month by month'} />
+      onOpen={onOpen} openLabel="CA costing, month by month" />
   );
 }
 
@@ -132,19 +130,19 @@ export function CaMatchedRows({ ca }: { ca: CaView }) {
   );
 }
 
-/** Costing & impact rows from the inputs. `sheet`: HSM's costing-sheet rows, when there are no inputs. */
-export function CaCostRows({ ca, sheet }: { ca: CaView; sheet?: Partial<Record<'tariff' | 'net' | 'other', string | null>> }) {
+/** Costing & impact rows from the inputs. */
+export function CaCostRows({ ca }: { ca: CaView }) {
   const { r, date } = actualSource(ca);
   const i = r?.inputs ?? null;
   const k = r?.kpis ?? null;
   const y = r?.actual.yieldPct ?? null;
   return (
     <>
-      <Row k="Tariff" v={i ? `${inr(i.tariffActual, 2)}/kWh · standard ${inr(i.tariffStandard, 2)}` : sheet?.tariff ?? null} />
+      <Row k="Tariff" v={i ? `${inr(i.tariffActual, 2)}/kWh · standard ${inr(i.tariffStandard, 2)}` : null} />
       <Row k="Contribution" v={i ? `${inr(i.contributionPerMt)}/MT` : null} />
-      <Row k="Net material" v={i ? `${inr(i.netMaterialPerMt)}/MT` : sheet?.net ?? null} />
+      <Row k="Net material" v={i ? `${inr(i.netMaterialPerMt)}/MT` : null} />
       <Row k="Other conversion · actual / standard" last={date}
-        v={i && k?.otherActualPerMt != null ? `${inr(k.otherActualPerMt)}/MT · ${inr(i.otherConversionStandard)}/MT` : sheet?.other ?? null} />
+        v={i && k?.otherActualPerMt != null ? `${inr(k.otherActualPerMt)}/MT · ${inr(i.otherConversionStandard)}/MT` : null} />
       <Row k="Yield material variance" last={date} v={i && y !== null ? `${fixed(y, 2)} % vs ${fixed(i.standardYieldPct, 2)} % standard` : null} />
     </>
   );
