@@ -1,6 +1,6 @@
 /** MID: machine sections, and visits up to the period's end in the form shapes. */
 import { describe, expect, test, vi } from 'vitest';
-import { sectionOf } from '../../src/modules/mid/sections';
+import { masterSection, sectionOf } from '../../src/modules/mid/sections';
 import { midReport } from '../../src/modules/mid/mid.service';
 
 describe('MID sections', () => {
@@ -13,6 +13,14 @@ describe('MID sections', () => {
     expect(sectionOf('hsm', 'FINISHING-03')).toBe('finishing');
     expect(sectionOf('hsm', 'VERTICAL PINCH ROLL')).toBeNull();
     expect(sectionOf('lsm', 'SLP NO. 1')).toBeNull();
+  });
+  test('the Section given in MID Master wins over the name', () => {
+    const master = new Map([['VERTICAL PINCH ROLL', 'finishing' as const], ['FINISHING-03', 'auxiliary' as const]]);
+    expect(sectionOf('hsm', 'Vertical  pinch roll', master)).toBe('finishing');
+    expect(sectionOf('hsm', 'FINISHING-03', master)).toBe('auxiliary');
+    expect(sectionOf('hsm', 'ROUGHING-02', master)).toBe('roughing');   // not in the master: by name
+    expect(['Roughing', 'Route / Diverter', 'Finishing', 'Auxiliary', '', 'x'].map(masterSection))
+      .toEqual(['roughing', 'route', 'finishing', 'auxiliary', null, null]);
   });
 });
 
@@ -39,9 +47,15 @@ describe('MID logbook forms', () => {
     const row = (tag: string, at: string, result: Record<string, unknown>) => ({ tags: [tag], createdAt: at, result });
     const V = 'mid-logbook/vibration-reading';
     const T = 'mid-logbook/temperature-reading';
+    const M = 'mid-logbook/mid-master';
     const p = (point: string, h: number, status: string, remarks?: string) =>
       ({ date: '2026-04-21', division: 'RM', unit: 'HSM', machine: 'PUMP-04', component: 'Pump', point, 'horizontal-mm-s-rms': h, 'vertical-mm-s-rms': 1, 'axial-mm-s-rms': 1, status, remarks });
     const rows: Record<string, unknown[]> = {
+      [M]: [
+        row(M, '2026-10-31T06:00:00Z', { division: 'RM', unit: 'HSM', machine: 'PUMP-04', component: 'Pump', point: 'B1' }),   // no Section: by name
+        row(M, '2026-10-31T06:00:00Z', { division: 'RM', unit: 'HSM', machine: 'ROUGHING-01', component: 'Main motor', point: 'B1', section: 'Finishing' }),
+        row(M, '2026-10-31T06:00:00Z', { division: 'RM', unit: 'RMD', machine: 'PUMP-04', component: 'Pump', point: 'B1', section: 'Roughing' }),   // another unit
+      ],
       [V]: [
         row(V, '2026-10-29T05:00:00Z', p('B1', 9, 'Good')),
         row(V, '2026-10-29T06:00:00Z', p('B1', 2.5, 'Good')), // re-filed: wins
@@ -66,7 +80,7 @@ describe('MID logbook forms', () => {
     const pump = r.latest!.machines.find((m) => m.machine === 'PUMP-04')!;
     expect(pump.points.map((x) => [x.point, x.horizontal])).toEqual([['B1', 2.5], ['B2', 6.2]]);
     expect(pump).toMatchObject({ status: 'Un-acceptable', diagnosis: 'Bearing noise', maxMmS: 6.2 });
-    expect(r.latest!.machines.map((m) => m.machine)).toEqual(['PUMP-04', 'ROUGHING-01']); // nothing from the old reports
+    expect(r.latest!.machines.map((m) => [m.machine, m.section])).toEqual([['PUMP-04', 'auxiliary'], ['ROUGHING-01', 'finishing']]); // nothing from the old reports; Section from MID Master
     expect(r.temperature).toEqual({ date: '2026-04-12', readings: [{ equipment: 'ROUGHING-2', phase: 'Y Phase', loadMw: null, designC: 90, maxC: 77, status: 'Acceptable', remarks: 'Loose lug' }] });
     expect(r.sources.filter((s) => s.kind === 'logbook').map((s) => s.name)).toEqual(['MID Logbook → Vibration Reading', 'MID Logbook → Temperature Reading', 'MID Logbook → Temperature Reading']);
     vi.doUnmock('../../src/integrations/logbook/client');

@@ -20,6 +20,8 @@ export const SETUP_FORM = 'hsm-checklists__shift-setup-checklist';
 /** Read only — MID fills them. */
 export const MID_VIBRATION_FORM = 'mid-logbook__vibration-reading';
 export const MID_TEMPERATURE_FORM = 'mid-logbook__temperature-reading';
+/** The plant fills it: one entry per measuring point, with the machine's Section (the user, 31 Oct 2026). */
+export const MID_MASTER_FORM = 'mid-logbook__mid-master';
 
 /** A form's tag (what entries carry and reads filter on): its id with "/" for "__". */
 export const tagOf = (formId: string) => formId.replace('__', '/');

@@ -6,13 +6,14 @@
  * The logbook is the only source (the user, 31 Oct 2026): MID's four Excel vibration reports (HSM
  * 21 Apr, RMD 23 Jan, LSM 13 Apr, RMS 10 Jan 2026) were written into the Vibration Reading form
  * and are no longer read. A machine's status is the worst of its points', its diagnosis their remarks.
+ * Its section is the one the plant gave it in MID Master, else worked out from its name (sections.ts).
  */
 import type { Env } from '../../config/env';
-import type { MidMachine, MidPoint, MidReport, MidStatus, MidTemperature, MidVisit } from '../../contracts';
+import type { MidMachine, MidPoint, MidReport, MidSection, MidStatus, MidTemperature, MidVisit } from '../../contracts';
 import { fetchFormEntries, num, type InsightEntry } from '../../integrations/logbook/client';
 import { isDate } from '../hsm/production.service';
-import { MID_TEMPERATURE_FORM, MID_VIBRATION_FORM, tagOf } from '../forms-db/forms';
-import { sectionOf } from './sections';
+import { MID_MASTER_FORM, MID_TEMPERATURE_FORM, MID_VIBRATION_FORM, tagOf } from '../forms-db/forms';
+import { machineKey, masterSection, sectionOf } from './sections';
 
 interface ReadingRow extends MidPoint { date: string; mill: string; machine: string }
 interface ConditionRow { date: string; mill: string; machine: string; status: string; diagnosis: string | null }
@@ -44,11 +45,29 @@ async function entries(env: Env, form: string, mill: string): Promise<{ date: st
       && (e.v.division == null || String(e.v.division).trim().toUpperCase() === 'RM'));
 }
 
+/** MID Master: each of the mill's machines with a Section → that section; the latest entry with one wins. */
+async function masterSections(env: Env, mill: string): Promise<Map<string, MidSection>> {
+  const read = await fetchFormEntries(tagOf(MID_MASTER_FORM), Date.now() - 10 * 365 * 86_400_000, env);
+  const out = new Map<string, MidSection>();
+  if (!read.ok) return out;
+  const at = (r: InsightEntry) => String(r.createdAt ?? r.invocationTime ?? '');
+  for (const r of [...read.rows].sort((a, b) => at(a).localeCompare(at(b)))) {
+    const v = r.result ?? {};
+    const s = masterSection(v.section);
+    const machine = text(v.machine);
+    if (s && machine && String(v.unit ?? '').trim().toLowerCase() === mill && String(v.division ?? '').trim().toUpperCase() === 'RM') {
+      out.set(machineKey(machine), s);
+    }
+  }
+  return out;
+}
+
 /** The report with the MID logbook forms' entries laid over the Excel reports. Logbook down: the reports alone. */
 export async function midReportLive(env: Env, mill: string, to: string): Promise<MidReport> {
-  const [vib, temp] = await Promise.all([
+  const [vib, temp, sections] = await Promise.all([
     entries(env, MID_VIBRATION_FORM, mill).catch(() => []),
     entries(env, MID_TEMPERATURE_FORM, mill).catch(() => []),
+    masterSections(env, mill).catch(() => new Map<string, MidSection>()),
   ]);
   // One reading per date, machine, component and point: the latest filed.
   const points = new Map<string, ReadingRow & { status: MidStatus | null; remarks: string | null }>();
@@ -89,6 +108,7 @@ export async function midReportLive(env: Env, mill: string, to: string): Promise
     logged,
     [...conditions.values()],
     temperatures,
+    sections,
   );
   const dates = (rows: { date: string }[]) => [...new Set(rows.map((r) => r.date).filter((d) => d <= to))].sort();
   report.sources.push(
@@ -98,7 +118,10 @@ export async function midReportLive(env: Env, mill: string, to: string): Promise
   return report;
 }
 
-export function midReport(mill: string, to: string, readings: ReadingRow[] = [], conditions: ConditionRow[] = [], temperatures: TemperatureRow[] = []): MidReport {
+export function midReport(
+  mill: string, to: string, readings: ReadingRow[] = [], conditions: ConditionRow[] = [], temperatures: TemperatureRow[] = [],
+  sections?: Map<string, MidSection>,
+): MidReport {
   const rows = readings.filter((r) => r.mill === mill && r.date <= to);
   const dates = [...new Set(rows.map((r) => r.date))].sort();
   const visits: MidVisit[] = dates.map((date) => {
@@ -111,7 +134,7 @@ export function midReport(mill: string, to: string, readings: ReadingRow[] = [],
           .map(({ part, component, point, horizontal, vertical, axial }) => ({ part, component, point, horizontal, vertical, axial }));
         const c = conditions.find((x) => x.mill === mill && x.date === date && x.machine === machine);
         return {
-          machine, section: sectionOf(mill, machine),
+          machine, section: sectionOf(mill, machine, sections),
           status: statusOf(c?.status),
           diagnosis: c?.diagnosis ?? null,
           maxMmS: highest(points),
