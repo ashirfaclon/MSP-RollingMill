@@ -14,7 +14,7 @@ import type { ProductionComparison } from '@/services/hsmProduction';
 import KpiCard, { NO_ENTRIES } from '@/components/visualization/KpiCard';
 import { productionTermText } from './productionTerm';
 import ProductionDrawer from './ProductionDrawer';
-import { COUNTER_START_DATE, dm, useProduction, useSelection } from '@/services/hsmProduction';
+import { dm, useProduction, useSelection } from '@/services/hsmProduction';
 
 const fmt1 = (v: number | null) => (v === null ? 'NA' : v.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 
@@ -35,7 +35,7 @@ export default function ProductionKpiCard() {
     erp = t.erpDays ? t.erpMt : null;
     influx = t.influxMt;
     if (current.influx.connection === 'down') note = current.influx.message;
-    else if (t.influxMt === null) note = `No counter data · starts ${dm(COUNTER_START_DATE)}`;
+    else if (t.influxMt === null) note = 'No counter data in this period';
     // No coverage notes ("entered to …"). Both cover the whole period: the line under the two figures is Influx − ERP.
     else if (t.erpDays === t.days && t.varianceMt !== null) {
       // Highlighted like the shift panel's plan gap: amber when the two disagree, green when they match.

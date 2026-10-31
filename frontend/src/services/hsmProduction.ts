@@ -15,8 +15,6 @@ export { addDays, dm, plantDate, cycleLabel } from '@/lib/plantDay';
 
 export type { Grain, ProductionComparison, PeriodRow } from '@contracts';
 
-/** The day the Influx counter starts publishing — the comparison's default start. */
-export const COUNTER_START_DATE = '2026-09-21';
 const REFRESH_MS = 60_000;
 
 /* A minute-resolution clock that re-renders subscribers, read outside render. */
@@ -41,9 +39,6 @@ export function useProduction(params: { from: string; to: string; grain: Grain }
   const { data, loading, error } = useApi<ProductionComparison>(rangeUrl('/api/hsm/production', params), REFRESH_MS);
   return { data, loading, error };
 }
-
-/** ERP cut-over for the strip mill: the log sheet has live entries from this date. */
-export const ERP_START_DATE = '2025-11-30';
 
 /** The Duration filter as plant dates (each 08:00 → 08:00) plus its label; `today` is the current plant date. */
 export function useSelection(): { dates: { from: string; to: string } | null; label: string; today: string | null } {

@@ -3,12 +3,14 @@
 /**
  * Equipment settings in use (the user, 31 Oct 2026): the backend's defaults (config/equipment.ts)
  * overlaid with any edit made on the dashboard. The HSM motor rated currents set Motor current
- * loading %; the RMD oil tank sizes turn levels into litres (worked out in the backend).
+ * loading %; the RMD oil tank sizes turn levels into litres; the RMD temperature limits colour the
+ * bearing and oil temperature readings (both worked out in the backend).
  */
-import { useApi, type HsmMotorRatings, type RmdOilTanks } from './hsmApi';
+import { useApi, type HsmMotorRatings, type RmdOilTanks, type RmdTempLimits } from './hsmApi';
 
 export const HSM_MOTORS_URL = '/api/forms/equipment/hsm-motors';
 export const RMD_TANKS_URL = '/api/forms/equipment/rmd-tanks';
+export const RMD_LIMITS_URL = '/api/forms/equipment/rmd-temperature-limits';
 
 export function useHsmMotorRatings() {
   const s = useApi<HsmMotorRatings>(HSM_MOTORS_URL);
@@ -20,6 +22,11 @@ export function useHsmMotorRatings() {
 export function useRmdOilTanks() {
   const s = useApi<RmdOilTanks>(RMD_TANKS_URL);
   return { data: s.dataUrl === RMD_TANKS_URL ? s.data : null, error: s.error };
+}
+
+export function useRmdTempLimits() {
+  const s = useApi<RmdTempLimits>(RMD_LIMITS_URL);
+  return { data: s.dataUrl === RMD_LIMITS_URL ? s.data : null, error: s.error };
 }
 
 /** A stand's loading % (load ÷ rated current × 100), or null without its load or rated current. */

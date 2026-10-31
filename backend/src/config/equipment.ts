@@ -55,5 +55,21 @@ export const RMD_OIL_TANK_DEFAULTS: readonly RmdOilTank[] = [
   { tank: 'new-continuous-stand-7-8', label: 'NC stand 7–8', group: 'route', lengthM: 1.26, widthM: 0.85, depthM: 0.87 },
 ];
 
-/** Sanity bounds for an edit (a typing slip, not a real motor or tank, is refused). */
-export const EQUIPMENT_LIMITS = { ratedCurrentA: [1, 20_000], tankM: [0.1, 10] } as const;
+/** RMD temperature limits, °C: a reading below min or above max is outside them (the card turns red). */
+export type RmdTempLimitId = 'bearing' | 'flywheel' | 'oil-tank';
+export interface RmdTempLimit {
+  limit: RmdTempLimitId;
+  label: string;
+  minC: number;
+  maxC: number;
+}
+
+/** Source: the plant, 16 Oct 2026 — bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature 45–65 °C. */
+export const RMD_TEMP_LIMIT_DEFAULTS: readonly RmdTempLimit[] = [
+  { limit: 'bearing', label: 'Bearings (reduction / pinion gear)', minC: 45, maxC: 65 },
+  { limit: 'flywheel', label: 'Flywheel bearings', minC: 45, maxC: 80 },
+  { limit: 'oil-tank', label: 'Oil tank', minC: 45, maxC: 65 },
+];
+
+/** Sanity bounds for an edit (a typing slip, not a real motor, tank or limit, is refused). */
+export const EQUIPMENT_LIMITS = { ratedCurrentA: [1, 20_000], tankM: [0.1, 10], tempC: [0, 200] } as const;

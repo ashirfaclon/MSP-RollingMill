@@ -1,17 +1,18 @@
 /**
- * Equipment settings (the user, 31 Oct 2026): the HSM stand motors' rated current and the RMD gearbox
- * oil tanks' inside dimensions. The defaults are in config/equipment.ts; an edit made on the dashboard
- * (the Motor current / Gearbox oil drill-downs) is saved to the logbook "Equipment settings" forms —
- * one entry per motor or tank, the latest wins — and from then on is the value in use. The logbook
+ * Equipment settings (the user, 31 Oct 2026): the HSM stand motors' rated current, the RMD gearbox
+ * oil tanks' inside dimensions and the RMD temperature limits. The defaults are in config/equipment.ts;
+ * an edit made on the dashboard (the Motor current / Gearbox oil / Bearing temp drill-downs) is saved
+ * to the logbook "Equipment settings" forms — one entry per motor, tank or limit, the latest wins —
+ * and from then on is the value in use. The logbook
  * entry records who changed it and when; the code is never rewritten at run time.
  */
 import type { Env } from '../../config/env';
-import { EQUIPMENT_LIMITS, HSM_MOTOR_DEFAULTS, RMD_OIL_TANK_DEFAULTS } from '../../config/equipment';
-import type { HsmMotorRatings, HsmMotorRatingsBody, RmdOilTanks, RmdOilTanksBody } from '../../contracts';
+import { EQUIPMENT_LIMITS, HSM_MOTOR_DEFAULTS, RMD_OIL_TANK_DEFAULTS, RMD_TEMP_LIMIT_DEFAULTS, type RmdTempLimitId } from '../../config/equipment';
+import type { HsmMotorRatings, HsmMotorRatingsBody, RmdOilTanks, RmdOilTanksBody, RmdTempLimits, RmdTempLimitsBody } from '../../contracts';
 import { fetchFormEntries, num, saveFormEntries, type FormWrite, type InsightEntry } from '../../integrations/logbook/client';
 import { HttpError } from '../../shared/http-error';
 import { MSG } from '../../shared/messages';
-import { HSM_MOTOR_FORM, MOTOR_KEYS, RMD_TANK_FORM, TANK_KEYS, tagOf } from './forms';
+import { HSM_MOTOR_FORM, MOTOR_KEYS, RMD_TANK_FORM, RMD_TEMP_LIMIT_FORM, TANK_KEYS, TEMP_LIMIT_KEYS, tagOf } from './forms';
 
 /** Settings are saved rarely: read every entry ever made (ten years). */
 const LOOK_BACK_MS = 3650 * 86_400_000;
@@ -123,4 +124,53 @@ export async function saveRmdOilTanks(env: Env, body: RmdOilTanksBody, filledBy:
 /** tank → its inside size in use (m). */
 export async function rmdTankSizes(env: Env): Promise<Map<string, TankSize>> {
   return new Map((await rmdOilTanks(env)).rows.map((r) => [r.tank, { lengthM: r.lengthM, widthM: r.widthM, depthM: r.depthM }]));
+}
+
+// ---------------------------------- RMD temperature limits ----------------------------------
+
+export async function rmdTempLimits(env: Env): Promise<RmdTempLimits> {
+  const { read, out } = await latestByKey(env, RMD_TEMP_LIMIT_FORM, TEMP_LIMIT_KEYS.limit);
+  return {
+    logbook: logbookOf(read),
+    rows: RMD_TEMP_LIMIT_DEFAULTS.map((d) => {
+      const s = out.get(d.limit);
+      const lo = s ? num(s.v[TEMP_LIMIT_KEYS.minC]) : null;
+      const hi = s ? num(s.v[TEMP_LIMIT_KEYS.maxC]) : null;
+      const edited = lo !== null && hi !== null;
+      return {
+        limit: d.limit, label: d.label, minC: edited ? lo! : d.minC, maxC: edited ? hi! : d.maxC,
+        defaults: { minC: d.minC, maxC: d.maxC },
+        edited, editedAt: edited ? s!.at : null, editedBy: edited ? s!.by : null,
+      };
+    }),
+  };
+}
+
+export async function saveRmdTempLimits(env: Env, body: RmdTempLimitsBody, filledBy: string): Promise<FormWrite> {
+  const byId = new Map(RMD_TEMP_LIMIT_DEFAULTS.map((d) => [d.limit as string, d]));
+  const [lo, hi] = EQUIPMENT_LIMITS.tempC;
+  const rows = Array.isArray(body?.rows) ? body.rows : [];
+  if (!rows.length) throw new HttpError(400, 'bad_rows', 'rows must list the limits to save');
+  const current = new Map((await rmdTempLimits(env)).rows.map((r) => [r.limit as string, r]));
+  const entries = rows.map((r) => {
+    const d = byId.get(r?.limit);
+    if (!d) throw new HttpError(400, 'bad_limit', `unknown limit: ${String(r?.limit)}`);
+    const minC = Number(r.minC); const maxC = Number(r.maxC);
+    for (const v of [minC, maxC]) {
+      if (!Number.isFinite(v) || v < lo || v > hi) throw new HttpError(400, 'bad_value', `${d.label}: limits must be ${lo}–${hi} °C`);
+    }
+    if (minC >= maxC) throw new HttpError(400, 'bad_value', `${d.label}: min must be below max`);
+    return { [TEMP_LIMIT_KEYS.limit]: d.limit, [TEMP_LIMIT_KEYS.name]: d.label, [TEMP_LIMIT_KEYS.minC]: round(minC, 1), [TEMP_LIMIT_KEYS.maxC]: round(maxC, 1) };
+  }).filter((e) => {
+    const c = current.get(String(e[TEMP_LIMIT_KEYS.limit]));
+    return !c || c.minC !== e[TEMP_LIMIT_KEYS.minC] || c.maxC !== e[TEMP_LIMIT_KEYS.maxC];
+  });
+  if (!entries.length) return { ok: true, saved: 0, added: 0, updated: 0, removed: 0 };
+  return saveFormEntries(RMD_TEMP_LIMIT_FORM, entries, (x) => String(x[TEMP_LIMIT_KEYS.limit] ?? ''), filledBy, env);
+}
+
+export type TempLimits = Record<RmdTempLimitId, readonly [number, number]>;
+/** limit → [min, max] °C in use. */
+export async function rmdTempLimitsInUse(env: Env): Promise<TempLimits> {
+  return Object.fromEntries((await rmdTempLimits(env)).rows.map((r) => [r.limit, [r.minC, r.maxC] as const])) as TempLimits;
 }

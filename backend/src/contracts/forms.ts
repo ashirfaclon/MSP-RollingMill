@@ -77,3 +77,14 @@ export interface RmdOilTanks {
 }
 /** POST /api/forms/equipment/rmd-tanks */
 export interface RmdOilTanksBody { rows: { tank: string; lengthM: number; widthM: number; depthM: number }[] }
+
+/** GET /api/forms/equipment/rmd-temperature-limits — RMD bearing, flywheel and oil tank limits in use (°C), and defaults. */
+export interface RmdTempLimits {
+  logbook: { connection: 'up' | 'down'; message: string };
+  rows: ({
+    limit: 'bearing' | 'flywheel' | 'oil-tank'; label: string;
+    minC: number; maxC: number; defaults: { minC: number; maxC: number };
+  } & EditedBy)[];
+}
+/** POST /api/forms/equipment/rmd-temperature-limits */
+export interface RmdTempLimitsBody { rows: { limit: string; minC: number; maxC: number }[] }

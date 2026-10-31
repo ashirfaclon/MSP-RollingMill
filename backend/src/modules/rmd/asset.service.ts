@@ -20,8 +20,8 @@
  * late, so the read takes everything submitted from a month before the period.
  */
 import type { Env } from '../../config/env';
-import { RMD_OIL_TANK_DEFAULTS } from '../../config/equipment';
-import { capacityL, rmdTankSizes, type TankSize } from '../forms-db/equipment.store';
+import { RMD_OIL_TANK_DEFAULTS, RMD_TEMP_LIMIT_DEFAULTS } from '../../config/equipment';
+import { capacityL, rmdTankSizes, rmdTempLimitsInUse, type TankSize, type TempLimits } from '../forms-db/equipment.store';
 import type { RmdAssetForms, RmdBearingGroup, RmdOilGroup, RmdReading } from '../../contracts';
 import { fetchFormsEntries, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
@@ -72,8 +72,8 @@ export function tankLitres(stem: string, inches: number, sizes: Map<string, Tank
   return { litres: Math.round(inches * INCH_M * s.lengthM * s.widthM * 1000), capacityL: capacityL(s) };
 }
 
-/** The plant's limits, °C. */
-export const LIMITS = { bearing: [45, 65], flywheel: [45, 80], oilTemp: [45, 65] } as const;
+/** The default limits, °C (config/equipment.ts); the limits in use come from the Equipment settings store. */
+export const DEFAULT_LIMITS = Object.fromEntries(RMD_TEMP_LIMIT_DEFAULTS.map((l) => [l.limit, [l.minC, l.maxC] as const])) as TempLimits;
 
 /** A reading with its limits and where it falls. */
 export function withLimits(r: Omit<RmdReading, 'min' | 'max' | 'status'>, limits: readonly [number, number] | null): RmdReading {
@@ -81,7 +81,7 @@ export function withLimits(r: Omit<RmdReading, 'min' | 'max' | 'status'>, limits
   const [min, max] = limits;
   return { ...r, min, max, status: r.value < min ? 'low' : r.value > max ? 'high' : 'ok' };
 }
-const bearingLimits = (point: string) => (point.startsWith('Flywheel') ? LIMITS.flywheel : LIMITS.bearing);
+const bearingLimits = (point: string, limits: TempLimits) => (point.startsWith('Flywheel') ? limits.flywheel : limits.bearing);
 
 interface Entry { form: string; date: string; time: string | null; createdMs: number; res: Record<string, unknown> }
 
@@ -105,7 +105,7 @@ const later = (a: Entry, b: Entry) =>
   a.date !== b.date ? a.date > b.date : (a.time ?? '') !== (b.time ?? '') ? (a.time ?? '') > (b.time ?? '') : a.createdMs > b.createdMs;
 const order = (a: Entry, b: Entry) => (later(a, b) ? 1 : later(b, a) ? -1 : 0);
 
-export function bearingGroup(entries: Entry[], group: AssetGroup): Omit<RmdBearingGroup, 'lastDate'> {
+export function bearingGroup(entries: Entry[], group: AssetGroup, limits: TempLimits = DEFAULT_LIMITS): Omit<RmdBearingGroup, 'lastDate'> {
   const mine = entries.filter((e) => BEARING_FORMS[e.form]?.group === group);
   // Per form, the latest entry; the group's latest reading is all of those together.
   const latestByForm = new Map<string, Entry>();
@@ -116,7 +116,7 @@ export function bearingGroup(entries: Entry[], group: AssetGroup): Omit<RmdBeari
   const readingsOf = (e: Entry): RmdReading[] => Object.entries(e.res).flatMap(([field, v]) => {
     const b = bearingOf(e.form, field);
     const c = num(v);
-    return b && c !== null ? [withLimits({ ...b, value: c, at: e.date }, bearingLimits(b.point))] : [];
+    return b && c !== null ? [withLimits({ ...b, value: c, at: e.date }, bearingLimits(b.point, limits))] : [];
   });
   const latest = [...latestByForm.values()].flatMap(readingsOf)
     .sort((a, b) => a.equipment.localeCompare(b.equipment, undefined, { numeric: true }) || a.point.localeCompare(b.point));
@@ -131,7 +131,7 @@ export function bearingGroup(entries: Entry[], group: AssetGroup): Omit<RmdBeari
   return { latest, max, trend, history, entries: mine.length };
 }
 
-export function oilGroup(entries: Entry[], group: AssetGroup, sizes: Map<string, TankSize> = DEFAULT_TANK_SIZES): Omit<RmdOilGroup, 'levelLastDate' | 'temperatureLastDate'> {
+export function oilGroup(entries: Entry[], group: AssetGroup, sizes: Map<string, TankSize> = DEFAULT_TANK_SIZES, limits: TempLimits = DEFAULT_LIMITS): Omit<RmdOilGroup, 'levelLastDate' | 'temperatureLastDate'> {
   const tanks = TANKS.filter(([, g]) => g === group);
   const latest = (form: string) => entries.filter((e) => e.form === form)
     .reduce<Entry | null>((m, e) => (m === null || later(e, m) ? e : m), null);
@@ -143,7 +143,7 @@ export function oilGroup(entries: Entry[], group: AssetGroup, sizes: Map<string,
   }) : [];
   const temperature = tp ? tanks.flatMap(([stem, , label]) => {
     const v = num(tp.res[`${stem}-c`]);
-    return v === null ? [] : [withLimits({ equipment: label, point: 'Temperature', value: v, at: tp.date }, LIMITS.oilTemp)];
+    return v === null ? [] : [withLimits({ equipment: label, point: 'Temperature', value: v, at: tp.date }, limits['oil-tank'])];
   }) : [];
   // Tanks differ in size: the lowest is the one with the least oil against its capacity.
   const fill = (r: RmdReading) => r.litres! / r.capacityL!;
@@ -174,10 +174,11 @@ export function lastDates(entries: Entry[], to: string): RmdLastDates {
 
 export async function rmdAssetForms(env: Env, from: string, to: string): Promise<RmdAssetForms> {
   const startMs = Date.parse(`${from}T00:00:00+05:30`);
-  const [read, sizes] = await Promise.all([
+  const [read, sizes, limits] = await Promise.all([
     fetchFormsEntries(TAGS, startMs - LOOK_BACK_MS, env),
-    // The tank sizes in use: the defaults with any edit made on the dashboard.
+    // The tank sizes and temperature limits in use: the defaults with any edit made on the dashboard.
     rmdTankSizes(env).catch(() => DEFAULT_TANK_SIZES),
+    rmdTempLimitsInUse(env).catch(() => DEFAULT_LIMITS),
   ]);
   const rows = read.ok ? read.rows.map(toEntry).filter((e): e is Entry => e !== null) : [];
   const inPeriod = rows.filter((e) => e.date >= from && e.date <= to);
@@ -191,8 +192,8 @@ export async function rmdAssetForms(env: Env, from: string, to: string): Promise
     const older = await fetchFormsEntries(TAGS, startMs - LAST_ENTRY_LOOK_BACK_MS, env).catch(() => null);
     if (older?.ok) last = lastDates(older.rows.map(toEntry).filter((e): e is Entry => e !== null), to);
   }
-  const bearing = (g: AssetGroup): RmdBearingGroup => ({ ...bearingGroup(inPeriod, g), lastDate: last[g].bearing });
-  const oil = (g: AssetGroup): RmdOilGroup => ({ ...oilGroup(inPeriod, g, sizes), levelLastDate: last[g].level, temperatureLastDate: last[g].temperature });
+  const bearing = (g: AssetGroup): RmdBearingGroup => ({ ...bearingGroup(inPeriod, g, limits), lastDate: last[g].bearing });
+  const oil = (g: AssetGroup): RmdOilGroup => ({ ...oilGroup(inPeriod, g, sizes, limits), levelLastDate: last[g].level, temperatureLastDate: last[g].temperature });
   return {
     from, to,
     logbook: { connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },

@@ -1,20 +1,16 @@
 'use client';
 
 /**
- * Period and grouping controls shared by every drill-down. The Duration filter is always
- * one click away; the other presets exist because the ERP is entered 1–2 days late, so
- * "Today" alone would open most ERP drawers on an empty day.
+ * Period and grouping controls shared by every drill-down. Every drill-down shows the Duration
+ * filter's period; the fixed-date presets ("since the counter started", "since the ERP went live")
+ * were removed (the user, 31 Oct 2026) — a period before a source starts simply has no data.
  */
 import { useState } from 'react';
 import { Seg } from './DrillDrawer';
 import { autoGrain } from '@/lib/periods';
-import {
-  COUNTER_START_DATE, ERP_START_DATE, addDays, dm, useSelection, type Grain,
-} from '@/services/hsmProduction';
+import { useSelection, type Grain } from '@/services/hsmProduction';
 
-export type RangeId = 'counter' | 'last30' | 'selection' | 'since';
-
-const MAX_DAYS = 400;
+export type RangeId = 'selection';
 
 const GRAINS: { id: Grain; label: string }[] = [
   { id: 'day', label: 'Daily' },
@@ -30,22 +26,12 @@ export function useDrillRange(ids: RangeId[], initial: RangeId, opts: { grain?: 
   const [picked, setGrain] = useState<Grain | null>(null);
   const today = sel.today;
 
-  const datesOf = (id: RangeId): { from: string; to: string } | null => {
-    if (id === 'selection') return sel.dates;
-    if (!today) return null;
-    if (id === 'counter') return { from: COUNTER_START_DATE, to: today };
-    if (id === 'last30') return { from: addDays(today, -29), to: today };
-    const from = ERP_START_DATE > addDays(today, -(MAX_DAYS - 1)) ? ERP_START_DATE : addDays(today, -(MAX_DAYS - 1));
-    return { from, to: today };
-  };
+  const datesOf = (): { from: string; to: string } | null => sel.dates;
   const labelOf: Record<RangeId, { label: string; title?: string }> = {
-    counter: { label: `${dm(COUNTER_START_DATE)} → today`, title: 'Since the mill counter started publishing' },
-    last30: { label: 'Last 30 days' },
     selection: { label: `Duration filter${sel.dates ? ` · ${sel.label}` : ''}`, title: 'The period chosen in the Duration filter' },
-    since: { label: `Since ${dm(ERP_START_DATE)} ’25`, title: 'Since the ERP went live for the strip mill' },
   };
 
-  const dates = datesOf(range);
+  const dates = datesOf();
   const grain = picked ?? autoGrain(dates);
   const controls = (
     <>
@@ -54,7 +40,7 @@ export function useDrillRange(ids: RangeId[], initial: RangeId, opts: { grain?: 
         <Seg
           label="Period"
           value={range}
-          options={ids.map((id) => ({ id, ...labelOf[id], disabled: !datesOf(id) }))}
+          options={ids.map((id) => ({ id, ...labelOf[id], disabled: !datesOf() }))}
           onChange={setRange}
         />
       )}

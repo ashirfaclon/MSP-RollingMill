@@ -70,3 +70,5 @@ export const HSM_MOTOR_FORM = 'equipment-settings__hsm-motor-ratings';
 export const RMD_TANK_FORM = 'equipment-settings__rmd-oil-tanks';
 export const MOTOR_KEYS = { stand: 'stand', ratedCurrentA: 'rated-current-a' } as const;
 export const TANK_KEYS = { tank: 'tank', name: 'tank-name', lengthM: 'length-m', widthM: 'width-m', depthM: 'depth-m', capacityL: 'capacity-l' } as const;
+export const RMD_TEMP_LIMIT_FORM = 'equipment-settings__rmd-temperature-limits';
+export const TEMP_LIMIT_KEYS = { limit: 'limit', name: 'limit-name', minC: 'min-c', maxC: 'max-c' } as const;

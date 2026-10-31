@@ -16,15 +16,17 @@
  *                     drive's current now and its trend while running (status 1) over the period;
  *   Gearbox oil       a switch (the plant, 28 Oct 2026): Level = the oil (litres) in the group's tank
  *                     lowest against its capacity — the level (inches) × the tank's inside length ×
- *                     width; Temp = the hottest tank's oil temperature, against 45–65 °C;
+ *                     width; Temp = the hottest tank's oil temperature, against its limits;
  *   Run hours         ERP log sheet ACTUAL_RUNNING_HRS over the period (whole mill); opens per day;
  *   Condition trends  every MID machine; every bearing of each entry (the user, 31 Oct 2026).
  * Test entries are left out.
  * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
- * 45–65 °C — a card turns red when any of its readings is outside them, green when all are inside.
+ * 45–65 °C, editable in the drill-downs (the user, 31 Oct 2026) — a card turns red when any of its
+ * readings is outside them, green when all are inside.
  */
-import { useState } from 'react';
-import { RMD_TANKS_URL, useRmdOilTanks } from '@/services/equipment';
+import { useState, type ReactNode } from 'react';
+import { RMD_LIMITS_URL, RMD_TANKS_URL, useRmdOilTanks, useRmdTempLimits } from '@/services/equipment';
+import type { RmdTempLimits } from '@/services/hsmApi';
 import EquipmentSettings from './EquipmentSettings';
 import { midTop, rmdHottest, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
@@ -109,6 +111,8 @@ export default function RmdAssetHealth() {
   const fgs = FORMS[group] ?? null;
   // Each tank's size in use: the defaults with any edit made on the dashboard (the user, 31 Oct 2026).
   const tanks = useRmdOilTanks();
+  // The temperature limits in use, the same way (the user, 31 Oct 2026).
+  const limits = useRmdTempLimits();
   const bearingOf = (d: RmdAssetForms) => (fgs ? mergeBearing(fgs.map((g) => d.bearing[g])) : null);
   const oilOf = (d: RmdAssetForms) => (fgs ? mergeOil(fgs.map((g) => d.oil[g])) : null);
   const { dates } = useSelection();
@@ -190,7 +194,7 @@ export default function RmdAssetHealth() {
           series="prod"
           {...(zone ? { onOpen: () => setOpen('current'), openLabel: 'Each drive\'s current now, and its trend while running' } : {})}
         />}
-        {/* Level or temperature (the plant, 28 Oct 2026). Limits exist for the temperature only (45–65 °C): no colour on the level. */}
+        {/* Level or temperature (the plant, 28 Oct 2026). Limits exist for the temperature only: no colour on the level. */}
         {show.oil && <FlipKpiCard
           label="Gearbox oil"
           series="hold"
@@ -242,7 +246,8 @@ export default function RmdAssetHealth() {
           ['Form', 'Rolling Mill Division (TMT) → Mechanical → Mill Bearing Temperature'],
           ['Forms', (fgs ?? []).map((g) => (g === 'roughing' ? '20 Inch R Stand, 16 Inch R Stand' : 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)')).join(', ')],
           ['Field', 'Flywheel / Reduction gear / Pinion gear, D and ND side (°C) — each form\'s latest entry in the period'],
-        ]} formula={['Bearing temp = the hottest of those readings', 'Limits: bearings 45–65 °C, flywheel 45–80 °C (plant)']} />}
+        ]} formula={['Bearing temp = the hottest of those readings', 'Limits: the table above — the plant\'s, editable']}
+          settings={limits.data && <TempLimitSettings data={limits.data} ids={['bearing', 'flywheel']} />} />}
       </DrillDrawer>
       {/* One screen per view of the card (the plant, 29 Oct 2026): oil level, or oil temperature. */}
       <DrillDrawer open={open === 'oil'} onClose={() => setOpen(null)}
@@ -287,11 +292,28 @@ export default function RmdAssetHealth() {
             ['Field', 'one value per tank — the latest entry in the period'],
           ]} formula={[
             'Gearbox oil (Temp) = the hottest oil tank',
-            'Limits: oil tank temperature 45–65 °C (plant)',
-          ]} />
+            'Limits: the table above — the plant\'s, editable',
+          ]} settings={limits.data && <TempLimitSettings data={limits.data} ids={['oil-tank']} />} />
         )}
       </DrillDrawer>
     </div>
+  );
+}
+
+/** The temperature limits a drill-down's readings are judged by — editable (the user, 31 Oct 2026). */
+function TempLimitSettings({ data, ids }: { data: RmdTempLimits; ids: RmdTempLimits['rows'][number]['limit'][] }) {
+  return (
+    <EquipmentSettings
+      title="Temperature limits"
+      cols={[{ key: 'min', label: 'Min (°C)', dp: 0, step: '1' }, { key: 'max', label: 'Max (°C)', dp: 0, step: '1' }]}
+      rows={data.rows.filter((r) => ids.includes(r.limit)).map((r) => ({
+        id: r.limit, label: r.label, values: { min: r.minC, max: r.maxC },
+        defaults: { min: r.defaults.minC, max: r.defaults.maxC },
+        edited: r.edited, editedAt: r.editedAt, editedBy: r.editedBy,
+      }))}
+      saveUrl={RMD_LIMITS_URL}
+      toBody={(changed) => ({ rows: changed.map((c) => ({ limit: c.id, minC: c.values.min, maxC: c.values.max })) })}
+    />
   );
 }
 
@@ -328,9 +350,11 @@ function TankLevelTable({ rows }: { rows: RmdReading[] }) {
   );
 }
 
-function ReadingsTable({ rows, unit, label, max, source, formula }: {
+function ReadingsTable({ rows, unit, label, max, source, formula, settings }: {
   rows: RmdReading[]; unit: string; label: string; max: RmdReading | null;
   source: [string, string][] | null; formula: string[] | null;
+  /** The editable limits, between the readings and the source. */
+  settings?: ReactNode;
 }) {
   return (
     <>
@@ -355,6 +379,7 @@ function ReadingsTable({ rows, unit, label, max, source, formula }: {
           </tbody>
         </table>
       </div>
+      {settings}
       {source && <SourceBox sources={[{ name: 'Logbook', rows: source }]} formula={formula ?? []} />}
     </>
   );

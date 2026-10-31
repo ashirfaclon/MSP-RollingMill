@@ -2,8 +2,8 @@
 import { describe, expect, test } from 'vitest';
 import type { Env } from '../../src/config/env';
 import { HSM_MOTOR_DEFAULTS, RMD_OIL_TANK_DEFAULTS } from '../../src/config/equipment';
-import { capacityL, hsmMotorRatings, rmdOilTanks, saveHsmMotorRatings, saveRmdOilTanks } from '../../src/modules/forms-db/equipment.store';
-import { tankLitres } from '../../src/modules/rmd/asset.service';
+import { capacityL, hsmMotorRatings, rmdOilTanks, rmdTempLimits, saveHsmMotorRatings, saveRmdOilTanks, saveRmdTempLimits } from '../../src/modules/forms-db/equipment.store';
+import { tankLitres, withLimits } from '../../src/modules/rmd/asset.service';
 
 // No logbook session: only the defaults.
 const env = { erpCacheDir: 'data-test-none', iosenseBearer: null, logbookInsightId: null } as unknown as Env;
@@ -44,5 +44,24 @@ describe('an edit is checked before it is saved', () => {
   });
   test('nothing changed: nothing written', async () => {
     expect(await saveHsmMotorRatings(env, { rows: [{ stand: 'FM 1', ratedCurrentA: 1214 }] }, 'test')).toMatchObject({ ok: true, saved: 0 });
+  });
+});
+
+describe('RMD temperature limits', () => {
+  test('defaults: bearings 45–65, flywheel 45–80, oil tank 45–65 °C', async () => {
+    const l = await rmdTempLimits(env);
+    expect(l.rows.map((r) => [r.limit, r.minC, r.maxC, r.edited])).toEqual([
+      ['bearing', 45, 65, false], ['flywheel', 45, 80, false], ['oil-tank', 45, 65, false],
+    ]);
+  });
+  test('an edit is checked: unknown limit, out of range, min not below max', async () => {
+    await expect(saveRmdTempLimits(env, { rows: [{ limit: 'x', minC: 40, maxC: 60 }] }, 'test')).rejects.toThrow(/unknown limit/);
+    await expect(saveRmdTempLimits(env, { rows: [{ limit: 'bearing', minC: 40, maxC: 900 }] }, 'test')).rejects.toThrow(/0–200/);
+    await expect(saveRmdTempLimits(env, { rows: [{ limit: 'bearing', minC: 70, maxC: 60 }] }, 'test')).rejects.toThrow(/below max/);
+    expect(await saveRmdTempLimits(env, { rows: [{ limit: 'flywheel', minC: 45, maxC: 80 }] }, 'test')).toMatchObject({ ok: true, saved: 0 });
+  });
+  test('the limits in use set the status', () => {
+    const tight = { bearing: [45, 60], flywheel: [45, 80], 'oil-tank': [45, 65] } as const;
+    expect(withLimits({ equipment: 'x', point: 'Pinion gear D side', value: 63, at: '' }, tight.bearing).status).toBe('high');
   });
 });
