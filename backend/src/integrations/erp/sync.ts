@@ -22,9 +22,8 @@
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import oracledb from 'oracledb';
 import { loadEnv, type Env } from '../../config/env';
-import { RMD_STOCK_GODOWN, RMD_STOCK_ITEMS } from '../../modules/rmd/stock-items';
 import {
-  ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, PM_DIVISIONS, RMD_LOG_FIELDS, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
+  ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, PM_DIVISIONS, RMD_LOG_FIELDS, RMD_STOCK_RULE, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
   type ErpPmCache, type PmMill,
   type LsmLogField, type LsmProductionCache, type LsmStockCache, type RmsProductionCache, type RmdLogField, type RmdProductionCache, type RmdStockCache,
   type ErpCache, type ErpCommercialCache, type ErpDivisionRow, type ErpProductionCache,
@@ -494,7 +493,7 @@ async function pullLsm(env: Env, p: Paths, log: (line: string) => void) {
 }
 
 /**
- * RMD finished stock: the plant's item list in godown FGYRDP, by the plant's stock rule
+ * RMD finished stock: every RMD item (ERP item schedule F0114 — RMD_STOCK_RULE) in godown FGYRDP, by the plant's stock rule
  * (their stock-balance query): ITEMTRAN_BODY in their divisions, without the excluded voucher
  * types, every entry since the ledger starts — netted per item per date. Stock at the end of
  * a date = Σ net up to it. Its own failure.
@@ -505,26 +504,28 @@ async function pullRmdStock(env: Env, p: Paths, log: (line: string) => void) {
     conn = await oracledb.getConnection({ user: env.erpUser!, password: env.erpPassword!, connectString: env.erpDsn! });
     conn.callTimeout = 120_000;
     await conn.execute('SET TRANSACTION READ ONLY');
-    const codes = RMD_STOCK_ITEMS.map((i) => i.code);
-    const binds = Object.fromEntries(codes.map((c, i) => [`i${i}`, c]));
+    const sch = `${RMD_STOCK_RULE.itemSchPrefix}%`;
+    const items = ((await conn.execute<{ CODE: string; NAME: string }>(`
+      SELECT m.ITEM_CODE AS "CODE", m.ITEM_NAME AS "NAME" FROM MSPV7ERP1.ITEM_MAST m WHERE m.ITEM_SCH LIKE :sch ORDER BY 1`,
+      { sch }, { maxRows: 0 })).rows ?? []);
     const rows = ((await conn.execute<{ D: string; ITEM: string; NET: number }>(`
       SELECT TO_CHAR(TRUNC(t.VRDATE), 'YYYY-MM-DD') AS "D", t.ITEM_CODE AS "ITEM",
              SUM(NVL(t.QTYRECD, 0)) - SUM(NVL(t.QTYISSUED, 0)) AS "NET"
-        FROM MSPV7ERP1.ITEMTRAN_BODY t
-       WHERE t.ENTITY_CODE = 'MP' AND t.GODOWN_CODE = :godown
+        FROM MSPV7ERP1.ITEMTRAN_BODY t JOIN MSPV7ERP1.ITEM_MAST m ON m.ITEM_CODE = t.ITEM_CODE
+       WHERE t.ENTITY_CODE = 'MP' AND t.GODOWN_CODE = :godown AND m.ITEM_SCH LIKE :sch
          AND t.DIV_CODE IN (${STOCK_DIVISIONS.map((d) => `'${d}'`).join(', ')})
          AND t.TCODE NOT IN (${STOCK_EXCLUDED_TCODES.map((c) => `'${c}'`).join(', ')})
-         AND t.ITEM_CODE IN (${codes.map((_, i) => `:i${i}`).join(', ')})
        GROUP BY TRUNC(t.VRDATE), t.ITEM_CODE
-       ORDER BY 1, 2`, { godown: RMD_STOCK_GODOWN, ...binds }, { maxRows: 0 })).rows ?? []);
+       ORDER BY 1, 2`, { godown: RMD_STOCK_RULE.godown, sch }, { maxRows: 0 })).rows ?? []);
     const cache: RmdStockCache = {
       syncedAt: new Date().toISOString(),
-      source: `ITEMTRAN_BODY · GODOWN_CODE = '${RMD_STOCK_GODOWN}' · the plant's stock rule`,
-      godown: RMD_STOCK_GODOWN,
+      source: `ITEMTRAN_BODY · GODOWN_CODE = '${RMD_STOCK_RULE.godown}' · ITEM_MAST.ITEM_SCH LIKE '${sch}' · the plant's stock rule`,
+      godown: RMD_STOCK_RULE.godown,
+      items: items.map((i) => ({ code: String(i.CODE), name: String(i.NAME).trim() })),
       moves: rows.filter((r) => Number(r.NET) !== 0).map((r) => ({ date: String(r.D), item: String(r.ITEM), netMt: Number(r.NET) })),
     };
     writeAtomic(p.rmdStock, cache);
-    log(`  RMD stock: ${cache.moves.length} item-days, ${cache.moves[0]?.date ?? 'none'} → ${cache.moves.at(-1)?.date ?? 'none'}`);
+    log(`  RMD stock: ${cache.items.length} items, ${cache.moves.length} item-days, ${cache.moves[0]?.date ?? 'none'} → ${cache.moves.at(-1)?.date ?? 'none'}`);
   } catch (err) {
     log(`  RMD stock not synced: ${(err as Error).message}`);
   } finally {

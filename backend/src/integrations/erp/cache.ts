@@ -155,7 +155,21 @@ export function readErpRmsStock(env: Env): LsmStockCache | null {
 
 /** RMD finished stock: each item's net movement (received − issued, MT) per date in its godown. */
 export interface RmdStockMove { date: string; item: string; netMt: number }
-export interface RmdStockCache { syncedAt: string; source: string; godown: string; moves: RmdStockMove[] }
+/**
+ * RMD's finished items (the user, 31 Oct 2026): every item of ERP item schedule F0114 — TMT bars
+ * (F011403), miss-roll bars (F011402), rings (F011401) — stocked in godown FGYRDP, which RMD shares
+ * with other mills. No other mill's item is in F0114 (checked over all 1,322 items moved in the yard);
+ * a new RMD item is counted with no list to update. Replaces the plant's 44-item list (12 Oct 2026),
+ * which missed 20 of the 64 F0114 items.
+ */
+export const RMD_STOCK_RULE = { godown: 'FGYRDP', itemSchPrefix: 'F0114' } as const;
+
+export interface RmdStockCache {
+  syncedAt: string; source: string; godown: string;
+  /** Every RMD item (ITEM_MAST, item schedule F0114): code and name. */
+  items: { code: string; name: string }[];
+  moves: RmdStockMove[];
+}
 
 export function readErpRmdStock(env: Env): RmdStockCache | null {
   return readJson<RmdStockCache>(cachePaths(env).rmdStock);

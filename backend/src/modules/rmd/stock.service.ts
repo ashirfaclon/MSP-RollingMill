@@ -1,5 +1,5 @@
 /**
- * RMD finished stock by size: the plant's item list (stock-items.ts) in godown FGYRDP, from
+ * RMD finished stock by size: every RMD item (ERP item schedule F0114, RMD_STOCK_RULE) in godown FGYRDP, from
  * the ERP item ledger — stock at the end of a date is every movement up to it, from the
  * 2023 opening. All of it is free stock (no order link); every item of one bar size is
  * summed. Left out, as the plant asked (16 Oct 2026): the items with no bar size (the former
@@ -9,11 +9,18 @@ import type { Env } from '../../config/env';
 import type { RmdStockReport } from '../../contracts';
 import { readErpRmdStock, type RmdStockMove } from '../../integrations/erp/cache';
 import { MSG } from '../../shared/messages';
-import { RMD_STOCK_ITEMS } from './stock-items';
 
-/** The items shown: a sized bar that is not a miss roll. */
-const SHOWN = RMD_STOCK_ITEMS.filter((i) => i.sizeMm !== null && !/^MISS ROLL/i.test(i.name));
-const ITEM = new Map(SHOWN.map((i) => [i.code, i]));
+/** A TMT bar's size from its name ("MS TMT BAR 12 MM SL" → 12); null for anything else (rings, round bar, unsized). */
+export function barSizeOf(name: string): number | null {
+  if (!/TMT/i.test(name)) return null;
+  const m = /(\d+(?:\.\d+)?)\s*MM\b/i.exec(name);
+  return m ? Number(m[1]) : null;
+}
+
+/** The items shown: a sized TMT bar that is not a miss roll. */
+function shownItems(items: { code: string; name: string }[]) {
+  return items.map((i) => ({ ...i, sizeMm: barSizeOf(i.name) })).filter((i) => i.sizeMm !== null && !/^MISS ROLL/i.test(i.name));
+}
 /** Below this an item is nil, not stock (the ERP's own rounding): it isn't shown. */
 const MIN_MT = 0.05;
 /** Summed in kg (the ERP's 3 decimals of MT) so 50.205 rounds to 50.21 as the ERP does, not 50.20. */
@@ -24,7 +31,9 @@ const mtOf = (kgs: number) => Math.round(kgs / 10) / 100;
  * Every shown item, in its bar-size row (smallest first); each item's stock = Σ net movement
  * up to asOf. An item or row at 0 isn't shown.
  */
-export function stockBySize(moves: RmdStockMove[], asOf: string): RmdStockReport['sizes'] {
+export function stockBySize(moves: RmdStockMove[], asOf: string, items: { code: string; name: string }[]): RmdStockReport['sizes'] {
+  const SHOWN = shownItems(items);
+  const ITEM = new Map(SHOWN.map((i) => [i.code, i]));
   const byItem = new Map<string, number>(SHOWN.map((i) => [i.code, 0]));
   for (const m of moves) {
     if (!ITEM.has(m.item) || m.date > asOf) continue;
@@ -52,7 +61,7 @@ export function stockBySize(moves: RmdStockMove[], asOf: string): RmdStockReport
 export function rmdStock(env: Env, asOf: string): RmdStockReport {
   const cache = readErpRmdStock(env);
   const moves = cache?.moves ?? [];
-  const sizes = stockBySize(moves, asOf);
+  const sizes = stockBySize(moves, asOf, cache?.items ?? []);
   return {
     asOf,
     erp: {
