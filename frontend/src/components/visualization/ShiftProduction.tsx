@@ -14,7 +14,7 @@ import PlanConfig from '@/components/plan/PlanConfig';
  * HSM · Production by shift, all from /api/hsm/plan:
  *   – output per shift: the Production card's figure split Day 08–20 / Night 20–08 by where the
  *     counter's ticks fell (Day + Night = the card);
- *   – targets: the rolling plan (today a static import of the plant's Excel), per shift
+ *   – targets: the logbook Production Plan form (HSM ROLLING PLAN, saved with Edit plan), per shift
  *     exactly as written there; NA where the period has no plan;
  *   – plan gap: production − plan over the planned days only ("+" ahead; short, no sign);
  *   – compliance: actual ÷ plan × 100 over those same planned days — per shift (NA where the

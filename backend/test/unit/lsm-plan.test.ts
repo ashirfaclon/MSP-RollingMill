@@ -1,24 +1,17 @@
-/** LSM plan: October 2026, 8,750 MT over 31 days, halved per shift — against ERP PRODUTION_MT. */
+/** LSM plan (only from the logbook Production Plan form) and output per shift — against ERP PRODUTION_MT. */
 import { describe, expect, test } from 'vitest';
 import type { Env } from '../../src/config/env';
 import { lsmPlan, primeByShift, shiftTotals, splitByShift } from '../../src/modules/lsm/plan.service';
 import type { InsightEntry } from '../../src/integrations/logbook/client';
 
-// No ERP cache and no logbook session: the plan alone.
+// No ERP cache and no logbook session: nothing to read.
 const env = { erpCacheDir: 'data-test-none', iosenseBearer: null, logbookInsightId: null } as unknown as Env;
 
 describe('LSM plan', () => {
-  test('a day = 8,750 ÷ 31 = 282.26 MT, 141.13 a shift; the month adds up to 8,750', async () => {
-    const r = await lsmPlan(env, '2026-10-01', '2026-10-31');
-    expect(r.days[0]).toMatchObject({ date: '2026-10-01', planMt: 282.26, byShift: { Day: 141.13, Night: 141.13 } });
-    expect(r.totals.planMt).toBeCloseTo(8750, 0);
-    expect(r.totals.plannedDays).toBe(31);
-  });
-
-  test('no plan outside October; no ERP production: no gap, no compliance', async () => {
+  test('only from the logbook Production Plan form: no logbook, no plan (the October Excel plan is not read any more)', async () => {
     const r = await lsmPlan(env, '2026-09-30', '2026-11-01');
-    expect(r.days.map((d) => d.planMt)).toEqual([null, ...Array(31).fill(282.26), null]);
-    expect(r.totals).toMatchObject({ comparedDays: 0, actualMt: null, gapMt: null, compliancePct: null });
+    expect(r.days.every((d) => d.planMt === null)).toBe(true);
+    expect(r.totals).toMatchObject({ planMt: null, plannedDays: 0, comparedDays: 0, actualMt: null, gapMt: null, compliancePct: null });
   });
 });
 

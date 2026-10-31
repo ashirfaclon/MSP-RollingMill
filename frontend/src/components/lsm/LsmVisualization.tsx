@@ -13,7 +13,7 @@
  *                         ÷ PRODUTION_MT.
  *   Material balance      billet input, finished and the six losses (B_LOSS_MT, ENDCUT_MT,
  *                         MISROLL_MT, COLD_MT, REJECT_MT, SHORTLENGTH_MT), mass difference and yield.
- *   Production by shift   the plant's October 2026 plan (8,750 MT), spread to days, half per
+ *   Production by shift   the logbook Production Plan form (LSM ROLLING PLAN, saved with Edit plan), per
  *                         shift, as RMD's; whole day = PRODUTION_MT vs plan.
  *   Running rate          PRODUTION_MT ÷ running hours calculated from the LSM Production Sheet's runs.
  *   Finished stock card   the total of Finished stock by size, dated; no Order allocation panel

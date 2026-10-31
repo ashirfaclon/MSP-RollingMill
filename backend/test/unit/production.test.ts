@@ -77,26 +77,6 @@ describe('periods and variance', () => {
   });
 });
 
-describe('rolling plan', async () => {
-  const { planDays } = await import('../../src/modules/hsm/plan.service');
-  const rows = [
-    { date: '2026-10-01', shift: 'Day', thicknessMm: 2.8, widthMm: 200, mt: 3 },
-    { date: '2026-10-01', shift: 'Day', thicknessMm: 2.5, widthMm: 200, mt: 26 },
-    { date: '2026-10-02', shift: 'Night', thicknessMm: 3.2, widthMm: 280, mt: 10 },
-  ];
-  test('targets add up per day and per shift as written; an unplanned day is null, not 0', () => {
-    expect(planDays(['2026-10-01', '2026-10-02', '2026-10-03'], rows)).toEqual([
-      { date: '2026-10-01', planMt: 29, byShift: { Day: 29 } },
-      { date: '2026-10-02', planMt: 10, byShift: { Night: 10 } },
-      { date: '2026-10-03', planMt: null, byShift: {} },
-    ]);
-  });
-  test('the imported October plan: 1–14 Oct, as in the tracker of 12 Oct', () => {
-    const days = planDays(['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07']);
-    expect(days.map((d) => d.planMt)).toEqual([140, 225, 225, 225, 225, 184, 184]);
-  });
-});
-
 describe('production by shift', async () => {
   const { splitByShift, shiftOf } = await import('../../src/modules/hsm/shift-split');
   const at = (s: string) => Date.parse(`${s}+05:30`);

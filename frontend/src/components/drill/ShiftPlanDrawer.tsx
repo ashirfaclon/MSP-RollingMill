@@ -234,10 +234,10 @@ const SOURCES: SourceSystem[] = [
     ],
   },
   {
-    name: 'Plan',
+    name: 'Logbook',
     rows: [
-      ['File', 'Daily_Rolling_Tracker_Oct2026.xlsx, sheet Daily Log'],
-      ['Field', 'target MT per date and shift, as written'],
+      ['Form', 'PRODUCTION PLAN → HSM ROLLING PLAN (saved on the dashboard, Edit plan)'],
+      ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
     ],
   },
 ];

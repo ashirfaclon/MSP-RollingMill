@@ -1,8 +1,8 @@
 /**
  * Production plan in its logbook form (Production Plan Form Spec): one entry per date with every
  * column of the dashboard's Edit plan popup. Saving a month writes all its dates; for each date the
- * latest entry wins. The plan services lay the saved dates over their imported plans, so a date
- * the plant has saved shows its targets and the rest keep the import until it is replaced.
+ * latest entry wins. The ONLY source of every mill's plan (the user, 31 Oct 2026): the plans once
+ * imported from the plant's Excel files were moved into these forms; a date with no entry has no plan.
  */
 import type { Env } from '../../config/env';
 import type { PlanSaveBody, SavedPlan } from '../../contracts';
@@ -110,7 +110,7 @@ export async function savedPlan(env: Env, mill: ConfigMill, month: string): Prom
   };
 }
 
-/** Lay the saved dates over a plan's days: their target is Day + Night, per shift as saved. */
+/** A plan's days from the saved dates: their target is Day + Night, per shift as saved; any other date has none. */
 export function withSavedPlan<T extends { date: string; planMt: number | null; byShift: Record<string, number> }>(
   days: T[], saved: Map<string, SavedPlanDay>,
 ): T[] {
@@ -120,6 +120,9 @@ export function withSavedPlan<T extends { date: string; planMt: number | null; b
   });
 }
 
-/** The plan's source line: the dashboard's saved plan first, when the period has any. */
-export const planSource = (saved: Map<string, SavedPlanDay>, imported: string) =>
-  saved.size ? `Production plan saved on the dashboard (logbook Production Plan) · otherwise ${imported}` : imported;
+/** The plan's source line. */
+export const planSource = (saved: Map<string, SavedPlanDay>) =>
+  saved.size ? 'Logbook Production Plan (saved on the dashboard)' : 'Logbook Production Plan: no plan saved for this period';
+
+/** Days with no plan yet, for withSavedPlan to fill from the logbook. */
+export const unplannedDays = (dates: string[]) => dates.map((date) => ({ date, planMt: null as number | null, byShift: {} as Record<string, number> }));

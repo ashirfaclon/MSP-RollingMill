@@ -1,58 +1,31 @@
 /**
- * The rolling plan: target MT per day, size and shift, as the plant fills it in (a week's
- * plan arrives before the previous week ends). TEMPORARY SOURCE: a static import of the
- * plant's Excel tracker (scripts/import-rolling-plan.py → plan/rolling-plan-<month>.json),
- * until the plan-import feature replaces it. Only this file reads it.
+ * HSM production plan: target MT per day and shift from the logbook Production Plan form (HSM ROLLING
+ * PLAN), saved on the dashboard (Edit plan) — the only source (the user, 31 Oct 2026; the October 2026
+ * Excel tracker was moved into the form). A date with no entry has no plan.
  *
- * Shifts are taken exactly as written (the mill runs one shift for about 15 days, then the
- * other). Plan gap compares the plan with production (the Production card's Total) over the
- * planned days only, so a period running past the planned week is not compared unfairly.
+ * Shifts are taken exactly as saved (the mill runs one shift for about 15 days, then the other).
+ * Plan gap compares the plan with production (the Production card's Total) over the planned days
+ * only, so a period running past the planned days is not compared unfairly.
  */
 import type { Env } from '../../config/env';
 import type { PlanDay, PlanReport } from '../../contracts';
-// TODO(plan-feature): HARDCODED — the October 2026 plan (1–18 Oct, 104 rows, 3,420 MT) from the
-// plant's Excel (Daily_Rolling_Tracker_Oct2026 updated new.xlsx, shared 16 Oct 2026). Remove this
-// import, plan/rolling-plan-2026-10.json and scripts/import-rolling-plan.py once the
-// plan-import feature supplies the plan.
-import october2026 from './plan/rolling-plan-2026-10.json';
 import { dateRange, productionComparison, round2 } from './production.service';
 import { SHIFTS, productionTicks, splitByShift } from './shift-split';
-import { planSource, savedPlanDays, withSavedPlan } from '../forms-db/plan.store';
-
-interface PlanRow { date: string; shift: string; thicknessMm: number | null; widthMm: number | null; mt: number }
-interface PlanFile { month: string; source: string; rows: PlanRow[] }
-
-/** Every imported month. Add the next month's file here (until the import feature exists). */
-const PLANS: PlanFile[] = [october2026 as PlanFile];
-const ROWS: PlanRow[] = PLANS.flatMap((p) => p.rows);
-const SOURCE = PLANS.map((p) => p.source).join(' · ');
+import { planSource, savedPlanDays, unplannedDays, withSavedPlan } from '../forms-db/plan.store';
 
 const sum = (xs: number[]) => round2(xs.reduce((a, b) => a + b, 0));
-
-/** Targets per day and shift for plan dates `from`..`to`. Pure. */
-export function planDays(dates: string[], rows: PlanRow[] = ROWS): Omit<PlanDay, 'actualMt' | 'actualByShift'>[] {
-  return dates.map((date) => {
-    const rs = rows.filter((r) => r.date === date);
-    const byShift: Record<string, number> = {};
-    for (const r of rs) {
-      const shift = r.shift || '—';
-      byShift[shift] = round2((byShift[shift] ?? 0) + r.mt);
-    }
-    return { date, planMt: rs.length ? sum(rs.map((r) => r.mt)) : null, byShift };
-  });
-}
 
 export async function planReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PlanReport> {
   const dates = dateRange(from, to);
   const [prod, ticks, saved] = await Promise.all([
     productionComparison(env, from, to, 'day', nowMs).catch(() => null),
     productionTicks(env, from, to, nowMs).catch(() => null),
-    // The plan saved on the dashboard (logbook Production Plan) wins over the import, date by date.
+    // The plan: the logbook Production Plan form.
     savedPlanDays(env, 'hsm', from, to).catch(() => new Map()),
   ]);
   const actualByDay = new Map((prod?.days ?? []).map((d) => [d.date, d.influxMt]));
   const split = splitByShift(ticks ?? [], new Map(dates.map((d) => [d, ticks ? actualByDay.get(d) ?? null : null])));
-  const days: PlanDay[] = withSavedPlan(planDays(dates), saved).map((d) => ({
+  const days: PlanDay[] = withSavedPlan(unplannedDays(dates), saved).map((d) => ({
     ...d, actualMt: actualByDay.get(d.date) ?? null, actualByShift: split.get(d.date) ?? null,
   }));
   const actualByShift: Record<string, number> = Object.fromEntries(SHIFTS.map((s) => [s, 0]));
@@ -65,7 +38,7 @@ export async function planReport(env: Env, from: string, to: string, nowMs = Dat
   const actuals = planned.map((d) => d.actualMt);
   const actualMt = planned.length && actuals.every((a) => a !== null) ? sum(actuals as number[]) : null;
   return {
-    from, to, source: planSource(saved, SOURCE), days,
+    from, to, source: planSource(saved), days,
     totals: {
       planMt, byShift, plannedDays: planned.length, days: days.length, actualMt,
       gapMt: planMt !== null && actualMt !== null ? round2(actualMt - planMt) : null,

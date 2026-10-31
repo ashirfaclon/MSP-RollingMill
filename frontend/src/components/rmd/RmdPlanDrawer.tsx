@@ -22,7 +22,7 @@ import { rangeUrl, useApi, type RmdPlanDay, type RmdPlanReport } from '@/service
 export type RmdShiftView = 'shift' | 'day';
 export type PlanMill = 'rmd' | 'lsm' | 'rms';
 
-/** What differs between the mills: the measure, the shifts, the plan file and the ERP field. */
+/** What differs between the mills: the measure, the shifts, the plan form and the ERP field. */
 interface MillPlan {
   sub: string; measure: string; field: string; dayPlan: string; shifts: string; plan: SourceSystem; erp: SourceSystem;
   /** Where output per shift comes from; none = NA. */
@@ -33,11 +33,11 @@ const MILL: Record<PlanMill, MillPlan> = {
     sub: 'RMD · MT',
     measure: 'Prime + SL',
     field: 'PRODUCT_PRIME_SLENGTH_MT',
-    dayPlan: 'Day plan = month plan ÷ calendar days (shutdown dates not given), Prime + SL',
-    shifts: 'Shift target = day plan ÷ 2  (Day 09:00–21:00 IST, Night 21:00–09:00 IST)',
-    plan: { name: 'Plan', rows: [
-      ['File', 'RMD Month Wise production plan FY 26-27, sheet Production Plan'],
-      ['Field', 'TOTAL PRODUCTION — PRIME + SHORT LENGTH (MT), on line + off line, per month'],
+    dayPlan: 'Day plan = Day (MT) + Night (MT) as saved, Prime + SL',
+    shifts: 'Shift target = Day (MT) / Night (MT) as saved  (Day 09:00–21:00 IST, Night 21:00–09:00 IST)',
+    plan: { name: 'Logbook', rows: [
+      ['Form', 'PRODUCTION PLAN → RMD ROLLING PLAN (saved on the dashboard, Edit plan)'],
+      ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
     ] },
     erp: { name: 'ERP', rows: [
       ['Table', 'ATTR_TRAN_DATA_BODY'],
@@ -49,11 +49,11 @@ const MILL: Record<PlanMill, MillPlan> = {
     sub: 'LSM · MT',
     measure: 'Production',
     field: 'PRODUTION_MT',
-    dayPlan: 'Day plan = month plan ÷ 31 days (October 2026: 8,750 MT, no shutdown)',
-    shifts: 'Shift target = day plan ÷ 2  (Day 09:00–21:00 IST, Night 21:00–09:00 IST)',
-    plan: { name: 'Plan', rows: [
-      ['File', 'PRODUCTION PLAN FOR LSM Oct-2026, Sheet1'],
-      ['Field', 'TOTAL PRODUCTION (MT), October 2026'],
+    dayPlan: 'Day plan = Day (MT) + Night (MT) as saved',
+    shifts: 'Shift target = Day (MT) / Night (MT) as saved  (Day 09:00–21:00 IST, Night 21:00–09:00 IST)',
+    plan: { name: 'Logbook', rows: [
+      ['Form', 'PRODUCTION PLAN → LSM ROLLING PLAN (saved on the dashboard, Edit plan)'],
+      ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
     ] },
     erp: { name: 'ERP', rows: [
       ['Table', 'ATTR_TRAN_DATA_BODY'],
@@ -75,11 +75,11 @@ const MILL: Record<PlanMill, MillPlan> = {
     sub: 'RMS · MT',
     measure: 'Production',
     field: 'PRODUCTION_MT',
-    dayPlan: 'Day plan = month plan ÷ calendar days (shutdown dates not given)',
-    shifts: 'Shift target = day plan ÷ 2  (Day 09:30–21:30 IST, Night 21:30–09:30 IST)',
-    plan: { name: 'Plan', rows: [
-      ['File', 'RMS_Production_Plan (one workbook per month, April–October 2026)'],
-      ['Field', 'TOTAL PRODUCTION (MT), per month'],
+    dayPlan: 'Day plan = Day (MT) + Night (MT) as saved',
+    shifts: 'Shift target = Day (MT) / Night (MT) as saved  (Day 09:30–21:30 IST, Night 21:30–09:30 IST)',
+    plan: { name: 'Logbook', rows: [
+      ['Form', 'PRODUCTION PLAN → RMS ROLLING PLAN (saved on the dashboard, Edit plan)'],
+      ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
     ] },
     erp: { name: 'ERP', rows: [
       ['Table', 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],

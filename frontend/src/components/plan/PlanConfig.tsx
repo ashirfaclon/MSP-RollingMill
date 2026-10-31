@@ -2,7 +2,7 @@
 
 /**
  * Production plan config (the user, 28 Oct 2026): the plant fills each mill's plan on the dashboard
- * instead of the Excel imports. One form for all four mills, holding only what the dashboard uses —
+ * — the only source of every plan (the Excel plans were moved into the forms, 31 Oct 2026). One form for all four mills, holding only what the dashboard uses —
  * the target MT per day and per shift (Production by shift: target, compliance, plan gap):
  *   Month, the month's plan (MT, the mill's Production measure), shutdowns — a single shift or the
  *   whole day (the user, 31 Oct 2026; working days count half a day per shift off) — and the day-by-day

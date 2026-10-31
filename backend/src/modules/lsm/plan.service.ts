@@ -1,11 +1,8 @@
 /**
- * LSM production plan: the plant's October 2026 plan (8,750 MT, 31 working days, no shutdown),
- * the same measure as the Production card (PRODUTION_MT). Spread evenly over the month's days
- * and halved between the two 12-hour shifts (Day 09–21, Night 21–09 IST), as RMD's is.
- *
- * The plan splits the month by billet size (110×110 for 21 days at 24 MT/h, 125×125 for 10 days
- * at 25 MT/h, plus 64 MT extra heat) but does not say which dates — until it does, every day
- * gets month ÷ 31. Plan gap and compliance compare only the days with ERP production.
+ * LSM production plan: target MT per day and shift (the Production card's measure, PRODUTION_MT)
+ * from the logbook Production Plan form (LSM ROLLING PLAN), saved on the dashboard (Edit plan) — the
+ * only source (the user, 31 Oct 2026; the October 2026 Excel plan was moved into the form). A date
+ * with no entry has no plan. Plan gap and compliance compare only the days with ERP production.
  *
  * Output per shift (the user, 16 Oct 2026): the ERP enters production per day only, so a date's
  * PRODUTION_MT is split between the shifts by their prime pieces in the logbook's LSM Production
@@ -19,18 +16,10 @@ import type { LsmPlanReport, RmdPlanDay } from '../../contracts';
 import { fetchFormEntries, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
 import { dateRange, round2 } from '../hsm/production.service';
-import { RMD_SHIFTS, rmdPlanDays, summarisePlan, type PlanMonth } from '../rmd/plan.service';
+import { RMD_SHIFTS, planDaysFrom, summarisePlan } from '../rmd/plan.service';
 import { lsmProductionByDay } from './production.service';
-import { planSource, savedPlanDays, withSavedPlan } from '../forms-db/plan.store';
+import { planSource, savedPlanDays } from '../forms-db/plan.store';
 import type { ConfigMill } from '../forms-db/forms';
-// TODO(plan-feature): HARDCODED — the LSM plan for October 2026 (8,750 MT) from the plant's Excel
-// (PRODUCTION PLAN FOR LSM Oct-2026.xlsx, shared 16 Oct 2026). Remove this import and
-// plan/lsm-plan-2026-10.json once the plan-import feature supplies the plan.
-import oct2026 from './plan/lsm-plan-2026-10.json';
-
-const MONTHS = new Map<string, PlanMonth>(oct2026.months.map((m) => [m.month, {
-  month: m.month, workingDays: m.workingDays, calendarDays: m.calendarDays, planMt: m.productionMt,
-}]));
 
 export const LSM_SHEET_FORM = 'lsm-production-sheet/production-sheet';
 const LOOK_BACK_MS = 31 * 86_400_000;
@@ -81,24 +70,24 @@ export function shiftTotals(days: RmdPlanDay[]): NonNullable<LsmPlanReport['tota
  * Production Sheet form (LSM, RMS): the ERP day split by the shifts' prime pieces.
  */
 export async function planWithShifts(env: Env, from: string, to: string, opts: {
-  months: Map<string, PlanMonth>; actual: (dates: string[]) => Map<string, number | null>; form: string; source: string; mill: ConfigMill;
+  actual: (dates: string[]) => Map<string, number | null>; form: string; mill: ConfigMill;
 }): Promise<LsmPlanReport> {
   const dates = dateRange(from, to);
   const [read, saved] = await Promise.all([
     fetchFormEntries(opts.form, Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env),
-    // The plan saved on the dashboard (logbook Production Plan) wins over the import, date by date.
+    // The plan: the logbook Production Plan form.
     savedPlanDays(env, opts.mill, from, to).catch(() => new Map()),
   ]);
   const pcs = read.ok ? primeByShift(read.rows) : new Map<string, Record<string, number>>();
-  const days = withSavedPlan(rmdPlanDays(dates, opts.actual(dates), opts.months), saved)
+  const days = planDaysFrom(dates, opts.actual(dates), saved)
     .map((d) => ({ ...d, actualByShift: splitByShift(d, pcs.get(d.date)) }));
   return {
-    from, to, source: planSource(saved, opts.source), days,
+    from, to, source: planSource(saved), days,
     totals: { ...summarisePlan(days), shifts: shiftTotals(days) },
     shiftSource: { form: opts.form, connection: read.ok ? 'up' : 'down', message: read.ok ? MSG.LOGBOOK_UP : read.message },
   };
 }
 
 export function lsmPlan(env: Env, from: string, to: string): Promise<LsmPlanReport> {
-  return planWithShifts(env, from, to, { months: MONTHS, actual: (dates) => lsmProductionByDay(env, dates), form: LSM_SHEET_FORM, source: oct2026.source, mill: 'lsm' });
+  return planWithShifts(env, from, to, { actual: (dates) => lsmProductionByDay(env, dates), form: LSM_SHEET_FORM, mill: 'lsm' });
 }
