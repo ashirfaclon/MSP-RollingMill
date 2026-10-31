@@ -22,7 +22,7 @@ import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import LsmMillLoadDrawer from './LsmMillLoadDrawer';
 import FlipKpiCard from './FlipKpiCard';
 import Panel from '@/components/Panel';
-import KpiCard, { type Series } from '@/components/visualization/KpiCard';
+import KpiCard from '@/components/visualization/KpiCard';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
@@ -35,7 +35,6 @@ import { MidVibrationDrawer, MidVibrationTrend, midDate, MidRemarks, remarkSumma
 import { ErpPmDrawer, ErpPmRows, PmOnTimeCard, usePm } from './ErpPm';
 import './asset.css';
 
-const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
 /** The hottest of a reading's six bearings; null without any. */
 const hottest = (e: LsmDriveReading) => {
   const t = [e.flywheelDeC, e.flywheelNdeC, e.reductionDeC, e.reductionNdeC, e.pinionDeC, e.pinionNdeC].filter((v): v is number => v !== null);

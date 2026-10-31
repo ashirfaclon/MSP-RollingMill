@@ -9,15 +9,15 @@ import {
 const at = (d: string, hhmm: string) => Date.parse(`${d}T${hhmm}:00+05:30`);
 
 describe('plant days', () => {
-  test('a plant day runs 06:00 → 06:00 IST', () => {
-    expect(plantDayStart('2026-09-22')).toBe(at('2026-09-22', '06:00'));
+  test('a plant day runs 08:00 → 08:00 IST', () => {
+    expect(plantDayStart('2026-09-22')).toBe(at('2026-09-22', '08:00'));
     expect(dateRange('2026-09-29', '2026-10-02')).toEqual(['2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02']);
   });
 
-  test('counter increases fall in the plant day they happen in; 05:59 belongs to the day before', () => {
+  test('counter increases fall in the plant day they happen in; 07:59 belongs to the day before', () => {
     const inc: Increment[] = [
-      { t: at('2026-09-23', '05:59'), v: 10 },   // → 22 Sep
-      { t: at('2026-09-23', '06:00'), v: 20 },   // → 23 Sep
+      { t: at('2026-09-23', '07:59'), v: 10 },   // → 22 Sep
+      { t: at('2026-09-23', '08:00'), v: 20 },   // → 23 Sep
       { t: at('2026-09-23', '23:30'), v: 5 },    // → 23 Sep
     ];
     const days = buildDays(['2026-09-22', '2026-09-23'], [], inc, at('2026-09-20', '00:00'), at('2026-09-25', '00:00'), at('2026-09-25', '00:00'));
@@ -80,8 +80,8 @@ describe('periods and variance', () => {
 describe('production by shift', async () => {
   const { splitByShift, shiftOf } = await import('../../src/modules/hsm/shift-split');
   const at = (s: string) => Date.parse(`${s}+05:30`);
-  test('Day is 06:00–18:00 IST, Night 18:00–06:00', () => {
-    expect([shiftOf(at('2026-10-07T06:00:00')), shiftOf(at('2026-10-07T17:59:00')), shiftOf(at('2026-10-07T18:00:00')), shiftOf(at('2026-10-08T05:59:00'))])
+  test('Day is 08:00–20:00 IST, Night 20:00–08:00', () => {
+    expect([shiftOf(at('2026-10-07T08:00:00')), shiftOf(at('2026-10-07T19:59:00')), shiftOf(at('2026-10-07T20:00:00')), shiftOf(at('2026-10-08T07:59:00'))])
       .toEqual(['Day', 'Day', 'Night', 'Night']);
   });
   test('each plant day splits by where its ticks fell, and Day + Night equals the day exactly', () => {

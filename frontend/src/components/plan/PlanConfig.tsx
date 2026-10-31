@@ -12,7 +12,7 @@
  * Opens on the month as last saved (/api/forms/plan/:mill), else on the plan in use (/api/:mill/plan).
  * Save writes the month to the mill's logbook form (one entry per date); every screen then reloads.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import DrillDrawer from '@/components/drill/DrillDrawer';
 import { fixed } from '@/lib/num';
 import { DAY_START_HOUR, dm, shiftsLabel } from '@/lib/plantDay';
@@ -49,9 +49,9 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
   const [filledFor, setFilledFor] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: 'saving' | 'saved' | 'error'; text: string } | null>(null);
 
-  // Opens on the month as saved; else on the plan the dashboard uses now. Once per month.
-  useEffect(() => {
-    if (filledFor === month || !current || (!saved && !sv.error)) return;
+  // Opens on the month as saved; else on the plan the dashboard uses now. Once per month, filled during
+  // render (React: adjusting state when data arrives — no effect).
+  if (filledFor !== month && current && (saved || sv.error)) {
     if (saved?.saved) {
       const byDate = new Map(saved.days.map((d) => [d.date, d]));
       setRows(dates.map((date) => {
@@ -70,7 +70,7 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
     }
     setFilledFor(month);
     setStatus(null);
-  }, [current, saved, sv.error, dates, month, filledFor]);
+  }
 
   const save = async () => {
     if (entered === null) { setStatus({ kind: 'error', text: 'Enter the month plan first.' }); return; }

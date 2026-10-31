@@ -33,7 +33,7 @@ import HeaderSlot from '@/components/shell/HeaderSlot';
 import BearingTrendAll, { rmdBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
-import KpiCard, { type Series } from '@/components/visualization/KpiCard';
+import KpiCard from '@/components/visualization/KpiCard';
 import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
@@ -99,8 +99,6 @@ const CARDS: Record<Group, { bearing: boolean; current: boolean; oil: boolean }>
   auxiliary: { bearing: false, current: false, oil: false },
 };
 const STRIP: Record<number, string> = { 6: '', 5: ' ah-strip--five', 4: ' ah-strip--four', 3: ' ah-strip--three' };
-
-const NA = (label: string, unit: string, series: Series) => <KpiCard key={label} label={label} value="NA" unit={unit} note="" series={series} />;
 
 export default function RmdAssetHealth() {
   const [group, setGroup] = useState<Group>('route');
@@ -324,7 +322,6 @@ function toneOf(rows: RmdReading[]): 'v-ok' | 'v-risk' | undefined {
   return judged.some((r) => r.status !== 'ok') ? 'v-risk' : 'v-ok';
 }
 const LIMIT_TONE = { ok: 'v-ok', low: 'v-risk', high: 'v-risk' } as const;
-
 
 /** Oil tank level: the reading (inches), the oil in litres and the capacity (no "Full" column — the user, 29 Oct 2026). */
 function TankLevelTable({ rows }: { rows: RmdReading[] }) {

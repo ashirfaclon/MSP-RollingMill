@@ -11,7 +11,7 @@
  * Save writes one entry to the logbook form (HSM Checklists → Production Variance Checklist); the
  * production figures are filled by the server from the same source as the Production card.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import DrillDrawer from '@/components/drill/DrillDrawer';
 import { fixed } from '@/lib/num';
 import { useProduction, useSelection } from '@/services/hsmProduction';
@@ -38,11 +38,13 @@ export default function VarianceChecklist({ open, onClose }: { open: boolean; on
   const variance = influx !== null && erp !== null ? influx - erp : null;
   const pct = variance !== null && erp ? (variance / erp) * 100 : null;
 
-  // The reasons are typed by the person; a new date starts them empty.
+  // The reasons are typed by the person; a new date starts them empty (reset during render, no effect).
   const [reasons, setReasons] = useState<Record<ReasonKey, string>>({ missRoll: '', finishEndcut: '', millScale: '', stripEndcut: '' });
-  useEffect(() => {
+  const [reasonsFor, setReasonsFor] = useState(day);
+  if (reasonsFor !== day) {
+    setReasonsFor(day);
     setReasons({ missRoll: '', finishEndcut: '', millScale: '', stripEndcut: '' });
-  }, [day]);
+  }
   const reasonTotal = REASONS.reduce((a, r) => a + (Number(reasons[r.key]) || 0), 0);
   const [status, setStatus] = useState<{ kind: 'saving' | 'saved' | 'error'; text: string } | null>(null);
   const save = async () => {

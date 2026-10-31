@@ -5,7 +5,7 @@
  * the "Edit inputs" button on Costing & impact. Opens on the month as last saved; Save writes one entry
  * to the mill's logbook form (CA Inputs, every field a column) — the latest entry of a month wins.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import DrillDrawer from '@/components/drill/DrillDrawer';
 import { postJson, useApi, type FormSaveResult, type SavedCaInputs } from '@/services/hsmApi';
 import { caFieldsFor, type CaGroup, type CaMill } from './caConfig';
@@ -26,12 +26,12 @@ export default function CaInputs({ mill, open, onClose }: { mill: CaMill; open: 
   const [filledFor, setFilledFor] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: 'saving' | 'saved' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    if (filledFor === month || (!saved && !s.error)) return;
+  // Filled during render, once per month (React: adjusting state when data arrives — no effect).
+  if (filledFor !== month && (saved || s.error)) {
     setValues(Object.fromEntries(fields.map((f) => [f.key, saved?.values[f.key] == null ? '' : r2(saved.values[f.key]!)])));
     setFilledFor(month);
     setStatus(null);
-  }, [saved, s.error, month, filledFor, fields]);
+  }
 
   const save = async () => {
     const missing = fields.filter((f) => !Number.isFinite(Number(values[f.key])) || (values[f.key] ?? '').trim() === '');

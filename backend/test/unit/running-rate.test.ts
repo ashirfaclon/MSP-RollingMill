@@ -23,8 +23,8 @@ test('a lone billet adds no running time', () => {
   expect(runs.map(hours)).toEqual([0, 0]);
 });
 
-test('a run crossing 06:00 is cut there, each part in its own plant day', () => {
-  const runs = runsOf(ticks('2026-09-26T05:50:00', '2026-09-26T05:58:00', '2026-09-26T06:04:00'));
+test('a run crossing 08:00 is cut there, each part in its own plant day', () => {
+  const runs = runsOf(ticks('2026-09-26T07:50:00', '2026-09-26T07:58:00', '2026-09-26T08:04:00'));
   expect(runs.map((r) => [r.date, hours(r) * 60, r.billets])).toEqual([
     ['2026-09-25', 10, 2],
     ['2026-09-26', 4, 1],
