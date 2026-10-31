@@ -40,7 +40,11 @@ async function entries(env: Env, form: string, mill: string): Promise<{ date: st
   const at = (r: InsightEntry) => String(r.createdAt ?? r.invocationTime ?? '');
   return [...read.rows].sort((a, b) => at(a).localeCompare(at(b)))
     .map((r) => ({ v: r.result ?? {}, date: String(r.result?.date ?? '').slice(0, 10) }))
-    .filter((e) => isDate(e.date) && String(e.v.mill ?? '').toLowerCase() === mill);
+    // The mill is the form's Unit (renamed from Mill, with Division before it — the user, 31 Oct 2026):
+    // Division RM, Unit HSM / RMD / LSM / RMS. Entries filed before the rename keep Mill and no Division.
+    .filter((e) => isDate(e.date)
+      && String(e.v.unit ?? e.v.mill ?? '').trim().toLowerCase() === mill
+      && (e.v.division == null || String(e.v.division).trim().toUpperCase() === 'RM'));
 }
 
 /** The report with the MID logbook forms' entries laid over the Excel reports. Logbook down: the reports alone. */
