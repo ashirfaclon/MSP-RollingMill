@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Rolling Mill Code Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; a verdict, a severity strip that filters, a fix-first list, then the findings ledger. */
+:root {
+  --bg: #eef0f2; --panel: #ffffff; --fg: #15191e; --muted: #5b6570; --line: #d5dae0;
+  --accent: #b4470f; --code-bg: #e6e9ed;
+  --crit: #a3121b; --crit-bg: #fbe7e8; --high: #c25400; --high-bg: #fdeedd;
+  --med: #8a6a00; --med-bg: #f8f0d2; --low: #4b5b6b; --low-bg: #e6ebf0;
+  --ok: #1f6f43; --ok-bg: #e2f2e8;
+  --display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12161a; --panel: #1a1f25; --fg: #e4e8ec; --muted: #9aa5b1; --line: #2c343d;
+  --accent: #f08a4b; --code-bg: #232a32;
+  --crit: #ff7b84; --crit-bg: #3a1619; --high: #ffa456; --high-bg: #3a2513;
+  --med: #e7c75a; --med-bg: #332c12; --low: #a9b8c7; --low-bg: #242c35;
+  --ok: #6fd39b; --ok-bg: #16301f; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12161a; --panel: #1a1f25; --fg: #e4e8ec; --muted: #9aa5b1; --line: #2c343d;
+  --accent: #f08a4b; --code-bg: #232a32;
+  --crit: #ff7b84; --crit-bg: #3a1619; --high: #ffa456; --high-bg: #3a2513;
+  --med: #e7c75a; --med-bg: #332c12; --low: #a9b8c7; --low-bg: #242c35;
+  --ok: #6fd39b; --ok-bg: #16301f; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px; }
+h1, h2 { font-family: var(--display); font-weight: 600; letter-spacing: .01em; text-wrap: balance; margin: 0; line-height: 1.1; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); }
+h2 { font-size: 1.7rem; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+.eyebrow { font: 600 .74rem/1 var(--body); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; color: var(--muted); font-size: .88rem; }
+header { display: grid; gap: 14px; }
+section { display: grid; gap: 16px; min-width: 0; }
+
+.verdict { border-left: 4px solid var(--accent); padding: 4px 0 4px 18px; display: grid; gap: 10px; }
+.verdict p { font-size: 1.05rem; }
+
+.strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 560px) { .strip { grid-template-columns: repeat(2, 1fr); } }
+.sev-tile { all: unset; cursor: pointer; display: grid; gap: 2px; padding: 14px 16px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); border-top: 5px solid var(--c); }
+.sev-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sev-tile[aria-pressed="true"] { background: var(--cbg); border-color: var(--c); }
+.sev-tile .n { font: 700 2.3rem/1 var(--display); color: var(--c); font-variant-numeric: tabular-nums; }
+.sev-tile .l { font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.c-critical { --c: var(--crit); --cbg: var(--crit-bg); }
+.c-high { --c: var(--high); --cbg: var(--high-bg); }
+.c-medium { --c: var(--med); --cbg: var(--med-bg); }
+.c-low { --c: var(--low); --cbg: var(--low-bg); }
+
+ol.fix { margin: 0; padding: 0; list-style: none; counter-reset: fix; display: grid; gap: 10px; }
+ol.fix li { counter-increment: fix; display: grid; grid-template-columns: 2.2rem 1fr; gap: 4px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+ol.fix li::before { content: counter(fix); font: 700 1.6rem/1 var(--display); color: var(--accent); grid-row: span 2; }
+ol.fix b { font-weight: 600; }
+ol.fix span { color: var(--muted); font-size: .92rem; grid-column: 2; }
+.refs { font-family: var(--mono); font-size: .78rem; color: var(--accent); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip { all: unset; cursor: pointer; font-size: .84rem; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type=search] { flex: 1 1 220px; min-width: 0; font: inherit; font-size: .9rem; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); }
+.count { color: var(--muted); font-size: .85rem; }
+
+.list { display: grid; gap: 8px; }
+details.f { background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--c); border-radius: 6px; min-width: 0; }
+details.f > summary { cursor: pointer; list-style: none; padding: 12px 14px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: baseline; }
+details.f > summary::-webkit-details-marker { display: none; }
+details.f > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fid { font: 600 .8rem var(--mono); color: var(--c); }
+.ftitle { font-weight: 600; min-width: 0; }
+.fsub { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: .8rem; color: var(--muted); align-items: center; }
+.where { font-family: var(--mono); font-size: .76rem; overflow-wrap: anywhere; }
+.pill { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; padding: 1px 7px; border-radius: 3px; background: var(--cbg); color: var(--c); font-weight: 600; }
+.proof { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; padding: 1px 7px; border-radius: 3px; border: 1px solid var(--line); }
+.proof.p-proven { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+.fbody { padding: 0 14px 14px 14px; display: grid; gap: 8px; border-top: 1px dashed var(--line); padding-top: 12px; margin: 0 0 0 0; }
+.fbody dt { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; }
+.fbody dd { margin: 0 0 4px 0; max-width: 72ch; overflow-wrap: anywhere; }
+.fbody dd.ev { font-family: var(--mono); font-size: .8rem; background: var(--code-bg); padding: 8px 10px; border-radius: 4px; white-space: pre-wrap; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .74rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+.st-bad { color: var(--crit); font-weight: 600; } .st-ok { color: var(--ok); font-weight: 600; } .st-warn { color: var(--high); font-weight: 600; }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .two { grid-template-columns: 1fr; } }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 8px; min-width: 0; }
+.box h3 { margin: 0; font: 600 1.15rem var(--display); letter-spacing: .02em; }
+.box ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: .92rem; }
+.paths code { display: block; margin-top: 4px; white-space: pre-wrap; }
+@media (prefers-reduced-motion: no-preference) { details.f[open] .fbody { animation: in .15s ease-out; } @keyframes in { from { opacity: .4 } to { opacity: 1 } } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Code audit · MSP Rolling Mill dashboards</div>
+    <h1>Rolling Mill Code Audit</h1>
+    <div class="meta">
+      <span>6 Nov 2026</span>
+      <span>Commit <code>0bd6873</code> on <code>main</code></span>
+      <span>Backend (Fastify) + frontend (Next.js static export)</span>
+      <span>About 35k lines of source</span>
+    </div>
+  </header>
+
+  <section class="verdict" aria-label="Verdict">
+    <p><b>The code is tidy, but the numbers and the access model aren't safe to trust.</b> Type-checks pass and all 191 backend unit tests pass, but those tests don't catch any of the 32 calculation bugs found. Several production, yield, energy and running-rate figures can be wrong on real data. The same is true of a shared-credential flaw that lets someone who was refused sign-in knock out the logbook for everyone.</p>
+    <p>Everything below was checked by reading the code, and most of it was proven with failing tests run against the real modules. All systems were mocked: no real historian, ERP or logbook was contacted, and nothing was written. Each finding is tagged <b>Proven</b>, <b>Code read</b> or <b>Suspected</b>.</p>
+  </section>
+
+  <section aria-labelledby="sev-h">
+    <h2 id="sev-h">Findings by severity</h2>
+    <div class="strip" id="strip"></div>
+  </section>
+
+  <section aria-labelledby="fix-h">
+    <h2 id="fix-h">Fix these first</h2>
+    <ol class="fix">
+      <li><b>Stop sharing one IOsense credential across all users.</b><span>Keep the token per session, or use only the service PAT. Check the organisation <i>before</i> storing anything, and never let a failed request wipe the PAT. <span class="refs">S-01 · S-07</span></span></li>
+      <li><b>Fix the HSM counter maths.</b><span>A day with no historian data gets another day's tonnes, and any small dip in the counter is treated as a reset, which counts the whole running total again. Both feed production, yield, running rate and plan. <span class="refs">K-01 · K-02</span></span></li>
+      <li><b>Pair numerator and denominator days in every ratio.</b><span>Specific energy, mass yield, RMD running rate and HSM net production each divide totals taken over different sets of days. LSM also adds duplicate ERP vouchers together. <span class="refs">K-04 – K-07 · K-09</span></span></li>
+      <li><b>Close the Flux injection and lock down who can write.</b><span>Escape <code>${</code>, and refuse the catalogue request when the historian check fails. Set <code>AUTH_ALLOWED_ORGANISATIONS</code>, add a writer role, and refuse to start with auth off unless the environment is explicitly development. <span class="refs">S-02 · S-03 · S-06</span></span></li>
+      <li><b>Limit how much one request can cost.</b><span>Put an upper bound on <code>/api/hsm/stock</code>, cap concurrent historian queries, and lower the rate limit on expensive routes. <span class="refs">S-04 · S-05</span></span></li>
+      <li><b>Make failures say they failed.</b><span>The ERP sync reports success when four of its pulls failed, a logbook outage reads as "no plan saved", and a live-feed timeout never shows an error. <span class="refs">K-08 · K-16 · K-23 · F-01</span></span></li>
+      <li><b>Fix the CA-inputs month-switch race.</b><span>It silently saves October's figures as November's. <span class="refs">F-02</span></span></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="all-h">
+    <h2 id="all-h">All findings</h2>
+    <div class="controls" id="areas"></div>
+    <div class="controls">
+      <input type="search" id="q" placeholder="Search title, file or scenario" aria-label="Search findings">
+      <span class="count" id="count"></span>
+    </div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section aria-labelledby="chk-h">
+    <h2 id="chk-h">Checks run</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Check</th><th>Result</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Backend <code>tsc --noEmit</code></td><td class="st-ok">Clean</td><td>Same results under the UTC, Asia/Kolkata and America/New_York time zones.</td></tr>
+        <tr><td>Backend <code>npm test</code></td><td class="st-ok">191 / 191 pass</td><td>None of the 32 calculation bugs is caught. <code>lsm-plan.test.ts:11</code> asserts the buggy behaviour as correct.</td></tr>
+        <tr><td>Frontend <code>tsc --noEmit</code></td><td class="st-ok">Clean</td><td></td></tr>
+        <tr><td>Frontend <code>npm run lint</code></td><td class="st-bad">4 errors</td><td>All four are in <code>tools/mimic-render/render.cjs</code>, yet commit 0bd6873 says "lint clean".</td></tr>
+        <tr><td>Frontend unit tests</td><td class="st-warn">13 / 13 pass</td><td>They cover only <code>axisFloor</code> and the twin model. Nothing covers plant days, periods, saved selections or number formatting.</td></tr>
+        <tr><td>Playwright</td><td class="st-warn">Not run</td><td>Its web server starts the backend against the real plant sources. Reading the specs shows they are out of date (T-01).</td></tr>
+        <tr><td>Route sweep, all 122 route/method pairs without a session</td><td class="st-ok">All refused</td><td>Only health, ready and the SSO exchange answer without a session, as intended.</td></tr>
+        <tr><td>Backend <code>npm audit</code></td><td class="st-warn">4 (1 high)</td><td>The zod advisory is high, but it isn't reachable because zod only parses environment config. Fastify 5.12.5 has a header-validation bypass. fast-uri is low.</td></tr>
+        <tr><td>Frontend <code>npm audit</code></td><td class="st-warn">2 (1 critical)</td><td>Most Next.js 16.3.6 advisories need a Next server, so they don't apply to the static export. The dev-server MCP leak does apply when <code>next dev</code> is exposed through <code>*.iocompute.ai</code>.</td></tr>
+        <tr><td>Secrets in git history</td><td class="st-ok">None</td><td><code>.env</code> and <code>.env.deploy</code> have always been gitignored and are excluded from the Docker image.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="two" aria-label="Fairness and reproduction">
+    <div class="box">
+      <h3>Done well</h3>
+      <ul>
+        <li>Every data route requires a signed session, and the enforcement is in one hook.</li>
+        <li>ERP SQL uses bound parameters, a read-only transaction and an offline sync. The API never opens Oracle.</li>
+        <li>Plant-day maths uses UTC plus a fixed IST offset, so it doesn't depend on the server's or the browser's time zone.</li>
+        <li>Trend queries are bucketed to about 500 points, divisions are guarded, and no NaN reaches the JSON.</li>
+        <li>The frontend keeps the session in <code>sessionStorage</code>, removes the SSO token from the URL, discards out-of-order responses, and cleans up its intervals.</li>
+        <li>Errors have one response shape with no stack traces, logs redact credentials, and the container runs as a non-root user.</li>
+      </ul>
+    </div>
+    <div class="box paths">
+      <h3>Reproduce</h3>
+      <p style="font-size:.9rem">Findings tagged <b>Proven</b> were reproduced with vitest tests that import the real modules, mock every external system (fetch, a fake InfluxDB HTTP server, synthetic ERP rows), and assert the correct behaviour, so they fail where the bug is.</p>
+      <p style="font-size:.9rem">Those tests were run from a temporary folder and aren't in the repo. The evidence line of each finding gives the inputs and outputs needed to rebuild one, for example as a regression test when the bug is fixed.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+const F = [
+// ---------------- Security & access ----------------
+{id:'S-16',sev:'critical',area:'Security',proof:'Proven',title:'A GitHub personal access token is stored in plain text in the git remote URL',
+ where:'.git/config (remote "origin")',
+ scenario:'The origin URL has the form `https://<user>:ghp_…@github.com/…`, so the token is readable by anyone or anything with access to this workspace. It is printed by `git remote -v`, and it shows up in any tool or log that echoes the remote. It was printed during this audit. Revoke it on GitHub, then set the remote to a plain HTTPS URL with a credential helper, or use SSH.',
+ evidence:'git remote -v → https://<user>:ghp_<redacted>@github.com/<user>/MSP-RollingMill.git'},
+{id:'S-01',sev:'critical',area:'Security',proof:'Proven',title:'One IOsense credential for the whole server, and a refused user replaces it',
+ where:'backend/src/integrations/logbook/client.ts:38,86 · modules/auth/auth.routes.ts:25-35',
+ scenario:'Every user\'s logbook reads and writes go out under one module-level `bearer`. `exchangeSsoToken()` overwrites it before the route checks the organisation. Someone from a disallowed organisation is refused with a 403, but the server now calls IOsense with their token. Their token can\'t read the plant\'s insight, so the next 401 calls `dropSession()`, which nulls the plant\'s PAT for everyone until a restart. Between two allowed users, user A\'s saves go out under user B\'s IOsense identity while the entry records A as the one who filled it.',
+ evidence:'sso-hijack.test.ts\noutsider sign-in → 403 forbidden_organisation\nlegit user request went out with Authorization = Bearer ATTACKER-JWT\nlogbook state for legit user → { connection: "down", message: "Logbook session expired…" }'},
+{id:'S-02',sev:'high',area:'Security',proof:'Proven',title:'Flux injection through /api/historian/catalogue',
+ where:'backend/src/modules/sources/sources.routes.ts:129-138 · integrations/influx.ts:257',
+ scenario:'The `measurement` parameter is only checked against the historian\'s list when the probe answered "up". On a timeout or VPN blip, the raw string goes into Flux. `esc()` escapes `\\` and `"` but not `${…}`, which Flux evaluates inside string literals. Any signed-in user can run expressions with the server\'s Influx token (for example `findRecord` on another bucket) and read the results back one yes-or-no answer at a time. The code comment says identifiers "never come from user input".',
+ evidence:'flux-interp.test.ts (probe made to fail) → status 200, connection "up"\npredicate: (r) => r._measurement == "${string(v: (from(bucket: \\"other-bucket\\") |> range(start: -1h) |> findRecord(…))._value)}"'},
+{id:'S-03',sev:'high',area:'Security',proof:'Code read',title:'Any IOsense user from any organisation can rewrite plans, CA inputs and equipment limits',
+ where:'backend/.env.deploy (AUTH_ALLOWED_ORGANISATIONS unset) · modules/forms-db/forms-db.routes.ts',
+ scenario:'The deploy env leaves the organisation allow-list empty, so any IOsense organisation can sign in. There are no roles: every session can call every POST under /api/forms. One user can change rated motor currents, RMD temperature limits, the monthly plan or CA tariffs, and the dashboards immediately treat the new values as the plant\'s.',
+ evidence:'grep AUTH_ALLOWED_ORGANISATIONS backend/.env.deploy → not set\nconfig/server.ts:41 "Empty = any organisation IOsense signs in"'},
+{id:'S-04',sev:'high',area:'Security',proof:'Code read',title:'One client can tie up the plant historian',
+ where:'backend/src/modules/hsm/params.ts:6 · plugins/security.ts:33-39 · rmd/condition.service.ts:22 · hsm/production.service.ts:213',
+ scenario:'Ranges of up to 400 days are allowed on every route. Queries run 1-minute `aggregateWindow` + `pivot` (RMD condition, 180 s timeout) or counter `difference` (120 s). The only limit is 600 requests a minute per IP, with no cap on concurrent queries. A closed browser tab doesn\'t cancel the server\'s Influx query. A script, or a polling bug, can keep hundreds of long queries running on the same historian the plant uses.',
+ evidence:'RATE_LIMIT_PER_MINUTE default 600; no p-limit/queue anywhere in src/integrations'},
+{id:'S-05',sev:'high',area:'Security',proof:'Proven',title:'/api/hsm/stock?to=9999-12-31 builds 2.9 million rows',
+ where:'backend/src/modules/hsm/hsm.routes.ts:127-131 · hsm/erp-kpis.service.ts:347',
+ scenario:'Only `isDate(to)` is checked. The service then builds one row per day from the start of the ledger to `to`.',
+ evidence:'stock.audit.test.ts: 9999-12-31 → 2,912,718 daily rows, 169 MB JSON, 8.2 s CPU on the event loop, 807 MB heap'},
+{id:'S-06',sev:'medium',area:'Security',proof:'Code read',title:'Auth is open if NODE_ENV is forgotten, and nothing is logged',
+ where:'backend/src/config/server.ts:21,57 · plugins/auth.ts:37',
+ scenario:'`NODE_ENV` defaults to development, and the local `.env` has `AUTH_DISABLED` on. Running `npm start` with that file on a server leaves every route open. The only warning in the auth plugin is suppressed exactly when auth is disabled, so nothing in the log says the API is open.',
+ evidence:'if (!config.AUTH_DISABLED) app.log.warn(…)   // no warning for the disabled case itself'},
+{id:'S-07',sev:'medium',area:'Security',proof:'Proven',title:'Any error mentioning "auth" or "token" kills the logbook until restart',
+ where:'backend/src/integrations/logbook/client.ts:48-53,62-63',
+ scenario:'`isAuthFailure` matches /session expired|auth|token|unauthor/ against any error text. `dropSession` sets the credential to null, not undefined, so the env PAT is never re-read. One refused write whose message happens to contain "token", or an SSO user\'s IOsense JWT expiring, takes the logbook down for every user until someone signs in again or the process restarts.',
+ evidence:'Covered in sso-hijack.test.ts: after one 401 every later request is "down", with zero outbound calls retried under the PAT'},
+{id:'S-08',sev:'medium',area:'Security',proof:'Code read',title:'Plan saves aren\'t atomic, and two concurrent saves race',
+ where:'backend/src/integrations/logbook/client.ts:454-488',
+ scenario:'A month\'s plan is up to 31 sequential update or add calls. If call 17 fails, days 1–16 hold the new plan and days 17–31 the old one, and each row\'s month totals disagree. Each save reads first and then writes. Two people saving the same month at once both see "no row" and both add, which doubles the rows until the next save cleans them up.',
+ evidence:'for (const result of results) { … await call(\'PUT\'|\'POST\') … }  // no rollback'},
+{id:'S-09',sev:'medium',area:'Security',proof:'Suspected',title:'Logbook reads are silently cut off at 10,000 rows',
+ where:'backend/src/integrations/logbook/client.ts:25-26,399,454',
+ scenario:'Reads stop at 20 pages of 500 rows and still return ok. A save looks back three years to find each existing key. Once a form passes 10,000 rows, older keys are missed, so a save adds a duplicate instead of updating. Readers likewise see a truncated history. The hourly LSM form is the most likely to reach this.',
+ evidence:'MAX_PAGES = 20; PAGE = 500; loop exits without flagging truncation'},
+{id:'S-10',sev:'low',area:'Security',proof:'Proven',title:'Missing value limits on what the dashboard saves',
+ where:'backend/src/modules/forms-db/plan.store.ts:116-127 · ca.store.ts:21-26 · checklist.store.ts:299',
+ scenario:'Accepted: a plan of 1e300 MT, a standard yield of 5000 %, a tariff of 1e308, and months 2026-00 and 2026-99 (an empty save that "succeeds"). Malformed bodies such as `days:[null]` or a non-string Remark give a 500 instead of a 400.',
+ evidence:'sweep.test.ts\nPOST plan {monthPlanMt:1e300,…} → passed validation (502 only because the logbook was offline)\nPOST plan {month:"2026-99",days:[]} → passed validation\nPOST plan {days:[null]} → 500 plan_save_failed'},
+{id:'S-11',sev:'low',area:'Security',proof:'Proven',title:'/api/pm/:mill accepts toString, constructor and __proto__',
+ where:'backend/src/modules/pm/pm.routes.ts:13',
+ scenario:'`mill in PM_DIVISIONS` walks the prototype chain. The route returns 200 with mill "toString" and an empty report. It does no harm today, but the same pattern on a lookup that is used would.',
+ evidence:'/api/pm/toString → 200 {"mill":"toString",…}  (also constructor, __proto__, hasOwnProperty, valueOf)'},
+{id:'S-12',sev:'low',area:'Security',proof:'Proven',title:'Impossible dates pass validation, then crash or return junk',
+ where:'backend/src/modules/hsm/production.service.ts:38',
+ scenario:'`Date.parse` rolls 2026-02-30 over to 2 Mar, so `isDate` accepts it. `dateRange` then returns [], and `days[0].date` throws.',
+ evidence:'GET /api/hsm/production?from=2026-02-30&to=2026-03-01 → 500\nGET /api/hsm/stock?to=2026-02-31 → 200'},
+{id:'S-13',sev:'low',area:'Security',proof:'Proven',title:'A health probe with a query string gets rate-limited',
+ where:'backend/src/plugins/security.ts:38',
+ scenario:'The rate-limit allow-list compares the URL exactly, so a load-balancer probe that adds a cache-buster gets a 429 and may mark the pod unhealthy.',
+ evidence:'limit 2/min: /api/health?probe=1 ×4 → 200,200,429,429; /api/health ×4 → all 200'},
+{id:'S-14',sev:'low',area:'Security',proof:'Code read',title:'Upstream error text is echoed to the browser',
+ where:'backend/src/integrations/logbook/client.ts:444',
+ scenario:'Refused writes return `"<msg>: " + String(errors)` in the 502 body. That shows IOsense internals, or "[object Object]" when the error is an object.',
+ evidence:'message: `${MSG.LOGBOOK_WRITE_REFUSED}: ${String(errors ?? status)}`'},
+{id:'S-15',sev:'low',area:'Security',proof:'Code read',title:'Supply chain: unpinned Oracle client and dependencies behind on advisories',
+ where:'backend/Dockerfile:27 · package-lock.json',
+ scenario:'Instant Client is downloaded from a moving "latest" URL with no checksum, and base images aren\'t pinned by digest. Fastify 5.12.5 and fast-uri have advisories with fixes available. `next dev` is reachable through `allowedDevOrigins: *.iocompute.ai` and is affected by the dev-server MCP leak.',
+ evidence:'npm audit: backend 4 (1 high, unreachable), frontend 2 (1 critical, mostly N/A for a static export)'},
+
+// ---------------- KPI maths ----------------
+{id:'K-01',sev:'critical',area:'KPI maths',proof:'Proven',title:'A day with no historian data gets another day\'s production, marked as fully covered',
+ where:'backend/src/modules/hsm/counter-events.ts:126,136 · hsm/production.service.ts:117-118',
+ scenario:'There\'s no boundary reading for an empty day, because `createEmpty:false` skips it. The code falls back to the first and last readings of the whole requested range. Counter: 100 at 1 Oct 08:00, 300 at 2 Oct 08:00, silent until 3 Oct 10:00, then 500 by 4 Oct 08:00. The result flows into yield, running rate and plan.',
+ evidence:'H2: got [200, 200, 410] t, all \'full\'; truth [200, NA, 200]: 810 t reported against 400'},
+{id:'K-02',sev:'high',area:'KPI maths',proof:'Proven',title:'Any small dip in the counter is treated as a reset, so the whole total is counted again',
+ where:'backend/src/modules/hsm/counter-events.ts:83,131',
+ scenario:'Any fall in Total_Production_Ton, even 0.2 t, sets the running value to 0. Counter: 1000 at 08:00, 1100 at 12:00, 1099.8 at 12:01 from PLC jitter or a setpoint change, 1200 at the end of the day.',
+ evidence:'H1: events [[1000,1100,100],[0,1200,1200]] → 1300 t; truth 200 t'},
+{id:'K-03',sev:'medium',area:'KPI maths',proof:'Suspected',title:'difference(nonNegative:true) may turn a dip into a full-counter jump',
+ where:'backend/src/modules/hsm/production.service.ts:216 · rmd/billets.service.ts',
+ scenario:'In Flux\'s documented behaviour, a fall makes the next difference equal the whole current value. That would add a full counter\'s worth to RMD billets, shift-split ticks, yield input and the noise filter (K-11). This needs a real Influx instance to confirm.',
+ evidence:'|> difference(nonNegative: true) |> filter(fn: (r) => r._value > 0.0)'},
+{id:'K-04',sev:'high',area:'KPI maths',proof:'Proven',title:'Specific energy divides some days\' kWh by all days\' production',
+ where:'backend/src/modules/power/power.service.ts:148-160 · ca/ca.service.ts:91 · frontend/src/components/drill/powerPeriods.ts:35',
+ scenario:'1000 MT on each of 3 days, with 100,000 kWh entered for day 1 only. The period figure divides 100,000 kWh by 3000 MT. RMD, LSM and RMS rupee costing inherit it, and the frontend repeats the same mistake.',
+ evidence:'F1: totals.kwhPerMt 33.33; expected 100'},
+{id:'K-05',sev:'high',area:'KPI maths',proof:'Proven',title:'LSM adds duplicate ERP vouchers together',
+ where:'backend/src/modules/lsm/production.service.ts:22-25,74-77',
+ scenario:'Real cache: 14 Oct 2026 has L7P26O14-0001 and -0002 with identical values. Production reads 772.26 MT instead of 386.13, and running hours come to 28.5 h in one day. RMS removes duplicates; LSM doesn\'t. The doubled figure goes into plan compliance, running rate and kWh/MT. 27 Apr 2026 is doubled the same way.',
+ evidence:'data/erp-lsm-production.json: two vouchers, INPUT_MT 406.22, PRODUTION_MT 386.13 each\nrlr pure.test: expected 772.26 to be 386.13'},
+{id:'K-06',sev:'high',area:'KPI maths',proof:'Proven',title:'Mass yield divides totals taken over different days',
+ where:'backend/src/modules/rmd/production.service.ts:31-46 · lsm/production.service.ts:27-41 · rms/production.service.ts:35-56',
+ scenario:'A day with input but no production, or production but no input, still counts on its own side of the division.',
+ evidence:'LSM Jan 2026 (real cache): 74.28 % vs 94.29 % over days that have both (14 input-only dates)\nRMD Mar 2026: 101.49 % vs 96.16 % (10 Mar has production, no input)'},
+{id:'K-07',sev:'high',area:'KPI maths',proof:'Proven',title:'RMD running rate divides some days\' tonnes by all days\' hours',
+ where:'backend/src/modules/rmd/running-rate.service.ts:40-43',
+ scenario:'The ERP is entered about 1.5 days late, so the newest days add running hours with no tonnage. The rate is understated every day. HSM\'s `summariseRate` pairs the days correctly.',
+ evidence:'3 days × 20 h, ERP 400 MT for day 1 only → 6.67 TPH; expected 20'},
+{id:'K-08',sev:'high',area:'KPI maths',proof:'Proven',title:'The ERP sync reports success when four of its pulls failed',
+ where:'backend/src/integrations/erp/sync.ts:548 (catches at 259, 332, 411, 448, 488, 529)',
+ scenario:'The RMD, RMS, PM, stock and LSM pulls catch their errors, log them and carry on. The run returns `ok: true`, so each mill reads "up" while serving a cache that may be weeks old.',
+ evidence:'pcm S1: ORA-00942 / ORA-01013 thrown → result { ok: true, message: "ERP synced" }'},
+{id:'K-09',sev:'medium',area:'KPI maths',proof:'Proven',title:'HSM net production subtracts by-products over fewer days than it counts production',
+ where:'backend/src/modules/hsm/production.service.ts:179-187',
+ scenario:'Production sums every day with counter data, while by-products sum only the days with an ERP booking. 3 days of 1000 t with 40 t of by-products booked for day 1 gives net 2960 t, which looks like a 98.7 % yield. `yield.service.ts` already does this correctly.',
+ evidence:'H3: netMt 2960, byProductDays 1; expected 960 over the booked day'},
+{id:'K-10',sev:'medium',area:'KPI maths',proof:'Proven',title:'HSM running rate counts a day with production but 0 hours',
+ where:'backend/src/modules/hsm/running-rate.service.ts:73-76,139',
+ scenario:'`runH = round2(r?.h ?? 0)`. A billet-counter gap gives 0 h but real tonnes, which inflates the rate.',
+ evidence:'H4: 100 MT/5 h + 100 MT/0 h → 40 TPH; expected 20'},
+{id:'K-11',sev:'medium',area:'KPI maths',proof:'Proven',title:'One glitched billet reading can exhaust server memory',
+ where:'backend/src/modules/hsm/counter-events.ts:173',
+ scenario:'`denoise` allocates one array slot per billet in each increment. A PLC writing 65535 or 4294967295 allocates that many slots on every production, yield, plan and shift request.',
+ evidence:'D1: increment 1e7 → 432 ms, 382 MB heap (1e8+ would run out of memory)'},
+{id:'K-12',sev:'medium',area:'KPI maths',proof:'Proven',title:'One shutdown month blanks the whole multi-month CA period',
+ where:'backend/src/modules/ca/ca.service.ts:132,140-142',
+ scenario:'`total()` returns null if any month is null. For Sep–Oct with Oct shut down, kWh/MT, rate, yield, conversion cost, output opportunity and yield loss all come back NA.',
+ evidence:'pcm C1'},
+{id:'K-13',sev:'medium',area:'KPI maths',proof:'Code read',title:'CA computes kWh/MT two different ways',
+ where:'backend/src/modules/ca/ca.service.ts:69-75 vs 91',
+ scenario:'HSM pairs power and production by day. RMD, LSM and RMS take the power card\'s total, which has the K-04 bug. That breaks the "uniform across mills" rule, and the comment saying CA and the card agree is false.',
+ evidence:'—'},
+{id:'K-14',sev:'medium',area:'KPI maths',proof:'Proven',title:'MTTR divides closed-breakdown hours by all breakdowns',
+ where:'backend/src/modules/pm/pm.service.ts:62',
+ scenario:'One closed 4 h breakdown plus one open breakdown gives an MTTR of 2 h. MTBF uses the same count.',
+ evidence:'pcm P1: MTTR 2; expected 4'},
+{id:'K-15',sev:'medium',area:'KPI maths',proof:'Proven',title:'Impossible dates crash several mills\' summaries',
+ where:'backend/src/modules/hsm/production.service.ts:38 (used by params.ts:12-14)',
+ scenario:'`from=2026-02-31` passes validation, `dateRange` returns [], and `summarise` and `rmdBillets` throw on `days[0].date`. `lsmProduction` returns `fromDate: undefined`.',
+ evidence:'H7 + rlr baddate.test: TypeError'},
+{id:'K-16',sev:'medium',area:'KPI maths',proof:'Code read',title:'A logbook outage reads as "no plan saved"',
+ where:'backend/src/modules/forms-db/plan.store.ts:160 · rmd/plan.service.ts:48 · lsm/plan.service.ts:79',
+ scenario:'`if (!read.ok) return out;` plus `.catch(() => new Map())` mean that when the logbook is down, plan and compliance go NA with the wrong reason, and the actual figure silently switches to all days. The existing test asserts this as correct.',
+ evidence:'test/unit/lsm-plan.test.ts:11'},
+{id:'K-17',sev:'medium',area:'KPI maths',proof:'Proven',title:'The MID screen hides a logbook outage',
+ where:'backend/src/modules/mid/mid.service.ts:37,52,65',
+ scenario:'It returns an empty "no readings" report with no connection field. The comment still refers to Excel reports that were removed.',
+ evidence:'pcm M1'},
+{id:'K-18',sev:'medium',area:'KPI maths',proof:'Proven',title:'The worst MID vibration reading can drop out of its section',
+ where:'backend/src/modules/mid/mid.service.ts:129-133 · mid/sections.ts:38',
+ scenario:'Machines are grouped by the name exactly as typed. "ROUGHING 1" at 2 mm/s and "Roughing  1" (double space) at 9 mm/s become two machines. The 9 mm/s one gets no section, so the section shows 2 mm/s. A `machineKey` normaliser exists but isn\'t used here.',
+ evidence:'pcm M2'},
+{id:'K-19',sev:'medium',area:'KPI maths',proof:'Proven',title:'RMD running hours show 0 instead of NA for days not yet covered',
+ where:'backend/src/modules/rmd/running-rate.service.ts:40',
+ scenario:'Range 1–3 Oct at 1 Oct 12:00 gives runH [2, 0, 0] instead of [2, NA, NA].',
+ evidence:'rlr mocked.test'},
+{id:'K-20',sev:'medium',area:'KPI maths',proof:'Proven',title:'With one RMD line\'s counter down, figures silently show half the mill',
+ where:'backend/src/modules/rmd/running-rate.service.ts:35 · rmd/billets.service.ts:42,64',
+ scenario:'`up = m1.up || m2.up`, so the status says up while only M1\'s hours are used. `addNull(121, null)` gives 121, shown as the mill total.',
+ evidence:'rlr mocked.test'},
+{id:'K-21',sev:'medium',area:'KPI maths',proof:'Proven',title:'LSM run hours can exceed 24 h in a day',
+ where:'backend/src/modules/lsm/running-rate.service.ts:31-57',
+ scenario:'Runs of 09:00→08:59 and 08:00→10:00 on one date give 25 h. An entry with start equal to end, or with start and end swapped, counts as 0 h because of the modulo wrap.',
+ evidence:'rlr pure.test: expected 25 to be ≤ 24'},
+{id:'K-22',sev:'medium',area:'KPI maths',proof:'Code read',title:'The HSM plan gap stays blank all month',
+ where:'backend/src/modules/hsm/plan.service.ts:39',
+ scenario:'`actuals.every(a => a !== null) ? sum : null`. With the plan saved ahead for the whole month, future days have no actual yet, so the month-to-date gap is null until the month ends.',
+ evidence:'—'},
+{id:'K-23',sev:'medium',area:'KPI maths',proof:'Code read',title:'A logbook outage reads as "no CA inputs saved"',
+ where:'backend/src/modules/forms-db/ca.store.ts:240',
+ scenario:'A failed read returns an empty result, so all costing goes NA with the wrong reason.',
+ evidence:'if (!read.ok) return empty;'},
+{id:'K-24',sev:'low',area:'KPI maths',proof:'Proven',title:'Shift split invents zeros',
+ where:'backend/src/modules/hsm/shift-split.ts:40',
+ scenario:'A day of 120 t with no ticks gives { Day: 0, Night: 0 }, so the shifts don\'t add up to the day\'s total.',
+ evidence:'H5'},
+{id:'K-25',sev:'low',area:'KPI maths',proof:'Proven',title:'HSM stores check fails on days with no stores receipt yet',
+ where:'backend/src/modules/hsm/erp-kpis.service.ts:87,90',
+ scenario:'`storesMt: stores ?? 0` makes the stores gap equal to the whole day\'s production.',
+ evidence:'H6: storesMt 0 / gap 100'},
+{id:'K-26',sev:'low',area:'KPI maths',proof:'Code read',title:'HSM running-rate ERP side invents zeros',
+ where:'backend/src/modules/hsm/running-rate.service.ts:125,128,145,147',
+ scenario:'`e.mt += r.mt ?? 0` turns a voucher with a blank PRODUCTION_MT into 0, while the Production card shows NA for the same day.',
+ evidence:'—'},
+{id:'K-27',sev:'low',area:'KPI maths',proof:'Proven',title:'Power: blank kWh shows as 0, negative kWh is accepted, and repeat entries add up',
+ where:'backend/src/modules/power/power.service.ts:133-134',
+ scenario:'A blank kWh shows as 0 kWh in the per-meter breakdown. Entering −999,000 kWh gives −999 kWh/MT. A re-submitted 50,000 kWh reading becomes 100,000 (the last may be intended for LSM\'s hourly form).',
+ evidence:'pcm F2, F3, F4'},
+{id:'K-28',sev:'low',area:'KPI maths',proof:'Proven',title:'ERP breakdowns: open ones end at the text "null", and some have negative hours',
+ where:'backend/src/integrations/erp/sync.ts:401',
+ scenario:'`String(r.T)` stores the text "null" as the end of an open breakdown. A breakdown whose end is before its start keeps −2 h, which goes into MTTR.',
+ evidence:'pcm S1'},
+{id:'K-29',sev:'low',area:'KPI maths',proof:'Proven',title:'PM counts read 0 when the ERP cache is missing',
+ where:'backend/src/modules/pm/pm.service.ts',
+ scenario:'Equipment count, open work orders and PM due show 0 instead of NA. The response does also say the ERP is down.',
+ evidence:'pcm P2'},
+{id:'K-30',sev:'low',area:'KPI maths',proof:'Proven',title:'Stock totals don\'t match the listed sizes',
+ where:'backend/src/modules/rmd/stock.service.ts:53-57 · lsm/stock.service.ts:83-89,114',
+ scenario:'RMD\'s total counts sizes hidden from its list. LSM and RMS drop sections with negative stock from both the list and the total, so the total no longer equals the ledger (10 instead of 6 in a synthetic case). The real caches don\'t trigger this today.',
+ evidence:'rlr pure.test'},
+{id:'K-31',sev:'low',area:'KPI maths',proof:'Suspected',title:'RMS: real vouchers can be merged, or be joined too loosely',
+ where:'backend/src/modules/rms/production.service.ts:25 · integrations/erp/sync.ts:307',
+ scenario:'Duplicates are removed on date, MT and pieces only, so two real vouchers with equal output collapse into one. The log-sheet join uses only VRNO and ENTITY_CODE, where HSM joins on six keys.',
+ evidence:'synthetic case'},
+{id:'K-32',sev:'low',area:'KPI maths',proof:'Code read',title:'The "billets today" live figure has no freshness check',
+ where:'backend/src/modules/hsm/live.service.ts:101-103',
+ scenario:'A feed that stopped at 08:05 still shows the morning\'s count as today\'s live figure at 18:00. The stands do have a freshness check.',
+ evidence:'—'},
+
+// ---------------- Frontend ----------------
+{id:'F-01',sev:'high',area:'Frontend',proof:'Proven',title:'A live request that times out never counts as a failure',
+ where:'frontend/src/components/twin/liveStore.ts:75,84',
+ scenario:'`ctl.abort()` is called with no reason, so the abort reason never contains "Timeout" and the catch returns early. With the backend hung, the mimic shows a loading skeleton forever: no error, no "retrying", no backoff. It re-polls every 25 s.',
+ evidence:'live.audit: 150 s of hung fetches → {status:"connecting", error:null} after 7 calls'},
+{id:'F-02',sev:'high',area:'Frontend',proof:'Code read',title:'Changing month and saving writes October\'s CA inputs as November\'s',
+ where:'frontend/src/components/condition/CaInputs.tsx:30,41,72 · plan/PlanConfig.tsx:54,168',
+ scenario:'The fields refill only when the new month\'s read returns, and Save stays enabled meanwhile. The POST sends `{month:"2026-11", values:<October>}`, and the backend accepts it. PlanConfig has the same race; there the backend rejects the dates, so the user only sees a confusing error.',
+ evidence:'if (filledFor !== month && (saved || s.error)) { … }  // Save not gated on filledFor === month'},
+{id:'F-03',sev:'medium',area:'Frontend',proof:'Code read',title:'useApi keeps the previous URL\'s data, so cards mix periods',
+ where:'frontend/src/services/hsmApi.ts:104-128 · condition/HsmSpecificEnergy.tsx:27-35',
+ scenario:'Data and error aren\'t reset when the URL changes. HsmSpecificEnergy joins the new period\'s power with the old period\'s production and shows a wrong kWh/MT, permanently if the production request then fails. A stale error also makes CaInputs and PlanConfig fill with blanks and never refill.',
+ evidence:'—'},
+{id:'F-04',sev:'medium',area:'Frontend',proof:'Code read',title:'Asset Health cards show NA while loading and when the API fails',
+ where:'frontend/src/components/asset/AssetHealth.tsx:108-133 · LsmAssetHealth.tsx',
+ scenario:'A 502 from /api/hsm/mill-load shows "NA" with no note, which looks the same as "no source", the one thing NA is meant to mean in this project.',
+ evidence:'—'},
+{id:'F-05',sev:'medium',area:'Frontend',proof:'Code read',title:'No error boundary anywhere',
+ where:'frontend/src/app (no error.tsx / global-error.tsx)',
+ scenario:'Any render exception, such as F-15 or one unexpected null behind the many `!` assertions, replaces the whole control-room screen with Next\'s "Application error" until someone reloads.',
+ evidence:'grep ErrorBoundary|error.tsx → none'},
+{id:'F-06',sev:'medium',area:'Frontend',proof:'Code read',title:'An expiring session throws away whatever was being typed',
+ where:'frontend/src/auth/session.ts · services/hsmApi.ts:79,141',
+ scenario:'Sessions last 12 h with no refresh. The first 401, usually a background poll, unmounts the whole app. A planner halfway through 62 Day/Night cells loses them all. A wall display needs someone to re-launch it from IOsense. There\'s also no server-side logout or revocation.',
+ evidence:'—'},
+{id:'F-07',sev:'medium',area:'Frontend',proof:'Code read',title:'Duplicate React keys in MID vibration',
+ where:'frontend/src/components/asset/MidVibration.tsx:54',
+ scenario:'The key is `${machine}-${part}-${point}`, and the backend always sends part: null. Motor "DE" and Gearbox "DE" on one machine collide as "X-null-DE", so rows can get mixed up on refresh.',
+ evidence:'mid.service.ts:78 part: null'},
+{id:'F-08',sev:'medium',area:'Frontend',proof:'Code read',title:'The RMD current chart is rebuilt on every live poll',
+ where:'frontend/src/components/asset/RmdCurrentDrawer.tsx:94-96 · drill/DrillChart.tsx:163',
+ scenario:'An inline `series=[…]` array is a dependency of the effect that rebuilds the chart. Every 30 s poll destroys and recreates the Highcharts chart, which loses the user\'s zoom. The line picker also isn\'t reset when the zone changes, which can leave the drawer empty.',
+ evidence:'—'},
+{id:'F-09',sev:'medium',area:'Frontend',proof:'Code read',title:'No request timeouts; polling continues in hidden tabs',
+ where:'frontend/src/services/hsmApi.ts:77,138',
+ scenario:'A hung save leaves "Saving…" showing forever. About 20 hooks re-poll every 60 s even in background tabs, which adds to the historian load in S-04.',
+ evidence:'—'},
+{id:'F-10',sev:'low',area:'Frontend',proof:'Code read',title:'The date picker allows ranges the backend refuses',
+ where:'frontend/src/components/shell/DateRangePicker.tsx:102-105',
+ scenario:'A future end date can be typed, and nothing warns that ranges over 400 days fail. A two-year range makes every HSM card show "At most 400 days".',
+ evidence:'—'},
+{id:'F-11',sev:'low',area:'Frontend',proof:'Code read',title:'The variance checklist wipes typed reasons at the 08:00 rollover',
+ where:'frontend/src/components/checklist/VarianceChecklist.tsx:33,43-47',
+ scenario:'With the default date, the plant day rolls over at 08:00 IST, which resets the form during render and points the save at the new day.',
+ evidence:'—'},
+{id:'F-12',sev:'low',area:'Frontend',proof:'Proven',title:'A corrupted saved selection breaks the header',
+ where:'frontend/src/state/globalSel.ts:74-85',
+ scenario:'`duration in DURATION_LABELS` accepts "constructor", and the trigger label then becomes a function, which React refuses to render. Inverted or impossible custom ranges load as-is, and every request gets a 400. The theme and sidebar values are never validated.',
+ evidence:'storage.audit: {"duration":"constructor"} → selectedDates undefined, label typeof function'},
+{id:'F-13',sev:'low',area:'Frontend',proof:'Proven',title:'Number formatters print NaN, ∞, "-0.0" and "09:60"',
+ where:'frontend/src/lib/num.ts:11 · lib/plantDay.ts · lib/time.ts · drill/DrillChart.tsx:22',
+ scenario:'`fixed(NaN)` gives "NaN" instead of NA. A delta of −0.03 MT shows as a green "Delta -0.0 MT". `hhmmOf(9.999)` gives "09:60", `dm("garbage")` gives "0 undefined", and `fmtDuration(-90 min)` gives "-30 m". `isDate("2026-02-31")` is true here too.',
+ evidence:'pure.audit: 10 failing assertions'},
+{id:'F-14',sev:'low',area:'Frontend',proof:'Proven',title:'MID "days ago" uses the browser\'s time zone',
+ where:'frontend/src/components/asset/MidVibration.tsx:245',
+ scenario:'This is the only date maths in the app that depends on the browser\'s time zone. A visit on 5 Nov reads "1 day ago" in Kolkata and "today" in Los Angeles.',
+ evidence:'—'},
+{id:'F-15',sev:'low',area:'Frontend',proof:'Code read',title:'Equipment settings crash if rows change while editing',
+ where:'frontend/src/components/asset/EquipmentSettings.tsx:84,39',
+ scenario:'`draft![r.id][c.key]` throws when a new row appears. The drawer has no focus trap, so Tab can reach the header\'s drive-group switch behind it. Combined with F-05, this blanks the app.',
+ evidence:'—'},
+{id:'F-16',sev:'low',area:'Frontend',proof:'Code read',title:'Logbook text goes into HTML tooltips unescaped',
+ where:'frontend/src/components/drill/DrillChart.tsx:96-106',
+ scenario:'`useHTML: true` with series names taken from logbook text. Highcharts\' allow-list blocks scripts but not injected markup or links. There\'s also no CSP for the static site: there are no headers in next.config.ts and no nginx config in the repo.',
+ evidence:'—'},
+{id:'F-17',sev:'low',area:'Frontend',proof:'Code read',title:'Smaller issues',
+ where:'frontend/src (various)',
+ scenario:'Logbook time strings are parsed three different ways. The month input isn\'t validated on browsers without `type=month`. The Reset tooltip says "Today" but resets to Yesterday. The test-only /twin/fixtures page ships in the production build. `fetchJson`\'s inflight cleanup can evict a newer entry.',
+ evidence:'—'},
+
+// ---------------- Tests & tooling ----------------
+{id:'T-01',sev:'medium',area:'Tests',proof:'Code read',title:'Playwright specs test UI that no longer exists',
+ where:'frontend/src/tests/rolling-mill.spec.ts:81-109 · wiring.e2e.spec.ts:1473-1496',
+ scenario:'They expect an h2 heading, a "Gearbox oil" card, `.ah-fact` and `.ah-status`, three drive-group buttons, and a `{shutdown}` POST body. All of these have since been removed or changed. The "passed" in `.last-run.json` must come from a filtered run.',
+ evidence:'grep .ah-fact|.ah-status src → nothing'},
+{id:'T-02',sev:'medium',area:'Tests',proof:'Proven',title:'191 passing unit tests that miss every calculation bug',
+ where:'backend/test/unit',
+ scenario:'None of the 32 KPI findings is caught, and one test asserts the wrong behaviour. Tests check arithmetic on clean data, never gaps, dips, duplicates or partial days.',
+ evidence:'npm test → 191/191 pass; scratch tests → 7 + 21 failing'},
+{id:'T-03',sev:'low',area:'Tests',proof:'Proven',title:'Commit messages claim checks that don\'t pass',
+ where:'git 0bd6873',
+ scenario:'"lint clean": lint fails with 4 errors. "unit tests on the current day starts": only backend tests changed, and the frontend day-start logic has no unit tests.',
+ evidence:'npm run lint → exit 1'},
+];
+
+const SEV = [['critical','Critical'],['high','High'],['medium','Medium'],['low','Low']];
+const AREAS = ['All','Security','KPI maths','Frontend','Tests'];
+const state = { sev: null, area: 'All', q: '' };
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+
+$('#strip').innerHTML = SEV.map(([k, l]) =>
+  `<button class="sev-tile c-${k}" data-sev="${k}" aria-pressed="false"><span class="n">${F.filter((f) => f.sev === k).length}</span><span class="l">${l}</span></button>`).join('');
+$('#areas').innerHTML = AREAS.map((a) => `<button class="chip" data-area="${a}" aria-pressed="${a === 'All'}">${a} <span class="count">${a === 'All' ? F.length : F.filter((f) => f.area === a).length}</span></button>`).join('');
+
+function render() {
+  const q = state.q.toLowerCase();
+  const rows = F.filter((f) => (!state.sev || f.sev === state.sev) && (state.area === 'All' || f.area === state.area)
+    && (!q || (f.id + f.title + f.where + f.scenario + f.evidence).toLowerCase().includes(q)));
+  $('#count').textContent = `${rows.length} of ${F.length} shown`;
+  $('#list').innerHTML = rows.map((f) => `
+    <details class="f c-${f.sev}" id="${f.id}">
+      <summary>
+        <span class="fid">${f.id}</span><span class="ftitle">${fmt(f.title)}</span>
+        <span class="fsub"><span class="pill">${f.sev}</span><span class="proof ${f.proof === 'Proven' ? 'p-proven' : ''}">${f.proof}</span><span class="where">${esc(f.where)}</span></span>
+      </summary>
+      <dl class="fbody">
+        <dt>What goes wrong</dt><dd>${fmt(f.scenario)}</dd>
+        ${f.evidence && f.evidence !== '—' ? `<dt>Evidence</dt><dd class="ev">${esc(f.evidence)}</dd>` : ''}
+      </dl>
+    </details>`).join('') || '<p class="count">No findings match.</p>';
+}
+document.addEventListener('click', (e) => {
+  const s = e.target.closest('[data-sev]'); const a = e.target.closest('[data-area]');
+  if (s) { state.sev = state.sev === s.dataset.sev ? null : s.dataset.sev;
+    document.querySelectorAll('[data-sev]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sev === state.sev))); render(); }
+  if (a) { state.area = a.dataset.area;
+    document.querySelectorAll('[data-area]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.area === state.area))); render(); }
+});
+$('#q').addEventListener('input', (e) => { state.q = e.target.value; render(); });
+render();
+if (location.hash && document.getElementById(location.hash.slice(1))) document.getElementById(location.hash.slice(1)).open = true;
+</script>
+</body>
+</html>
