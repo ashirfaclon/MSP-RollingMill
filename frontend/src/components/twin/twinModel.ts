@@ -308,7 +308,7 @@ export function rmdTwinModel(
     for (const zone of ['route', 'finishing'] as const) {
       const zs = (live?.stations ?? []).filter((s) => s.line === line && s.zone === zone).map((s) => nodeOf({
         id: s.id, name: s.label, kind: machineOf(zone, s.label), row: `line${line}`, section: zone,
-        on: s.on, at: s.at, currentA: s.currentA,
+        on: s.on, at: s.at, currentA: s.currentA, rpm: s.rpm,
       }, now));
       if (!zs.length) continue;
       /* A line's runs move at the line's measured speed: the only speed the plant publishes. */
@@ -319,7 +319,7 @@ export function rmdTwinModel(
     }
     chainRow(mine, edges);
     nodes.push(...mine);
-    return { id: `line${line}`, label: `Line ${line}`, sections, speed: { signal: sig, spec: LINE_MPS, unit: 'm/s', dp: 1 }, speedNorm };
+    return { id: `line${line}`, label: `Line ${line}`, sections, speed: { signal: sig, spec: LINE_MPS, unit: 'MPS', dp: 1 }, speedNorm };
   });
   const billets = assess({ value: live?.billetsToday ?? null, ts: ms(live?.lastReadingAt) }, BILLETS, now);
   return assemble('rmd', now, rows, nodes, edges,

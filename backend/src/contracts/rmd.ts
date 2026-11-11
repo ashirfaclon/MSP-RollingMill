@@ -40,6 +40,8 @@ export interface RmdStationNow {
   on: boolean | null;
   /** The drive's current feedback (A), live; null without a fresh reading. */
   currentA: number | null;
+  /** The drive's speed feedback (RPM), live; null without a fresh reading. */
+  rpm: number | null;
   at: string | null;
   fresh: boolean;
 }

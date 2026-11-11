@@ -104,6 +104,9 @@
 .mx-read-unit { fill: var(--mx-ink-3); font-size: 6.5px; font-weight: 700; }
 /* Stale: grey, with its age. Suspect: amber with its "?". A total over a period: the quieter ink. */
 .mx-read--stale { fill: var(--mx-ink-3); }
+/* A machine's speed under its current (RMD, 11 Nov 2026). */
+.mx-rpm { fill: var(--mx-ink-2); letter-spacing: 0.3px; }
+.mx-rpm.mx-read--na { fill: var(--mx-ink-3); }
 .mx-read-age { fill: var(--mx-ink-3); font-size: 8px; font-weight: 700; }
 .mx-read--suspect { fill: var(--warn); }
 .mx-read--total { fill: var(--mx-ink-2); }

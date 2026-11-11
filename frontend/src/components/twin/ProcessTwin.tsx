@@ -25,7 +25,7 @@ import { ageOf, good, periodLabel, readingText } from './signal';
 import { EXIT, INFEED, litSet, type TwinModel, type TwinNode, type TwinRow } from './twinModel';
 import { Sprite } from './twinArt';
 import { Lamp, Readout, RefBar, Run, SelectRing, TwinDefs, flowOf, nozzle, spriteBox, spriteMetres, type Box, type RunState } from './twinDraw';
-import { BILLETS, CURRENT } from './twinSignals';
+import { BILLETS, CURRENT, RPM } from './twinSignals';
 import './twin.css';
 
 /* ------------------------------- geometry -------------------------------- */
@@ -34,7 +34,7 @@ const VB_W = 1151;
 const PAD = 10;
 /** Lanes, px. */
 /* Lanes, px — small, so the machines are what the eye lands on (the user, 30 Oct 2026). */
-const LANE = { header: 11, name: 13, reading: 13, bar: 5, meta: 10, rowGap: 14 };
+const LANE = { header: 11, name: 13, reading: 13, bar: 5, rpm: 11, meta: 10, rowGap: 14 };
 /** Between machines, and between a row's sections. */
 const GAP = { machine: 6, section: 22, endRun: 18 };
 /** A header's width: the .mx-group face is ~6.1 px a character at 9.5 px plus 1.2 px tracking. */
@@ -57,6 +57,8 @@ interface RowPlan {
 interface Layout { h: number; pxPerM: number; rows: RowPlan[]; infeed: Box; exit: Box; forkX: number; mergeX: number }
 
 const spriteOf = (n: TwinNode) => (n.state === 'running' || n.state === 'warning' ? `${n.kind}-hot` : n.kind);
+/** Each machine's speed (RPM) is written under its current where the mill publishes one (the plant, 11 Nov 2026). */
+const rpmLane = (m: TwinModel) => (Object.values(m.route.nodes).some((n) => n.rpm !== null) ? LANE.rpm : 0);
 
 function layout(m: TwinModel): Layout {
   const infeedM = spriteMetres(END.infeed);
@@ -92,7 +94,7 @@ function layout(m: TwinModel): Layout {
     ? Math.max(...rows.flatMap((r) => r.sections.flatMap((s) => s.nodeIds.map((id) => spriteMetres(spriteOf(m.route.nodes[id])).h)))) * pxPerM
     : 60;
   const band = Math.max(tallest, infeedM.h * pxPerM, exitM.h * pxPerM);
-  const rowH = LANE.header + LANE.name + band + LANE.reading + LANE.bar + LANE.meta;
+  const rowH = LANE.header + LANE.name + band + LANE.reading + LANE.bar + rpmLane(m) + LANE.meta;
 
   const infeedW = Math.max(END_MIN_W, infeedM.w * pxPerM);
   const exitW = Math.max(END_MIN_W, exitM.w * pxPerM);
@@ -181,7 +183,8 @@ export default function ProcessTwin({ model, onOpen, selected, onSelect }: {
   const say = (n: TwinNode) => {
     const r = readingText(n.current, CURRENT, model.now);
     const state = n.state === 'running' ? 'running' : n.state === 'stopped' ? 'stopped' : n.state === 'fault' ? 'stopped while its section runs' : n.state === 'warning' ? 'warning' : 'no live data';
-    return `${n.name} ${state}${n.current.quality === 'missing' ? '' : `, ${r.text} amps${n.current.quality === 'stale' ? ' (stale)' : n.current.quality === 'suspect' ? ' (doubtful)' : ''}`}`;
+    const rpm = n.rpm && n.rpm.quality !== 'missing' ? `, ${readingText(n.rpm, RPM, model.now).text} RPM` : '';
+    return `${n.name} ${state}${n.current.quality === 'missing' ? '' : `, ${r.text} amps${n.current.quality === 'stale' ? ' (stale)' : n.current.quality === 'suspect' ? ' (doubtful)' : ''}`}${rpm}`;
   };
 
   const placed = useMemo(() => new Map(L.rows.flatMap((r) => r.machines.map((p) => [p.node.id, p] as const))), [L]);
@@ -264,8 +267,16 @@ export default function ProcessTwin({ model, onOpen, selected, onSelect }: {
                   <Readout cx={b.cx} y={readY} signal={n.current} spec={CURRENT} now={model.now} unit="A" small
                     text={n.running.quality === 'missing' ? 'NA' : stopped || (n.state === 'fault' && n.running.value === false) ? 'Off' : undefined} />
                   <RefBar cx={b.cx} y={rp.floor + LANE.reading + 1} load={n.load} tone={n.tone} quality={n.current.quality} />
+                  {n.rpm && (() => {
+                    const r = readingText(n.rpm, RPM, model.now);
+                    return (
+                      <text className={`mx-sub mx-rpm${r.quality === 'missing' ? ' mx-read--na' : ''}`} x={b.cx} y={rp.floor + LANE.reading + LANE.bar + LANE.rpm - 2} textAnchor="middle">
+                        {r.text} RPM
+                      </text>
+                    );
+                  })()}
                   {(n.current.quality === 'stale' || n.running.quality === 'stale') && (
-                    <text className="mx-sub mx-read--stale" x={b.cx} y={rp.floor + LANE.reading + LANE.bar + LANE.meta - 2} textAnchor="middle">
+                    <text className="mx-sub mx-read--stale" x={b.cx} y={rp.floor + LANE.reading + LANE.bar + rpmLane(model) + LANE.meta - 2} textAnchor="middle">
                       {ageOf(n.current.ts ?? n.running.ts, model.now).toUpperCase()} OLD
                     </text>
                   )}

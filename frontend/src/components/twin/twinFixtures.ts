@@ -57,7 +57,7 @@ export function rmdFixtures(now: number) {
   const dayStart = () => { const d = new Date(now); d.setUTCHours(3, 30, 0, 0); if (d.getTime() > now) d.setUTCDate(d.getUTCDate() - 1); return d.toISOString(); };
 
   const st = (id: string, zone: RmdStationNow['zone'], line: 1 | 2, label: string, on: boolean | null, a: number | null, at: string | null = AT): RmdStationNow =>
-    ({ id, zone, line, label, on, currentA: a, at: on === null ? null : at, fresh: on !== null });
+    ({ id, zone, line, label, on, currentA: a, rpm: on === null ? null : on ? 350 : 0, at: on === null ? null : at, fresh: on !== null });
   const zones = (stations: RmdStationNow[]): RmdLive['zones'] => (['route', 'finishing'] as const).map((id) => {
     const mine = stations.filter((s) => s.zone === id);
     const on = mine.filter((s) => s.on).length;

@@ -168,14 +168,16 @@ const routeStation = (line: 1 | 2, n: number): RmdStationDef => ({
 export const RMD_STATIONS: RmdStationDef[] = [
   ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => routeStation(1, n)),
   ...[1, 2, 3, 4, 5, 6].map((n) => routeStation(2, n)),
+  // Finishing in mill order (the plant, 11 Nov 2026): the first pinch roll before the shear on both lines.
+  // Line 1's first pinch roll is tagged PRI (RUNNING_STATUS_PRI); it is shown as PR1.
   ...([
-    ['FS', 'CUR_FB_FS', 'SPD_FB_FS'], ['PRI', 'CUR_FB_PR1', 'SPD_FB_PR1'], ['PR2', 'CUR_FB_PR2', 'SPD_FB_PR2'],
-    ['TB1', 'CUR_FB_TB1', 'SPD_FB_TB1'], ['TB2', 'CUR_FB_TB2', 'SPD_FB_TB2'],
-  ] as const).map(([c, cur, spd]): RmdStationDef => ({
-    id: `L1_${c}`, zone: 'finishing', line: 1, label: c, unitTag: 'Line-1', group: 'M1', field: `RUNNING_STATUS_${c}`, currentField: cur, speedField: spd,
+    ['PRI', 'PR1', 'CUR_FB_PR1', 'SPD_FB_PR1'], ['FS', 'FS', 'CUR_FB_FS', 'SPD_FB_FS'], ['PR2', 'PR2', 'CUR_FB_PR2', 'SPD_FB_PR2'],
+    ['TB1', 'TB1', 'CUR_FB_TB1', 'SPD_FB_TB1'], ['TB2', 'TB2', 'CUR_FB_TB2', 'SPD_FB_TB2'],
+  ] as const).map(([c, label, cur, spd]): RmdStationDef => ({
+    id: `L1_${c}`, zone: 'finishing', line: 1, label, unitTag: 'Line-1', group: 'M1', field: `RUNNING_STATUS_${c}`, currentField: cur, speedField: spd,
   })),
   ...([
-    ['CS', 'CS_On_Off', 'CS_Current', 'CS_RPM'], ['PR pre', 'Pinch_Roll_Pre_On_Off', 'Pinch_Roll_Pre_Current', 'Pinch_Roll_Pre_RPM'],
+    ['PR pre', 'Pinch_Roll_Pre_On_Off', 'Pinch_Roll_Pre_Current', 'Pinch_Roll_Pre_RPM'], ['CS', 'CS_On_Off', 'CS_Current', 'CS_RPM'],
     ['PR post', 'Pinch_Roll_Post_On_Off', 'Pinch_Roll_Post_Current', 'Pinch_Roll_Post_RPM'],
     ['TB 1', 'Tail_Breaker_01_On_Off', 'Tail_Break_01_Current', 'Tail_Break_01_RPM'],
     ['TB 2', 'Tail_Breaker_02_On_Off', 'Tail_Break_02_Current', 'Tail_Break_02_RPM'],
