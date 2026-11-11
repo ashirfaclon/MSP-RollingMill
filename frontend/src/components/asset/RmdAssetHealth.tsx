@@ -18,7 +18,9 @@
  *                     lowest against its capacity — the level (inches) × the tank's inside length ×
  *                     width; Temp = the hottest tank's oil temperature, against its limits;
  *   Run hours         ERP log sheet ACTUAL_RUNNING_HRS over the period (whole mill); opens per day;
- *   Condition trends  every MID machine; every bearing of each entry (the user, 31 Oct 2026).
+ *   Condition trends  every MID machine; every stand's bearings at their latest reading in one bar chart,
+ *                     All / Roughing / Route (the user, 11 Nov 2026) — the trend over time is in the
+ *                     Bearing temp drill-down.
  * Test entries are left out.
  * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
  * 45–65 °C, editable in the drill-downs (the user, 31 Oct 2026) — a card turns red when any of its
@@ -31,6 +33,7 @@ import EquipmentSettings from './EquipmentSettings';
 import { midTop, rmdHottest, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
 import BearingTrendAll, { rmdBearingPoints } from './BearingTrendAll';
+import RmdBearingBars, { type StandReading } from './RmdBearingBars';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard from '@/components/visualization/KpiCard';
@@ -62,6 +65,15 @@ const GROUPS: { id: Group; label: string }[] = [
 const LIVE: Partial<Record<Group, ('route' | 'finishing')[]>> = { all: ['route', 'finishing'], route: ['route'], finishing: ['finishing'] };
 const FORMS: Partial<Record<Group, ('roughing' | 'route')[]>> = { all: ['roughing', 'route'], roughing: ['roughing'], route: ['route'] };
 const NAME: Record<Group, string> = { all: 'All groups', roughing: 'Roughing', route: 'Route', finishing: 'Finishing', auxiliary: 'Auxiliary' };
+
+/** A group's stands' latest bearing readings, each with its group and its entry's time. */
+function standReadings(d: RmdAssetForms, g: 'roughing' | 'route'): StandReading[] {
+  const b = d.bearing[g];
+  return b.latest.map((r) => {
+    const times = b.history.filter((h) => h.equipment === r.equipment && h.at === r.at && h.time).map((h) => h.time!);
+    return { ...r, group: g, time: times.length ? times.sort().at(-1)! : null };
+  });
+}
 
 /** Several form groups as one: readings together, the hottest of them, the latest dates. */
 const later = (a: string | null, b: string | null) => (a === null ? b : b === null ? a : a > b ? a : b);
@@ -148,6 +160,9 @@ export default function RmdAssetHealth() {
   const bearingMax = bearing?.max?.value ?? null;
   const oilLevelL = oil?.minLevel?.litres ?? null;
   const bearingLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!bearing && bearingMax === null, bearing?.lastDate, dates?.from);
+  // The all-stands chart: each group with no reading in the period shows its own last entry.
+  const roughLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!forms && !forms.bearing.roughing.latest.length, forms?.bearing.roughing.lastDate, dates?.from);
+  const routeLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!forms && !forms.bearing.route.latest.length, forms?.bearing.route.lastDate, dates?.from);
   const levelLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!oil && oilLevelL === null, oil?.levelLastDate, dates?.from);
   const tempLast = useLastEntry<RmdAssetForms>('/api/rmd/asset-forms', !!oil && oilTempC === null, oil?.temperatureLastDate, dates?.from);
   const hottestOil = (d: RmdAssetForms) => { const t = oilOf(d)?.temperature ?? []; return t.length ? Math.max(...t.map((r) => r.value)) : null; };
@@ -175,7 +190,7 @@ export default function RmdAssetHealth() {
           note=""
           series="hold"
           tone={bearingTone}
-          {...(bearing ? { onOpen: () => setOpen('bearing'), openLabel: 'Every bearing at the latest reading, and the trend' } : {})}
+          {...(bearing ? { onOpen: () => setOpen('bearing'), openLabel: 'Every bearing at the latest reading, and the trend over time' } : {})}
         />}
         {/* Live while any of the group's drives runs; otherwise the mean while running over the selected dates (the user, 28 Oct 2026). */}
         {show.current && <KpiCard
@@ -216,12 +231,14 @@ export default function RmdAssetHealth() {
       <div className="rm-row ah-row--one">
         <Panel title="Condition trends" sub={show.bearing ? 'Every machine and every bearing' : 'Every machine'} className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
-          {/* Every bearing of the group's stands, each reading (the user, 31 Oct 2026). */}
+          {/* Every stand's bearings at their latest reading, in one chart (the user, 11 Nov 2026); a group with none in the period: its last entry's. */}
           {show.bearing && (() => {
-            const now = rmdBearingPoints(bearing?.history ?? []);
-            const before = !now.length && bearingLast.data ? rmdBearingPoints(bearingOf(bearingLast.data)?.history ?? []) : [];
-            return <BearingTrendAll points={now.length ? now : before} last={!now.length && before.length ? bearingLast.date : null}
-              empty={bearing && !bearing.lastDate ? 'No entries recorded yet in the Mill Bearing Temperature forms' : 'No bearing readings in this period'} />;
+            const of = (g: 'roughing' | 'route', last: typeof roughLast) => (!forms ? []
+              : forms.bearing[g].latest.length ? standReadings(forms, g)
+                : last.data ? standReadings(last.data, g) : []);
+            const none = !!forms && !forms.bearing.roughing.lastDate && !forms.bearing.route.lastDate;
+            return <RmdBearingBars readings={[...of('roughing', roughLast), ...of('route', routeLast)]}
+              empty={none ? 'No entries recorded yet in the Mill Bearing Temperature forms' : 'No bearing readings in this period'} />;
           })()}
         </Panel>
       </div>
@@ -245,6 +262,12 @@ export default function RmdAssetHealth() {
           ['Forms', (fgs ?? []).map((g) => (g === 'roughing' ? '20 Inch R Stand, 16 Inch R Stand' : 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)')).join(', ')],
           ['Field', 'Flywheel / Reduction gear / Pinion gear, D and ND side (°C) — each form\'s latest entry in the period'],
         ]} formula={['Bearing temp = the hottest of those readings', 'Limits: the table above — the plant\'s, editable']}
+          trend={(() => {
+            // Every bearing at each reading over the period (moved here from Condition trends, 11 Nov 2026).
+            const now = rmdBearingPoints(bearing.history);
+            const before = !now.length && bearingLast.data ? rmdBearingPoints(bearingOf(bearingLast.data)?.history ?? []) : [];
+            return <BearingTrendAll points={now.length ? now : before} last={!now.length && before.length ? bearingLast.date : null} />;
+          })()}
           settings={limits.data && <TempLimitSettings data={limits.data} ids={['bearing', 'flywheel']} />} />}
       </DrillDrawer>
       {/* One screen per view of the card (the plant, 29 Oct 2026): oil level, or oil temperature. */}
@@ -347,9 +370,11 @@ function TankLevelTable({ rows }: { rows: RmdReading[] }) {
   );
 }
 
-function ReadingsTable({ rows, unit, label, max, source, formula, settings }: {
+function ReadingsTable({ rows, unit, label, max, source, formula, trend, settings }: {
   rows: RmdReading[]; unit: string; label: string; max: RmdReading | null;
   source: [string, string][] | null; formula: string[] | null;
+  /** The readings over time, after the table. */
+  trend?: ReactNode;
   /** The editable limits, between the readings and the source. */
   settings?: ReactNode;
 }) {
@@ -376,6 +401,7 @@ function ReadingsTable({ rows, unit, label, max, source, formula, settings }: {
           </tbody>
         </table>
       </div>
+      {trend}
       {settings}
       {source && <SourceBox sources={[{ name: 'Logbook', rows: source }]} formula={formula ?? []} />}
     </>

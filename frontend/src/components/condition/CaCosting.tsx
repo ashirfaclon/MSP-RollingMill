@@ -113,7 +113,11 @@ function actualSource(ca: CaView): { r: CaReport | null; date: string | null } {
   return { r, date: null };
 }
 
-/** Matched-run performance: actual vs the month's benchmark (one plant-entered benchmark, not size-matched). */
+/**
+ * Matched-run performance: actual vs the month's benchmark (one plant-entered benchmark, not size-matched),
+ * as two bar charts — production rate and energy per MT (the plant's reference graph, 11 Nov 2026). The
+ * badge says how far actual is from matched: red when worse (a lower rate, more energy), green otherwise.
+ */
 export function CaMatchedRows({ ca }: { ca: CaView }) {
   const { r, date } = actualSource(ca);
   const i = r?.inputs ?? null;
@@ -123,10 +127,43 @@ export function CaMatchedRows({ ca }: { ca: CaView }) {
   const ra = lr ? lr.report.actual : a;
   const ri = lr ? lr.report.inputs : i;
   return (
-    <>
-      <Row k="Production rate · actual vs matched" last={lr ? lr.date : date} v={ri && ra?.rateTph != null ? `${fixed(ra.rateTph, 2)} vs ${fixed(ri.benchmarkRateTph, 2)} TPH` : null} />
-      <Row k="Energy per MT · actual vs matched" last={date} v={i && a?.kwhPerMt != null ? `${fixed(a.kwhPerMt, 1)} vs ${fixed(i.benchmarkKwhPerMt, 1)} kWh/MT` : null} />
-    </>
+    <div className="ca-mbars">
+      <MatchedBar title="Production rate" unit="TPH" dp={2} higherIsBetter last={lr ? lr.date : date}
+        actual={ra?.rateTph ?? null} matched={ri ? ri.benchmarkRateTph : null} />
+      <MatchedBar title="Energy per MT" unit="kWh/MT" dp={1} higherIsBetter={false} last={date}
+        actual={a?.kwhPerMt ?? null} matched={i ? i.benchmarkKwhPerMt : null} />
+    </div>
+  );
+}
+
+function MatchedBar({ title, unit, dp, higherIsBetter, actual, matched, last }: {
+  title: string; unit: string; dp: number; higherIsBetter: boolean;
+  actual: number | null; matched: number | null; last: string | null;
+}) {
+  const pct = actual !== null && matched ? ((actual - matched) / matched) * 100 : null;
+  const worse = pct !== null && (higherIsBetter ? pct < 0 : pct > 0);
+  const top = Math.max(actual ?? 0, matched ?? 0) * 1.15 || 1;
+  const bar = (label: string, v: number | null, cls: string) => (
+    <div className="ca-mbar-col" title={`${label}: ${v === null ? 'NA' : `${fixed(v, dp)} ${unit}`}`}>
+      <span className={`ca-mbar-val num${v === null ? ' v-na' : ''}`}>{v === null ? 'NA' : fixed(v, dp)}</span>
+      <span className="ca-mbar-track"><span className={`ca-mbar-fill ${cls}`} style={{ height: v === null ? 0 : `${(v / top) * 100}%` }} /></span>
+      <span className="ca-mbar-label">{label}</span>
+    </div>
+  );
+  return (
+    <figure className="ca-mbar" aria-label={`${title}: actual ${actual === null ? 'NA' : fixed(actual, dp)} vs matched ${matched === null ? 'NA' : fixed(matched, dp)} ${unit}`}>
+      <figcaption>
+        <span className="rm-k">{title} · {unit}</span>
+        {pct !== null && (
+          <span className={`chip ${worse ? 'chip--risk' : 'chip--ok'}`}>{worse ? '⚠' : '✓'} {pct > 0 ? '+' : pct < 0 ? '−' : ''}{fixed(Math.abs(pct), 1)} % vs matched</span>
+        )}
+      </figcaption>
+      <div className="ca-mbar-plot">
+        {bar('Actual', actual, pct === null ? 'is-neutral' : worse ? 'is-worse' : 'is-better')}
+        {bar('Matched', matched, 'is-matched')}
+      </div>
+      {last && actual !== null && <span className="rm-card-last ca-last">Last entry · {dm(last)}</span>}
+    </figure>
   );
 }
 

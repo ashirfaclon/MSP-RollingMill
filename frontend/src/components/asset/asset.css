@@ -172,3 +172,59 @@
 .eq-changed { font-size: 11px; color: var(--text-2); white-space: nowrap; }
 .eq-default { color: var(--muted-3); }
 .eq-status { margin: 0; font-size: 12px; color: var(--ok); }
+
+/* RMD bearing temperature, all stands in one chart (RmdBearingBars). */
+.brb-set { display: inline-flex; align-items: center; gap: 8px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted-2); }
+.brb-set select {
+  font: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--text);
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 26px 5px 10px; cursor: pointer;
+}
+.brb-set select:focus-visible { outline: 2px solid var(--border-hi); outline-offset: 1px; }
+.brb-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.brb-top .chip { white-space: normal; text-transform: none; letter-spacing: 0; font-size: 11.5px; }
+.brb-legend { display: inline-flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11px; font-weight: 600; color: var(--text-2); }
+.brb-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.brb-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.brb-legend .brb-solid { background: var(--text-3); }
+.brb-legend .brb-hatch { background: repeating-linear-gradient(45deg, var(--text-3) 0 3px, var(--panel) 3px 5px); }
+.brb-chart { display: flex; align-items: flex-start; position: relative; }
+.brb-axis { flex: none; }
+.brb-axis text { font-size: 10.5px; fill: var(--muted-2); font-variant-numeric: tabular-nums; }
+.brb-scroll { flex: 1; min-width: 0; overflow-x: auto; padding-bottom: 4px; }
+.brb-scroll::-webkit-scrollbar { height: 8px; }
+.brb-scroll::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; }
+.brb-band { fill: var(--risk-dim); opacity: 0.55; }
+.brb-grid { stroke: var(--border-soft); stroke-width: 1; }
+.brb-sep { stroke: var(--border-soft); stroke-width: 1; stroke-dasharray: 2 4; }
+.brb-base { stroke: var(--border-hi); stroke-width: 1; }
+.brb-bar { stroke: var(--panel); stroke-width: 0; }
+.brb-bar--out { stroke: var(--risk); stroke-width: 2; }
+.brb-hatch-line { stroke: var(--panel); opacity: 0.85; }
+.brb-val { font-size: 11px; font-weight: 700; fill: var(--text); font-variant-numeric: tabular-nums; }
+.brb-val--out { fill: var(--risk); }
+.brb-in { font-size: 10.5px; font-weight: 700; fill: #fff; paint-order: stroke; stroke: rgba(0, 0, 0, 0.25); stroke-width: 2px; }
+.brb-stand { font-size: 11.5px; font-weight: 700; fill: var(--text); }
+.brb-date { font-size: 10px; font-weight: 600; fill: var(--muted-2); }
+.brb-limit { stroke: var(--risk); stroke-width: 2; }
+.brb-limit-text {
+  position: absolute; right: 6px; padding: 1px 6px; border-radius: 4px; pointer-events: none;
+  font-size: 10.5px; font-weight: 700; color: var(--risk); background: var(--panel); white-space: nowrap;
+}
+
+/* Condition Analytics · Matched-run performance: actual vs matched, two bar charts (CaCosting). */
+.ca-mbars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 560px) { .ca-mbars { grid-template-columns: minmax(0, 1fr); } }
+.ca-mbar { margin: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); }
+.ca-mbar figcaption { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.ca-mbar figcaption .chip { text-transform: none; letter-spacing: 0; }
+.ca-mbar-plot { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; height: 170px; margin-bottom: 22px; padding: 0 10px; border-bottom: 1px solid var(--border-hi); }
+.ca-mbar-col { display: flex; flex-direction: column; align-items: center; min-height: 0; position: relative; }
+.ca-mbar-val { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.ca-mbar-track { flex: 1; width: 100%; max-width: 72px; display: flex; align-items: flex-end; }
+.ca-mbar-fill { width: 100%; border-radius: 4px 4px 0 0; transition: height 0.3s ease; }
+.ca-mbar-fill.is-matched { background: var(--cat-1); }
+.ca-mbar-fill.is-worse { background: var(--risk); }
+.ca-mbar-fill.is-better { background: var(--ok); }
+.ca-mbar-fill.is-neutral { background: var(--text-3); }
+.ca-mbar-label { position: absolute; bottom: -20px; font-size: 11px; font-weight: 700; color: var(--text-2); }
+.ca-mbar .ca-last { font-size: 10.5px; }
