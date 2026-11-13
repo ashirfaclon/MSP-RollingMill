@@ -9,6 +9,8 @@
  *   Day / Night targets: spread evenly over the working shifts, or written day by day (HSM runs one
  *   shift for about 15 days at a time).
  * Left out, as the dashboard reads none of it: sizes, billet-size splits, MT/h, hours, remarks.
+ * RMD: each plan is for Online or Offline (the user, 13 Nov 2026) — picked in the popup, opening on the
+ * top bar's rolling (Online under Both); saved per date and rolling, and Both shows the two added.
  * Opens on the month as last saved (/api/forms/plan/:mill), else on the plan in use (/api/:mill/plan).
  * Save writes the month to the mill's logbook form (one entry per date); every screen then reloads.
  */
@@ -17,6 +19,8 @@ import DrillDrawer from '@/components/drill/DrillDrawer';
 import { fixed } from '@/lib/num';
 import { DAY_START_HOUR, dm, shiftsLabel } from '@/lib/plantDay';
 import { postJson, rangeUrl, useApi, type FormSaveResult, type SavedPlan } from '@/services/hsmApi';
+import { RMD_MODE_LABELS, useGlobalSel } from '@/state/globalSel';
+import type { PlanRolling } from '@contracts';
 import '@/components/checklist/checklist.css';
 import './plan.css';
 
@@ -35,23 +39,28 @@ const thisMonth = () => new Date(Date.now() + 330 * 60_000).toISOString().slice(
 
 export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; open: boolean; onClose: () => void }) {
   const [month, setMonth] = useState(thisMonth);
+  const { rmdMode } = useGlobalSel();
+  const [rolling, setRolling] = useState<PlanRolling>(rmdMode === 'offline' ? 'offline' : 'online');
+  const rmd = mill === 'rmd';
   const dates = useMemo(() => monthDates(month), [month]);
-  const url = open ? rangeUrl(`/api/${mill}/plan`, { from: dates[0], to: dates[dates.length - 1] }) : null;
+  const range = { from: dates[0], to: dates[dates.length - 1] };
+  const url = !open ? null : rmd ? `/api/rmd/plan?from=${range.from}&to=${range.to}&mode=${rolling}` : rangeUrl(`/api/${mill}/plan`, range);
   const s = useApi<{ days: PlanDayIn[] }>(url);
   const current = s.data && s.dataUrl === url ? s.data : null;
   // The month as last saved to the logbook (Production Plan form), when it has been.
-  const savedUrl = open ? `/api/forms/plan/${mill}?month=${month}` : null;
+  const savedUrl = open ? `/api/forms/plan/${mill}?month=${month}${rmd ? `&rolling=${rolling}` : ''}` : null;
   const sv = useApi<SavedPlan>(savedUrl);
   const saved = sv.data && sv.dataUrl === savedUrl ? sv.data : null;
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState('');
-  /** The month the form was filled for: refreshes never overwrite what is being typed. */
+  /** The month (RMD: and rolling) the form was filled for: refreshes never overwrite what is being typed. */
   const [filledFor, setFilledFor] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: 'saving' | 'saved' | 'error'; text: string } | null>(null);
 
   // Opens on the month as saved; else on the plan the dashboard uses now. Once per month, filled during
   // render (React: adjusting state when data arrives — no effect).
-  if (filledFor !== month && current && (saved || sv.error)) {
+  const filledKey = rmd ? `${month}|${rolling}` : month;
+  if (filledFor !== filledKey && current && (saved || sv.error)) {
     if (saved?.saved) {
       const byDate = new Map(saved.days.map((d) => [d.date, d]));
       setRows(dates.map((date) => {
@@ -68,7 +77,7 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
       const sum = current.days.reduce((a, d) => a + (d.planMt ?? 0), 0);
       setTotal(sum ? r2(sum) : '');
     }
-    setFilledFor(month);
+    setFilledFor(filledKey);
     setStatus(null);
   }
 
@@ -79,8 +88,9 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
       const r = await postJson<FormSaveResult>(`/api/forms/plan/${mill}`, {
         month, monthPlanMt: entered,
         days: rows.map((x) => ({ date: x.date, dayOff: x.dayOff, nightOff: x.nightOff, dayMt: num(x.day) ?? 0, nightMt: num(x.night) ?? 0 })),
+        ...(rmd ? { rolling } : {}),
       });
-      setStatus({ kind: 'saved', text: `Saved — ${r.entries} days to the logbook (Production Plan).` });
+      setStatus({ kind: 'saved', text: `Saved — ${r.entries} days to the logbook (Production Plan${rmd ? `, ${RMD_MODE_LABELS[rolling]}` : ''}).` });
     } catch (e) {
       setStatus({ kind: 'error', text: (e as Error).message });
     }
@@ -112,6 +122,14 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
       loading={!!url && !s.data && !s.error} error={s.error} hasData={rows.length > 0}>
       <div className="ck-form">
         <div className="ck-grid ck-grid--wide">
+          {rmd && (
+            <label className="ck-f"><span>Rolling</span>
+              <select value={rolling} onChange={(e) => setRolling(e.target.value as PlanRolling)}>
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
+              </select>
+            </label>
+          )}
           <label className="ck-f"><span>Month</span>
             <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
           </label>
@@ -168,7 +186,7 @@ export default function PlanConfig({ mill, open, onClose }: { mill: PlanMill; op
           <button type="button" className="ck-save" onClick={save} disabled={status?.kind === 'saving' || !rows.length}>Save plan</button>
           {status
             ? <span role="status" className={status.kind === 'error' ? 'ck-msg-error' : undefined}>{status.text}</span>
-            : <span>{saved?.saved ? 'Opened on the plan as last saved.' : 'Not saved for this month yet.'}</span>}
+            : <span>{saved?.saved ? 'Opened on the plan as last saved.' : `Not saved for this month${rmd ? ` (${RMD_MODE_LABELS[rolling]})` : ''} yet.`}</span>}
         </div>
       </div>
     </DrillDrawer>

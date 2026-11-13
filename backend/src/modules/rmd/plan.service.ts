@@ -7,8 +7,8 @@
  * Plan gap and compliance compare the plan with ERP Prime + SL only over the days that have
  * both (the ERP is entered a day or two late). Production per shift is not in the ERP: NA.
  *
- * The plan is for the whole mill, so Online / Offline has no plan: only that rolling's production
- * (the user, 13 Nov 2026).
+ * Online / Offline: that rolling's plan against its production; Both: Online + Offline (plan.store.ts;
+ * the user, 13 Nov 2026).
  */
 import type { Env } from '../../config/env';
 import type { RmdMode, RmdPlanDay, RmdPlanReport } from '../../contracts';
@@ -48,7 +48,7 @@ export function summarisePlan(days: RmdPlanDay[]): RmdPlanReport['totals'] {
 export async function rmdPlan(env: Env, from: string, to: string, mode: RmdMode = 'all'): Promise<RmdPlanReport> {
   const dates = dateRange(from, to);
   // The plan: the logbook Production Plan form.
-  const saved = mode === 'all' ? await savedPlanDays(env, 'rmd', from, to).catch(() => new Map()) : new Map();
+  const saved = await savedPlanDays(env, 'rmd', from, to, mode).catch(() => new Map());
   const days = planDaysFrom(dates, rmdProductionByDay(env, dates, mode), saved);
   return { from, to, source: planSource(saved), days, totals: summarisePlan(days) };
 }

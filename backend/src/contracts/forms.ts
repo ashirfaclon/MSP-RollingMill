@@ -6,17 +6,23 @@
  */
 export interface PlanDayInput { date: string; dayOff: boolean; nightOff: boolean; dayMt: number; nightMt: number }
 
-/** POST /api/forms/plan/:mill — one month's plan; the dashboard writes one entry per date. */
+/** Which RMD rolling a plan is for (RMD only; the user, 13 Nov 2026). */
+export type PlanRolling = 'online' | 'offline';
+
+/** POST /api/forms/plan/:mill — one month's plan; the dashboard writes one entry per date (RMD: per date and rolling). */
 export interface PlanSaveBody {
   /** YYYY-MM */
   month: string;
   monthPlanMt: number;
   days: PlanDayInput[];
+  /** RMD: required — the plan is saved for Online or Offline. Other mills: none. */
+  rolling?: PlanRolling;
 }
 
-/** GET /api/forms/plan/:mill?month=YYYY-MM — the month as last saved (latest entry per date). */
+/** GET /api/forms/plan/:mill?month=YYYY-MM[&rolling=online|offline] — the month as last saved (latest entry per date). */
 export interface SavedPlan {
   month: string;
+  rolling: PlanRolling | null;
   saved: boolean;
   monthPlanMt: number | null;
   days: PlanDayInput[];

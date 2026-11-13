@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { planEntries, shutdownOf, shutdownValue } from '../../src/modules/forms-db/plan.store';
+import { planEntries, planOfDate, rollingOf, shutdownOf, shutdownValue, type SavedPlanDay } from '../../src/modules/forms-db/plan.store';
 
 /** A month of days at 100 / 100, with the given shutdowns. */
 const month = (off: Record<string, { dayOff?: boolean; nightOff?: boolean }> = {}) =>
@@ -34,5 +34,28 @@ describe('Production plan: a shutdown can be one shift or the whole day', () => 
     expect(on('2026-11-01')).toMatchObject({ shutdown: 'No', 'day-total-mt': 200 });
     expect(rows[0]['working-days']).toBe(28);   // 30 − 1 whole day − ½ − ½
     expect(rows[0]['month-total-mt']).toBe(5600);
+  });
+});
+
+describe('RMD plan: Online and Offline (the user, 13 Nov 2026)', () => {
+  const d = (dayMt: number, nightMt: number, at: string, nightOff = false): SavedPlanDay =>
+    ({ date: '2026-11-20', dayOff: false, nightOff, dayMt, nightMt, monthPlanMt: (dayMt + nightMt) * 30, at });
+  test('each entry carries its Rolling', () => {
+    const rows = planEntries({ month: '2026-11', monthPlanMt: 6000, days: month(), rolling: 'offline' });
+    expect(rows[0].rolling).toBe('Offline');
+    expect(planEntries({ month: '2026-11', monthPlanMt: 6000, days: month() })[0]).not.toHaveProperty('rolling');
+    expect(rollingOf('Online')).toBe('online');
+    expect(rollingOf(undefined)).toBeNull();
+  });
+  test('Online / Offline: that rolling only; Both: the two added', () => {
+    const m = new Map([['online', d(120, 130, '2026-11-02')], ['offline', d(30, 0, '2026-11-05', true)], ['', d(200, 200, '2026-10-30')]]);
+    expect(planOfDate(m, 'online')?.dayMt).toBe(120);
+    expect(planOfDate(m, 'offline')?.nightOff).toBe(true);
+    expect(planOfDate(m, 'all')).toMatchObject({ dayMt: 150, nightMt: 130, nightOff: false, monthPlanMt: 8400, at: '2026-11-05' });
+  });
+  test('Both: one rolling alone counts as is; the whole-mill entry only without either', () => {
+    expect(planOfDate(new Map([['online', d(120, 130, 'a')], ['', d(200, 200, 'b')]]), 'all')?.dayMt).toBe(120);
+    expect(planOfDate(new Map([['', d(200, 200, 'b')]]), 'all')?.dayMt).toBe(200);
+    expect(planOfDate(new Map([['', d(200, 200, 'b')]]), 'online')).toBeUndefined();
   });
 });

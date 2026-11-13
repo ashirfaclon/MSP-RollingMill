@@ -3,13 +3,17 @@
  * column of the dashboard's Edit plan popup. Saving a month writes all its dates; for each date the
  * latest entry wins. The ONLY source of every mill's plan (the user, 31 Oct 2026): the plans once
  * imported from the plant's Excel files were moved into these forms; a date with no entry has no plan.
+ *
+ * RMD: each plan is for Online or Offline — the form's Rolling field, one entry per date and rolling
+ * (the user, 13 Nov 2026). Both = Online + Offline. Entries saved before carry no Rolling: they are
+ * the whole mill's, shown under Both only, for dates with no Online / Offline entry.
  */
 import type { Env } from '../../config/env';
-import type { PlanSaveBody, SavedPlan } from '../../contracts';
+import type { PlanRolling, PlanSaveBody, RmdMode, SavedPlan } from '../../contracts';
 import { saveFormEntries, fetchFormEntries, num, type FormWrite, type InsightEntry } from '../../integrations/logbook/client';
 import { HttpError } from '../../shared/http-error';
 import { dateRange, isDate, round2 } from '../hsm/production.service';
-import { PLAN_FORM, PLAN_KEYS as K, tagOf, type ConfigMill } from './forms';
+import { PLAN_FORM, PLAN_KEYS as K, ROLLING_LABELS, tagOf, type ConfigMill } from './forms';
 
 const DAY_MS = 86_400_000;
 /** Plans are saved ahead of their month: read a year of submissions. */
@@ -27,6 +31,12 @@ export function shutdownOf(v: unknown): { dayOff: boolean; nightOff: boolean } {
   const s = String(v ?? '').trim().toLowerCase();
   if (s === 'yes' || s === 'whole day') return { dayOff: true, nightOff: true };
   return { dayOff: s === 'day shift', nightOff: s === 'night shift' };
+}
+
+/** The form's Rolling value → online / offline; null for an entry without one (saved before the split). */
+export function rollingOf(v: unknown): PlanRolling | null {
+  const s = String(v ?? '').trim().toLowerCase();
+  return s === 'online' || s === 'offline' ? s : null;
 }
 
 const mmYyyy = (month: string) => `${month.slice(5, 7)}-${month.slice(0, 4)}`;
@@ -58,6 +68,7 @@ export function planEntries(body: PlanSaveBody): Record<string, unknown>[] {
   // Working days: a whole-day shutdown takes a day off, a single shift half a day.
   const workingDays = rows.reduce((a, r) => a + (r.dayOff ? 0 : 0.5) + (r.nightOff ? 0 : 0.5), 0);
   return rows.map((r) => ({
+    ...(body.rolling ? { [K.rolling]: ROLLING_LABELS[body.rolling] } : {}),
     [K.month]: mmYyyy(body.month),
     [K.monthPlan]: round2(body.monthPlanMt),
     [K.workingDays]: workingDays,
@@ -73,15 +84,25 @@ export function planEntries(body: PlanSaveBody): Record<string, unknown>[] {
 }
 
 export function savePlan(env: Env, mill: ConfigMill, body: PlanSaveBody, filledBy: string): Promise<FormWrite> {
-  // One row per date: a date saved before is updated, not added again.
-  return saveFormEntries(PLAN_FORM[mill], planEntries(body), (r) => String(r[K.date] ?? ''), filledBy, env);
+  const rolling = body?.rolling;
+  if (mill === 'rmd' ? rolling !== 'online' && rolling !== 'offline' : rolling !== undefined) {
+    throw new HttpError(400, 'bad_rolling', mill === 'rmd' ? 'rolling must be online or offline' : 'rolling is for RMD only');
+  }
+  // One row per date (RMD: per date and rolling): saved before → updated, not added again.
+  const keyOf = (r: Record<string, unknown>) => `${String(r[K.date] ?? '')}${mill === 'rmd' ? `|${rollingOf(r[K.rolling]) ?? ''}` : ''}`;
+  return saveFormEntries(PLAN_FORM[mill], planEntries(body), keyOf, filledBy, env);
 }
 
-/** The latest saved entry of each date (dates from `from` to `to`); empty when none or the logbook is down. */
-export async function savedPlanDays(env: Env, mill: ConfigMill, from: string, to: string): Promise<Map<string, SavedPlanDay>> {
+/**
+ * The latest saved entry of each date (dates from `from` to `to`); empty when none or the logbook is down.
+ * `rolling` (RMD): that rolling's entries only; 'all' = Online + Offline per date, or the whole-mill
+ * entry of a date that has neither.
+ */
+export async function savedPlanDays(env: Env, mill: ConfigMill, from: string, to: string, rolling: RmdMode = 'all'): Promise<Map<string, SavedPlanDay>> {
   const read = await fetchFormEntries(tagOf(PLAN_FORM[mill]), Date.parse(`${from}T00:00:00+05:30`) - LOOK_BACK_MS, env);
-  const out = new Map<string, SavedPlanDay>();
-  if (!read.ok) return out;
+  // date → rolling ('' = none) → its latest entry.
+  const latest = new Map<string, Map<string, SavedPlanDay>>();
+  if (!read.ok) return new Map();
   const at = (r: InsightEntry) => String(r.createdAt ?? r.invocationTime ?? '');
   for (const r of [...read.rows].sort((a, b) => at(a).localeCompare(at(b)))) {
     const v = r.result ?? {};
@@ -90,19 +111,44 @@ export async function savedPlanDays(env: Env, mill: ConfigMill, from: string, to
     const day = num(v[K.day]);
     const night = num(v[K.night]);
     if (day === null || night === null) continue;
-    out.set(date, { date, ...shutdownOf(v[K.shutdown]), dayMt: day, nightMt: night, monthPlanMt: num(v[K.monthPlan]), at: at(r) });
+    const m = latest.get(date) ?? new Map<string, SavedPlanDay>();
+    m.set(rollingOf(v[K.rolling]) ?? '', { date, ...shutdownOf(v[K.shutdown]), dayMt: day, nightMt: night, monthPlanMt: num(v[K.monthPlan]), at: at(r) });
+    latest.set(date, m);
+  }
+  const out = new Map<string, SavedPlanDay>();
+  for (const [date, m] of latest) {
+    const d = planOfDate(m, rolling);
+    if (d) out.set(date, d);
   }
   return out;
 }
 
+/**
+ * One date's plan from its latest entry per rolling ('' = an entry without one): that rolling's, or for
+ * 'all' Online + Offline (a shift is off only when it is off in both), else the whole-mill entry.
+ */
+export function planOfDate(m: Map<string, SavedPlanDay>, rolling: RmdMode): SavedPlanDay | undefined {
+  if (rolling !== 'all') return m.get(rolling);
+  const on = m.get('online');
+  const off = m.get('offline');
+  if (!on || !off) return on ?? off ?? m.get('');
+  return {
+    date: on.date, dayOff: on.dayOff && off.dayOff, nightOff: on.nightOff && off.nightOff,
+    dayMt: round2(on.dayMt + off.dayMt), nightMt: round2(on.nightMt + off.nightMt),
+    monthPlanMt: on.monthPlanMt !== null && off.monthPlanMt !== null ? round2(on.monthPlanMt + off.monthPlanMt) : null,
+    at: on.at > off.at ? on.at : off.at,
+  };
+}
+
 /** The month as last saved, for the popup to open on. */
-export async function savedPlan(env: Env, mill: ConfigMill, month: string): Promise<SavedPlan> {
+export async function savedPlan(env: Env, mill: ConfigMill, month: string, rolling: PlanRolling | null = null): Promise<SavedPlan> {
   if (!/^\d{4}-\d{2}$/.test(month)) throw new HttpError(400, 'bad_month', 'month must be YYYY-MM');
   const dates = monthDates(month);
-  const saved = await savedPlanDays(env, mill, dates[0], dates[dates.length - 1]);
+  const saved = await savedPlanDays(env, mill, dates[0], dates[dates.length - 1], rolling ?? 'all');
   const days = dates.flatMap((d) => (saved.has(d) ? [saved.get(d)!] : []));
   return {
     month,
+    rolling,
     saved: days.length > 0,
     monthPlanMt: days.length ? days[days.length - 1].monthPlanMt : null,
     days: days.map(({ date, dayOff, nightOff, dayMt, nightMt }) => ({ date, dayOff, nightOff, dayMt, nightMt })),

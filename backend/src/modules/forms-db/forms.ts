@@ -31,7 +31,11 @@ export const PLAN_KEYS = {
   month: 'month', monthPlan: 'month-plan-mt', workingDays: 'working-days', date: 'date', shutdown: 'shutdown',
   day: 'day-mt', night: 'night-mt', dayTotal: 'day-total-mt',
   monthDay: 'month-day-total-mt', monthNight: 'month-night-total-mt', monthTotal: 'month-total-mt',
+  /** RMD only: Online / Offline (the user, 13 Nov 2026). */
+  rolling: 'rolling',
 } as const;
+/** The plan form's Rolling dropdown options. */
+export const ROLLING_LABELS = { online: 'Online', offline: 'Offline' } as const;
 
 /** CA inputs columns, one entry per month: the popup's field key → the form's key. */
 export const CA_KEYS = {

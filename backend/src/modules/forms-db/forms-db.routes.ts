@@ -1,6 +1,6 @@
 /**
  * The dashboard's config forms, mounted at /api/forms — the popups save here and read back:
- *   POST /plan/:mill, GET /plan/:mill?month   production plan (one entry per date)
+ *   POST /plan/:mill, GET /plan/:mill?month[&rolling]   production plan (one entry per date; RMD per date and rolling)
  *   POST /ca/:mill,   GET /ca/:mill?month     CA inputs (one entry per month)
  *   POST /hsm/variance, POST /hsm/setup       HSM checklists
  *   GET/POST /equipment/hsm-motors            HSM stand motors' rated current (defaults + dashboard edits)
@@ -16,7 +16,7 @@ import type { CaInputsBody, FormSaveResult, HsmMotorRatingsBody, PlanSaveBody, R
 import type { FormWrite } from '../../integrations/logbook/client';
 import { CA_FORM, CONFIG_MILLS, HSM_MOTOR_FORM, PLAN_FORM, RMD_TANK_FORM, RMD_TEMP_LIMIT_FORM, SETUP_FORM, VARIANCE_FORM, type ConfigMill } from './forms';
 import { hsmMotorRatings, rmdOilTanks, rmdTempLimits, saveHsmMotorRatings, saveRmdOilTanks, saveRmdTempLimits } from './equipment.store';
-import { savePlan, savedPlan } from './plan.store';
+import { rollingOf, savePlan, savedPlan } from './plan.store';
 import { saveCaInputs, savedCaInputs } from './ca.store';
 import { saveSetup, saveVariance } from './checklist.store';
 
@@ -36,8 +36,10 @@ export async function formsDbRoutes(app: FastifyInstance) {
     const mill = millOf(req.params.mill);
     return done(PLAN_FORM[mill], await savePlan(loadEnv(), mill, req.body, filledByOf(req)));
   });
-  app.get<{ Params: { mill: string } }>('/plan/:mill', { config: { errorCode: 'plan_read_failed' } }, async (req) =>
-    savedPlan(loadEnv(), millOf(req.params.mill), searchParams(req).get('month') ?? ''));
+  app.get<{ Params: { mill: string } }>('/plan/:mill', { config: { errorCode: 'plan_read_failed' } }, async (req) => {
+    const q = searchParams(req);
+    return savedPlan(loadEnv(), millOf(req.params.mill), q.get('month') ?? '', rollingOf(q.get('rolling')));
+  });
 
   app.post<{ Params: { mill: string }; Body: CaInputsBody }>('/ca/:mill', { config: { errorCode: 'ca_save_failed' } }, async (req) => {
     const mill = millOf(req.params.mill);
