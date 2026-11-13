@@ -1,9 +1,11 @@
 /** RMD production and losses from the ERP log sheet (FA-SKJ codes as the plant gave them). */
 import { describe, expect, test } from 'vitest';
-import { massDifference, massYield, summarise } from '../../src/modules/rmd/production.service';
+import { massDifference, massYield, ofMode, summarise } from '../../src/modules/rmd/production.service';
+import type { RmdLogRow } from '../../src/integrations/erp/cache';
 
-const entry = (date: string, vrno: string, input: number, prod: number, prime: number, bloss: number, endcut: number, misroll: number, chip: number) => ({
-  date, vrno, v: { INPUT_MT: input, ACTUAL_RUNNING_HRS: 5, PRODUCT_PRIME_SLENGTH_MT: prod, FINISH_PRODUCT_PRIME_MT: prime, BLOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, CHIP_OFF_MT: chip },
+const entry = (date: string, vrno: string, input: number, prod: number, prime: number, bloss: number, endcut: number, misroll: number, chip: number): RmdLogRow => ({
+  date, vrno, mode: vrno.endsWith('-0002') ? 'offline' : 'online',
+  v: { INPUT_MT: input, ACTUAL_RUNNING_HRS: 5, PRODUCT_PRIME_SLENGTH_MT: prod, FINISH_PRODUCT_PRIME_MT: prime, BLOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, CHIP_OFF_MT: chip, TOTAL_POWER_CONSUMPTION: null },
 });
 // 7 Oct 2026 as the ERP holds it: two entries.
 const ROWS = [
@@ -32,5 +34,21 @@ describe('RMD production from the log sheet', () => {
     expect(massYield(200.12, 209.76)).toBe(95.4);
     expect(massDifference(209.76, 200.12)).toBe(9.64);
     expect(massYield(200.12, 0)).toBeNull();
+  });
+
+  test('Online / Offline: only that rolling\'s entries; Both is every entry, and one synced before the split counts under Both only', () => {
+    const on = summarise('d', '7 Oct', ['2026-10-07'], ofMode(ROWS, 'online'));
+    expect(on).toMatchObject({ productionMt: 96.34, billetInputMt: 100.17, runningHrs: 5, chipOffMt: 1 });
+    const off = summarise('d', '7 Oct', ['2026-10-07'], ofMode(ROWS, 'offline'));
+    expect(off).toMatchObject({ productionMt: 103.78, billetInputMt: 109.59, chipOffMt: 0 });
+    expect(ofMode(ROWS, 'all')).toHaveLength(3);
+    const old = ROWS.map(({ mode: _m, ...r }) => r);
+    expect(ofMode(old, 'online')).toHaveLength(0);
+    expect(ofMode(old, 'all')).toHaveLength(3);
+  });
+
+  test('a field missing from an older cache is no entry, not NaN', () => {
+    const old = ROWS.map((r) => ({ ...r, v: { ...r.v, TOTAL_POWER_CONSUMPTION: undefined as unknown as null } }));
+    expect(summarise('d', '7 Oct', ['2026-10-07'], old).productionMt).toBe(200.12);
   });
 });

@@ -29,11 +29,12 @@
  * submitted from a month before the period.
  */
 import type { Env } from '../../config/env';
-import type { PowerDay, PowerEntry, PowerReport } from '../../contracts';
+import type { PowerDay, PowerEntry, PowerReport, RmdMode } from '../../contracts';
 import { fetchFormsEntries, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
 import { dateRange, plantDayStart, productionComparison, round2 } from '../hsm/production.service';
-import { rmdProductionByDay } from '../rmd/production.service';
+import { rmdLogRows, rmdProductionByDay, sumOf } from '../rmd/production.service';
+import { readErpRmdProduction } from '../../integrations/erp/cache';
 import { lsmProductionByDay } from '../lsm/production.service';
 import { rmsProductionByDay } from '../rms/production.service';
 
@@ -175,12 +176,51 @@ export function powerReport(env: Env, from: string, to: string, nowMs = Date.now
   return report(env, 'hsm', from, to, nowMs, production);
 }
 
-/** RMD: the three VCB forms, over the ERP log sheet's production (PRODUCT_PRIME_SLENGTH_MT). */
-export function rmdPowerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
+/**
+ * RMD: the three VCB forms, over the ERP log sheet's production (PRODUCT_PRIME_SLENGTH_MT).
+ * Online / Offline: the meters can't tell the two apart, so power is that rolling's
+ * TOTAL_POWER_CONSUMPTION from the same ERP entries (the user, 13 Nov 2026).
+ */
+export function rmdPowerReport(env: Env, from: string, to: string, nowMs = Date.now(), mode: RmdMode = 'all'): Promise<PowerReport> {
+  if (mode !== 'all') return Promise.resolve(rmdErpPowerReport(env, from, to, mode));
   const byDay = rmdProductionByDay(env, dateRange(from, to));
   const vals = [...byDay.values()].filter((v): v is number => v !== null);
   const production = Promise.resolve({ byDay, total: vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null });
   return report(env, 'rmd', from, to, nowMs, production);
+}
+
+const ERP_METER = 'ERP log sheet';
+
+/** RMD Online / Offline power: the ERP log sheet entries of that rolling, shaped as the logbook report. */
+function rmdErpPowerReport(env: Env, from: string, to: string, mode: 'online' | 'offline'): PowerReport {
+  const cache = readErpRmdProduction(env);
+  const rows = rmdLogRows(env, mode);
+  const inRange = rows.filter((r) => r.date >= from && r.date <= to);
+  const days: PowerDay[] = dateRange(from, to).map((date) => {
+    const es = inRange.filter((r) => r.date === date);
+    const kwh = sumOf(es, 'TOTAL_POWER_CONSUMPTION');
+    const productionMt = sumOf(es, 'PRODUCT_PRIME_SLENGTH_MT');
+    const entries = es.filter((r) => typeof r.v.TOTAL_POWER_CONSUMPTION === 'number').length;
+    const byEquipment: Record<string, number> = kwh === null ? {} : { [ERP_METER]: kwh };
+    return { date, kwh, entries, byEquipment, productionMt, kwhPerMt: specificEnergy(kwh, productionMt) };
+  });
+  // Σ power ÷ Σ production over the days that have both, so a day without power doesn't lower it.
+  const both = days.filter((d) => d.kwh !== null && d.productionMt);
+  const kwh = both.length ? round2(both.reduce((a, d) => a + d.kwh!, 0)) : null;
+  const productionMt = both.length ? round2(both.reduce((a, d) => a + d.productionMt!, 0)) : null;
+  const entries = inRange.filter((r) => typeof r.v.TOTAL_POWER_CONSUMPTION === 'number');
+  return {
+    from, to, form: 'ERP log sheet · TOTAL_POWER_CONSUMPTION', erpMode: mode,
+    logbook: { connection: cache ? 'up' : 'down', message: cache ? MSG.ERP_UP : MSG.ERP_NOT_SYNCED, readSince: null },
+    equipment: entries.length ? [ERP_METER] : [],
+    days,
+    totals: { kwh, entries: entries.length, byEquipment: kwh === null ? {} as Record<string, number> : { [ERP_METER]: kwh }, productionMt, kwhPerMt: specificEnergy(kwh, productionMt) },
+    entries: [...entries].reverse().map((r) => ({
+      date: r.date, shift: '', equipment: ERP_METER, previousReading: null, presentReading: null,
+      kwh: r.v.TOTAL_POWER_CONSUMPTION, enteredAt: null,
+    })),
+    lastDate: rows.filter((r) => r.date <= to && typeof r.v.TOTAL_POWER_CONSUMPTION === 'number').at(-1)?.date ?? null,
+  };
 }
 
 /** LSM: the daily power consumption record, over the ERP log sheet's production (PRODUTION_MT). */

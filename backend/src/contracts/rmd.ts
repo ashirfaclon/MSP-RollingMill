@@ -110,10 +110,20 @@ export interface RmdRatePeriod {
   rateTph: number | null;
 }
 
+/**
+ * Which RMD rolling the ERP figures cover: Online (RO001, hot billets from the caster), Offline
+ * (RO002, cold billets reheated) or both together — the log sheet head's TRAN_COLUMN_NAME1
+ * (Management Dash.xlsx, 12 Nov 2026).
+ */
+export type RmdMode = 'all' | 'online' | 'offline';
+
 export interface RmdRunningRateReport {
   from: string;
   to: string;
   grain: Grain;
+  mode: RmdMode;
+  /** Where running hours come from: the billet counters (Both), or the ERP log sheet's ACTUAL_RUNNING_HRS (Online / Offline). */
+  hoursFrom: 'counters' | 'erp';
   gapMinutes: number;
   influx: { connection: 'up' | 'down'; message: string };
   rows: RmdRatePeriod[];
@@ -155,6 +165,7 @@ export interface RmdProductionReport {
   from: string;
   to: string;
   grain: Grain;
+  mode: RmdMode;
   erp: { connection: 'up' | 'down'; message: string; syncedAt: string | null; lastDate: string | null };
   rows: RmdProductionPeriod[];
   totals: RmdProductionPeriod;

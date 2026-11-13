@@ -73,7 +73,7 @@ function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill:
           ariaLabel={`Power by period: ${rows.map((x) => `${x.label} ${k(x.kwh)} kWh`).join('; ')}`}
         />
       ) : (
-        <p className="pd-empty">No logbook entries for this period.</p>
+        <p className="pd-empty">{data.erpMode ? 'No ERP entries for this period.' : 'No logbook entries for this period.'}</p>
       )}
 
       <div className="pd-table-wrap">
@@ -86,7 +86,9 @@ function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill:
 
       <Entries entries={data.entries} />
 
-      <SourceBox sources={SOURCES[mill]} formula={FORMULA[mill]} />
+      {data.erpMode
+        ? <SourceBox sources={rmdErpPowerSources(data.erpMode)} formula={[`Power (kWh) = Σ TOTAL_POWER_CONSUMPTION of every ${data.erpMode === 'online' ? 'Online' : 'Offline'} entry dated in the period`, 'Power (MWh) = Power (kWh) ÷ 1000']} />
+        : <SourceBox sources={SOURCES[mill]} formula={FORMULA[mill]} />}
       {data.logbook.connection === 'down' && <p className="v-warn">{data.logbook.message}</p>}
     </>
   );
@@ -138,6 +140,18 @@ function Entries({ entries }: { entries: PowerEntry[] }) {
       </div>
     </>
   );
+}
+
+/** RMD Online / Offline: the meters can't tell the two rollings apart, so power is the ERP log sheet's (the user, 13 Nov 2026). */
+export function rmdErpPowerSources(mode: 'online' | 'offline'): SourceSystem[] {
+  return [{
+    name: 'ERP',
+    rows: [
+      ['Table', 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],
+      ['Filter', `USER_CODE = 'FA-SKJ', TRAN_COLUMN_NAME1 = '${mode === 'online' ? 'RO001' : 'RO002'}' (${mode === 'online' ? 'Online' : 'Offline'})`],
+      ['Field', "ATTR_CODE = 'TOTAL_POWER_CONSUMPTION' (kWh, value in ATTR_VALUE)"],
+    ],
+  }];
 }
 
 const SOURCES: Record<PowerMill, SourceSystem[]> = {

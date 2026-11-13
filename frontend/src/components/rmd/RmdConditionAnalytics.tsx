@@ -14,6 +14,8 @@
  *   Costing            the month's CA inputs (Edit inputs, logbook CA Inputs) with the figures above
  *                      (CaCosting): output opportunity, conversion cost, cost variance, yield material
  *                      loss, output margin, matched-run performance, costing & impact.
+ *   Online / Offline   (top bar, the user, 13 Nov 2026) production, rate and specific energy of that
+ *                      rolling from its ERP entries; costing NA (the CA inputs are for the whole mill).
  */
 import { useState } from 'react';
 import { useRmdProduction } from './RmdProductionDrawer';
@@ -27,6 +29,7 @@ import KpiCard from '@/components/visualization/KpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
+import { useGlobalSel, type RmdModeSel } from '@/state/globalSel';
 import { rangeUrl, useApi, type RmdRunningRateReport } from '@/services/hsmApi';
 import RmdRunningRateDrawer from './RmdRunningRateDrawer';
 import '@/components/visualization/visualization.css';
@@ -38,9 +41,18 @@ const CA_SOURCES: [string, string][] = [
   ['Running hours', 'Influx billet counters, M1 + M2 (billets ≤ 10 min apart)'],
   ['Power', 'Logbook TMT Electrical Department → Power Reading VCB 1 / 2 / 3'],
 ];
+/** Online / Offline: that rolling's ERP entries only; the CA inputs are for the whole mill, so no costing (the user, 13 Nov 2026). */
+const caSourcesOf = (mode: RmdModeSel): [string, string][] => (mode === 'all' ? CA_SOURCES : [
+  ['Rolling', `${mode === 'online' ? 'Online · TRAN_COLUMN_NAME1 = RO001' : 'Offline · TRAN_COLUMN_NAME1 = RO002'}`],
+  ['Production', 'ERP Production Log Sheet · PRODUCT_PRIME_SLENGTH_MT (Prime + SL), INPUT_MT, mass yield'],
+  ['Running hours', 'ERP Production Log Sheet · ACTUAL_RUNNING_HRS'],
+  ['Power', 'ERP Production Log Sheet · TOTAL_POWER_CONSUMPTION'],
+  ['Costing', 'The CA inputs are for the whole mill: shown under Both only'],
+]);
 
 export default function RmdConditionAnalytics() {
   const { dates } = useSelection();
+  const { rmdMode } = useGlobalSel();
   const rateUrl = rangeUrl('/api/rmd/running-rate', dates ? { ...dates, grain: 'day' } : null);
   const rateS = useApi<RmdRunningRateReport>(rateUrl);
   const rate = rateS.data && rateS.dataUrl === rateUrl ? rateS.data.totals : null;
@@ -87,7 +99,7 @@ export default function RmdConditionAnalytics() {
       </div>
 
       <RmdRunningRateDrawer open={open === 'rate'} onClose={() => setOpen(null)} />
-      <CaDrawer open={open === 'ca'} onClose={() => setOpen(null)} mill="rmd" ca={ca} sources={CA_SOURCES} />
+      <CaDrawer open={open === 'ca'} onClose={() => setOpen(null)} mill="rmd" ca={ca} sources={caSourcesOf(rmdMode)} />
       <CaInputs mill={'rmd'} open={inputsOpen} onClose={() => setInputsOpen(false)} />
       {/* The mill mimic — the same twin as Visualization — at the bottom of the page (the user, 30 Oct 2026). */}
       <RmdMillMimic />

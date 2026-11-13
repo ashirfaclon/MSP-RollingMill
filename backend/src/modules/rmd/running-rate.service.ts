@@ -6,15 +6,18 @@
  * Running hours, as for HSM: the mill is running while billets keep entering less than
  * RUN_GAP_MS apart (10 min); a longer gap is a stop. RMD has two lines, so the mill counts as
  * running while EITHER line feeds billets: the M1 and M2 counters are read as one timeline.
+ *
+ * Online / Offline: the counters can't tell which rolling a billet is, so the hours are that
+ * rolling's ACTUAL_RUNNING_HRS from the ERP log sheet (the user, 13 Nov 2026).
  */
 import type { Env } from '../../config/env';
-import type { Grain, RmdRatePeriod, RmdRunningRateReport } from '../../contracts';
+import type { Grain, RmdMode, RmdRatePeriod, RmdRunningRateReport } from '../../contracts';
 import { RMD_BILLET_COUNT } from '../../integrations/historian/tags';
 import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, readCounter, round2 } from '../hsm/production.service';
 import { RUN_GAP_MS, runsOf } from '../hsm/running-rate.service';
 import { RMD_DAY_START_HOUR, rmdDayStart } from './billets.service';
-import { rmdProductionByDay } from './production.service';
+import { rmdByDay, rmdProductionByDay } from './production.service';
 
 const DAY_MS = 86_400_000;
 const H_MS = 3_600_000;
@@ -22,22 +25,26 @@ const H_MS = 3_600_000;
 /** Production ÷ hours; null without production or without running time. */
 export const rmdRate = (mt: number | null, h: number | null) => (mt === null || !h ? null : round2(mt / h));
 
-export async function rmdRunningRate(env: Env, from: string, to: string, grain: Grain, nowMs = Date.now()): Promise<RmdRunningRateReport> {
+export async function rmdRunningRate(env: Env, from: string, to: string, grain: Grain, nowMs = Date.now(), mode: RmdMode = 'all'): Promise<RmdRunningRateReport> {
   const dates = dateRange(from, to);
-  const fromMs = rmdDayStart(from);
-  const toMs = Math.min(rmdDayStart(to) + DAY_MS, nowMs);
-  const [m1, m2] = await Promise.all([
-    readCounter(env, RMD_BILLET_COUNT.M1, fromMs, toMs),
-    readCounter(env, RMD_BILLET_COUNT.M2, fromMs, toMs),
-  ]);
-  const runs = runsOf([...m1.increments, ...m2.increments], RUN_GAP_MS, RMD_DAY_START_HOUR);
-  const hoursOn = (d: string) => runs.filter((r) => r.date === d).reduce((a, r) => a + (r.end - r.start), 0) / H_MS;
-  const up = m1.connection === 'up' || m2.connection === 'up';
-  const production = rmdProductionByDay(env, dates);
+  const erpHours = mode !== 'all';
+  const [m1, m2] = erpHours ? [null, null] : await (() => {
+    const fromMs = rmdDayStart(from);
+    const toMs = Math.min(rmdDayStart(to) + DAY_MS, nowMs);
+    return Promise.all([readCounter(env, RMD_BILLET_COUNT.M1, fromMs, toMs), readCounter(env, RMD_BILLET_COUNT.M2, fromMs, toMs)]);
+  })();
+  const runs = m1 && m2 ? runsOf([...m1.increments, ...m2.increments], RUN_GAP_MS, RMD_DAY_START_HOUR) : [];
+  const erpH = erpHours ? rmdByDay(env, dates, mode, 'ACTUAL_RUNNING_HRS') : null;
+  /** A date's running hours; null for an ERP date with none entered. */
+  const hoursOn = (d: string): number | null => (erpH ? erpH.get(d) ?? null
+    : runs.filter((r) => r.date === d).reduce((a, r) => a + (r.end - r.start), 0) / H_MS);
+  const up = erpHours || m1!.connection === 'up' || m2!.connection === 'up';
+  const production = rmdProductionByDay(env, dates, mode);
   const productionOf = (d: string): number | null => production.get(d) ?? null;
 
   const period = (key: string, label: string, ds: string[]): RmdRatePeriod => {
-    const runH = up ? round2(ds.reduce((a, d) => a + hoursOn(d), 0)) : null;
+    const hs = ds.map(hoursOn);
+    const runH = !up || (erpHours && hs.every((h) => h === null)) ? null : round2(hs.reduce<number>((a, h) => a + (h ?? 0), 0));
     const prod = ds.map(productionOf);
     const productionMt = prod.every((p) => p === null) ? null : round2(prod.reduce<number>((a, p) => a + (p ?? 0), 0));
     return { key, label, fromDate: ds[0], toDate: ds[ds.length - 1], days: ds.length, runH, productionMt, rateTph: rmdRate(productionMt, runH) };
@@ -49,9 +56,9 @@ export async function rmdRunningRate(env: Env, from: string, to: string, grain: 
     g.dates.push(d);
     groups.set(p.key, g);
   }
-  const down = !up ? (m1.connection === 'down' ? m1 : m2) : null;
+  const down = !up ? (m1!.connection === 'down' ? m1! : m2!) : null;
   return {
-    from, to, grain, gapMinutes: RUN_GAP_MS / 60_000,
+    from, to, grain, mode, hoursFrom: erpHours ? 'erp' : 'counters', gapMinutes: RUN_GAP_MS / 60_000,
     influx: down ? { connection: 'down', message: down.message } : { connection: 'up', message: MSG.HISTORIAN_UP },
     rows: [...groups].map(([key, g]) => period(key, g.label, g.dates)),
     totals: period('total', 'Total', dates),

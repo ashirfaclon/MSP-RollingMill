@@ -9,9 +9,12 @@
  *   input       INPUT_MT (billet input)
  *
  * Mass yield = production ÷ billet input × 100; mass difference = billet input − production.
+ *
+ * Online / Offline (`mode`, the user, 13 Nov 2026): only that rolling's entries (RMD_MODE_CODES);
+ * all of them for Both. An entry synced before the split has no mode, so it counts under Both only.
  */
 import type { Env } from '../../config/env';
-import type { Grain, RmdProductionPeriod, RmdProductionReport } from '../../contracts';
+import type { Grain, RmdMode, RmdProductionPeriod, RmdProductionReport } from '../../contracts';
 import { readErpRmdProduction, type RmdLogField, type RmdLogRow } from '../../integrations/erp/cache';
 import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, round2 } from '../hsm/production.service';
@@ -23,8 +26,8 @@ export const massYield = (productionMt: number | null, inputMt: number | null) =
 export const massDifference = (inputMt: number | null, productionMt: number | null) =>
   (inputMt === null || productionMt === null ? null : round2(inputMt - productionMt));
 
-const sumOf = (rows: RmdLogRow[], f: RmdLogField) => {
-  const v = rows.map((r) => r.v[f]).filter((x): x is number => x !== null);
+export const sumOf = (rows: RmdLogRow[], f: RmdLogField) => {
+  const v = rows.map((r) => r.v[f]).filter((x): x is number => typeof x === 'number');
   return v.length ? round2(v.reduce((a, b) => a + b, 0)) : null;
 };
 
@@ -47,9 +50,15 @@ export function summarise(key: string, label: string, dates: string[], rows: Rmd
   };
 }
 
-export function rmdProduction(env: Env, from: string, to: string, grain: Grain): RmdProductionReport {
+/** The log sheet's entries for one rolling, or all of them. */
+export const ofMode = (rows: RmdLogRow[], mode: RmdMode) => (mode === 'all' ? rows : rows.filter((r) => r.mode === mode));
+
+/** The cached log sheet entries of `mode`. */
+export const rmdLogRows = (env: Env, mode: RmdMode) => ofMode(readErpRmdProduction(env)?.rows ?? [], mode);
+
+export function rmdProduction(env: Env, from: string, to: string, grain: Grain, mode: RmdMode = 'all'): RmdProductionReport {
   const cache = readErpRmdProduction(env);
-  const rows = cache?.rows ?? [];
+  const rows = ofMode(cache?.rows ?? [], mode);
   const dates = dateRange(from, to);
   const groups = new Map<string, { label: string; dates: string[] }>();
   for (const d of dates) {
@@ -59,7 +68,7 @@ export function rmdProduction(env: Env, from: string, to: string, grain: Grain):
     groups.set(p.key, g);
   }
   return {
-    from, to, grain,
+    from, to, grain, mode,
     erp: {
       connection: cache ? 'up' : 'down',
       message: cache ? MSG.ERP_UP : MSG.ERP_NOT_SYNCED,
@@ -71,8 +80,11 @@ export function rmdProduction(env: Env, from: string, to: string, grain: Grain):
   };
 }
 
-/** Production per date, MT (for specific energy and running rate); null where none is entered. */
-export function rmdProductionByDay(env: Env, dates: string[]): Map<string, number | null> {
-  const rows = readErpRmdProduction(env)?.rows ?? [];
-  return new Map(dates.map((d) => [d, sumOf(rows.filter((r) => r.date === d), 'PRODUCT_PRIME_SLENGTH_MT')]));
+/** One log sheet field per date (production for specific energy and running rate); null where none is entered. */
+export function rmdByDay(env: Env, dates: string[], mode: RmdMode = 'all', field: RmdLogField = 'PRODUCT_PRIME_SLENGTH_MT'): Map<string, number | null> {
+  const rows = rmdLogRows(env, mode);
+  return new Map(dates.map((d) => [d, sumOf(rows.filter((r) => r.date === d), field)]));
 }
+
+/** Production per date, MT; null where none is entered. */
+export const rmdProductionByDay = (env: Env, dates: string[], mode: RmdMode = 'all') => rmdByDay(env, dates, mode);

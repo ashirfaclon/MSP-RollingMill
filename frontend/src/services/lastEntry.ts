@@ -12,6 +12,7 @@
  */
 import { useApi } from './hsmApi';
 import { dm } from '@/lib/plantDay';
+import { rmdModeQuery } from '@/state/globalSel';
 
 export interface LastEntry<T> {
   /** The report for the last day with data; null while loading, or when there is none. */
@@ -27,7 +28,7 @@ export interface LastEntry<T> {
  */
 export function useLastEntry<T>(path: string | null, need: boolean, lastDate: string | null | undefined, from: string | null | undefined, query = ''): LastEntry<T> {
   const date = need && path && lastDate && from && lastDate < from ? lastDate : null;
-  const url = date ? `${path}?from=${date}&to=${date}${query ? `&${query}` : ''}` : null;
+  const url = date ? `${path}?from=${date}&to=${date}${query ? `&${query}` : ''}${path ? rmdModeQuery(path) : ''}` : null;
   const s = useApi<T>(url);
   return { data: url && s.dataUrl === url ? s.data : null, date };
 }

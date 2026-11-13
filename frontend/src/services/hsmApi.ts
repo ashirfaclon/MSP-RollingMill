@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { authHeader, sessionRejected } from '@/auth/session';
 import { API_BASE } from './apiBase';
+import { rmdModeQuery } from '@/state/globalSel';
 
 /** Response types come from the backend's API contract (type-only — no backend code is bundled). */
 export type {
@@ -108,4 +109,4 @@ export async function postJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export const rangeUrl = (path: string, p: { from: string; to: string; grain?: string } | null) =>
-  p ? `${path}?from=${p.from}&to=${p.to}${p.grain ? `&grain=${p.grain}` : ''}` : null;
+  p ? `${path}?from=${p.from}&to=${p.to}${p.grain ? `&grain=${p.grain}` : ''}${rmdModeQuery(path)}` : null;

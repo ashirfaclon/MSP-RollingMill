@@ -83,9 +83,17 @@ export function readErpPm(env: Env): ErpPmCache | null {
  * CHIP_OFF_MT): the sheet's spelling returned no rows; these are the codes in the table,
  * confirmed with the user. Chip off is the plant's rejection.
  */
-export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT'] as const;
+export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT', 'TOTAL_POWER_CONSUMPTION'] as const;
 export type RmdLogField = (typeof RMD_LOG_FIELDS)[number];
-export interface RmdLogRow { date: string; vrno: string; v: Record<RmdLogField, number | null> }
+/**
+ * Online / Offline: the log sheet head's TRAN_COLUMN_NAME1, RO001 = Online, RO002 = Offline (Management
+ * Dash.xlsx, 12 Nov 2026). Power per rolling is the entry's TOTAL_POWER_CONSUMPTION, kWh (the user,
+ * 13 Nov 2026) — on Zoho's Online / Offline power, POWER_KWHMT = it ÷ PRODUCT_PRIME_SLENGTH_MT.
+ */
+export const RMD_MODE_CODES = { RO001: 'online', RO002: 'offline' } as const;
+export type RmdLogMode = (typeof RMD_MODE_CODES)[keyof typeof RMD_MODE_CODES];
+/** `mode` is missing on a cache synced before the Online / Offline split; a value absent there reads as null. */
+export interface RmdLogRow { date: string; vrno: string; mode?: RmdLogMode | null; v: Record<RmdLogField, number | null> }
 export interface RmdProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmdLogRow[] }
 
 export function readErpRmdProduction(env: Env): RmdProductionCache | null {

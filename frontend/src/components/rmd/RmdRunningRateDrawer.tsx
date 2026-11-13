@@ -61,11 +61,17 @@ function Content({ data }: { data: RmdRunningRateReport }) {
           <tfoot><Row r={t} /></tfoot>
         </table>
       </div>
-      <SourceBox sources={SOURCES} formula={[
-        'Running rate = PRODUCT_PRIME_SLENGTH_MT ÷ running hours',
-        `Running hours = time between two BILLET_COUNT counts (either line), when ${data.gapMinutes} min or less apart`,
-        'Day = 09:00 IST → 09:00 IST',
-      ]} />
+      {data.hoursFrom === 'erp' ? (
+        <SourceBox sources={erpSources(data.mode === 'online' ? 'RO001' : 'RO002')} formula={[
+          'Running rate = PRODUCT_PRIME_SLENGTH_MT ÷ ACTUAL_RUNNING_HRS, the same entries',
+        ]} />
+      ) : (
+        <SourceBox sources={SOURCES} formula={[
+          'Running rate = PRODUCT_PRIME_SLENGTH_MT ÷ running hours',
+          `Running hours = time between two BILLET_COUNT counts (either line), when ${data.gapMinutes} min or less apart`,
+          'Day = 09:00 IST → 09:00 IST',
+        ]} />
+      )}
       {data.influx.connection === 'down' && <p className="v-warn">{data.influx.message}</p>}
     </>
   );
@@ -100,3 +106,13 @@ const SOURCES: SourceSystem[] = [
     ],
   },
 ];
+
+/** Online / Offline: the billet counters can't tell the two rollings apart, so the hours are the ERP's (the user, 13 Nov 2026). */
+const erpSources = (code: 'RO001' | 'RO002'): SourceSystem[] => [{
+  name: 'ERP',
+  rows: [
+    ['Table', 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],
+    ['Filter', `USER_CODE = 'FA-SKJ', TRAN_COLUMN_NAME1 = '${code}' (${code === 'RO001' ? 'Online' : 'Offline'})`],
+    ['Field', "ATTR_CODE = 'PRODUCT_PRIME_SLENGTH_MT', 'ACTUAL_RUNNING_HRS' (value in ATTR_VALUE)"],
+  ],
+}];

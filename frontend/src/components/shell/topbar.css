@@ -46,6 +46,8 @@
 .tb-seg-btn:hover { color: var(--text-2); }
 .tb-seg-btn--theme { padding: 5px 9px; }
 .tb-seg-btn--theme.on { background: var(--panel-hi); color: var(--text); }
+.tb-seg-btn--mode { padding: 5px 10px; font-size: 11px; }
+.tb-seg-btn--mode.on { background: var(--panel-hi); color: var(--text); }
 .tb-seg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 :root[data-theme="light"] .topbar {

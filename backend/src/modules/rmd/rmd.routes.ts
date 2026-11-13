@@ -1,12 +1,11 @@
 /**
- * RMD (TMT rolling mill) KPIs, mounted at /api/rmd. Only the sources the plant has
- * confirmed are wired: the Influx billet counters and the logbook power forms. ERP-based
- * figures (production, stock, orders) are on hold until their ERP fields are given.
+ * RMD (TMT rolling mill) KPIs, mounted at /api/rmd. The ERP figures (production, running rate,
+ * power, plan) take `mode` = all | online | offline.
  */
 import type { FastifyInstance } from 'fastify';
 import { loadEnv } from '../../config/env';
 import { searchParams } from '../../shared/request';
-import { parseGrain, parseRange } from '../hsm/params';
+import { parseGrain, parseRange, parseRmdMode } from '../hsm/params';
 import { rmdPowerReport } from '../power/power.service';
 import { rmdBillets } from './billets.service';
 import { rmdCurrentTrend, rmdLive, rmdStationTrend } from './live.service';
@@ -39,7 +38,7 @@ export async function rmdRoutes(app: FastifyInstance) {
   app.get('/power', { config: { errorCode: 'rmd_power_failed' } }, async (req) => {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
-    return rmdPowerReport(loadEnv(), from, to);
+    return rmdPowerReport(loadEnv(), from, to, Date.now(), parseRmdMode(q));
   });
 
   /** The mill flow now: billets since 09:00 IST and every running-status point. */
@@ -87,7 +86,7 @@ export async function rmdRoutes(app: FastifyInstance) {
   app.get('/running-rate', { config: { errorCode: 'rmd_running_rate_failed' } }, async (req) => {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
-    return rmdRunningRate(loadEnv(), from, to, parseGrain(q));
+    return rmdRunningRate(loadEnv(), from, to, parseGrain(q), Date.now(), parseRmdMode(q));
   });
 
   /** Asset health: the logbook's Mill Bearing Temperature and Oil Tank forms, latest in the period. */
@@ -98,8 +97,9 @@ export async function rmdRoutes(app: FastifyInstance) {
 
   /** Production plan (month-wise FY plan spread to days and shifts) against ERP Prime + SL. */
   app.get('/plan', { config: { errorCode: 'rmd_plan_failed' } }, async (req) => {
-    const { from, to } = parseRange(searchParams(req));
-    return rmdPlan(loadEnv(), from, to);
+    const q = searchParams(req);
+    const { from, to } = parseRange(q);
+    return rmdPlan(loadEnv(), from, to, parseRmdMode(q));
   });
 
   /** Finished stock by bar size in FGYRDP at the end of date `to` (ERP item ledger). */
@@ -113,6 +113,6 @@ export async function rmdRoutes(app: FastifyInstance) {
   app.get('/production', { config: { errorCode: 'rmd_production_failed' } }, async (req) => {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
-    return rmdProduction(loadEnv(), from, to, parseGrain(q));
+    return rmdProduction(loadEnv(), from, to, parseGrain(q), parseRmdMode(q));
   });
 }

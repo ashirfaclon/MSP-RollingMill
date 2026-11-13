@@ -23,7 +23,7 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import oracledb from 'oracledb';
 import { loadEnv, type Env } from '../../config/env';
 import {
-  ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, PM_DIVISIONS, RMD_LOG_FIELDS, RMD_STOCK_RULE, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
+  ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, PM_DIVISIONS, RMD_LOG_FIELDS, RMD_MODE_CODES, RMD_STOCK_RULE, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
   type ErpPmCache, type PmMill,
   type LsmLogField, type LsmProductionCache, type LsmStockCache, type RmsProductionCache, type RmdLogField, type RmdProductionCache, type RmdStockCache,
   type ErpCache, type ErpCommercialCache, type ErpDivisionRow, type ErpProductionCache,
@@ -224,7 +224,8 @@ async function pull(env: Env, p: Paths, t0: number, log: (line: string) => void)
 
 /**
  * RMD Production Log Sheet, as the plant specified: ATTR_TRAN_DATA_BODY where USER_CODE =
- * 'FA-SKJ', one row per entry (VRDATE, VRNO) with its RMD_LOG_FIELDS values (ATTR_VALUE).
+ * 'FA-SKJ', one row per entry (VRDATE, VRNO) with its RMD_LOG_FIELDS values (ATTR_VALUE), and
+ * Online / Offline from its head's TRAN_COLUMN_NAME1 (RMD_MODE_CODES).
  * A failure is logged and the previous RMD cache stays in place.
  */
 async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
@@ -237,9 +238,12 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
       `MAX(CASE WHEN b.ATTR_CODE = '${f}' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "${f}"`,
     ).join(',\n             ');
     const rows = ((await conn.execute<Record<string, unknown>>(`
-      SELECT TO_CHAR(b.VRDATE, 'YYYY-MM-DD') AS "D", b.VRNO AS "VRNO",
+      SELECT TO_CHAR(b.VRDATE, 'YYYY-MM-DD') AS "D", b.VRNO AS "VRNO", MAX(h.TRAN_COLUMN_NAME1) AS "MODE",
              ${pivot}
         FROM MSPV7ERP1.ATTR_TRAN_DATA_BODY b
+        LEFT JOIN MSPV7ERP1.ATTR_TRAN_DATA_HEAD h
+          ON h.ENTITY_CODE = b.ENTITY_CODE AND h.TCODE = b.TCODE AND h.TNATURE = b.TNATURE
+         AND h.SERIES = b.SERIES AND h.ACC_YEAR = b.ACC_YEAR AND h.VRNO = b.VRNO
        WHERE b.USER_CODE = 'FA-SKJ'
          AND b.ATTR_CODE IN (${RMD_LOG_FIELDS.map((f) => `'${f}'`).join(', ')})
          AND b.VRDATE >= TO_DATE(:fromDate, 'YYYY-MM-DD')
@@ -247,15 +251,18 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
        ORDER BY b.VRDATE, b.VRNO`, { fromDate: FROM }, { maxRows: 0 })).rows ?? []) as Record<string, unknown>[];
     const cache: RmdProductionCache = {
       syncedAt: new Date().toISOString(),
-      source: "ATTR_TRAN_DATA_BODY · USER_CODE = 'FA-SKJ'",
+      source: "ATTR_TRAN_DATA_BODY · USER_CODE = 'FA-SKJ' · Online / Offline: ATTR_TRAN_DATA_HEAD.TRAN_COLUMN_NAME1",
       fromDate: FROM,
       rows: rows.map((r) => ({
         date: String(r.D), vrno: String(r.VRNO),
+        mode: RMD_MODE_CODES[String(r.MODE) as keyof typeof RMD_MODE_CODES] ?? null,
         v: Object.fromEntries(RMD_LOG_FIELDS.map((f) => [f, num(r[f])])) as Record<RmdLogField, number | null>,
       })),
     };
     writeAtomic(p.rmdProduction, cache);
-    log(`  RMD log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);
+    const online = cache.rows.filter((r) => r.mode === 'online').length;
+    const offline = cache.rows.filter((r) => r.mode === 'offline').length;
+    log(`  RMD log sheet: ${cache.rows.length} entries (${online} online, ${offline} offline), ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);
   } catch (err) {
     log(`  RMD log sheet not synced: ${(err as Error).message}`);
   } finally {

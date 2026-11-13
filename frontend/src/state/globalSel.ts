@@ -26,6 +26,10 @@ export type ThemeSel = 'dark' | 'light';
 /** Screen rail: full labels, or an icon strip that gives the dashboard the width. */
 export type SidebarSel = 'expanded' | 'collapsed';
 
+/** RMD's ERP figures: Online (RO001), Offline (RO002) or both rollings together (the user, 13 Nov 2026). */
+export type RmdModeSel = 'all' | 'online' | 'offline';
+export const RMD_MODE_LABELS: Record<RmdModeSel, string> = { all: 'Both', online: 'Online', offline: 'Offline' };
+
 export interface GlobalSel {
   duration: DurationPreset;
   /** First and last plant date (inclusive, YYYY-MM-DD), used when duration is 'custom'. */
@@ -33,6 +37,7 @@ export interface GlobalSel {
   customTo: string | null;
   theme: ThemeSel;
   sidebar: SidebarSel;
+  rmdMode: RmdModeSel;
 }
 
 /** Declared before `load()` runs at module start, which validates a stored preset against it. */
@@ -55,7 +60,7 @@ export const DURATION_LABELS: Record<DurationPreset, string> = {
  * By default the dashboard shows the PREVIOUS plant day (the user, 30 Oct 2026): the plant reads
  * yesterday's figures, not the day still running — and Reset goes back to it.
  */
-const DEFAULTS: GlobalSel = { duration: 'yesterday', customFrom: null, customTo: null, theme: 'dark', sidebar: 'expanded' };
+const DEFAULTS: GlobalSel = { duration: 'yesterday', customFrom: null, customTo: null, theme: 'dark', sidebar: 'expanded', rmdMode: 'all' };
 /**
  * Bumped when the default changes. A selection stored under an older version that still holds the
  * old default ("today") was never chosen — it was the default — so it moves to the new one.
@@ -79,6 +84,7 @@ function load(): GlobalSel {
       sel.customTo = plantDate(Math.max(customFromMs, customToMs - 1));
     }
     if (!(sel.duration in DURATION_LABELS)) sel.duration = DEFAULTS.duration;
+    if (!(sel.rmdMode in RMD_MODE_LABELS)) sel.rmdMode = DEFAULTS.rmdMode;
     if (sel.duration === 'custom' && !(sel.customFrom && sel.customTo && isDate(sel.customFrom) && isDate(sel.customTo))) {
       sel.duration = DEFAULTS.duration;
     }
@@ -101,12 +107,21 @@ export function setGlobalSel(patch: Partial<GlobalSel>) {
 }
 
 /** The filters (not the theme or the rail) as they are by default. */
-export const isDefaultFilter = (sel: GlobalSel) => sel.duration === DEFAULTS.duration;
+export const isDefaultFilter = (sel: GlobalSel) => sel.duration === DEFAULTS.duration && sel.rmdMode === DEFAULTS.rmdMode;
 
-/** Put the filters back to their defaults — Duration "Yesterday", the previous plant day. Theme and rail are kept. */
+/** Put the filters back to their defaults — Duration "Yesterday", the previous plant day; RMD Both. Theme and rail are kept. */
 export function resetFilters() {
-  setGlobalSel({ duration: DEFAULTS.duration, customFrom: DEFAULTS.customFrom, customTo: DEFAULTS.customTo });
+  setGlobalSel({ duration: DEFAULTS.duration, customFrom: DEFAULTS.customFrom, customTo: DEFAULTS.customTo, rmdMode: DEFAULTS.rmdMode });
 }
+
+/**
+ * `&mode=online|offline` for an RMD ERP request (production, running rate, power, plan, CA costing)
+ * when RMD is switched to one rolling; '' otherwise, so Both asks exactly what it always did.
+ * Read outside React: every caller renders under useSelection, so a switch re-renders it.
+ */
+const RMD_MODE_PATHS = ['/api/rmd/production', '/api/rmd/running-rate', '/api/rmd/power', '/api/rmd/plan', '/api/ca/rmd'];
+export const rmdModeQuery = (path: string) =>
+  (state.rmdMode !== 'all' && RMD_MODE_PATHS.includes(path) ? `&mode=${state.rmdMode}` : '');
 
 /**
  * The server renders with the defaults; the client hydrates against the same defaults and

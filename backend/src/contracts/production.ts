@@ -108,6 +108,8 @@ export interface PowerReport {
    * months. The card shows that day when the period has none (the user, 30 Oct 2026).
    */
   lastDate: string | null;
+  /** RMD Online / Offline: power from the ERP log sheet (TOTAL_POWER_CONSUMPTION), not the logbook. */
+  erpMode?: 'online' | 'offline';
 }
 
 /** GET /api/hsm/plan — the rolling plan (targets) per day and shift, as filled in by the plant. */

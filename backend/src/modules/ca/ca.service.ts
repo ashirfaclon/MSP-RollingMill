@@ -13,9 +13,12 @@
  *
  * Output opportunity and Output margin are potentials: no source says whether billets or orders were
  * there for the extra tonnes (the user, 28 Oct 2026).
+ *
+ * RMD Online / Offline (`mode`): production, running hours, power and yield of that rolling only; the
+ * CA inputs are for the whole mill, so no inputs and every costing figure NA (the user, 13 Nov 2026).
  */
 import type { Env } from '../../config/env';
-import type { CaActual, CaInputs, CaKpis, CaMonthPart, CaReport } from '../../contracts';
+import type { CaActual, CaInputs, CaKpis, CaMonthPart, CaReport, RmdMode } from '../../contracts';
 import { runningRate } from '../hsm/running-rate.service';
 import { yieldComparison } from '../hsm/yield.service';
 import { lsmProduction, lsmProductionByDay } from '../lsm/production.service';
@@ -56,7 +59,7 @@ const lastOf = (month: string) =>
 const div = (a: number | null, b: number | null) => (a === null || b === null || b <= 0 ? null : a / b);
 
 /** The mill's own figures for one stretch of days. */
-export async function caActual(env: Env, mill: ConfigMill, from: string, to: string): Promise<CaActual> {
+export async function caActual(env: Env, mill: ConfigMill, from: string, to: string, mode: RmdMode = 'all'): Promise<CaActual> {
   if (mill === 'hsm') {
     const [rate, yld, power] = await Promise.all([
       runningRate(env, from, to, 'day'), yieldComparison(env, from, to, 'day'), powerReport(env, from, to),
@@ -78,7 +81,7 @@ export async function caActual(env: Env, mill: ConfigMill, from: string, to: str
   }
   const [rate, prod, power] = await Promise.all(
     mill === 'rmd'
-      ? [rmdRunningRate(env, from, to, 'day'), rmdProduction(env, from, to, 'day'), rmdPowerReport(env, from, to)]
+      ? [rmdRunningRate(env, from, to, 'day', Date.now(), mode), rmdProduction(env, from, to, 'day', mode), rmdPowerReport(env, from, to, Date.now(), mode)]
       : mill === 'lsm'
         ? [formRunningRate(env, from, to, 'day', { form: LSM_SHEET_FORM, dayStartMin: 9 * 60, production: (d) => lsmProductionByDay(env, d) }),
           lsmProduction(env, from, to, 'day'), lsmPowerReport(env, from, to)]
@@ -177,15 +180,24 @@ export function caPeriod(mill: string, from: string, to: string, months: CaMonth
   };
 }
 
-export async function caReport(env: Env, mill: ConfigMill, from: string, to: string): Promise<CaReport> {
+export async function caReport(env: Env, mill: ConfigMill, from: string, to: string, mode: RmdMode = 'all'): Promise<CaReport> {
+  const split = mill === 'rmd' && mode !== 'all';
   const months = await Promise.all(monthsOf(from, to).map(async (month): Promise<CaMonthPart> => {
     const f = from > `${month}-01` ? from : `${month}-01`;
     const t = to < lastOf(month) ? to : lastOf(month);
-    const [saved, actual] = await Promise.all([savedCaInputs(env, mill, month), caActual(env, mill, f, t)]);
+    const [saved, actual] = await Promise.all([
+      split ? null : savedCaInputs(env, mill, month), caActual(env, mill, f, t, mill === 'rmd' ? mode : 'all'),
+    ]);
+    if (!saved) return { month, from: f, to: t, share: daysIn(f, t) / daysIn(`${month}-01`, lastOf(month)), inputs: null, actual, kpis: NONE };
     const inputs = saved.saved && KEYS.every((k) => saved.values[k] != null)
       ? (Object.fromEntries(KEYS.map((k) => [k, saved.values[k]!])) as unknown as CaInputs) : null;
     const share = daysIn(f, t) / daysIn(`${month}-01`, lastOf(month));
     return { month, from: f, to: t, share, inputs, actual, kpis: caKpis(inputs, actual, share) };
   }));
+  if (split) {
+    // No inputs on purpose, so nothing is "missing": the actual figures, every costing figure NA.
+    const p = caPeriod(mill, from, to, months.map((m) => ({ ...m, inputs: {} as CaInputs })));
+    return { ...p, months, inputs: null, kpis: NONE };
+  }
   return caPeriod(mill, from, to, months);
 }

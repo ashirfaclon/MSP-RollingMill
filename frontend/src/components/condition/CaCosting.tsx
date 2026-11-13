@@ -63,6 +63,8 @@ function emptyNote(ca: CaView, v: number | null): boolean | string {
   const r = ca.report;
   if (!r || v !== null) return false;
   if (r.missing.length) return `No CA inputs for ${r.missing.map(monthLabel).join(', ')}`;
+  // RMD Online / Offline: no inputs on purpose (they are for the whole mill), so a plain NA.
+  if (!r.inputs) return false;
   return true;
 }
 

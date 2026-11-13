@@ -8,7 +8,7 @@
 import DateRangePicker from './DateRangePicker';
 import MillPicker from './MillPicker';
 import { millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
-import { isDefaultFilter, resetFilters, setGlobalSel, useGlobalSel, type ThemeSel } from '@/state/globalSel';
+import { RMD_MODE_LABELS, isDefaultFilter, resetFilters, setGlobalSel, useGlobalSel, type RmdModeSel, type ThemeSel } from '@/state/globalSel';
 import { HEADER_SLOT_ID } from './HeaderSlot';
 import './topbar.css';
 
@@ -32,6 +32,23 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
         {/* Mill switch — keeps the screen, changes the mill. */}
         <MillPicker mill={mill} screen={screen} />
 
+        {/* RMD: the ERP figures for Online, Offline or both rollings (the user, 13 Nov 2026). */}
+        {mill === 'rmd' && (
+          <div className="tb-seg" role="group" aria-label="Rolling">
+            {(['all', 'online', 'offline'] as RmdModeSel[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`tb-seg-btn tb-seg-btn--mode${sel.rmdMode === m ? ' on' : ''}`}
+                onClick={() => setGlobalSel({ rmdMode: m })}
+                aria-pressed={sel.rmdMode === m}
+              >
+                {RMD_MODE_LABELS[m]}
+              </button>
+            ))}
+          </div>
+        )}
+
         <DateRangePicker />
         {/* Back to the default filter (Today); disabled when already there. */}
         <button
@@ -39,7 +56,7 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
           className="tb-reset"
           onClick={resetFilters}
           disabled={isDefaultFilter(sel)}
-          title="Reset the filter to Today"
+          title="Reset the filters"
         >
           <ResetGlyph />
           Reset

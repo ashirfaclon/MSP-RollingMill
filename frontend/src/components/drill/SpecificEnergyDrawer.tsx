@@ -13,7 +13,7 @@ import { useDrillRange } from './useDrillRange';
 import { powerPeriods } from './powerPeriods';
 import { dm } from '@/services/hsmProduction';
 import type { Grain } from '@contracts';
-import type { PowerMill } from './PowerDrawer';
+import { rmdErpPowerSources, type PowerMill } from './PowerDrawer';
 import type { PowerReport } from '@/services/hsmApi';
 
 export default function SpecificEnergyDrawer(props: {
@@ -65,7 +65,7 @@ function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill:
           ariaLabel={`Specific energy by period: ${rows.map((x) => `${x.label} ${n(x.kwhPerMt)} kWh/MT`).join('; ')}`}
         />
       ) : (
-        <p className="pd-empty">No logbook entries for this period.</p>
+        <p className="pd-empty">{data.erpMode ? 'No ERP entries for this period.' : 'No logbook entries for this period.'}</p>
       )}
 
       <div className="pd-table-wrap">
@@ -85,7 +85,9 @@ function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill:
         </table>
       </div>
 
-      <SourceBox sources={SOURCES[mill]} formula={FORMULA[mill]} />
+      {data.erpMode
+        ? <SourceBox sources={rmdErpPowerSources(data.erpMode)} formula={['Specific energy = Σ TOTAL_POWER_CONSUMPTION (kWh) ÷ Σ PRODUCT_PRIME_SLENGTH_MT (MT), the same entries']} />
+        : <SourceBox sources={SOURCES[mill]} formula={FORMULA[mill]} />}
       {data.logbook.connection === 'down' && <p className="v-warn">{data.logbook.message}</p>}
     </>
   );
