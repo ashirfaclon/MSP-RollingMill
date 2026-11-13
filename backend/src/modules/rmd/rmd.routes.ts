@@ -82,11 +82,11 @@ export async function rmdRoutes(app: FastifyInstance) {
     return rmdChemistry(loadEnv(), from, to);
   });
 
-  /** Running rate: production ÷ running hours (billets ≤ 10 min apart, either line). Production pending → rate null. */
+  /** Running rate: ERP billet input ÷ adjusted running hours (single-stand time counts half). */
   app.get('/running-rate', { config: { errorCode: 'rmd_running_rate_failed' } }, async (req) => {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
-    return rmdRunningRate(loadEnv(), from, to, parseGrain(q), Date.now(), parseRmdMode(q));
+    return rmdRunningRate(loadEnv(), from, to, parseGrain(q), parseRmdMode(q));
   });
 
   /** Asset health: the logbook's Mill Bearing Temperature and Oil Tank forms, latest in the period. */

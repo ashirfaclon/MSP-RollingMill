@@ -6,7 +6,7 @@
  * sample figure:
  *   Production by shift   targets from the plant's month-wise FY plan (Prime + SL), half per
  *                         shift; output per shift NA (not in the ERP); whole day = ERP Prime + SL
- *                         vs plan. Running rate = ERP production ÷ running hours (billet counters).
+ *                         vs plan. Running rate = ERP billet input ÷ adjusted running hours.
  *   Finished stock card   the total of Finished stock by size (ERP item ledger, FGYRDP, at the period
  *                         end), dated; no Order allocation panel (the user, 31 Oct 2026).
  *   Material balance      billet input, finished and the four losses from the ERP log sheet
@@ -49,7 +49,7 @@ export default function RmdVisualization() {
 
 /* ----------------------------- Running rate ------------------------------ */
 
-/** ERP production ÷ running hours over the Duration period. */
+/** ERP billet input ÷ adjusted running hours over the Duration period. */
 function RunningRateFoot() {
   const { dates } = useSelection();
   const url = rangeUrl('/api/rmd/running-rate', dates ? { ...dates, grain: 'day' } : null);

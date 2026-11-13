@@ -29,7 +29,7 @@ describe('RMD billets per day (09:00 IST → 09:00 IST: shifts 09–21 and 21–
 });
 
 import { runsOf } from '../../src/modules/hsm/running-rate.service';
-import { rmdRate } from '../../src/modules/rmd/running-rate.service';
+import { adjustedHours, rmdRate } from '../../src/modules/rmd/running-rate.service';
 import { RMD_DAY_START_HOUR } from '../../src/modules/rmd/billets.service';
 
 describe('RMD running hours and rate', () => {
@@ -47,5 +47,12 @@ describe('RMD running hours and rate', () => {
     expect(rmdRate(null, 14.32)).toBeNull();
     expect(rmdRate(300, 0)).toBeNull();
     expect(rmdRate(300, 12)).toBe(25);
+  });
+
+  test('single-stand minutes sit inside running hours and count half (the plant, 13 Nov 2026)', () => {
+    // 17 Jun 2026 Online: 10.75 h running, 15 min of it single-stand → 10.625 h.
+    expect(adjustedHours(10.75, 15)).toBe(10.63);
+    expect(adjustedHours(10.75, null)).toBe(10.75);   // none entered: no adjustment
+    expect(adjustedHours(null, 15)).toBeNull();
   });
 });

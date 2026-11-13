@@ -81,7 +81,7 @@ export async function caActual(env: Env, mill: ConfigMill, from: string, to: str
   }
   const [rate, prod, power] = await Promise.all(
     mill === 'rmd'
-      ? [rmdRunningRate(env, from, to, 'day', Date.now(), mode), rmdProduction(env, from, to, 'day', mode), rmdPowerReport(env, from, to, Date.now(), mode)]
+      ? [rmdRunningRate(env, from, to, 'day', mode), rmdProduction(env, from, to, 'day', mode), rmdPowerReport(env, from, to, Date.now(), mode)]
       : mill === 'lsm'
         ? [formRunningRate(env, from, to, 'day', { form: LSM_SHEET_FORM, dayStartMin: 9 * 60, production: (d) => lsmProductionByDay(env, d) }),
           lsmProduction(env, from, to, 'day'), lsmPowerReport(env, from, to)]
@@ -90,7 +90,8 @@ export async function caActual(env: Env, mill: ConfigMill, from: string, to: str
   );
   const mt = prod.totals.productionMt;
   return {
-    mt, runH: rate.totals.runH, rateTph: rate.totals.rateTph,
+    // RMD: the hours its TPH is on (single-stand time at half).
+    mt, runH: 'adjustedH' in rate.totals ? rate.totals.adjustedH : rate.totals.runH, rateTph: rate.totals.rateTph,
     kwh: power.totals.kwh, kwhPerMt: power.totals.kwhPerMt,
     billetInputMt: prod.totals.billetInputMt, yieldPct: prod.totals.massYieldPct,
   };

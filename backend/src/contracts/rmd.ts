@@ -95,18 +95,41 @@ export interface RmdCurrentTrend {
   series: { id: string; line: 1 | 2; label: string; meanA: number | null; points: [number, number | null][] }[];
 }
 
-/** GET /api/rmd/running-rate — production ÷ running hours, per RMD day / week / month. */
+/** One period of the LSM / RMS running rate (FormRunningRateReport): production ÷ running hours. */
 export interface RmdRatePeriod {
   key: string;
   label: string;
   fromDate: string;
   toDate: string;
   days: number;
-  /** Hours the mill was running: billets (either line) no more than 10 min apart. */
+  /** Hours the mill was running. */
   runH: number | null;
-  /** RMD production, MT — the ERP log sheet (PRODUCT_PRIME_SLENGTH_MT); null with no entry. */
+  /** Production, MT; null with no entry. */
   productionMt: number | null;
   /** productionMt ÷ runH; null without both. */
+  rateTph: number | null;
+}
+
+/**
+ * GET /api/rmd/running-rate period — TPH = billet input ÷ adjusted running hours, all from the
+ * ERP log sheet (the plant, 13 Nov 2026). Single-stand time sits inside the running hours and
+ * counts half: adjusted = running hours − single-stand hours ÷ 2.
+ */
+export interface RmdTphPeriod {
+  key: string;
+  label: string;
+  fromDate: string;
+  toDate: string;
+  days: number;
+  /** Billet input, MT (INPUT_MT); null with no entry. */
+  inputMt: number | null;
+  /** Running hours (ACTUAL_RUNNING_HRS); null with no entry. */
+  runH: number | null;
+  /** Single-stand running hours (MILL_SINGLE_STAND, entered in minutes); 0 when none entered. */
+  singleStandH: number | null;
+  /** runH − singleStandH ÷ 2. */
+  adjustedH: number | null;
+  /** inputMt ÷ adjustedH; null without both. */
   rateTph: number | null;
 }
 
@@ -122,12 +145,9 @@ export interface RmdRunningRateReport {
   to: string;
   grain: Grain;
   mode: RmdMode;
-  /** Where running hours come from: the billet counters (Both), or the ERP log sheet's ACTUAL_RUNNING_HRS (Online / Offline). */
-  hoursFrom: 'counters' | 'erp';
-  gapMinutes: number;
-  influx: { connection: 'up' | 'down'; message: string };
-  rows: RmdRatePeriod[];
-  totals: RmdRatePeriod;
+  erp: { connection: 'up' | 'down'; message: string };
+  rows: RmdTphPeriod[];
+  totals: RmdTphPeriod;
 }
 
 /** GET /api/rmd/production — the RMD Production Log Sheet (ERP), per date / week / month. */

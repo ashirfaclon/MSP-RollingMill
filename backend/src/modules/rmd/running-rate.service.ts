@@ -1,53 +1,44 @@
 /**
- * RMD running rate (TPH) = production ÷ hours the mill was running, per RMD day (09:00 →
- * 09:00 IST) / week / month. Production is the ERP log sheet (PRODUCT_PRIME_SLENGTH_MT,
- * production.service.ts), summed by its date.
+ * RMD running rate (TPH), per RMD day / week / month, all from the ERP log sheet (the plant,
+ * 13 Nov 2026):
  *
- * Running hours, as for HSM: the mill is running while billets keep entering less than
- * RUN_GAP_MS apart (10 min); a longer gap is a stop. RMD has two lines, so the mill counts as
- * running while EITHER line feeds billets: the M1 and M2 counters are read as one timeline.
+ *   TPH = billet input (INPUT_MT) ÷ adjusted running hours
+ *   adjusted running hours = double-stand hours + single-stand hours ÷ 2
  *
- * Online / Offline: the counters can't tell which rolling a billet is, so the hours are that
- * rolling's ACTUAL_RUNNING_HRS from the ERP log sheet (the user, 13 Nov 2026).
+ * The mill rolls double-stand or single-stand; single-stand hours count half. MILL_SINGLE_STAND is
+ * entered in minutes and is already inside ACTUAL_RUNNING_HRS, so adjusted = running hours −
+ * single-stand hours ÷ 2. Online / Offline: that rolling's entries only (production.service.ts).
  */
 import type { Env } from '../../config/env';
-import type { Grain, RmdMode, RmdRatePeriod, RmdRunningRateReport } from '../../contracts';
-import { RMD_BILLET_COUNT } from '../../integrations/historian/tags';
+import type { Grain, RmdMode, RmdRunningRateReport, RmdTphPeriod } from '../../contracts';
+import { readErpRmdProduction } from '../../integrations/erp/cache';
 import { MSG } from '../../shared/messages';
-import { dateRange, periodOf, readCounter, round2 } from '../hsm/production.service';
-import { RUN_GAP_MS, runsOf } from '../hsm/running-rate.service';
-import { RMD_DAY_START_HOUR, rmdDayStart } from './billets.service';
-import { rmdByDay, rmdProductionByDay } from './production.service';
+import { dateRange, periodOf, round2 } from '../hsm/production.service';
+import { ofMode, sumOf } from './production.service';
 
-const DAY_MS = 86_400_000;
-const H_MS = 3_600_000;
-
-/** Production ÷ hours; null without production or without running time. */
+/** Input ÷ hours; null without input or without running time. */
 export const rmdRate = (mt: number | null, h: number | null) => (mt === null || !h ? null : round2(mt / h));
 
-export async function rmdRunningRate(env: Env, from: string, to: string, grain: Grain, nowMs = Date.now(), mode: RmdMode = 'all'): Promise<RmdRunningRateReport> {
-  const dates = dateRange(from, to);
-  const erpHours = mode !== 'all';
-  const [m1, m2] = erpHours ? [null, null] : await (() => {
-    const fromMs = rmdDayStart(from);
-    const toMs = Math.min(rmdDayStart(to) + DAY_MS, nowMs);
-    return Promise.all([readCounter(env, RMD_BILLET_COUNT.M1, fromMs, toMs), readCounter(env, RMD_BILLET_COUNT.M2, fromMs, toMs)]);
-  })();
-  const runs = m1 && m2 ? runsOf([...m1.increments, ...m2.increments], RUN_GAP_MS, RMD_DAY_START_HOUR) : [];
-  const erpH = erpHours ? rmdByDay(env, dates, mode, 'ACTUAL_RUNNING_HRS') : null;
-  /** A date's running hours; null for an ERP date with none entered. */
-  const hoursOn = (d: string): number | null => (erpH ? erpH.get(d) ?? null
-    : runs.filter((r) => r.date === d).reduce((a, r) => a + (r.end - r.start), 0) / H_MS);
-  const up = erpHours || m1!.connection === 'up' || m2!.connection === 'up';
-  const production = rmdProductionByDay(env, dates, mode);
-  const productionOf = (d: string): number | null => production.get(d) ?? null;
+/** Running hours less half the single-stand time (minutes); null without running hours. */
+export const adjustedHours = (runH: number | null, singleMin: number | null) =>
+  (runH === null ? null : round2(runH - (singleMin ?? 0) / 120));
 
-  const period = (key: string, label: string, ds: string[]): RmdRatePeriod => {
-    const hs = ds.map(hoursOn);
-    const runH = !up || (erpHours && hs.every((h) => h === null)) ? null : round2(hs.reduce<number>((a, h) => a + (h ?? 0), 0));
-    const prod = ds.map(productionOf);
-    const productionMt = prod.every((p) => p === null) ? null : round2(prod.reduce<number>((a, p) => a + (p ?? 0), 0));
-    return { key, label, fromDate: ds[0], toDate: ds[ds.length - 1], days: ds.length, runH, productionMt, rateTph: rmdRate(productionMt, runH) };
+export function rmdRunningRate(env: Env, from: string, to: string, grain: Grain, mode: RmdMode = 'all'): RmdRunningRateReport {
+  const cache = readErpRmdProduction(env);
+  const rows = ofMode(cache?.rows ?? [], mode);
+  const dates = dateRange(from, to);
+
+  const period = (key: string, label: string, ds: string[]): RmdTphPeriod => {
+    const set = new Set(ds);
+    const mine = rows.filter((r) => set.has(r.date));
+    const runH = sumOf(mine, 'ACTUAL_RUNNING_HRS');
+    const singleMin = sumOf(mine, 'MILL_SINGLE_STAND');
+    const adjustedH = adjustedHours(runH, singleMin);
+    const inputMt = sumOf(mine, 'INPUT_MT');
+    return {
+      key, label, fromDate: ds[0], toDate: ds[ds.length - 1], days: ds.length,
+      inputMt, runH, singleStandH: runH === null ? null : round2((singleMin ?? 0) / 60), adjustedH, rateTph: rmdRate(inputMt, adjustedH),
+    };
   };
   const groups = new Map<string, { label: string; dates: string[] }>();
   for (const d of dates) {
@@ -56,10 +47,9 @@ export async function rmdRunningRate(env: Env, from: string, to: string, grain: 
     g.dates.push(d);
     groups.set(p.key, g);
   }
-  const down = !up ? (m1!.connection === 'down' ? m1! : m2!) : null;
   return {
-    from, to, grain, mode, hoursFrom: erpHours ? 'erp' : 'counters', gapMinutes: RUN_GAP_MS / 60_000,
-    influx: down ? { connection: 'down', message: down.message } : { connection: 'up', message: MSG.HISTORIAN_UP },
+    from, to, grain, mode,
+    erp: { connection: cache ? 'up' : 'down', message: cache ? MSG.ERP_UP : MSG.ERP_NOT_SYNCED },
     rows: [...groups].map(([key, g]) => period(key, g.label, g.dates)),
     totals: period('total', 'Total', dates),
   };

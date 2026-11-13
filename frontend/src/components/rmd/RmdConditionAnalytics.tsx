@@ -38,14 +38,14 @@ import '@/components/asset/asset.css';
 
 const CA_SOURCES: [string, string][] = [
   ['Production', 'ERP Production Log Sheet · PRODUCT_PRIME_SLENGTH_MT (Prime + SL), INPUT_MT, mass yield'],
-  ['Running hours', 'Influx billet counters, M1 + M2 (billets ≤ 10 min apart)'],
+  ['Running hours', 'ERP Production Log Sheet · ACTUAL_RUNNING_HRS, single-stand time (MILL_SINGLE_STAND) at half'],
   ['Power', 'Logbook TMT Electrical Department → Power Reading VCB 1 / 2 / 3'],
 ];
 /** Online / Offline: that rolling's ERP entries only; the CA inputs are for the whole mill, so no costing (the user, 13 Nov 2026). */
 const caSourcesOf = (mode: RmdModeSel): [string, string][] => (mode === 'all' ? CA_SOURCES : [
   ['Rolling', `${mode === 'online' ? 'Online · TRAN_COLUMN_NAME1 = RO001' : 'Offline · TRAN_COLUMN_NAME1 = RO002'}`],
   ['Production', 'ERP Production Log Sheet · PRODUCT_PRIME_SLENGTH_MT (Prime + SL), INPUT_MT, mass yield'],
-  ['Running hours', 'ERP Production Log Sheet · ACTUAL_RUNNING_HRS'],
+  ['Running hours', 'ERP Production Log Sheet · ACTUAL_RUNNING_HRS, single-stand time (MILL_SINGLE_STAND) at half'],
   ['Power', 'ERP Production Log Sheet · TOTAL_POWER_CONSUMPTION'],
   ['Costing', 'The CA inputs are for the whole mill: shown under Both only'],
 ]);

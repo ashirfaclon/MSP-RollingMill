@@ -81,9 +81,11 @@ export function readErpPm(env: Env): ErpPmCache | null {
  * 2026): table ATTR_TRAN_DATA_BODY, USER_CODE = 'FA-SKJ', ATTR_CODE → ATTR_VALUE, dated by
  * VRDATE. Two spellings differ from the sheet (MISSROLL_MT → MISROLL_MT, CHIP_OFF →
  * CHIP_OFF_MT): the sheet's spelling returned no rows; these are the codes in the table,
- * confirmed with the user. Chip off is the plant's rejection.
+ * confirmed with the user. Chip off is the plant's rejection. MILL_SINGLE_STAND: single-stand running
+ * time for TPH (the plant, 13 Nov 2026) — entered in minutes, already inside ACTUAL_RUNNING_HRS
+ * (every entry Jun–Nov 2026: 5–50, on days running hours equal the scheduled hours).
  */
-export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT', 'TOTAL_POWER_CONSUMPTION'] as const;
+export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT', 'TOTAL_POWER_CONSUMPTION', 'MILL_SINGLE_STAND'] as const;
 export type RmdLogField = (typeof RMD_LOG_FIELDS)[number];
 /**
  * Online / Offline: the log sheet head's TRAN_COLUMN_NAME1, RO001 = Online, RO002 = Offline (Management
