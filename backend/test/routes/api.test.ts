@@ -109,6 +109,22 @@ describe('HSM range routes reject bad input with a named error', () => {
   });
 });
 
+describe('plant settings', () => {
+  const post = async (url: string, body: unknown, authorization = `Bearer ${session}`) => {
+    const res = await app.inject({ method: 'POST', url, payload: body as object, headers: authorization ? { authorization } : {} });
+    return { status: res.statusCode, body: res.json() };
+  };
+  test('read and save need a session', async () => {
+    expect(await get('/api/settings/lsm', { authorization: '' })).toMatchObject({ status: 401 });
+    expect(await post('/api/settings/lsm', { limits: { 'oil-temp': null } }, '')).toMatchObject({ status: 401 });
+  });
+  test('an unknown mill, and an edit with a problem, are refused before the store is touched', async () => {
+    expect(await get('/api/settings/xyz')).toMatchObject({ status: 400, body: { error: 'bad_mill' } });
+    expect(await post('/api/settings/rms', { limits: { 'oil-temp': { min: 80, max: 60 } } }))
+      .toMatchObject({ status: 400, body: { error: 'bad_settings', message: 'Gearbox oil temperature: the minimum must be below the maximum' } });
+  });
+});
+
 describe('access: only through an IOsense session', () => {
   test('data and status routes refuse a caller without a session', async () => {
     for (const url of ['/api/hsm/live', '/api/hsm/production?from=2026-09-22&to=2026-09-28', '/api/config', '/api/sources', '/api/erp']) {

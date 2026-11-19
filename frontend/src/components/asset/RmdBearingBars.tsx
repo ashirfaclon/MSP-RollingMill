@@ -79,16 +79,18 @@ export default function RmdBearingBars({ readings, empty }: { readings: StandRea
   const lo = rows.reduce((m, r) => Math.min(m, r.value), Infinity);
 
   // The limits drawn: the bearings', and the flywheel's where it differs and a flywheel is shown.
-  const limitOf = (fly: boolean) => rows.find((r) => (r.position === 'Flywheel') === fly && r.min !== null && r.max !== null) ?? null;
+  // A limit may have one side only (Settings): each side is drawn where it is set.
+  const limitOf = (fly: boolean) => rows.find((r) => (r.position === 'Flywheel') === fly && (r.min !== null || r.max !== null)) ?? null;
   const bl = limitOf(false), fl = limitOf(true);
   const main = bl ?? fl;
   const lines: { y: number; text: string; dash: string }[] = [];
   if (main) {
     const who = bl && fl && (fl.max !== bl.max || fl.min !== bl.min) ? 'Bearings' : 'Alert';
-    lines.push({ y: main.max!, text: `${who}: above ${main.max} °C`, dash: '8 5' }, { y: main.min!, text: `${who}: below ${main.min} °C`, dash: '8 5' });
+    if (main.max !== null) lines.push({ y: main.max, text: `${who}: above ${main.max} °C`, dash: '8 5' });
+    if (main.min !== null) lines.push({ y: main.min, text: `${who}: below ${main.min} °C`, dash: '8 5' });
     if (bl && fl) {
-      if (fl.max !== bl.max) lines.push({ y: fl.max!, text: `Flywheel: above ${fl.max} °C`, dash: '3 4' });
-      if (fl.min !== bl.min) lines.push({ y: fl.min!, text: `Flywheel: below ${fl.min} °C`, dash: '3 4' });
+      if (fl.max !== null && fl.max !== bl.max) lines.push({ y: fl.max, text: `Flywheel: above ${fl.max} °C`, dash: '3 4' });
+      if (fl.min !== null && fl.min !== bl.min) lines.push({ y: fl.min, text: `Flywheel: below ${fl.min} °C`, dash: '3 4' });
     }
   }
   const top = Math.max(80, ...lines.map((l) => l.y + 10), Number.isFinite(hi) ? Math.ceil((hi + 8) / 10) * 10 : 0);
@@ -145,8 +147,8 @@ export default function RmdBearingBars({ readings, empty }: { readings: StandRea
                   ))}
                 </defs>
                 {/* Outside the limits, shaded. */}
-                {main && <rect x={0} y={TOP} width={width} height={y(main.max!) - TOP} className="brb-band" />}
-                {main && <rect x={0} y={y(main.min!)} width={width} height={TOP + PLOT - y(main.min!)} className="brb-band" />}
+                {main && main.max !== null && <rect x={0} y={TOP} width={width} height={y(main.max) - TOP} className="brb-band" />}
+                {main && main.min !== null && <rect x={0} y={y(main.min)} width={width} height={TOP + PLOT - y(main.min)} className="brb-band" />}
                 {ticks.map((t) => <line key={t} x1={0} x2={width} y1={y(t)} y2={y(t)} className="brb-grid" />)}
 
                 {stands.map((s, si) => (
@@ -161,7 +163,7 @@ export default function RmdBearingBars({ readings, empty }: { readings: StandRea
                       const color = POSITIONS[b.p]?.color ?? 'var(--cat-6)';
                       return (
                         <g key={b.point}>
-                          <title>{`${s.name} · ${name}: ${fixed(b.value, 0)} °C${b.min !== null ? ` (limits ${b.min}–${b.max} °C)` : ''} · ${dm(b.at)}${b.time ? ` ${b.time}` : ''}`}</title>
+                          <title>{`${s.name} · ${name}: ${fixed(b.value, 0)} °C${b.min !== null || b.max !== null ? ` (limits ${b.min ?? '—'}–${b.max ?? '—'} °C)` : ''} · ${dm(b.at)}${b.time ? ` ${b.time}` : ''}`}</title>
                           <path d={`M${x},${TOP + PLOT} V${by + 4} q0,-4 4,-4 h${bar - 8} q4,0 4,4 V${TOP + PLOT} Z`}
                             fill={b.nde ? `url(#brb-h${b.p})` : color} className={out ? 'brb-bar brb-bar--out' : 'brb-bar'} />
                           <text x={x + bar / 2} y={by - 5} textAnchor="middle" className={out ? 'brb-val brb-val--out' : 'brb-val'}>{fixed(b.value, 0)}</text>

@@ -4,8 +4,12 @@
  * RMD chemical composition — as the plant gave it: the logbook form Steel Melting Shop → SMS →
  * CCM Lolipop Sample, the RMD samples (its "mill" field). The card shows the latest sample of
  * the period, %C / %Mn / %S / %P / %Si with its furnace number and CCM; it opens every sample.
+ * C, S and P (and S + P) are coloured against their limits in the mill's Settings (the user,
+ * 19 Nov 2026; IS 1786 Fe 500D by default); Mn and Si have none.
  */
 import { useState } from 'react';
+import LimitsNote from '@/components/settings/LimitsNote';
+import { toneOf, useMillSettings, worstTone, type Tone } from '@/services/settings';
 import { useLastEntry } from '@/services/lastEntry';
 import DrillDrawer from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
@@ -18,6 +22,16 @@ const ELEMENTS: { key: 'c' | 'mn' | 's' | 'p' | 'si'; label: string }[] = [
 ];
 const pct = (v: number | null) => (v === null ? '—' : String(Number(v.toFixed(3))));
 
+type Limits = ReturnType<typeof useMillSettings>['limit'];
+/** An element's colour: C against its limit; S and P against theirs and against S + P together. */
+function chemTone(s: RmdChemSample, key: (typeof ELEMENTS)[number]['key'], limit: Limits): Tone | undefined {
+  const sp = s.s !== null && s.p !== null ? toneOf(s.s + s.p, limit('chem-sp')) : undefined;
+  if (key === 'c') return toneOf(s.c, limit('chem-c'));
+  if (key === 's') return worstTone([toneOf(s.s, limit('chem-s')), sp]);
+  if (key === 'p') return worstTone([toneOf(s.p, limit('chem-p')), sp]);
+  return undefined;
+}
+
 export default function RmdChemistryCard() {
   const { dates } = useSelection();
   const url = rangeUrl('/api/rmd/chemistry', dates);
@@ -29,6 +43,7 @@ export default function RmdChemistryCard() {
   const fromBefore = !r?.latest && !!prev.data?.latest;
   const last = r?.latest ?? prev.data?.latest ?? null;
   const loading = !r && !error;
+  const { limit } = useMillSettings('rmd');
 
   return (
     <>
@@ -43,7 +58,7 @@ export default function RmdChemistryCard() {
                 {ELEMENTS.map((e) => (
                   <span key={e.key} className="rmd-chem-cell">
                     <span className="rm-card-src">{e.label}</span>
-                    <span className="rmd-chem-v">{pct(last[e.key])}</span>
+                    <span className={`rmd-chem-v ${chemTone(last, e.key, limit) ?? ''}`}>{pct(last[e.key])}</span>
                   </span>
                 ))}
               </span>
@@ -58,13 +73,13 @@ export default function RmdChemistryCard() {
       </button>
       <DrillDrawer open={open} onClose={() => setOpen(false)} title="Chemical composition" sub="RMD · SMS lollipop samples · %"
         loading={loading} error={error} hasData={!!r}>
-        {r && <Content r={r} />}
+        {r && <Content r={r} limit={limit} />}
       </DrillDrawer>
     </>
   );
 }
 
-function Content({ r }: { r: RmdChemistryReport }) {
+function Content({ r, limit }: { r: RmdChemistryReport; limit: Limits }) {
   return (
     <>
       <div className="pd-table-wrap">
@@ -78,10 +93,11 @@ function Content({ r }: { r: RmdChemistryReport }) {
           <tbody>
             {r.samples.length === 0
               ? <tr><td colSpan={4 + ELEMENTS.length} className="v-na">NA</td></tr>
-              : r.samples.map((s, i) => <Row key={i} s={s} />)}
+              : r.samples.map((s, i) => <Row key={i} s={s} limit={limit} />)}
           </tbody>
         </table>
       </div>
+      <LimitsNote limits={[limit('chem-c'), limit('chem-s'), limit('chem-p'), limit('chem-sp')]} />
       <SourceBox
         sources={[{ name: 'Logbook', rows: [
           ['Form', 'Steel Melting Shop → SMS → CCM Lolipop Sample'],
@@ -95,14 +111,14 @@ function Content({ r }: { r: RmdChemistryReport }) {
   );
 }
 
-function Row({ s }: { s: RmdChemSample }) {
+function Row({ s, limit }: { s: RmdChemSample; limit: Limits }) {
   return (
     <tr>
       <td>{dm(s.date)}{s.time ? ` · ${s.time.slice(11, 16) || s.time}` : ''}</td>
       <td><b>{s.furnace || '—'}</b></td>
       <td>{s.ccm || '—'}</td>
       <td>{s.section || '—'}</td>
-      {ELEMENTS.map((e) => <td key={e.key} className={`num r ${s[e.key] === null ? 'v-na' : 'v-val'}`}>{pct(s[e.key])}</td>)}
+      {ELEMENTS.map((e) => <td key={e.key} className={`num r ${s[e.key] === null ? 'v-na' : chemTone(s, e.key, limit) ?? 'v-val'}`}>{pct(s[e.key])}</td>)}
     </tr>
   );
 }

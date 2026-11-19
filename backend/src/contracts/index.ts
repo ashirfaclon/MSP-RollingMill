@@ -15,3 +15,4 @@ export type * from './mid';
 export type * from './pm';
 export type * from './forms';
 export type * from './ca';
+export type * from './settings';

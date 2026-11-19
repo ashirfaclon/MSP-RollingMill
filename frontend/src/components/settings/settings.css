@@ -1,0 +1,46 @@
+/* The Settings screen: the drill-down drawer's frame, one table of limits per group. */
+
+.set-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.set-name { display: inline-flex; align-items: center; gap: 8px; }
+.set-name .pc-in { width: 180px; text-align: left; font-weight: 600; }
+.set-actions { display: inline-flex; align-items: center; gap: 8px; }
+.set-pending { font-size: 11px; color: var(--info); font-weight: 700; }
+
+.set-msg { margin: 0; font-size: 12px; color: var(--ok); }
+.set-msg--error { color: var(--risk); }
+.set-store { margin: 0; font-size: 11px; color: var(--muted); }
+
+.set-group { display: flex; flex-direction: column; gap: 6px; }
+/* One column layout for every group, so Min / Max line up down the drawer; the text wraps instead of scrolling. */
+.set-table { table-layout: fixed; }
+.set-table col.set-c-label { width: 34%; }
+.set-table col.set-c-num { width: 13%; }
+.set-table col.set-c-src { width: 40%; }
+table.grid.set-table td, table.grid.set-table th { white-space: normal; }
+.set-table td { vertical-align: top; }
+.set-unit { font-size: 11px; color: var(--muted); font-weight: 600; }
+.set-reading { display: block; margin-top: 2px; font-size: 10.5px; color: var(--muted-2); }
+.set-in { width: 100%; max-width: 84px; }
+.set-in::placeholder { color: var(--muted-3); font-weight: 500; }
+.set-source .chip { margin-right: 6px; }
+.set-basis { display: block; margin-top: 4px; font-size: 10.5px; line-height: 1.35; color: var(--muted-2); }
+.set-reset {
+  background: none; border: 0; padding: 0; font: inherit; font-size: 11px; font-weight: 700;
+  color: var(--info); cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.set-reset:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+/* Opened at this limit from a drill-down. */
+.set-focus td { background: color-mix(in srgb, var(--info) 10%, transparent); }
+
+/* The top bar's Settings button and a drill-down's "Edit limits" link. */
+.tb-settings svg { flex-shrink: 0; }
+.set-link {
+  align-self: flex-start; background: none; border: 0; padding: 0; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--info); cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.set-link:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+
+/* A drill-down's limits line. */
+.set-note { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: var(--radius-sm); }
+.set-note ul { margin: 0; padding: 0; list-style: none; font-size: 12px; display: flex; flex-direction: column; gap: 2px; }
+.set-note-src { color: var(--muted-2); font-size: 11px; }

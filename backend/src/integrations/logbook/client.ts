@@ -494,6 +494,39 @@ export async function saveFormEntries(
   }
 }
 
+/**
+ * Add one entry to a form and keep every earlier one (addInsightResult): for a store whose history
+ * is its audit trail — the settings document, the newest row wins (SETTINGS_AND_ALERTS_REPLICATION.md §3.4).
+ * `success` in the body decides, not the HTTP status. The form's read cache is cleared after.
+ */
+export async function appendFormEntry(
+  formId: string, result: Record<string, unknown>, filledBy: string, env = loadEnv(),
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const auth = currentBearer(env);
+  if (!auth) return { ok: false, message: droppedReason ?? MSG.LOGBOOK_NO_SESSION };
+  const insightId = env.logbookInsightId;
+  if (!insightId) return { ok: false, message: MSG.LOGBOOK_NOT_MAPPED };
+  const tag = formId.replace('__', '/');
+  try {
+    const res = await fetch(`${env.iosenseBase}/api/account/bruce/insightResult/add`, {
+      method: 'POST', headers: headers(env, auth), signal: AbortSignal.timeout(TIMEOUT_MS),
+      body: JSON.stringify({
+        insightID: insightId, resultName: tag, applicationType: 'Insight', tags: [tag], result,
+        metadata: { formId, source: 'msp-steel-logbook', filledBy, dataSource: [] }, invocationTime: new Date().toISOString(),
+      }),
+    });
+    const out = (await res.json().catch(() => ({}))) as { success?: boolean; errors?: unknown };
+    if (out.success) return { ok: true };
+    const authFail = isAuthFailure(res.status, out.errors);
+    if (authFail) dropSession(MSG.LOGBOOK_SESSION_EXPIRED);
+    return { ok: false, message: authFail ? MSG.LOGBOOK_SESSION_EXPIRED : `${MSG.LOGBOOK_WRITE_REFUSED}: ${String(out.errors ?? res.status)}` };
+  } catch {
+    return { ok: false, message: MSG.LOGBOOK_UNREACHABLE };
+  } finally {
+    for (const k of forms.keys()) if (k.startsWith(`${tag}|`)) forms.delete(k);
+  }
+}
+
 /** Delete one row of a form by its id (…/insightResult/delete/{insight}/{id}); gone already counts as done. */
 export async function deleteFormEntry(formId: string, id: string, env = loadEnv()): Promise<{ ok: boolean; message?: string }> {
   const auth = currentBearer(env);

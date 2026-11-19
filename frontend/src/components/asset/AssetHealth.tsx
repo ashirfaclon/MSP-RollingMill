@@ -19,8 +19,12 @@
  * mimic only shows the live state. Vibration from MID. No PM items: HSM's equipment is not in the
  * ERP's PM module (the user, 29 Oct 2026). The rest have
  * no source in the sheet.
+ * Each reading is coloured against its limit in the mill's Settings (the user, 19 Nov 2026): green
+ * inside, amber outside, red far outside; a card takes the worst of its stands.
  */
 import { useMemo, useState } from 'react';
+import { toneOf, useMillSettings, worstTone } from '@/services/settings';
+import LimitsNote from '@/components/settings/LimitsNote';
 import { hsmHottest, midTop, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
 import BearingTrendAll, { hsmBearingPoints } from './BearingTrendAll';
@@ -92,6 +96,11 @@ export default function AssetHealth() {
     };
   };
   const { latest, bearingC, loadA, loadPct } = figures(load);
+  // The limits in use: DC motor bearings and motor loading, per stand; the card is the worst stand.
+  const settings = useMillSettings('hsm');
+  const bearingL = settings.limit('motor-bearing-temp'), loadingL = settings.limit('motor-loading');
+  const bearingTone = worstTone(latest.flatMap((e) => [toneOf(e.deTempC, bearingL), toneOf(e.ndeTempC, bearingL)]));
+  const loadingTone = worstTone(latest.map((e) => toneOf(loadingPct(motors.rated, e.stand, e.loadA), loadingL)));
   /* Nothing filled in the period: the last day the Mill Load Log Sheet has (the user, 30 Oct 2026). */
   const loadLast = useLastEntry<HsmMillLoadReport>('/api/hsm/mill-load', !!gid && !!load && latest.length === 0, load?.lastDate, dates?.from);
   // Every DC motor bearing of the group's stands, each reading (the user, 31 Oct 2026).
@@ -106,6 +115,7 @@ export default function AssetHealth() {
       {/* No Gearbox oil card: HSM has no source for it (the user, 31 Oct 2026). */}
       <section className="rm-strip ah-strip ah-strip--four" aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+          tone={toneOf(mid.maxMmS, settings.limit('vibration'))}
           /* The machine with the highest reading, and the MID visit it is from (the user, 31 Oct 2026). */
           note="" where={(() => { const t = midTop(mid.machines, mid.date); return t ? { name: t.where, when: `MID · ${midDate(t.date)}` } : null; })()}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
@@ -119,6 +129,7 @@ export default function AssetHealth() {
           unit="°C"
           note=""
           series="hold"
+          tone={bearingTone}
           {...(canOpen ? { onOpen: () => setOpen(true), openLabel: 'Each stand: load and DC motor temperatures' } : {})}
         />
         <KpiCard
@@ -129,6 +140,7 @@ export default function AssetHealth() {
           unit="%"
           note=""
           series="prod"
+          tone={loadingTone}
           {...(canOpen ? { onOpen: () => setOpen(true), openLabel: 'Each stand: load and DC motor temperatures' } : {})}
         />
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod"
@@ -157,9 +169,9 @@ export default function AssetHealth() {
         {load && (
           <>
             <Stats items={[
-              { label: 'Motor current loading', value: loadPct === null ? 'NA' : fixed(loadPct, 0), unit: '% · mean of stands', tone: loadPct === null ? 'v-na' : undefined },
+              { label: 'Motor current loading', value: loadPct === null ? 'NA' : fixed(loadPct, 0), unit: '% · mean of stands', tone: loadPct === null ? 'v-na' : loadingTone },
               { label: 'Motor current', value: loadA === null ? 'NA' : fixed(loadA, 0), unit: 'A · mean of stands', tone: loadA === null ? 'v-na' : undefined },
-              { label: 'Hottest bearing', value: bearingC === null ? 'NA' : fixed(bearingC, 0), unit: '°C · DC motor', tone: bearingC === null ? 'v-na' : undefined },
+              { label: 'Hottest bearing', value: bearingC === null ? 'NA' : fixed(bearingC, 0), unit: '°C · DC motor', tone: bearingC === null ? 'v-na' : bearingTone },
             ]} />
             <div className="pd-table-wrap">
               <table className="grid pd-table" aria-label="Mill load per stand">
@@ -172,9 +184,9 @@ export default function AssetHealth() {
                         <td><b>{e.stand}</b></td>
                         <td className="num r">{e.loadA === null ? '—' : fixed(e.loadA, 0)}</td>
                         <td className="num r">{motors.rated.get(e.stand) ? fixed(motors.rated.get(e.stand)!, 0) : '—'}</td>
-                        <td className="num r v-val">{loadingPct(motors.rated, e.stand, e.loadA) === null ? '—' : fixed(loadingPct(motors.rated, e.stand, e.loadA), 0)}</td>
-                        <td className="num r">{e.deTempC === null ? '—' : fixed(e.deTempC, 0)}</td>
-                        <td className="num r">{e.ndeTempC === null ? '—' : fixed(e.ndeTempC, 0)}</td>
+                        <td className={`num r ${toneOf(loadingPct(motors.rated, e.stand, e.loadA), loadingL) ?? 'v-val'}`}>{loadingPct(motors.rated, e.stand, e.loadA) === null ? '—' : fixed(loadingPct(motors.rated, e.stand, e.loadA), 0)}</td>
+                        <td className={`num r ${toneOf(e.deTempC, bearingL) ?? ''}`}>{e.deTempC === null ? '—' : fixed(e.deTempC, 0)}</td>
+                        <td className={`num r ${toneOf(e.ndeTempC, bearingL) ?? ''}`}>{e.ndeTempC === null ? '—' : fixed(e.ndeTempC, 0)}</td>
                         <td>{dm(e.date)}{e.time ? ` · ${e.time.slice(11, 16)}` : ''} · {e.shift}</td>
                       </tr>
                     ))}
@@ -192,6 +204,7 @@ export default function AssetHealth() {
                 toBody={(changed) => ({ rows: changed.map((c) => ({ stand: c.id, ratedCurrentA: c.values.a })) })}
               />
             )}
+            <LimitsNote limits={[loadingL, bearingL]} />
             <SourceBox
               sources={[{ name: 'Logbook', rows: [
                 ['Form', 'Electrical HSM → Mill Load Log Sheet'],

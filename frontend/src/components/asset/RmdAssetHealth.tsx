@@ -22,13 +22,15 @@
  *                     All / Roughing / Route (the user, 11 Nov 2026) — the trend over time is in the
  *                     Bearing temp drill-down.
  * Test entries are left out.
- * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
- * 45–65 °C, editable in the drill-downs (the user, 31 Oct 2026) — a card turns red when any of its
- * readings is outside them, green when all are inside.
+ * Limits: the mill's Settings (the user, 19 Nov 2026) — by default the plant's bearings 45–65 °C,
+ * flywheel 45–80 °C, oil tank temperature 45–65 °C (16 Oct 2026), and standard placeholders for the
+ * oil level (% of capacity) and vibration. A card is green when all its readings are inside, amber
+ * when any is outside, red when any is far outside (critical); the drill-downs show the limits.
  */
 import { useState, type ReactNode } from 'react';
-import { RMD_LIMITS_URL, RMD_TANKS_URL, useRmdOilTanks, useRmdTempLimits } from '@/services/equipment';
-import type { RmdTempLimits } from '@/services/hsmApi';
+import { RMD_TANKS_URL, useRmdOilTanks } from '@/services/equipment';
+import { toneOf, useMillSettings, worstTone, type Tone } from '@/services/settings';
+import LimitsNote from '@/components/settings/LimitsNote';
 import EquipmentSettings from './EquipmentSettings';
 import { midTop, rmdHottest, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
@@ -121,8 +123,8 @@ export default function RmdAssetHealth() {
   const fgs = FORMS[group] ?? null;
   // Each tank's size in use: the defaults with any edit made on the dashboard (the user, 31 Oct 2026).
   const tanks = useRmdOilTanks();
-  // The temperature limits in use, the same way (the user, 31 Oct 2026).
-  const limits = useRmdTempLimits();
+  // The limits in use: the mill's Settings (the user, 19 Nov 2026).
+  const settings = useMillSettings('rmd');
   const bearingOf = (d: RmdAssetForms) => (fgs ? mergeBearing(fgs.map((g) => d.bearing[g])) : null);
   const oilOf = (d: RmdAssetForms) => (fgs ? mergeOil(fgs.map((g) => d.oil[g])) : null);
   const { dates } = useSelection();
@@ -153,8 +155,9 @@ export default function RmdAssetHealth() {
   const motorA = currentA ?? periodA ?? null;
   const bearing = forms ? bearingOf(forms) : null;
   const oil = forms ? oilOf(forms) : null;
-  const bearingTone = toneOf(bearing?.latest ?? []);
-  const oilTone = toneOf(oil?.temperature ?? []);
+  const bearingTone = readingsTone(bearing?.latest ?? []);
+  const oilTone = readingsTone(oil?.temperature ?? []);
+  const levelTone = readingsTone(oil?.level ?? []);
   const oilTempC = oil?.temperature.length ? Math.max(...oil.temperature.map((r) => r.value)) : null;
   /* Nothing filled in the period: the last day each form has, per group (the user, 30 Oct 2026). */
   const bearingMax = bearing?.max?.value ?? null;
@@ -176,6 +179,7 @@ export default function RmdAssetHealth() {
 
       <section className={`rm-strip ah-strip${STRIP[3 + Number(show.bearing) + Number(show.current) + Number(show.oil)]}`} aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+          tone={toneOf(mid.maxMmS, settings.limit('vibration'))}
           /* The machine with the highest reading, and the MID visit it is from (the user, 31 Oct 2026). */
           note="" where={(() => { const t = midTop(mid.machines, mid.date); return t ? { name: t.where, when: `MID · ${midDate(t.date)}` } : null; })()}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
@@ -207,13 +211,13 @@ export default function RmdAssetHealth() {
           series="prod"
           {...(zone ? { onOpen: () => setOpen('current'), openLabel: 'Each drive\'s current now, and its trend while running' } : {})}
         />}
-        {/* Level or temperature (the plant, 28 Oct 2026). Limits exist for the temperature only: no colour on the level. */}
+        {/* Level or temperature (the plant, 28 Oct 2026), each against its limit in Settings (level: % of capacity). */}
         {show.oil && <FlipKpiCard
           label="Gearbox oil"
           series="hold"
           faces={[
             { id: 'level', label: 'Level', title: 'Oil in the tank lowest against its capacity (L)',
-              card: { value: oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA', unit: 'L', noEntries: !!fgs && !!forms && oil?.minLevel?.litres == null,
+              card: { value: oil?.minLevel?.litres != null ? fixed(oil.minLevel.litres, 0) : 'NA', unit: 'L', tone: oil?.minLevel?.litres != null ? levelTone : undefined, noEntries: !!fgs && !!forms && oil?.minLevel?.litres == null,
                 lastEntry: lastFigure(oilLevelL, levelLast, (d) => oilOf(d)?.minLevel?.litres, (n) => fixed(n, 0)) } },
             { id: 'temp', label: 'Temp', title: 'The hottest oil tank (°C)',
               card: { value: oilTempC !== null ? fixed(oilTempC, 0) : 'NA', unit: '°C', tone: oilTempC !== null ? oilTone : undefined, noEntries: !!fgs && !!forms && oilTempC === null,
@@ -261,14 +265,14 @@ export default function RmdAssetHealth() {
           ['Form', 'Rolling Mill Division (TMT) → Mechanical → Mill Bearing Temperature'],
           ['Forms', (fgs ?? []).map((g) => (g === 'roughing' ? '20 Inch R Stand, 16 Inch R Stand' : 'Intermill, New Continuous Stand (1–8), Old Continuous Stand (1–6)')).join(', ')],
           ['Field', 'Flywheel / Reduction gear / Pinion gear, D and ND side (°C) — each form\'s latest entry in the period'],
-        ]} formula={['Bearing temp = the hottest of those readings', 'Limits: the table above — the plant\'s, editable']}
+        ]} formula={['Bearing temp = the hottest of those readings', 'Colour: green inside the limits, amber outside, red far outside (one band width past them)']}
           trend={(() => {
             // Every bearing at each reading over the period (moved here from Condition trends, 11 Nov 2026).
             const now = rmdBearingPoints(bearing.history);
             const before = !now.length && bearingLast.data ? rmdBearingPoints(bearingOf(bearingLast.data)?.history ?? []) : [];
             return <BearingTrendAll points={now.length ? now : before} last={!now.length && before.length ? bearingLast.date : null} />;
           })()}
-          settings={limits.data && <TempLimitSettings data={limits.data} ids={['bearing', 'flywheel']} />} />}
+          settings={<LimitsNote limits={[settings.limit('bearing-temp'), settings.limit('flywheel-temp')]} />} />}
       </DrillDrawer>
       {/* One screen per view of the card (the plant, 29 Oct 2026): oil level, or oil temperature. */}
       <DrillDrawer open={open === 'oil'} onClose={() => setOpen(null)}
@@ -277,6 +281,7 @@ export default function RmdAssetHealth() {
         {oil && oilView === 'level' && (
           <>
             <TankLevelTable rows={oil.level} />
+            <LimitsNote limits={[settings.limit('oil-tank-level')]} />
             {/* The tank sizes the litres are worked out with — editable (the user, 31 Oct 2026). */}
             {tanks.data && (
               <EquipmentSettings
@@ -302,7 +307,7 @@ export default function RmdAssetHealth() {
                 'Oil (L) = level (inches) × 0.0254 × inside length × inside width (m) × 1000 — box tanks, flat bottom, level from the bottom',
                 'Tank size (L × W × D, m): the table above — the plant\'s tank capacities, editable',
                 'Gearbox oil (Level) = the oil in the tank lowest against its capacity',
-                'Limits: level — none given yet',
+                'Colour: the oil against the tank\'s capacity, by the level limit above (% full)',
               ]}
             />
           </>
@@ -313,38 +318,21 @@ export default function RmdAssetHealth() {
             ['Field', 'one value per tank — the latest entry in the period'],
           ]} formula={[
             'Gearbox oil (Temp) = the hottest oil tank',
-            'Limits: the table above — the plant\'s, editable',
-          ]} settings={limits.data && <TempLimitSettings data={limits.data} ids={['oil-tank']} />} />
+            'Colour: green inside the limits, amber outside, red far outside',
+          ]} settings={<LimitsNote limits={[settings.limit('oil-tank-temp')]} />} />
         )}
       </DrillDrawer>
     </div>
   );
 }
 
-/** The temperature limits a drill-down's readings are judged by — editable (the user, 31 Oct 2026). */
-function TempLimitSettings({ data, ids }: { data: RmdTempLimits; ids: RmdTempLimits['rows'][number]['limit'][] }) {
-  return (
-    <EquipmentSettings
-      title="Temperature limits"
-      cols={[{ key: 'min', label: 'Min (°C)', dp: 0, step: '1' }, { key: 'max', label: 'Max (°C)', dp: 0, step: '1' }]}
-      rows={data.rows.filter((r) => ids.includes(r.limit)).map((r) => ({
-        id: r.limit, label: r.label, values: { min: r.minC, max: r.maxC },
-        defaults: { min: r.defaults.minC, max: r.defaults.maxC },
-        edited: r.edited, editedAt: r.editedAt, editedBy: r.editedBy,
-      }))}
-      saveUrl={RMD_LIMITS_URL}
-      toBody={(changed) => ({ rows: changed.map((c) => ({ limit: c.id, minC: c.values.min, maxC: c.values.max })) })}
-    />
-  );
+/** A reading's colour against its limit: green inside, amber outside, red far outside; none without a limit. */
+function readingTone(r: RmdReading): Tone | undefined {
+  if (r.status === null) return undefined;
+  return r.severity === 'critical' ? 'v-risk' : r.severity === 'warning' ? 'v-warn' : 'v-ok';
 }
-
-/** v-risk when any reading is outside its limits, v-ok when all with limits are inside; none without limits. */
-function toneOf(rows: RmdReading[]): 'v-ok' | 'v-risk' | undefined {
-  const judged = rows.filter((r) => r.status !== null);
-  if (!judged.length) return undefined;
-  return judged.some((r) => r.status !== 'ok') ? 'v-risk' : 'v-ok';
-}
-const LIMIT_TONE = { ok: 'v-ok', low: 'v-risk', high: 'v-risk' } as const;
+/** A card over several readings: the worst of them; none when no reading has a limit. */
+const readingsTone = (rows: RmdReading[]) => worstTone(rows.map(readingTone));
 
 /** Oil tank level: the reading (inches), the oil in litres and the capacity (no "Full" column — the user, 29 Oct 2026). */
 function TankLevelTable({ rows }: { rows: RmdReading[] }) {
@@ -359,7 +347,7 @@ function TankLevelTable({ rows }: { rows: RmdReading[] }) {
               <tr key={i}>
                 <td><b>{r.equipment}</b></td>
                 <td className="num r">{fixed(r.value, 1)}</td>
-                <td className="num r v-val">{fixed(r.litres ?? null, 0)}</td>
+                <td className={`num r ${readingTone(r) ?? 'v-val'}`}>{fixed(r.litres ?? null, 0)}</td>
                 <td className="num r">{fixed(r.capacityL ?? null, 0)}</td>
                 <td>{r.at}</td>
               </tr>
@@ -375,13 +363,13 @@ function ReadingsTable({ rows, unit, label, max, source, formula, trend, setting
   source: [string, string][] | null; formula: string[] | null;
   /** The readings over time, after the table. */
   trend?: ReactNode;
-  /** The editable limits, between the readings and the source. */
+  /** The limits in use (and a way to Settings), between the readings and the source. */
   settings?: ReactNode;
 }) {
   return (
     <>
       {max && <Stats items={[
-        { label: 'Hottest', value: fixed(max.value, 0), unit, tone: max.status ? LIMIT_TONE[max.status] : undefined },
+        { label: 'Hottest', value: fixed(max.value, 0), unit, tone: readingTone(max) },
         { label: 'At', value: max.equipment, unit: max.point, wrap: true },
       ]} />}
       <div className="pd-table-wrap">
@@ -393,8 +381,8 @@ function ReadingsTable({ rows, unit, label, max, source, formula, trend, setting
               : rows.map((r, i) => (
                 <tr key={i}>
                   <td><b>{r.equipment}</b></td><td>{r.point}</td>
-                  <td className={`num r ${r.status ? LIMIT_TONE[r.status] : 'v-val'}`}>{fixed(r.value, unit === 'in' ? 1 : 0)}</td>
-                  <td className="num r">{r.min === null ? '—' : `${r.min}–${r.max}`}</td>
+                  <td className={`num r ${readingTone(r) ?? 'v-val'}`}>{fixed(r.value, unit === 'in' ? 1 : 0)}</td>
+                  <td className="num r">{r.min === null && r.max === null ? '—' : r.min === null ? `max ${r.max}` : r.max === null ? `min ${r.min}` : `${r.min}–${r.max}`}</td>
                   <td>{r.at}</td>
                 </tr>
               ))}

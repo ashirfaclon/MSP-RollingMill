@@ -9,15 +9,20 @@
  *   Gearbox oil    the same form: oil temperature and oil pressure, the card turns over between them.
  * No Motor current card (no source; removed — the user, 31 Oct 2026); vibration from MID. No mill mimic on RMS
  * (the user, 23 Oct 2026). No VFD trips card on any mill (the user, 28 Oct 2026).
+ * Each reading is coloured against its limit in the mill's Settings (the user, 19 Nov 2026): green
+ * inside, amber outside, red far outside; a card takes the worst of its readings.
  */
 import { useMemo, useState } from 'react';
+import { toneOf, useMillSettings, worstTone } from '@/services/settings';
+import LimitsNote from '@/components/settings/LimitsNote';
+import type { LimitSetting } from '@/services/hsmApi';
 import { midTop, rmsHottest, whenText, withWhere } from './cardWhere';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard from '@/components/visualization/KpiCard';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
-import { rangeUrl, useApi, type RmsDriveReading, type RmsDriveReport, type RmsProductionReport } from '@/services/hsmApi';
+import { rangeUrl, useApi, type RmsDriveReport, type RmsProductionReport } from '@/services/hsmApi';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import FlipKpiCard from './FlipKpiCard';
@@ -58,6 +63,9 @@ export default function RmsAssetHealth() {
     };
   };
   const { bearingC, oilTempC, oilPressure } = figures(drives);
+  const settings = useMillSettings('rms');
+  const limits = { fly: settings.limit('flywheel-temp'), gear: settings.limit('gearbox-bearing-temp'), oilT: settings.limit('oil-temp'), oilP: settings.limit('oil-pressure') };
+  const bearingTone = worstTone((drives?.latest ?? []).flatMap((e) => e.bearings.map((b) => toneOf(b.valueC, bearingLimit(b.component, limits)))));
   const driveLast = useLastEntry<RmsDriveReport>('/api/rms/drive-temp', !!drives && drives.latest.length === 0, drives?.lastDate, dates?.from);
   const trend = useMemo(() => (drives ? rmsBearingPoints(drives.entries) : []), [drives]);
   const [driveOpen, setDriveOpen] = useState(false);
@@ -70,11 +78,12 @@ export default function RmsAssetHealth() {
       {/* No Motor current card: RMS has no source for it (the user, 31 Oct 2026). */}
       <section className="rm-strip ah-strip ah-strip--five" aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+          tone={toneOf(mid.maxMmS, settings.limit('vibration'))}
           /* The machine with the highest reading, and the MID visit it is from (the user, 31 Oct 2026). */
           note="" where={(() => { const t = midTop(mid.machines, mid.date); return t ? { name: t.where, when: `MID · ${midDate(t.date)}` } : null; })()}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title="RMS · mill" mid={mid} />
-        <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" loading={loading}
+        <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" loading={loading} tone={bearingTone}
           noEntries={!!drives && bearingC === null}
           lastEntry={withWhere(lastFigure(bearingC, driveLast, (d) => figures(d).bearingC, (n) => fixed(n, 0)), driveLast.data ? rmsHottest(driveLast.data.latest) : null)}
           where={(() => { const h = rmsHottest(drives?.latest ?? []); return h ? { name: h.where, when: whenText(h) } : null; })()} {...opener} />
@@ -83,12 +92,12 @@ export default function RmsAssetHealth() {
           label="Gearbox oil"
           series="hold"
           faces={[
-            { id: 'temp', label: 'Temp', title: 'The hottest gearbox oil (°C)', card: { value: oilTempC === null ? 'NA' : fixed(oilTempC, 1), unit: '°C', loading, noEntries: !!drives && oilTempC === null, lastEntry: lastFigure(oilTempC, driveLast, (d) => figures(d).oilTempC, (n) => fixed(n, 1)) } },
-            { id: 'pressure', label: 'Pressure', title: 'The lowest gearbox oil pressure (kg/cm², as filled)', card: { value: oilPressure === null ? 'NA' : fixed(oilPressure, 1), unit: 'kg/cm²', loading, noEntries: !!drives && oilPressure === null, lastEntry: lastFigure(oilPressure, driveLast, (d) => figures(d).oilPressure, (n) => fixed(n, 1)) } },
+            { id: 'temp', label: 'Temp', title: 'The hottest gearbox oil (°C)', card: { value: oilTempC === null ? 'NA' : fixed(oilTempC, 1), unit: '°C', loading, tone: toneOf(oilTempC, limits.oilT), noEntries: !!drives && oilTempC === null, lastEntry: lastFigure(oilTempC, driveLast, (d) => figures(d).oilTempC, (n) => fixed(n, 1)) } },
+            { id: 'pressure', label: 'Pressure', title: 'The lowest gearbox oil pressure (kg/cm², as filled)', card: { value: oilPressure === null ? 'NA' : fixed(oilPressure, 1), unit: 'kg/cm²', loading, tone: toneOf(oilPressure, limits.oilP), noEntries: !!drives && oilPressure === null, lastEntry: lastFigure(oilPressure, driveLast, (d) => figures(d).oilPressure, (n) => fixed(n, 1)) } },
           ]}
           {...opener}
         />
-        <RmsDriveDrawer open={driveOpen} onClose={() => setDriveOpen(false)} report={drives} loading={loading} error={driveS.error} />
+        <RmsDriveDrawer open={driveOpen} onClose={() => setDriveOpen(false)} report={drives} loading={loading} error={driveS.error} limits={limits} />
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod" loading={!prodS.data && !prodS.error}
           noEntries={!!prodS.data && prodS.dataUrl === url && runH == null}
           lastEntry={lastFigure(runH, prodLast, (d) => d.totals.runningHrs, (n) => fixed(n, 1))} />
@@ -119,10 +128,15 @@ export default function RmsAssetHealth() {
   );
 }
 
-/** Each drive at its latest reading: every bearing, hottest first, and the gearbox oil. */
-function RmsDriveDrawer({ open, onClose, report, loading, error }: { open: boolean; onClose: () => void; report: RmsDriveReport | null; loading: boolean; error: string | null }) {
+type RmsLimits = { fly: LimitSetting | null; gear: LimitSetting | null; oilT: LimitSetting | null; oilP: LimitSetting | null };
+/** A bearing's limit: the flywheel's, or the gearbox bearings' (reduction gearboxes, pinion). */
+const bearingLimit = (component: string, l: RmsLimits) => (component === 'Flywheel' ? l.fly : l.gear);
+
+/** Each drive at its latest reading: every bearing, hottest first, and the gearbox oil — each coloured against its limit. */
+function RmsDriveDrawer({ open, onClose, report, loading, error, limits }: {
+  open: boolean; onClose: () => void; report: RmsDriveReport | null; loading: boolean; error: string | null; limits: RmsLimits;
+}) {
   const latest = report?.latest ?? [];
-  const hottest = (e: RmsDriveReading) => (e.bearings.length ? Math.max(...e.bearings.map((b) => b.valueC)) : null);
   return (
     <DrillDrawer open={open} onClose={onClose} title="Drive temperatures" sub="RMS · °C" loading={loading} error={error} hasData={!!report}>
       {report && (
@@ -141,17 +155,18 @@ function RmsDriveDrawer({ open, onClose, report, loading, error }: { open: boole
                   {[...e.bearings].sort((a, b) => b.valueC - a.valueC).map((b) => (
                     <tr key={`${b.component} ${b.point}`}>
                       <td><b>{b.component}</b></td><td>{b.point}</td>
-                      <td className={`num r ${b.valueC === hottest(e) ? 'v-warn' : 'v-val'}`}>{fixed(b.valueC, 1)}</td>
+                      <td className={`num r ${toneOf(b.valueC, bearingLimit(b.component, limits)) ?? 'v-val'}`}>{fixed(b.valueC, 1)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr><td><b>Gearbox oil</b></td><td>Temperature</td><td className="num r">{e.oilTempC === null ? '—' : fixed(e.oilTempC, 1)}</td></tr>
-                  <tr><td /><td>Pressure (kg/cm², as filled)</td><td className="num r">{e.oilPressure === null ? '—' : fixed(e.oilPressure, 1)}</td></tr>
+                  <tr><td><b>Gearbox oil</b></td><td>Temperature</td><td className={`num r ${toneOf(e.oilTempC, limits.oilT) ?? ''}`}>{e.oilTempC === null ? '—' : fixed(e.oilTempC, 1)}</td></tr>
+                  <tr><td /><td>Pressure (kg/cm², as filled)</td><td className={`num r ${toneOf(e.oilPressure, limits.oilP) ?? ''}`}>{e.oilPressure === null ? '—' : fixed(e.oilPressure, 1)}</td></tr>
                 </tfoot>
               </table>
             </div>
           ))}
+          <LimitsNote limits={[limits.gear, limits.fly, limits.oilT, limits.oilP]} />
           <SourceBox
             sources={[{ name: 'Logbook', rows: [['Form', 'Rolling Mill Structure (RMS) → RMS Mechanical → Drive Temp'], ['Day', 'RMS mill day, 09:30 → 09:30 IST, from the form\'s date-time']] }]}
             formula={['Bearing temp card = the hottest bearing at each drive\'s latest reading', 'Gearbox oil = the hottest oil temperature / the lowest oil pressure at those readings']}

@@ -12,16 +12,19 @@
  * Each form has two dates (the user, 16 Oct 2026): "Date" is the day the readings are for — it
  * places the entry; "Time" is when the form was filled — it only orders two entries of one day.
  *
- * Limits (the plant, 16 Oct 2026): bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature
- * 45–65 °C. A reading outside them is "low" or "high". Oil tank level has no limits yet.
+ * Limits: the plant settings in use (modules/settings — the plant's 16 Oct 2026 figures by default:
+ * bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature 45–65 °C; oil tank level a placeholder
+ * minimum, % of capacity). A reading outside them is "low" or "high", a warning or critical.
  *
  * Each request reads the forms fresh from the logbook (one call per form, shared for 30 s), so
  * an entry deleted or corrected there is gone or changed on the next refresh. Entries are typed
  * late, so the read takes everything submitted from a month before the period.
  */
 import type { Env } from '../../config/env';
-import { RMD_OIL_TANK_DEFAULTS, RMD_TEMP_LIMIT_DEFAULTS } from '../../config/equipment';
-import { capacityL, rmdTankSizes, rmdTempLimitsInUse, type TankSize, type TempLimits } from '../forms-db/equipment.store';
+import { RMD_OIL_TANK_DEFAULTS } from '../../config/equipment';
+import { capacityL, rmdTankSizes, type TankSize } from '../forms-db/equipment.store';
+import { judge, limitsInUse, limitsOf } from '../settings/settings.store';
+import type { LimitSetting } from '../../contracts';
 import type { RmdAssetForms, RmdBearingGroup, RmdOilGroup, RmdReading } from '../../contracts';
 import { fetchFormsEntries, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
@@ -72,16 +75,24 @@ export function tankLitres(stem: string, inches: number, sizes: Map<string, Tank
   return { litres: Math.round(inches * INCH_M * s.lengthM * s.widthM * 1000), capacityL: capacityL(s) };
 }
 
-/** The default limits, °C (config/equipment.ts); the limits in use come from the Equipment settings store. */
-export const DEFAULT_LIMITS = Object.fromEntries(RMD_TEMP_LIMIT_DEFAULTS.map((l) => [l.limit, [l.minC, l.maxC] as const])) as TempLimits;
+/** A limit as a reading is judged by it. */
+type Band = Pick<LimitSetting, 'min' | 'max' | 'critical'>;
+/** The RMD limits these forms are judged by (plant settings ids). */
+export interface RmdLimits { bearing: Band | null; flywheel: Band | null; oilTemp: Band | null; oilLevelPct: Band | null }
+const rmdLimitsOf = (byId: Map<string, LimitSetting>): RmdLimits => ({
+  bearing: byId.get('bearing-temp') ?? null, flywheel: byId.get('flywheel-temp') ?? null,
+  oilTemp: byId.get('oil-tank-temp') ?? null, oilLevelPct: byId.get('oil-tank-level') ?? null,
+});
+/** The shipped defaults (config/limits.ts), for a caller without the settings store. */
+export const DEFAULT_LIMITS: RmdLimits = rmdLimitsOf(new Map(limitsOf({ version: 1, updatedAt: null, updatedBy: null, limits: {} }, 'rmd').map((l) => [l.id, l])));
 
-/** A reading with its limits and where it falls. */
-export function withLimits(r: Omit<RmdReading, 'min' | 'max' | 'status'>, limits: readonly [number, number] | null): RmdReading {
-  if (!limits) return { ...r, min: null, max: null, status: null };
-  const [min, max] = limits;
-  return { ...r, min, max, status: r.value < min ? 'low' : r.value > max ? 'high' : 'ok' };
+/** A reading with its limits and where it falls; `judged` is the figure the limit is for (oil level: % of capacity). */
+export function withLimits(r: Omit<RmdReading, 'min' | 'max' | 'status' | 'severity'>, limit: Band | null, judged = r.value): RmdReading {
+  const j = judge(judged, limit);
+  if (!limit || !j) return { ...r, min: null, max: null, status: null, severity: null };
+  return { ...r, min: limit.min, max: limit.max, status: j.status, severity: j.severity };
 }
-const bearingLimits = (point: string, limits: TempLimits) => (point.startsWith('Flywheel') ? limits.flywheel : limits.bearing);
+const bearingLimits = (point: string, limits: RmdLimits) => (point.startsWith('Flywheel') ? limits.flywheel : limits.bearing);
 
 interface Entry { form: string; date: string; time: string | null; createdMs: number; res: Record<string, unknown> }
 
@@ -105,7 +116,7 @@ const later = (a: Entry, b: Entry) =>
   a.date !== b.date ? a.date > b.date : (a.time ?? '') !== (b.time ?? '') ? (a.time ?? '') > (b.time ?? '') : a.createdMs > b.createdMs;
 const order = (a: Entry, b: Entry) => (later(a, b) ? 1 : later(b, a) ? -1 : 0);
 
-export function bearingGroup(entries: Entry[], group: AssetGroup, limits: TempLimits = DEFAULT_LIMITS): Omit<RmdBearingGroup, 'lastDate'> {
+export function bearingGroup(entries: Entry[], group: AssetGroup, limits: RmdLimits = DEFAULT_LIMITS): Omit<RmdBearingGroup, 'lastDate'> {
   const mine = entries.filter((e) => BEARING_FORMS[e.form]?.group === group);
   // Per form, the latest entry; the group's latest reading is all of those together.
   const latestByForm = new Map<string, Entry>();
@@ -131,7 +142,7 @@ export function bearingGroup(entries: Entry[], group: AssetGroup, limits: TempLi
   return { latest, max, trend, history, entries: mine.length };
 }
 
-export function oilGroup(entries: Entry[], group: AssetGroup, sizes: Map<string, TankSize> = DEFAULT_TANK_SIZES, limits: TempLimits = DEFAULT_LIMITS): Omit<RmdOilGroup, 'levelLastDate' | 'temperatureLastDate'> {
+export function oilGroup(entries: Entry[], group: AssetGroup, sizes: Map<string, TankSize> = DEFAULT_TANK_SIZES, limits: RmdLimits = DEFAULT_LIMITS): Omit<RmdOilGroup, 'levelLastDate' | 'temperatureLastDate'> {
   const tanks = TANKS.filter(([, g]) => g === group);
   const latest = (form: string) => entries.filter((e) => e.form === form)
     .reduce<Entry | null>((m, e) => (m === null || later(e, m) ? e : m), null);
@@ -139,11 +150,14 @@ export function oilGroup(entries: Entry[], group: AssetGroup, sizes: Map<string,
   const tp = latest('oil-tank-temperature');
   const level = lv ? tanks.flatMap(([stem, , label]) => {
     const v = num(lv.res[stem]);
-    return v === null ? [] : [{ ...withLimits({ equipment: label, point: 'Level', value: v, at: lv.date }, null), ...tankLitres(stem, v, sizes) }];
+    if (v === null) return [];
+    const l = tankLitres(stem, v, sizes);
+    // The level's limit is a share of the tank's capacity.
+    return [{ ...withLimits({ equipment: label, point: 'Level', value: v, at: lv.date }, limits.oilLevelPct, (l.litres / l.capacityL) * 100), ...l }];
   }) : [];
   const temperature = tp ? tanks.flatMap(([stem, , label]) => {
     const v = num(tp.res[`${stem}-c`]);
-    return v === null ? [] : [withLimits({ equipment: label, point: 'Temperature', value: v, at: tp.date }, limits['oil-tank'])];
+    return v === null ? [] : [withLimits({ equipment: label, point: 'Temperature', value: v, at: tp.date }, limits.oilTemp)];
   }) : [];
   // Tanks differ in size: the lowest is the one with the least oil against its capacity.
   const fill = (r: RmdReading) => r.litres! / r.capacityL!;
@@ -176,9 +190,9 @@ export async function rmdAssetForms(env: Env, from: string, to: string): Promise
   const startMs = Date.parse(`${from}T00:00:00+05:30`);
   const [read, sizes, limits] = await Promise.all([
     fetchFormsEntries(TAGS, startMs - LOOK_BACK_MS, env),
-    // The tank sizes and temperature limits in use: the defaults with any edit made on the dashboard.
+    // The tank sizes and limits in use: the defaults with any edit made on the dashboard.
     rmdTankSizes(env).catch(() => DEFAULT_TANK_SIZES),
-    rmdTempLimitsInUse(env).catch(() => DEFAULT_LIMITS),
+    limitsInUse(env, 'rmd').then(rmdLimitsOf).catch(() => DEFAULT_LIMITS),
   ]);
   const rows = read.ok ? read.rows.map(toEntry).filter((e): e is Entry => e !== null) : [];
   const inPeriod = rows.filter((e) => e.date >= from && e.date <= to);

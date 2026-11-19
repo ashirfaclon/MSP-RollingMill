@@ -14,8 +14,12 @@
  *   Run hours      ERP log sheet NET_RUNNING_HRS over the period.
  * The sheet maps no drive to a mill section, so the figures cover every drive. No mill mimic on
  * LSM (the user, 23 Oct 2026). Vibration from MID; PM items on ERP PM.
+ * Each reading is coloured against its limit in the mill's Settings (the user, 19 Nov 2026): green
+ * inside, amber outside, red far outside; a card takes the worst of its readings.
  */
 import { useMemo, useState } from 'react';
+import { toneOf, useMillSettings, worstTone } from '@/services/settings';
+import LimitsNote from '@/components/settings/LimitsNote';
 import { lsmHottest, midTop, whenText, withWhere } from './cardWhere';
 import BearingTrendAll, { lsmBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
@@ -78,6 +82,15 @@ export default function LsmAssetHealth() {
   };
   const latest = drives?.latest ?? [];
   const { bearingC, levelIn, pressure } = figures(drives);
+  // The limits in use: flywheel bearings, the gearbox bearings (reduction, pinion), oil level and pressure, pass current.
+  const settings = useMillSettings('lsm');
+  const flyL = settings.limit('flywheel-temp'), gearL = settings.limit('gearbox-bearing-temp');
+  const bearingTones = (e: LsmDriveReading) => [
+    toneOf(e.flywheelDeC, flyL), toneOf(e.flywheelNdeC, flyL),
+    toneOf(e.reductionDeC, gearL), toneOf(e.reductionNdeC, gearL), toneOf(e.pinionDeC, gearL), toneOf(e.pinionNdeC, gearL),
+  ];
+  const bearingTone = worstTone(latest.flatMap(bearingTones));
+  const currentTone = worstTone((load?.latest?.passes ?? []).map((p) => toneOf(p.loadA, settings.limit('motor-current'))));
   /* Nothing filled in the period: the last day each form has (the user, 30 Oct 2026). */
   const driveLast = useLastEntry<LsmDriveReport>('/api/lsm/drive-temp', !!drives && drives.latest.length === 0, drives?.lastDate, dates?.from);
   const loadLast = useLastEntry<LsmMillLoadReport>('/api/lsm/mill-load', !!load && currentA === null, load?.lastDate, dates?.from);
@@ -90,14 +103,15 @@ export default function LsmAssetHealth() {
       {/* No "Selected asset" panel: last inspection is on the Vibration card, next PM and open work orders in ERP PM (the user, 31 Oct 2026). */}
       <section className="rm-strip ah-strip" aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
+          tone={toneOf(mid.maxMmS, settings.limit('vibration'))}
           /* The machine with the highest reading, and the MID visit it is from (the user, 31 Oct 2026). */
           note="" where={(() => { const t = midTop(mid.machines, mid.date); return t ? { name: t.where, when: `MID · ${midDate(t.date)}` } : null; })()}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title="LSM · mill" mid={mid} />
-        <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" noEntries={!!drives && bearingC === null}
+        <KpiCard label="Bearing temp" value={bearingC === null ? 'NA' : fixed(bearingC, 0)} unit="°C" note="" series="hold" noEntries={!!drives && bearingC === null} tone={bearingTone}
           lastEntry={withWhere(lastFigure(bearingC, driveLast, (d) => figures(d).bearingC, (n) => fixed(n, 0)), driveLast.data ? lsmHottest(driveLast.data.latest) : null)}
           where={(() => { const h = lsmHottest(latest); return h ? { name: h.where, when: whenText(h) } : null; })()} {...opener} />
-        <KpiCard label="Motor current" value={currentA === null ? 'NA' : fixed(currentA, 0)} unit="A" note="" series="prod" noEntries={!!load && currentA === null}
+        <KpiCard label="Motor current" value={currentA === null ? 'NA' : fixed(currentA, 0)} unit="A" note="" series="prod" noEntries={!!load && currentA === null} tone={currentTone}
           lastEntry={lastFigure(currentA, loadLast, (d) => d.latest?.meanA, (n) => fixed(n, 0))}
           {...(load ? { onOpen: () => setLoadOpen(true), openLabel: 'Each stand and pass: load at the latest reading' } : {})} />
         <LsmMillLoadDrawer open={loadOpen} onClose={() => setLoadOpen(false)} report={load} loading={!loadS.data && !loadS.error} error={loadS.error} />
@@ -106,8 +120,8 @@ export default function LsmAssetHealth() {
           label="Gearbox oil"
           series="hold"
           faces={[
-            { id: 'level', label: 'Level', title: 'The lowest oil level (inches, as filled)', card: { value: levelIn === null ? 'NA' : fixed(levelIn, 1), unit: 'in', noEntries: !!drives && levelIn === null, lastEntry: lastFigure(levelIn, driveLast, (d) => figures(d).levelIn, (n) => fixed(n, 1)) } },
-            { id: 'pressure', label: 'Pressure', title: 'The lowest oil pressure (kg/cm²)', card: { value: pressure === null ? 'NA' : fixed(pressure, 1), unit: 'kg/cm²', noEntries: !!drives && pressure === null, lastEntry: lastFigure(pressure, driveLast, (d) => figures(d).pressure, (n) => fixed(n, 1)) } },
+            { id: 'level', label: 'Level', title: 'The lowest oil level (inches, as filled)', card: { value: levelIn === null ? 'NA' : fixed(levelIn, 1), unit: 'in', tone: toneOf(levelIn, settings.limit('oil-level')), noEntries: !!drives && levelIn === null, lastEntry: lastFigure(levelIn, driveLast, (d) => figures(d).levelIn, (n) => fixed(n, 1)) } },
+            { id: 'pressure', label: 'Pressure', title: 'The lowest oil pressure (kg/cm²)', card: { value: pressure === null ? 'NA' : fixed(pressure, 1), unit: 'kg/cm²', tone: toneOf(pressure, settings.limit('oil-pressure')), noEntries: !!drives && pressure === null, lastEntry: lastFigure(pressure, driveLast, (d) => figures(d).pressure, (n) => fixed(n, 1)) } },
           ]}
           {...opener}
         />
@@ -142,9 +156,9 @@ export default function LsmAssetHealth() {
         {drives && (
           <>
             <Stats items={[
-              { label: 'Hottest bearing', value: bearingC === null ? 'NA' : fixed(bearingC, 0), unit: '°C', tone: bearingC === null ? 'v-na' : undefined },
-              { label: 'Lowest oil level', value: levelIn === null ? 'NA' : fixed(levelIn, 1), unit: 'in', tone: levelIn === null ? 'v-na' : undefined },
-              { label: 'Lowest oil pressure', value: pressure === null ? 'NA' : fixed(pressure, 1), unit: 'kg/cm²', tone: pressure === null ? 'v-na' : undefined },
+              { label: 'Hottest bearing', value: bearingC === null ? 'NA' : fixed(bearingC, 0), unit: '°C', tone: bearingC === null ? 'v-na' : bearingTone },
+              { label: 'Lowest oil level', value: levelIn === null ? 'NA' : fixed(levelIn, 1), unit: 'in', tone: levelIn === null ? 'v-na' : toneOf(levelIn, settings.limit('oil-level')) },
+              { label: 'Lowest oil pressure', value: pressure === null ? 'NA' : fixed(pressure, 1), unit: 'kg/cm²', tone: pressure === null ? 'v-na' : toneOf(pressure, settings.limit('oil-pressure')) },
             ]} />
             <h3 className="rm-k">Bearing temperature · °C</h3>
             <div className="pd-table-wrap">
@@ -163,7 +177,7 @@ export default function LsmAssetHealth() {
                     : latest.map((e) => (
                       <tr key={e.drive}>
                         <td><b>{e.drive || '—'}</b></td>
-                        {[e.flywheelDeC, e.flywheelNdeC, e.reductionDeC, e.reductionNdeC, e.pinionDeC, e.pinionNdeC].map((v, i) => <td key={i} className="num r">{c0(v)}</td>)}
+                        {[e.flywheelDeC, e.flywheelNdeC, e.reductionDeC, e.reductionNdeC, e.pinionDeC, e.pinionNdeC].map((v, i) => <td key={i} className={`num r ${bearingTones(e)[i] ?? ''}`}>{c0(v)}</td>)}
                       </tr>
                     ))}
                 </tbody>
@@ -179,14 +193,15 @@ export default function LsmAssetHealth() {
                     : latest.map((e) => (
                       <tr key={e.drive}>
                         <td><b>{e.drive || '—'}</b></td>
-                        <td className="num r">{e.oilLevelIn === null ? '—' : fixed(e.oilLevelIn, 1)}</td>
-                        <td className="num r">{e.oilPressure === null ? '—' : fixed(e.oilPressure, 1)}</td>
+                        <td className={`num r ${toneOf(e.oilLevelIn, settings.limit('oil-level')) ?? ''}`}>{e.oilLevelIn === null ? '—' : fixed(e.oilLevelIn, 1)}</td>
+                        <td className={`num r ${toneOf(e.oilPressure, settings.limit('oil-pressure')) ?? ''}`}>{e.oilPressure === null ? '—' : fixed(e.oilPressure, 1)}</td>
                         <td>{time(e.at)} · {e.shift}</td>
                       </tr>
                     ))}
                 </tbody>
               </table>
             </div>
+            <LimitsNote limits={[flyL, gearL, settings.limit('oil-level'), settings.limit('oil-pressure')]} />
             <SourceBox
               sources={[{ name: 'Logbook', rows: [
                 ['Form', 'Light Structure Mill → LSM Mechanical → Drive Temp'],

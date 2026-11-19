@@ -254,11 +254,13 @@ export interface RmdReading {
   value: number;
   /** The entry's Date: the day the readings are for (YYYY-MM-DD). */
   at: string;
-  /** The plant's limits for this reading (°C); null where none is given (oil level). */
+  /** The limits in use for this reading (plant settings; oil level: % of capacity); null where none is set. */
   min: number | null;
   max: number | null;
   /** Inside the limits, below or above them; null without limits. */
   status: 'ok' | 'low' | 'high' | null;
+  /** Outside: a warning, or critical when far outside (settings `critical`); null when inside or without limits. */
+  severity: 'warning' | 'critical' | null;
   /** Oil tank level only: the oil in the tank, L (level × inside length × width), and the tank's capacity, L. */
   litres?: number;
   capacityL?: number;

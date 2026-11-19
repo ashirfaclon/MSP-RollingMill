@@ -53,15 +53,19 @@ describe('RMD bearing and oil groups', () => {
     expect(tankLitres('new-continuous-stand-7-8', 1)).toEqual({ litres: 27, capacityL: 932 });   // 27.2 L an inch
   });
 
-  test('limits: bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature 45–65 °C; level none', () => {
-    const g = bearingGroup(entries, 'route');   // intermill flywheel D side 90 °C
-    expect(g.latest[0]).toMatchObject({ point: 'Flywheel D side', value: 90, min: 45, max: 80, status: 'high' });
+  test('limits: bearings 45–65 °C, flywheel 45–80 °C, oil tank temperature 45–65 °C; level a minimum % of capacity', () => {
+    const g = bearingGroup(entries, 'route');   // intermill flywheel D side 90 °C: outside, not a full band width (35) past
+    expect(g.latest[0]).toMatchObject({ point: 'Flywheel D side', value: 90, min: 45, max: 80, status: 'high', severity: 'warning' });
     const r = bearingGroup(entries, 'roughing').latest;
     expect(r.find((x) => x.point === 'Reduction gear ND side')).toMatchObject({ value: 63, max: 65, status: 'ok' });
     const o = oilGroup(entries, 'roughing');
     expect(o.temperature.map((x) => x.status)).toEqual(['low', 'low']);   // 41, 43 °C < 45
-    expect(o.level[0]).toMatchObject({ min: null, max: null, status: null });
-    expect(withLimits({ equipment: 'x', point: 'Flywheel ND side', value: 79, at: '' }, [45, 80]).status).toBe('ok');
+    expect(o.level[0]).toMatchObject({ min: 25, max: null });
+    const band = { min: 45, max: 80, critical: { below: 10, above: 115 } };
+    expect(withLimits({ equipment: 'x', point: 'Flywheel ND side', value: 79, at: '' }, band)).toMatchObject({ status: 'ok', severity: null });
+    expect(withLimits({ equipment: 'x', point: 'Flywheel ND side', value: 120, at: '' }, band)).toMatchObject({ status: 'high', severity: 'critical' });
+    // The level is judged as a share of the tank's capacity, not in inches.
+    expect(withLimits({ equipment: 'x', point: 'Level', value: 5, at: '' }, { min: 25, max: null, critical: { below: 21.25, above: null } }, 30).status).toBe('ok');
   });
 
   test('the Date places an entry; Time (when filled) only orders two entries of one Date', () => {
