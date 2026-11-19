@@ -44,3 +44,18 @@ table.grid.set-table td, table.grid.set-table th { white-space: normal; }
 .set-note { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: var(--radius-sm); }
 .set-note ul { margin: 0; padding: 0; list-style: none; font-size: 12px; display: flex; flex-direction: column; gap: 2px; }
 .set-note-src { color: var(--muted-2); font-size: 11px; }
+
+/* The tabs: Limits | Alerts. */
+.set-tabs { flex: none; }
+
+/* The Alerts tab: one compact box per setting; a blank box shows what it inherits, greyed. */
+.al-set-table { table-layout: auto; }
+.al-set-table th { white-space: normal; font-size: 10.5px; line-height: 1.25; vertical-align: bottom; }
+.al-set-table .al-c-rule { width: 30%; }
+.al-in { width: 100%; min-width: 58px; max-width: 104px; text-align: left; font-weight: 600; }
+.al-in::placeholder { color: var(--muted-3); font-weight: 500; }
+select.al-in { padding-right: 2px; }
+select.al-in:has(option[value=""]:checked) { color: var(--muted-2); font-weight: 500; }
+.al-in--edited { border-color: var(--info); }
+/* An alert with no limit can't raise: its settings wait, quietly. */
+.al-set-off td:not(.al-c-rule) { opacity: 0.6; }

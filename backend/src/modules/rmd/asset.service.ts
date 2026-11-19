@@ -216,4 +216,54 @@ export async function rmdAssetForms(env: Env, from: string, to: string): Promise
   };
 }
 
+/** One reading for the alert checker: which limit judges it, the asset and point, and when. */
+export interface RmdAlertReading { limitId: string; asset: string; point: string; value: number; day: string; at: string; source: 'bearings' | 'oil-temp' | 'oil-level' }
+
+/**
+ * Every reading of the period, as the alert checker reads them (modules/alerts): each bearing (flywheel
+ * points by the flywheel limit, the rest by the bearing limit), each tank's temperature, and each tank's
+ * level as % of its capacity — the figures Asset Health judges. With each form's last Date up to `to`.
+ */
+export async function rmdAlertReadings(env: Env, from: string, to: string) {
+  const startMs = Date.parse(`${from}T00:00:00+05:30`);
+  const [read, sizes] = await Promise.all([
+    fetchFormsEntries(TAGS, startMs - LOOK_BACK_MS, env),
+    rmdTankSizes(env).catch(() => DEFAULT_TANK_SIZES),
+  ]);
+  const rows = read.ok ? read.rows.map(toEntry).filter((e): e is Entry => e !== null) : [];
+  const readings: RmdAlertReading[] = [];
+  for (const e of [...rows].sort(order)) {
+    if (e.date < from || e.date > to) continue;
+    const at = `${e.date} ${e.time ?? ''}`.trim();
+    if (BEARING_FORMS[e.form]) {
+      for (const [field, v] of Object.entries(e.res)) {
+        const b = bearingOf(e.form, field); const c = num(v);
+        if (b && c !== null) readings.push({ limitId: b.point.startsWith('Flywheel') ? 'flywheel-temp' : 'bearing-temp', asset: b.equipment, point: b.point, value: c, day: e.date, at, source: 'bearings' });
+      }
+    } else if (e.form === 'oil-tank-temperature') {
+      for (const [stem, , label] of TANKS) {
+        const c = num(e.res[`${stem}-c`]);
+        if (c !== null) readings.push({ limitId: 'oil-tank-temp', asset: label, point: 'Temperature', value: c, day: e.date, at, source: 'oil-temp' });
+      }
+    } else if (e.form === 'oil-tank-level') {
+      for (const [stem, , label] of TANKS) {
+        const v = num(e.res[stem]);
+        if (v === null) continue;
+        const l = tankLitres(stem, v, sizes);
+        readings.push({ limitId: 'oil-tank-level', asset: label, point: 'Level', value: Math.round((l.litres / l.capacityL) * 1000) / 10, day: e.date, at, source: 'oil-level' });
+      }
+    }
+  }
+  let last = lastDates(rows, to);
+  if (read.ok && Object.values(last).some((k) => Object.values(k).some((d) => d === null))) {
+    const older = await fetchFormsEntries(TAGS, startMs - LAST_ENTRY_LOOK_BACK_MS, env).catch(() => null);
+    if (older?.ok) last = lastDates(older.rows.map(toEntry).filter((e): e is Entry => e !== null), to);
+  }
+  const newest = (kind: Kind) => [last.roughing[kind], last.route[kind]].reduce<string | null>((a, d) => (d !== null && (a === null || d > a) ? d : a), null);
+  return {
+    ok: read.ok, message: read.ok ? MSG.LOGBOOK_UP : read.message, readings,
+    lastDate: { bearings: newest('bearing'), 'oil-temp': newest('temperature'), 'oil-level': newest('level') },
+  };
+}
+
 export type { Entry as RmdFormEntry };

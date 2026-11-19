@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import DateRangePicker from './DateRangePicker';
 import SettingsDrawer from '@/components/settings/SettingsDrawer';
-import { OPEN_SETTINGS_EVENT } from '@/services/settings';
+import { OPEN_SETTINGS_EVENT, type OpenSettings } from '@/services/settings';
 import MillPicker from './MillPicker';
 import { millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
 import { RMD_MODE_LABELS, isDefaultFilter, resetFilters, setGlobalSel, useGlobalSel, type RmdModeSel, type ThemeSel } from '@/state/globalSel';
@@ -18,10 +18,12 @@ import './topbar.css';
 export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenId }) {
   const sel = useGlobalSel();
   const s = screenOf(screen);
-  // The Settings screen: from the button, or a drill-down's "Edit limits" (at that limit).
-  const [settings, setSettings] = useState<{ focus: string | null } | null>(null);
+  // The Settings screen: from the button, a drill-down's "Edit limits" (at that limit), or the Alerts page (at that alert).
+  const [settings, setSettings] = useState<OpenSettings | null>(null);
+  // The Alerts page is about now: no period, no rolling.
+  const dated = screen !== 'alerts';
   useEffect(() => {
-    const open = (e: Event) => setSettings({ focus: (e as CustomEvent<string | null>).detail ?? null });
+    const open = (e: Event) => setSettings((e as CustomEvent<OpenSettings>).detail);
     window.addEventListener(OPEN_SETTINGS_EVENT, open);
     return () => window.removeEventListener(OPEN_SETTINGS_EVENT, open);
   }, []);
@@ -43,7 +45,7 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
         <MillPicker mill={mill} screen={screen} />
 
         {/* RMD: the ERP figures for Online, Offline or both rollings (the user, 13 Nov 2026). */}
-        {mill === 'rmd' && (
+        {mill === 'rmd' && dated && (
           <div className="tb-seg" role="group" aria-label="Rolling">
             {(['all', 'online', 'offline'] as RmdModeSel[]).map((m) => (
               <button
@@ -59,20 +61,22 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
           </div>
         )}
 
-        <DateRangePicker />
+        {dated && <DateRangePicker />}
         {/* Back to the default filter (Today); disabled when already there. */}
-        <button
-          type="button"
-          className="tb-reset"
-          onClick={resetFilters}
-          disabled={isDefaultFilter(sel)}
-          title="Reset the filters"
-        >
-          <ResetGlyph />
-          Reset
-        </button>
+        {dated && (
+          <button
+            type="button"
+            className="tb-reset"
+            onClick={resetFilters}
+            disabled={isDefaultFilter(sel)}
+            title="Reset the filters"
+          >
+            <ResetGlyph />
+            Reset
+          </button>
+        )}
 
-        <button type="button" className="tb-reset tb-settings" onClick={() => setSettings({ focus: null })} title="The limits this mill's readings are judged by">
+        <button type="button" className="tb-reset tb-settings" onClick={() => setSettings({ tab: screen === 'alerts' ? 'alerts' : 'limits', focus: null })} title="The limits this mill's readings are judged by, and when its alerts notify">
           <GearGlyph />
           Settings
         </button>
@@ -93,7 +97,7 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
         </div>
       </div>
       {/* Mounted only while open, and anew per mill: a draft never outlives the drawer or crosses mills. */}
-      {settings && <SettingsDrawer key={mill} mill={mill} focusId={settings.focus} onClose={() => setSettings(null)} />}
+      {settings && <SettingsDrawer key={mill} mill={mill} tab={settings.tab} focusId={settings.focus} onClose={() => setSettings(null)} />}
     </header>
   );
 }

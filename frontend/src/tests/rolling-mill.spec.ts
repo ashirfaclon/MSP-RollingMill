@@ -58,18 +58,18 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   await page.screenshot({ path: `${SHOTS}/hsm-visualization-dark.png`, fullPage: true });
 });
 
-test('the sidebar: every mill has Visualization, Asset Health and Condition Analytics', async ({ page }) => {
+test('the sidebar: every mill has Visualization, Asset Health, Condition Analytics and Alerts', async ({ page }) => {
   await page.goto('/hsm/visualization');
   const nav = page.getByRole('navigation', { name: 'Dashboard screens' });
-  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/]);
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/, /Alerts/]);
   await expect(nav.getByRole('link', { name: /Visualization/ })).toHaveAttribute('aria-current', 'page');
   await page.goto('/rmd/visualization');
-  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/]);
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/, /Alerts/]);
   await page.goto('/lsm/visualization');
-  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/]);
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/, /Alerts/]);
   await page.goto('/rms/visualization');
-  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/]);
-  for (const there of ['/lsm/condition-analytics', '/rms/condition-analytics', '/rms/asset-health']) {
+  await expect(nav.getByRole('link')).toHaveText([/Visualization/, /Asset Health/, /Condition Analytics/, /Alerts/]);
+  for (const there of ['/lsm/condition-analytics', '/rms/condition-analytics', '/rms/asset-health', '/hsm/alerts', '/rms/alerts']) {
     expect((await page.request.get(there)).status()).toBe(200);
   }
 });

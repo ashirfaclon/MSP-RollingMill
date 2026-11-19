@@ -18,6 +18,7 @@ import { pmRoutes } from './modules/pm/pm.routes';
 import { formsDbRoutes } from './modules/forms-db/forms-db.routes';
 import { caRoutes } from './modules/ca/ca.routes';
 import { settingsRoutes } from './modules/settings/settings.routes';
+import { alertsRoutes } from './modules/alerts/alerts.routes';
 import { sourcesRoutes } from './modules/sources/sources.routes';
 import { systemRoutes, type Lifecycle } from './modules/system/system.routes';
 
@@ -66,6 +67,7 @@ export async function buildApp({ config, lifecycle = { shuttingDown: false } }: 
     await api.register(formsDbRoutes, { prefix: '/forms' });
     await api.register(caRoutes, { prefix: '/ca' });
     await api.register(settingsRoutes, { prefix: '/settings' });
+    await api.register(alertsRoutes, { prefix: '/alerts' });
   }, { prefix: '/api' });
 
   return app;

@@ -123,3 +123,20 @@ export const LIMIT_DEFAULTS: Record<LimitMill, readonly LimitDef[]> = {
 
 /** One mill's default, or undefined for an id the mill does not have. */
 export const limitDef = (mill: LimitMill, id: string) => LIMIT_DEFAULTS[mill].find((d) => d.id === id);
+
+const TEMP: readonly [number, number] = [5, 150];
+/**
+ * What a filed reading can really be: outside this it is a typing slip (the logbook has oil at 2 °C, a
+ * bearing at 4 °C, an RMS oil pressure of 35.2), shown as a data check and not judged against its limit
+ * (SETTINGS_AND_ALERTS_REPLICATION.md §5: a broken input raises a data row, never a process alarm).
+ * Worked-out daily figures have none.
+ */
+const PLAUSIBLE: Record<string, readonly [number, number]> = {
+  'motor-bearing-temp': TEMP, 'bearing-temp': TEMP, 'flywheel-temp': TEMP, 'gearbox-bearing-temp': TEMP,
+  'oil-tank-temp': TEMP, 'oil-temp': TEMP,
+  'motor-loading': [0, 300], 'motor-current': [0, 20_000],
+  'oil-tank-level': [0, 110], 'oil-level': [0.5, 40], 'oil-pressure': [0, 20],
+  vibration: [0, 100],
+  'chem-c': [0.01, 1.5], 'chem-s': [0.001, 0.5], 'chem-p': [0.001, 0.5], 'chem-sp': [0.002, 1],
+};
+export const plausibleOf = (id: string): readonly [number, number] | null => PLAUSIBLE[id] ?? null;

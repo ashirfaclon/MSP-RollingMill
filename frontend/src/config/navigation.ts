@@ -35,6 +35,13 @@ export const SCREENS = [
     icon: 'trend',
     mills: ['hsm', 'rmd', 'lsm', 'rms'],
   },
+  {
+    id: 'alerts',
+    label: 'Alerts',
+    sub: 'Limits crossed · Data checks',
+    icon: 'shield-alert',
+    mills: ['hsm', 'rmd', 'lsm', 'rms'],
+  },
 ] as const satisfies readonly { id: string; label: string; sub: string; icon: IconId; mills?: readonly MillId[] }[];
 
 export type ScreenId = (typeof SCREENS)[number]['id'];

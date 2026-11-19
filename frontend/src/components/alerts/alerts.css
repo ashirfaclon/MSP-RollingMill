@@ -1,0 +1,23 @@
+/* The Alerts page: counts, the limits crossed, the data checks. */
+
+.al-banner {
+  margin: 0; padding: 9px 12px; font-size: 12px; color: var(--info);
+  border: 1px solid color-mix(in srgb, var(--info) 35%, transparent); border-radius: var(--radius-sm);
+  background: var(--info-dim);
+}
+.al-banner b { font-weight: 700; }
+.al-banner--error { color: var(--risk); background: var(--risk-dim); border-color: color-mix(in srgb, var(--risk) 35%, transparent); }
+
+.al-table td { vertical-align: top; }
+table.grid.al-table td { white-space: normal; }
+.al-sub { display: block; margin-top: 2px; font-size: 10.5px; color: var(--muted); font-weight: 500; }
+.al-pin { margin-left: 6px; font-size: 10px; color: var(--muted); font-weight: 700; }
+.al-on { font-size: 11px; font-weight: 700; color: var(--muted); }
+/* Messages off: still listed, quietly. */
+.al-row--muted td { opacity: 0.55; }
+/* History, not a live alert. */
+.al-row--cleared td { color: var(--muted); }
+
+.al-empty { margin: 0; padding: 10px 2px; font-size: 12.5px; color: var(--muted); }
+.al-foot { margin: 0; font-size: 11.5px; color: var(--muted); }
+.al-on--yes { color: var(--text); }

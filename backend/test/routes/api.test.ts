@@ -123,6 +123,13 @@ describe('plant settings', () => {
     expect(await post('/api/settings/rms', { limits: { 'oil-temp': { min: 80, max: 60 } } }))
       .toMatchObject({ status: 400, body: { error: 'bad_settings', message: 'Gearbox oil temperature: the minimum must be below the maximum' } });
   });
+  test('alerts: need a session; an unknown mill and a bad alert setting are refused', async () => {
+    expect(await get('/api/alerts/lsm', { authorization: '' })).toMatchObject({ status: 401 });
+    expect(await post('/api/settings/lsm/alerts', { rules: { 'limit:vibration': { enabled: false } } }, '')).toMatchObject({ status: 401 });
+    expect(await get('/api/alerts/xyz')).toMatchObject({ status: 400, body: { error: 'bad_mill' } });
+    expect(await post('/api/settings/rms/alerts', { rules: { 'limit:oil-temp': { repeatHours: -1 } } }))
+      .toMatchObject({ status: 400, body: { error: 'bad_alert_settings', message: 'Gearbox oil temperature: repeat must be whole hours from 0 (once) to 168 (a week)' } });
+  });
 });
 
 describe('access: only through an IOsense session', () => {

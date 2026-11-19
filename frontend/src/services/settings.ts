@@ -43,6 +43,14 @@ export function limitText(l: LimitSetting | null | undefined): string {
   return l.max !== null ? `max ${l.max}${u}` : `min ${l.min}${u}`;
 }
 
+/** The Settings screen's tabs: the limits, and when each alert notifies. */
+export type SettingsTab = 'limits' | 'alerts';
+export interface OpenSettings { tab: SettingsTab; focus: string | null }
+
 /** Open the Settings screen from anywhere (a drill-down's "Edit limits"), at one limit when given. */
 export const OPEN_SETTINGS_EVENT = 'rm-open-settings';
-export const openSettings = (limitId?: string) => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { detail: limitId ?? null }));
+export const openSettings = (limitId?: string) =>
+  window.dispatchEvent(new CustomEvent<OpenSettings>(OPEN_SETTINGS_EVENT, { detail: { tab: 'limits', focus: limitId ?? null } }));
+/** Open it at the Alerts tab (the Alerts page's "Settings"), at one alert when given. */
+export const openAlertSettings = (ruleId?: string) =>
+  window.dispatchEvent(new CustomEvent<OpenSettings>(OPEN_SETTINGS_EVENT, { detail: { tab: 'alerts', focus: ruleId ?? null } }));

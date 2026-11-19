@@ -170,14 +170,7 @@ export function judge(value: number, l: Pick<LimitSetting, 'min' | 'max' | 'crit
 
 export async function millSettings(env: Env, mill: LimitMill): Promise<MillSettings> {
   const doc = await loadSettings(env);
-  const message = state.error
-    ? `${state.loaded ? 'Showing the settings last read' : 'Showing the defaults'} — the settings store can't be read: ${state.error}`
-    : doc.updatedAt ? 'Saved in IOsense' : 'Defaults in use — nothing changed yet';
-  return {
-    mill,
-    limits: limitsOf(doc, mill),
-    store: { connection: state.error ? 'down' : 'up', message, updatedAt: doc.updatedAt, updatedBy: doc.updatedBy },
-  };
+  return { mill, limits: limitsOf(doc, mill), store: { ...storeStatus(doc), updatedAt: doc.updatedAt, updatedBy: doc.updatedBy } };
 }
 
 /* ------------------------------ saving ------------------------------ */
@@ -215,42 +208,61 @@ export function checkPatch(mill: LimitMill, body: SettingsSaveBody | undefined) 
   return { changes, problems };
 }
 
+/** The store as the screens say it: up, or down with why (the defaults, or the settings last read, in use). */
+export function storeStatus(doc: SettingsDoc): { connection: 'up' | 'down'; message: string } {
+  if (state.error) return { connection: 'down', message: `${state.loaded ? 'Showing the settings last read' : 'Showing the defaults'} — the settings store can't be read: ${state.error}` };
+  return { connection: 'up', message: doc.updatedAt ? 'Saved in IOsense' : 'Defaults in use — nothing changed yet' };
+}
+
+/**
+ * Save a change to the document: `apply` makes the next document from the newest one in the store
+ * (never from a stale copy) and counts what it changed; nothing changed writes nothing. Written as a
+ * new row, then in use here at once. Shared by the limits and the alert settings.
+ */
+export async function saveDoc(
+  env: Env, apply: (cur: SettingsDoc, now: string) => { next: SettingsDoc; changed: number },
+  by: string | null, filledBy: string, nowMs = Date.now(),
+): Promise<SettingsSaveResult> {
+  const now = new Date(nowMs).toISOString();
+  const cur = await loadSettings(env, true, nowMs);
+  if (state.error) throw new HttpError(502, 'settings_store_down', `Not saved — the settings store can't be read: ${state.error}`);
+  const { next, changed } = apply(cur, now);
+  if (!changed) return { ok: true, changed: 0, updatedAt: cur.updatedAt ?? now };
+  const doc: SettingsDoc = { ...next, version: 1, updatedAt: now, updatedBy: by };
+  const w = await appendFormEntry(SETTINGS_FORM, doc as unknown as Record<string, unknown>, filledBy, env);
+  if (!w.ok) throw new HttpError(502, 'settings_save_failed', `Not saved — ${w.message}`);
+  install(doc);
+  state.readAt = nowMs;
+  return { ok: true, changed, updatedAt: now };
+}
+
+/** The name typed in the Settings screen: trimmed, at most 60 characters; null when blank. */
+export const byOf = (by: unknown) => strOrNull(typeof by === 'string' ? by.trim().slice(0, 60) : null);
+
 /**
  * Save a mill's limits: checked whole (refused with every problem listed), applied over the newest
- * document in the store, written as a new row, then in use here at once.
+ * document in the store.
  */
 export async function saveMillSettings(env: Env, mill: LimitMill, body: SettingsSaveBody, filledBy: string, nowMs = Date.now()): Promise<SettingsSaveResult> {
   const { changes, problems } = checkPatch(mill, body);
   if (problems.length) throw new HttpError(400, 'bad_settings', problems.join(' · '));
-  const by = strOrNull(typeof body?.by === 'string' ? body.by.trim().slice(0, 60) : null);
-  const now = new Date(nowMs).toISOString();
-
-  // Build on the newest document in the store, never on a stale copy.
-  const cur = await loadSettings(env, true, nowMs);
-  if (state.error) throw new HttpError(502, 'settings_store_down', `Not saved — the settings store can't be read: ${state.error}`);
-
-  const millLimits: Record<string, LimitOverride> = { ...(cur.limits[mill] ?? {}) };
-  let changed = 0;
-  for (const [id, v] of changes) {
-    const had = millLimits[id];
-    if (v === null) {
-      if (had) { delete millLimits[id]; changed += 1; }
-      continue;
+  const by = byOf(body?.by);
+  return saveDoc(env, (cur, now) => {
+    const millLimits: Record<string, LimitOverride> = { ...(cur.limits[mill] ?? {}) };
+    let changed = 0;
+    for (const [id, v] of changes) {
+      const had = millLimits[id];
+      if (v === null) {
+        if (had) { delete millLimits[id]; changed += 1; }
+        continue;
+      }
+      if (had && had.min === v.min && had.max === v.max) continue;
+      millLimits[id] = { ...v, by, at: now };
+      changed += 1;
     }
-    if (had && had.min === v.min && had.max === v.max) continue;
-    millLimits[id] = { ...v, by, at: now };
-    changed += 1;
-  }
-  if (!changed) return { ok: true, changed: 0, updatedAt: cur.updatedAt ?? now };
-
-  const limits = { ...cur.limits, [mill]: millLimits };
-  // Pruned: a mill with no edit left is dropped, so a cleared edit looks like one never made.
-  if (!Object.keys(millLimits).length) delete limits[mill];
-  const next: SettingsDoc = { ...cur, version: 1, updatedAt: now, updatedBy: by, limits };
-
-  const w = await appendFormEntry(SETTINGS_FORM, next as unknown as Record<string, unknown>, filledBy, env);
-  if (!w.ok) throw new HttpError(502, 'settings_save_failed', `Not saved — ${w.message}`);
-  install(next);
-  state.readAt = nowMs;
-  return { ok: true, changed, updatedAt: now };
+    const limits = { ...cur.limits, [mill]: millLimits };
+    // Pruned: a mill with no edit left is dropped, so a cleared edit looks like one never made.
+    if (!Object.keys(millLimits).length) delete limits[mill];
+    return { next: { ...cur, limits }, changed };
+  }, by, filledBy, nowMs);
 }
