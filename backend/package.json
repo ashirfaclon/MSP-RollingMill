@@ -19,6 +19,7 @@
     "sync:erp": "tsx --env-file-if-exists=.env src/jobs/erp-sync.ts",
     "sync:erp:prod": "node --env-file-if-exists=.env dist/erp-sync.js",
     "alerts": "tsx --env-file-if-exists=.env src/modules/alerts/sender/main.ts",
+    "prealerts:prod": "npm run build",
     "alerts:prod": "node --env-file-if-exists=.env dist/alert-sender.js"
   },
   "dependencies": {
