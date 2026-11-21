@@ -2,7 +2,7 @@
 
 /**
  * Top bar: which mill and which screen you are on, and the controls that apply to every
- * screen — mill switch, duration window, the mill's Settings (limits), theme. Brand block and
+ * screen — mill switch, duration window, the mill's Settings (limits), theme, full screen. Brand block and
  * segment controls follow pellet-frontend's TopBar; the tabs moved to the sidebar.
  */
 import { useEffect, useState } from 'react';
@@ -10,6 +10,8 @@ import DateRangePicker from './DateRangePicker';
 import SettingsDrawer from '@/components/settings/SettingsDrawer';
 import { OPEN_SETTINGS_EVENT, type OpenSettings } from '@/services/settings';
 import MillPicker from './MillPicker';
+import Picker from './Picker';
+import FullscreenButton from './FullscreenButton';
 import { millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
 import { RMD_MODE_LABELS, isDefaultFilter, resetFilters, setGlobalSel, useGlobalSel, type RmdModeSel, type ThemeSel } from '@/state/globalSel';
 import { HEADER_SLOT_ID } from './HeaderSlot';
@@ -37,29 +39,20 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
         </div>
       </div>
 
-      {/* The screen's own controls (HSM / RMD Asset Health: the drive group), filled through HeaderSlot. */}
-      <div id={HEADER_SLOT_ID} className="tb-slot" />
-
       <div className="tb-right">
         {/* Mill switch — keeps the screen, changes the mill. */}
         <MillPicker mill={mill} screen={screen} />
 
-        {/* RMD: the ERP figures for Online, Offline or both rollings (the user, 13 Nov 2026). */}
+        {/* RMD: the ERP figures for Online, Offline or both rollings (the user, 13 Nov 2026) — a dropdown
+            like the Mill beside it (the user, 21 Nov 2026). */}
         {mill === 'rmd' && dated && (
-          <div className="tb-seg" role="group" aria-label="Rolling">
-            {(['all', 'online', 'offline'] as RmdModeSel[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                className={`tb-seg-btn tb-seg-btn--mode${sel.rmdMode === m ? ' on' : ''}`}
-                onClick={() => setGlobalSel({ rmdMode: m })}
-                aria-pressed={sel.rmdMode === m}
-              >
-                {RMD_MODE_LABELS[m]}
-              </button>
-            ))}
-          </div>
+          <Picker label="Rolling" title="Rolling" value={sel.rmdMode} onChoose={(m) => setGlobalSel({ rmdMode: m })}
+            options={(['all', 'online', 'offline'] as RmdModeSel[]).map((m) => ({ id: m, text: RMD_MODE_LABELS[m] }))} />
         )}
+
+        {/* The screen's own controls (HSM / RMD Asset Health: the drive group), filled through HeaderSlot —
+            in this row with the other dropdowns, not on a line of their own (the user, 21 Nov 2026). */}
+        <div id={HEADER_SLOT_ID} className="tb-slot" />
 
         {dated && <DateRangePicker />}
         {/* Back to the default filter (Today); disabled when already there. */}
@@ -95,6 +88,9 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
             </button>
           ))}
         </div>
+
+        {/* Full screen: the last view control, at the far right (the user, 21 Nov 2026). */}
+        <FullscreenButton />
       </div>
       {/* Mounted only while open, and anew per mill: a draft never outlives the drawer or crosses mills. */}
       {settings && <SettingsDrawer key={mill} mill={mill} tab={settings.tab} focusId={settings.focus} onClose={() => setSettings(null)} />}

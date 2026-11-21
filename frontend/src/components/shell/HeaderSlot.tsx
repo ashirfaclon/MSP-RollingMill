@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * A screen's own controls in the top bar, between the page title and the Mill switch (the user,
- * 31 Oct 2026): the drive-group switch of HSM and RMD Asset Health, in place of the "Selected asset"
- * panel. Rendered into the top bar's slot through a portal; nothing until the slot is there.
+ * A screen's own controls in the top bar (the user, 31 Oct 2026): the drive-group dropdown of HSM and
+ * RMD Asset Health, in place of the "Selected asset" panel. The slot sits in the row of dropdowns, after
+ * Mill and Rolling, before Duration (21 Nov 2026). Rendered through a portal; nothing until the slot is there.
  */
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';

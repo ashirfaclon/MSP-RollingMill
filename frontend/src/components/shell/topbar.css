@@ -75,3 +75,8 @@
 .tb-reset:hover:not(:disabled) { border-color: var(--border-hi); color: var(--text); }
 .tb-reset:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tb-reset:disabled { color: var(--muted-3); cursor: default; opacity: 0.6; }
+
+/* An icon-only control (Full screen): square, the same height as Reset and Settings beside it. */
+.tb-reset.tb-icon { padding: 5px 7px; }
+.tb-reset.tb-icon svg { display: block; }
+.tb-reset.tb-icon[aria-pressed="true"] { color: var(--text); border-color: var(--border-hi); }

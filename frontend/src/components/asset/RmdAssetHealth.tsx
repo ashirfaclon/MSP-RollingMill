@@ -34,12 +34,13 @@ import LimitsNote from '@/components/settings/LimitsNote';
 import EquipmentSettings from './EquipmentSettings';
 import { midTop, rmdHottest, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
+import Picker from '@/components/shell/Picker';
 import BearingTrendAll, { rmdBearingPoints } from './BearingTrendAll';
 import RmdBearingBars, { type StandReading } from './RmdBearingBars';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard from '@/components/visualization/KpiCard';
-import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
+import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
@@ -63,6 +64,7 @@ const GROUPS: { id: Group; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'roughing', label: 'Roughing' }, { id: 'route', label: 'Route / diverter' }, { id: 'finishing', label: 'Finishing' }, { id: 'auxiliary', label: 'Auxiliary' },
 ];
+const GROUP_OPTIONS = GROUPS.map((g) => ({ id: g.id, text: g.label }));
 /** The groups with live drives, and the groups with mechanical forms. */
 const LIVE: Partial<Record<Group, ('route' | 'finishing')[]>> = { all: ['route', 'finishing'], route: ['route'], finishing: ['finishing'] };
 const FORMS: Partial<Record<Group, ('roughing' | 'route')[]>> = { all: ['roughing', 'route'], roughing: ['roughing'], route: ['route'] };
@@ -175,7 +177,8 @@ export default function RmdAssetHealth() {
   return (
     <div className="rm-viz ah">
       {/* The drive group: in the top bar, not a "Selected asset" panel (the user, 31 Oct 2026). */}
-      <HeaderSlot><Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} /></HeaderSlot>
+      {/* A dropdown in the top bar's row, beside Mill (the user, 21 Nov 2026 — was tabs on a line of their own). */}
+      <HeaderSlot><Picker label="Group" title="Drive group" value={group} onChoose={setGroup} options={GROUP_OPTIONS} /></HeaderSlot>
 
       <section className={`rm-strip ah-strip${STRIP[3 + Number(show.bearing) + Number(show.current) + Number(show.oil)]}`} aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}

@@ -34,9 +34,16 @@ test('RMD: rolling in casting, rolling in delivery and plant efficiency, per rol
 
   // Online and Offline: each its own figures.
   const both = await strip.getByRole('button', { name: /^Plant efficiency/ }).innerText();
-  await page.getByRole('group', { name: 'Rolling' }).getByRole('button', { name: 'Offline' }).click();
+  // The Rolling dropdown (was tabs, 21 Nov 2026).
+  const rolling = page.getByRole('button', { name: /^Rolling:/ });
+  await expect(rolling).toHaveAccessibleName('Rolling: Both');
+  await rolling.click();
+  await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Offline' }).click();
+  await expect(rolling).toHaveAccessibleName('Rolling: Offline');
+  await page.locator('.topbar').screenshot({ path: `${SHOTS}/rmd-rolling-dropdown.png` });
   await expect(strip.getByRole('button', { name: /^Plant efficiency/ })).not.toHaveText(both);
-  await page.getByRole('group', { name: 'Rolling' }).getByRole('button', { name: 'Both' }).click();
+  await rolling.click();
+  await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Both' }).click();
 
   await strip.getByRole('button', { name: /^Rolling in casting/ }).click();
   const drill = page.getByRole('dialog', { name: /Rolling in casting, delivery and plant efficiency/ });

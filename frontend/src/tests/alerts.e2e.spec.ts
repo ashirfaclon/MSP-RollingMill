@@ -28,7 +28,7 @@ test('every mill has an Alerts page in the sidebar; the period controls are hidd
   await page.getByRole('navigation', { name: 'Dashboard screens' }).getByRole('link', { name: /Alerts/ }).click();
   await expect(page).toHaveURL(/\/lsm\/alerts$/);
   await expect(page.getByRole('heading', { name: /Alerts/ })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Rolling' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Rolling:/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Reset the filters' })).toHaveCount(0);
 });
 

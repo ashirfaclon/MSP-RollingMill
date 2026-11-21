@@ -16,7 +16,12 @@ export default function Sidebar({ mill, screen }: { mill: MillId; screen: Screen
   return (
     <aside className="sb">
       <div className="sb-brand">
-        <div className="tb-mark">MSP</div>
+        {/* MSP Steel's logo (the user, 21 Nov 2026) on a white tile: navy lettering vanishes on the dark rail.
+            A plain <img>: the site is a static export, so next/image's optimiser is not there. */}
+        <span className="sb-logo">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/msp-logo-wordmark.png" alt="MSP Steel" width={445} height={132} />
+        </span>
         <div className="sb-brand-text">
           <div className="sb-title">MSP Steel</div>
           <div className="sb-sub">Rolling Mill · {millOf(mill).code}</div>

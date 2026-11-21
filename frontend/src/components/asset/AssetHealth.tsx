@@ -27,11 +27,12 @@ import { toneOf, useMillSettings, worstTone } from '@/services/settings';
 import LimitsNote from '@/components/settings/LimitsNote';
 import { hsmHottest, midTop, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
+import Picker from '@/components/shell/Picker';
 import BearingTrendAll, { hsmBearingPoints } from './BearingTrendAll';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard from '@/components/visualization/KpiCard';
-import DrillDrawer, { Seg, Stats } from '@/components/drill/DrillDrawer';
+import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import { fixed } from '@/lib/num';
 import { HSM_MOTORS_URL, loadingPct, useHsmMotorRatings } from '@/services/equipment';
@@ -50,6 +51,7 @@ const GROUPS: { id: Group; label: string }[] = [
   // All: the whole mill — every stand and every MID machine (the user, 31 Oct 2026).
   { id: 'all', label: 'All' }, { id: 'roughing', label: 'Roughing' }, { id: 'finishing', label: 'Finishing' }, { id: 'auxiliary', label: 'Auxiliary' },
 ];
+const GROUP_OPTIONS = GROUPS.map((g) => ({ id: g.id, text: g.label }));
 /** The stand groups of the Mill Load Log Sheet each group covers. */
 const STANDS: Partial<Record<Group, ('roughing' | 'finishing')[]>> = { all: ['roughing', 'finishing'], roughing: ['roughing'], finishing: ['finishing'] };
 const NAME: Record<Group, string> = { all: 'All stands', roughing: 'Roughing', finishing: 'Finishing', auxiliary: 'Auxiliary' };
@@ -110,7 +112,8 @@ export default function AssetHealth() {
   return (
     <div className="rm-viz ah">
       {/* The drive group: in the top bar, not a "Selected asset" panel (the user, 31 Oct 2026). */}
-      <HeaderSlot><Seg label="Drive group" value={group} onChange={setGroup} options={GROUPS} /></HeaderSlot>
+      {/* A dropdown in the top bar's row, beside Mill (the user, 21 Nov 2026 — was tabs on a line of their own). */}
+      <HeaderSlot><Picker label="Group" title="Drive group" value={group} onChoose={setGroup} options={GROUP_OPTIONS} /></HeaderSlot>
 
       {/* No Gearbox oil card: HSM has no source for it (the user, 31 Oct 2026). */}
       <section className="rm-strip ah-strip ah-strip--four" aria-label="Condition KPIs">

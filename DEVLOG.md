@@ -123,3 +123,13 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
 - **21 Nov 2026** — Reviewed the RMD issue log against the code (section 4). Started this log. Added
   Rolling in Casting / Delivery / Plant Efficiency to RMD (ERP); line-2 mimic labels PR1 / PR2 / TB1 / TB2.
   Alerts paused until the RMD points are finished (the user). Next: back to alerts step 5.
+  Committed `e8de662`. Then: a Full screen button, the last control at the right of the top bar
+  (`frontend/src/components/shell/FullscreenButton.tsx`; Esc leaves it; hidden where unsupported).
+  Themed scrollbars everywhere, dark and light (`--sb-thumb` tokens and one rule in `styles/theme.css`).
+  Top bar: RMD Rolling (Both / Online / Offline) and the Asset Health drive group are dropdowns now, like
+  Mill (one shared `components/shell/Picker.tsx`); the drive group sits in the row of controls (after
+  Rolling, before Duration), not beside the title. On narrower screens the controls wrap under the title
+  together, as one row. Test: `frontend/src/tests/topbar.e2e.spec.ts`.
+  MSP Steel's logo in the sidebar (was an "MSP" text badge): the user's `frontend/public/msp-logo.png`
+  (447 × 447, white background) cropped to its lettering as `msp-logo-wordmark.png`, on a white tile so
+  the navy shows on the dark rail; smaller when the sidebar is collapsed.

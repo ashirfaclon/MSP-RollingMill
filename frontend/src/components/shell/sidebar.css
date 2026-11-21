@@ -12,8 +12,15 @@
 
 .sb-brand { display: flex; align-items: center; gap: 10px; padding: 2px 4px 12px; border-bottom: 1px solid var(--border-soft); }
 .sb-brand-text { min-width: 0; }
+/* The logo: a white rounded tile beside the sidebar's title. */
+.sb-logo {
+  display: grid; place-items: center; flex: none; height: 34px; padding: 0 7px;
+  background: #ffffff; border: 1px solid rgba(120, 180, 255, 0.35); border-radius: 9px;
+}
+.sb-logo img { display: block; height: 17px; width: auto; }
+:root[data-theme="light"] .sb-logo { border-color: var(--border); }
 .sb-title { font-size: 13px; font-weight: 800; letter-spacing: 0.2px; color: var(--text); }
-.sb-sub { font-size: 10px; color: var(--muted-2); font-weight: 600; }
+.sb-sub { font-size: 10px; color: var(--muted-2); font-weight: 600; white-space: nowrap; }
 
 .sb-nav { display: flex; flex-direction: column; gap: 4px; }
 .sb-label {
@@ -65,6 +72,8 @@
 @media (min-width: 761px) {
   :root[data-sidebar="collapsed"] .sb { width: 62px; padding: 12px 8px; align-items: center; }
   :root[data-sidebar="collapsed"] .sb-brand { padding: 2px 0 12px; }
+  :root[data-sidebar="collapsed"] .sb-logo { height: 30px; padding: 0 5px; }
+  :root[data-sidebar="collapsed"] .sb-logo img { height: auto; width: 34px; }
   :root[data-sidebar="collapsed"] .sb-brand-text,
   :root[data-sidebar="collapsed"] .sb-label,
   :root[data-sidebar="collapsed"] .sb-text,
