@@ -70,9 +70,7 @@ export interface AlertControls {
   deadband: { mode: 'pct-of-band' | 'absolute'; value: number };
   /** Pins the severity; null = worked out from the reading. */
   severityOverride: AlertSeverity | null;
-  /** Remind every N hours while it stays active; 0 = once per crossing. */
-  repeatHours: number;
-  /** The least severe alarm that sends a message. */
+  /** The least severe alarm that sends a message: critical or warning (data checks are never sent). */
   minSeverityToNotify: AlertSeverity;
 }
 export type AlertField = keyof AlertControls;
@@ -119,8 +117,40 @@ export interface AlertsReport {
   counts: { critical: number; warning: number; data: number; cleared: number; muted: number; rules: number; noLimit: number };
   /** The settings store: down = the defaults are in use. */
   store: { connection: 'up' | 'down'; message: string };
-  /** Messages are not sent until the alert sender is running (step 5). */
-  sender: { running: boolean; message: string };
+  /** Who is told, and how often (Settings → Escalation matrix). */
+  escalation: MillEscalation;
+  /** The alert sender (its own deployment), from the last check it recorded in IOsense. */
+  sender: { running: boolean; message: string; lastCheckAt: string | null };
+}
+
+/* ------------------------------ who is told (SMS-ALERTS.md §5.5) ------------------------------ */
+
+/** One way of telling a level: on / off and who. Off keeps its contacts, so switching it back on needs no retyping. */
+export interface AlertChannel { enabled: boolean; contacts: string[] }
+
+/** One level of the mill's escalation matrix. */
+export interface EscalationLevel {
+  /**
+   * How often this level is told while the alert stands (with one message per crossing off): level 1
+   * every N minutes after the first; a later level first after N minutes, then every N. 0 = once, with the first alert.
+   */
+  everyMinutes: number;
+  /** Phone numbers. */
+  sms: AlertChannel;
+  /** Phone numbers. */
+  whatsapp: AlertChannel;
+  /** Email ids. */
+  email: AlertChannel;
+}
+
+/** A mill's contacts (the user, 21 Nov 2026: one list per mill). */
+export interface MillEscalation {
+  /** On: each crossing is told once, to level 1 only. Off: every level on its own interval while it stands. */
+  onePerCrossing: boolean;
+  /** Up to 10. None: alerts still go to the webhook, with nobody named. */
+  levels: EscalationLevel[];
+  setBy: string | null;
+  setAt: string | null;
 }
 
 /** A field set to null goes back to the layer below. */
@@ -131,4 +161,6 @@ export interface AlertSettingsSaveBody {
   defaults?: AlertControlsPatch;
   /** A rule set to null drops every setting of it. */
   rules?: Record<string, AlertControlsPatch | null>;
+  /** The whole contact list, replacing the saved one. */
+  escalation?: Pick<MillEscalation, 'onePerCrossing' | 'levels'>;
 }

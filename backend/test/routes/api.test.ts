@@ -127,8 +127,10 @@ describe('plant settings', () => {
     expect(await get('/api/alerts/lsm', { authorization: '' })).toMatchObject({ status: 401 });
     expect(await post('/api/settings/lsm/alerts', { rules: { 'limit:vibration': { enabled: false } } }, '')).toMatchObject({ status: 401 });
     expect(await get('/api/alerts/xyz')).toMatchObject({ status: 400, body: { error: 'bad_mill' } });
-    expect(await post('/api/settings/rms/alerts', { rules: { 'limit:oil-temp': { repeatHours: -1 } } }))
-      .toMatchObject({ status: 400, body: { error: 'bad_alert_settings', message: 'Gearbox oil temperature: repeat must be whole hours from 0 (once) to 168 (a week)' } });
+    expect(await post('/api/settings/rms/alerts', { rules: { 'limit:oil-temp': { onDelayReadings: 0 } } }))
+      .toMatchObject({ status: 400, body: { error: 'bad_alert_settings', message: 'Gearbox oil temperature: readings in a row must be a whole number from 1 to 9' } });
+    expect(await post('/api/settings/rms/alerts', { escalation: { onePerCrossing: true, levels: [{ everyMinutes: 0, sms: { enabled: true, contacts: [] }, whatsapp: { enabled: false, contacts: [] }, email: { enabled: false, contacts: [] } }] } }))
+      .toMatchObject({ status: 400, body: { error: 'bad_alert_settings', message: 'Level 1 SMS is on with nobody on it — add a number or switch it off' } });
   });
 });
 

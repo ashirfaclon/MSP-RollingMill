@@ -19,6 +19,8 @@ import { openSettings, type SettingsMill } from '@/services/settings';
 
 type Draft = Record<string, string>;
 const SEVERITIES = ['critical', 'warning', 'data'] as const;
+/** Data checks are never sent (the user, 21 Nov 2026): messages are from critical, or from warning up. */
+const FLOORS = ['critical', 'warning'] as const;
 
 /** A field as the box shows it. Deadband: "2" (%), or "1.5 abs". */
 function show(f: AlertField, c: AlertControls): string {
@@ -34,14 +36,14 @@ function words(f: AlertField, c: AlertControls, unit = ''): string {
   if (f === 'severityOverride') return v === null ? 'Auto' : SEVERITY_LABEL[v as keyof typeof SEVERITY_LABEL];
   if (f === 'minSeverityToNotify') return SEVERITY_LABEL[v as keyof typeof SEVERITY_LABEL];
   if (f === 'deadband') { const d = v as AlertControls['deadband']; return d.mode === 'absolute' ? `${d.value} ${unit}` : `${d.value} %`; }
-  if (f === 'repeatHours') return v === 0 ? 'Once' : `${v} h`;
   return String(v);
 }
 /** A box's text → the value sent; undefined when it can't be read (refused before sending). */
 function parse(f: AlertField, s: string): AlertControls[AlertField] | undefined {
   const t = s.trim();
   if (f === 'enabled') return t === 'on' ? true : t === 'off' ? false : undefined;
-  if (f === 'severityOverride' || f === 'minSeverityToNotify') return (SEVERITIES as readonly string[]).includes(t) ? t as AlertControls['minSeverityToNotify'] : undefined;
+  if (f === 'severityOverride') return (SEVERITIES as readonly string[]).includes(t) ? t as AlertControls['severityOverride'] : undefined;
+  if (f === 'minSeverityToNotify') return (FLOORS as readonly string[]).includes(t) ? t as AlertControls['minSeverityToNotify'] : undefined;
   if (f === 'deadband') {
     const m = /^(\d+(?:\.\d+)?)\s*(abs)?$/.exec(t);
     return m ? { mode: m[2] ? 'absolute' : 'pct-of-band', value: Number(m[1]) } : undefined;
@@ -56,8 +58,7 @@ const COLS: { f: AlertField; label: string; title: string }[] = [
   { f: 'staleDays', label: 'Days without entry', title: 'Days without an entry in the form before it raises' },
   { f: 'deadband', label: 'Deadband', title: 'Back inside the limit by this much before it counts as normal again: a % of the band, or an amount in the reading\'s unit' },
   { f: 'severityOverride', label: 'Severity', title: 'Fix the severity, or leave it Auto: worked out from the reading (critical when far past the limit, or past it a week)' },
-  { f: 'repeatHours', label: 'Repeat', title: 'Remind every N hours while it stays active; blank or 0 = once per crossing' },
-  { f: 'minSeverityToNotify', label: 'Messages from', title: 'The least severe alarm that sends a message' },
+  { f: 'minSeverityToNotify', label: 'Messages from', title: 'The least severe alarm that sends a message. Data checks are never sent.' },
 ];
 
 /** The Alerts tab: its draft, its save, and what it draws. The drawer shows the controls of the tab open. */
@@ -145,7 +146,7 @@ function AlertsBody({ data, focusId, valueOf, edit, reset, resets, changed }: {
     const edited = changed.includes(key);
     const cls = `pc-in al-in${edited ? ' al-in--edited' : ''}`;
     if (f === 'enabled' || f === 'severityOverride' || f === 'minSeverityToNotify') {
-      const opts = f === 'enabled' ? [['on', 'On'], ['off', 'Off']] : SEVERITIES.map((s) => [s, SEVERITY_LABEL[s]]);
+      const opts = f === 'enabled' ? [['on', 'On'], ['off', 'Off']] : (f === 'minSeverityToNotify' ? FLOORS : SEVERITIES).map((s) => [s, SEVERITY_LABEL[s]]);
       return (
         <select className={cls} value={v} onChange={(e) => edit(key, e.target.value)} aria-label={label}>
           <option value="">{inherited}</option>
@@ -159,7 +160,7 @@ function AlertsBody({ data, focusId, valueOf, edit, reset, resets, changed }: {
 
   return (
     <>
-      <p className="set-store">{data.sender.message} Set here when each alert will send a message; the Alerts page lists every alert either way.</p>
+      <p className="set-store">{data.sender.message} Set here when each alert will send a message; the Alerts page lists every alert either way. Who is told, and how often, is on the Escalation matrix tab.</p>
       <section className="set-group" aria-label="Mill defaults">
         <h3 className="rm-k">Mill defaults</h3>
         <p className="set-note-src">For every alert below with no setting of its own. A blank box keeps the standard setting, shown in grey.</p>

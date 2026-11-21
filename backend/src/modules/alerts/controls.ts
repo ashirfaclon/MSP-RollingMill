@@ -9,16 +9,18 @@
  *
  * The shipped layer is the behaviour before anyone tunes anything: every alert on, raised on the
  * first reading past its limit (a filed reading is a deliberate one), re-armed 2 % of the band back
- * inside, the severity worked out from the reading, once per crossing (no reminders — 30 standing
- * conditions reminding every 2 h would be 360 messages a day, §6.1), and messages from warning up,
- * so data checks show on the screen but page nobody (§5).
+ * inside, the severity worked out from the reading, and messages from warning up. Data checks show on
+ * the screen and page nobody, whatever is set (the user, 21 Nov 2026), so "messages from" is critical
+ * or warning only. How often a standing alert is told again is the mill's contact list's (escalation.ts),
+ * not a per-alert repeat (dropped 21 Nov 2026; a stored one is ignored).
  *
  * "Not filled" checks keep their own days (each form's expected filling interval), so a mill-wide
  * "readings in a row" never means days for them: staleDays is set per rule only.
  */
-import type { AlertControlSource, AlertControls, AlertControlsPatch, AlertField, AlertKind, AlertSeverity, AlertSettingsSaveBody } from '../../contracts';
+import type { AlertControlSource, AlertControls, AlertControlsPatch, AlertField, AlertKind, AlertSeverity, AlertSettingsSaveBody, MillEscalation } from '../../contracts';
 import type { LimitMill } from '../../config/limits';
 import type { SettingsDoc } from '../settings/settings.store';
+import { escalationOf } from './escalation';
 
 export const SHIPPED: AlertControls = {
   enabled: true,
@@ -26,7 +28,6 @@ export const SHIPPED: AlertControls = {
   staleDays: 2,
   deadband: { mode: 'pct-of-band', value: 2 },
   severityOverride: null,
-  repeatHours: 0,
   minSeverityToNotify: 'warning',
 };
 export const FIELDS = Object.keys(SHIPPED) as AlertField[];
@@ -34,7 +35,7 @@ const SEVERITIES: AlertSeverity[] = ['critical', 'warning', 'data'];
 
 /** The fields that mean something for a rule of this kind. */
 export function appliesTo(kind: AlertKind): AlertField[] {
-  const common: AlertField[] = ['enabled', 'severityOverride', 'repeatHours', 'minSeverityToNotify'];
+  const common: AlertField[] = ['enabled', 'severityOverride', 'minSeverityToNotify'];
   if (kind === 'limit') return ['enabled', 'onDelayReadings', 'deadband', ...common.slice(1)];
   if (kind === 'stale') return ['enabled', 'staleDays', ...common.slice(1)];
   return common;
@@ -44,7 +45,7 @@ const DEFAULT_FIELDS: AlertField[] = FIELDS.filter((f) => f !== 'staleDays');
 
 /** One stored layer: some fields, with who set them and when. */
 export type StoredControls = Partial<AlertControls> & { by?: string | null; at?: string };
-export interface MillAlertSection { defaults?: StoredControls; rules?: Record<string, StoredControls> }
+export interface MillAlertSection { defaults?: StoredControls; rules?: Record<string, StoredControls>; escalation?: MillEscalation }
 
 const objectOf = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {});
 
@@ -67,7 +68,7 @@ export function alertSection(doc: SettingsDoc, mill: LimitMill): MillAlertSectio
   const m = objectOf(objectOf(doc.alerts)[mill]);
   const rules: Record<string, StoredControls> = {};
   for (const [id, v] of Object.entries(objectOf(m.rules))) rules[id] = storedOf(v);
-  return { defaults: storedOf(m.defaults), rules };
+  return { defaults: storedOf(m.defaults), rules, escalation: escalationOf(m.escalation) };
 }
 
 const hasField = (s: StoredControls | undefined, f: AlertField) => s !== undefined && s[f] !== undefined;
@@ -110,11 +111,10 @@ function validField(f: AlertField, v: unknown): { ok: true; value: unknown } | {
       return whole(v, 1, 9) ? { ok: true, value: v } : { ok: false, why: 'readings in a row must be a whole number from 1 to 9' };
     case 'staleDays':
       return whole(v, 1, 90) ? { ok: true, value: v } : { ok: false, why: 'days without an entry must be a whole number from 1 to 90' };
-    case 'repeatHours':
-      return whole(v, 0, 168) ? { ok: true, value: v } : { ok: false, why: 'repeat must be whole hours from 0 (once) to 168 (a week)' };
     case 'severityOverride':
-    case 'minSeverityToNotify':
       return SEVERITIES.includes(v as AlertSeverity) ? { ok: true, value: v } : { ok: false, why: 'severity must be critical, warning or data' };
+    case 'minSeverityToNotify':
+      return v === 'critical' || v === 'warning' ? { ok: true, value: v } : { ok: false, why: 'messages are sent from critical or from warning up — data checks are never sent' };
     case 'deadband': {
       const d = objectOf(v);
       if (d.mode !== 'pct-of-band' && d.mode !== 'absolute') return { ok: false, why: 'deadband must be a % of the limit band or an amount' };
@@ -137,7 +137,7 @@ export function checkAlertPatch(body: AlertSettingsSaveBody | undefined, rules: 
   const problems: string[] = [];
   const defaults = objectOf(body?.defaults) as AlertControlsPatch;
   const ruleRaw = objectOf(body?.rules);
-  if (!Object.keys(defaults).length && !Object.keys(ruleRaw).length) problems.push('Nothing to save');
+  if (!Object.keys(defaults).length && !Object.keys(ruleRaw).length && body?.escalation === undefined) problems.push('Nothing to save');
 
   const checkLayer = (patch: Record<string, unknown>, allowed: AlertField[], where: string, defaultsLayer: boolean) => {
     const out: AlertControlsPatch = {};
@@ -170,7 +170,7 @@ export function checkAlertPatch(body: AlertSettingsSaveBody | undefined, rules: 
 
 export const LABEL: Record<AlertField, string> = {
   enabled: 'messages on / off', onDelayReadings: 'readings in a row', staleDays: 'days without an entry',
-  deadband: 'deadband', severityOverride: 'severity', repeatHours: 'repeat', minSeverityToNotify: 'messages from',
+  deadband: 'deadband', severityOverride: 'severity', minSeverityToNotify: 'messages from',
 };
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);

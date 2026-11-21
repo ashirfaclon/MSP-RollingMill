@@ -45,6 +45,16 @@ function currentBearer(env: Env): string | null {
 /** Why the session was dropped, so the status can say "expired" rather than "not connected". */
 let droppedReason: string | null = null;
 
+/**
+ * A process that only ever uses the access token from the environment (the alert sender: nobody logs
+ * in to it) takes it back after a refusal dropped it, rather than staying logged out for good.
+ */
+export function reseedSession() {
+  if (bearer !== null) return;
+  bearer = undefined;
+  droppedReason = null;
+}
+
 function dropSession(reason: string) {
   bearer = null;
   droppedReason = reason;

@@ -59,3 +59,23 @@ select.al-in:has(option[value=""]:checked) { color: var(--muted-2); font-weight:
 .al-in--edited { border-color: var(--info); }
 /* An alert with no limit can't raise: its settings wait, quietly. */
 .al-set-off td:not(.al-c-rule) { opacity: 0.6; }
+
+/* The "Who is told" tab: the mill's contact list, one card per level. */
+.ct-set { align-self: flex-start; }
+.ct-switch { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; cursor: pointer; }
+.ct-switch input, .ct-chan-on input { accent-color: var(--info); margin-top: 2px; }
+.ct-warn { margin: 0; font-size: 11px; color: var(--warn); font-weight: 600; }
+.ct-level { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 8px 10px 10px; border: 1px solid var(--border-soft); border-radius: var(--radius-sm); min-width: 0; }
+.ct-legend { display: flex; align-items: center; gap: 10px; padding: 0 4px; font-size: 12px; }
+.ct-every { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.ct-min { width: 64px; text-align: right; font-weight: 600; }
+.ct-every-note { flex-basis: 100%; margin-top: 0; }
+.ct-chan { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 8px; }
+.ct-chan-on { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ct-list { width: 100%; text-align: left; }
+.ct-list::placeholder { color: var(--muted-3); font-weight: 500; }
+/* Switched off: kept, greyed, still editable. */
+.ct-list--off { opacity: 0.55; }
+.ct-add { align-self: flex-start; }
+.ct-sample summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--info); }
+.ct-sample pre { margin: 6px 0 0; padding: 8px; max-height: 260px; overflow: auto; font-size: 10.5px; line-height: 1.4; border: 1px solid var(--border-soft); border-radius: var(--radius-sm); white-space: pre-wrap; word-break: break-word; }

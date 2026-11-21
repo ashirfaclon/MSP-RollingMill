@@ -5,8 +5,9 @@
  *   rules     every alert a mill can have — one per limit (Settings → Limits), one "not filled" check
  *             per form, one typing-slip check — with its controls resolved and whether it can fire
  *   alarms    the readings of the last WINDOW_DAYS checked by the one checker (engine.ts) against the
- *             limits in use, with the controls applied: the live list. The alert sender (step 5) will
- *             read this same list, so a message and the row on the screen can never disagree.
+ *             limits in use, with the controls applied: the live list. The alert sender (sender/) runs
+ *             this same function, so a message and the row on the screen can never disagree.
+ *   contacts  who is told, and how often (escalation.ts)
  *
  * A crossing shows while it is active, and for RECENT_DAYS after it cleared. Switching an alert off
  * never hides its row (§6.1): it shows, muted.
@@ -19,6 +20,8 @@ import { sharedFresh } from '../../shared/shared-fresh';
 import { byOf, limitsOf, loadSettings, saveDoc, storeStatus, type SettingsDoc } from '../settings/settings.store';
 import { alertSection, appliesTo, applyLayer, checkAlertPatch, resolveDefaults, resolveRule, SHIPPED, type MillAlertSection, type RuleRef, type StoredControls } from './controls';
 import { crossings } from './engine';
+import { checkEscalation } from './escalation';
+import { senderStatus } from './sender/status';
 import { collect, DAILY_IDS, SOURCES, WINDOW_DAYS, type Collected, type Reading, type Source } from './readings';
 
 /** A cleared crossing stays on the page this many days. */
@@ -190,7 +193,8 @@ export async function millAlerts(env: Env, mill: LimitMill, nowMs = Date.now()):
       noLimit: rules.filter((r) => !r.canFire).length,
     },
     store: storeStatus(doc),
-    sender: { running: false, message: 'No messages are sent yet — the alert sender is the next step. This page shows what it will send.' },
+    escalation: sec.escalation!,
+    sender: await senderStatus(env, nowMs),
   };
 }
 
@@ -203,6 +207,8 @@ export async function saveAlertSettings(env: Env, mill: LimitMill, body: AlertSe
   const doc = await loadSettings(env);
   const refs = new Map<string, RuleRef>(ruleDefs(mill, limitsOf(doc, mill)).map((d) => [d.ruleId, { kind: d.kind, label: d.label }]));
   const { defaultsPatch, rulesPatch, problems } = checkAlertPatch(body, refs);
+  const esc = body?.escalation === undefined ? null : checkEscalation(body.escalation);
+  if (esc) problems.push(...esc.problems);
   if (problems.length) throw new HttpError(400, 'bad_alert_settings', problems.join(' · '));
   const by = byOf(body?.by);
   return saveDoc(env, (cur: SettingsDoc, now) => {
@@ -216,10 +222,18 @@ export async function saveAlertSettings(env: Env, mill: LimitMill, body: AlertSe
       changed += r.changed;
       if (r.next) rules[id] = r.next; else delete rules[id];
     }
+    // The contact list, saved whole: one change however much of it moved.
+    const stored = objectOf(objectOf(objectOf(cur.alerts)[mill]).escalation);
+    let escalation = Object.keys(stored).length ? stored : undefined;
+    if (esc) {
+      const { by: _b, at: _a, ...was } = stored;
+      if (JSON.stringify(was) !== JSON.stringify(esc.value)) { escalation = { ...esc.value, by, at: now }; changed += 1; }
+    }
     // Pruned at every level, so a cleared setting looks like one never made.
     const millSec: Record<string, unknown> = {};
     if (d.next) millSec.defaults = d.next;
     if (Object.keys(rules).length) millSec.rules = rules;
+    if (escalation) millSec.escalation = escalation;
     const alerts = { ...objectOf(cur.alerts), [mill]: millSec };
     if (!Object.keys(millSec).length) delete alerts[mill];
     const next: SettingsDoc = { ...cur, alerts };

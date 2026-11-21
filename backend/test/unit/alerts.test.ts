@@ -69,10 +69,10 @@ describe('alert settings', () => {
   const doc = (alerts: unknown): SettingsDoc => ({ ...empty, alerts });
 
   test('each field: the rule\'s, else the mill\'s, else shipped', () => {
-    const sec = alertSection(doc({ lsm: { defaults: { repeatHours: 4, enabled: false }, rules: { 'limit:flywheel-temp': { enabled: true, by: 'A', at: 'x' } } } }), 'lsm');
+    const sec = alertSection(doc({ lsm: { defaults: { minSeverityToNotify: 'critical', enabled: false }, rules: { 'limit:flywheel-temp': { enabled: true, by: 'A', at: 'x' } } } }), 'lsm');
     const r = resolveRule(sec, 'limit:flywheel-temp');
-    expect(r.controls).toMatchObject({ enabled: true, repeatHours: 4, onDelayReadings: 1 });
-    expect(r.from).toMatchObject({ enabled: 'rule', repeatHours: 'mill', onDelayReadings: 'shipped' });
+    expect(r.controls).toMatchObject({ enabled: true, minSeverityToNotify: 'critical', onDelayReadings: 1 });
+    expect(r.from).toMatchObject({ enabled: 'rule', minSeverityToNotify: 'mill', onDelayReadings: 'shipped' });
     expect(r.setBy).toBe('A');
     expect(resolveRule(sec, 'limit:oil-pressure').controls.enabled).toBe(false);
   });
@@ -83,22 +83,24 @@ describe('alert settings', () => {
   });
 
   test('a stored value that is not valid falls through to the layer below', () => {
-    const sec = alertSection(doc({ lsm: { defaults: { onDelayReadings: 0, repeatHours: 'often' } } }), 'lsm');
-    expect(resolveRule(sec, 'limit:vibration').controls).toMatchObject({ onDelayReadings: 1, repeatHours: 0 });
+    // Data checks are never sent (the user, 21 Nov 2026): a stored "messages from data" is not valid.
+    const sec = alertSection(doc({ lsm: { defaults: { onDelayReadings: 0, minSeverityToNotify: 'data', repeatHours: 4 } } }), 'lsm');
+    expect(resolveRule(sec, 'limit:vibration').controls).toMatchObject({ onDelayReadings: 1, minSeverityToNotify: 'warning' });
+    expect(resolveRule(sec, 'limit:vibration').controls).not.toHaveProperty('repeatHours');
   });
 
   test('a save is refused whole, with every problem', () => {
     const refs = new Map([['limit:vibration', { kind: 'limit' as const, label: 'Vibration' }], ['stale:mid', { kind: 'stale' as const, label: 'MID not filled' }]]);
     const { problems } = checkAlertPatch({
       defaults: { onDelayReadings: 12, staleDays: 3, deadband: { mode: 'absolute', value: 1 } },
-      rules: { 'limit:vibration': { staleDays: 3, repeatHours: 1.5 }, 'stale:mid': { deadband: { mode: 'pct-of-band', value: 5 } }, 'limit:nope': {} },
+      rules: { 'limit:vibration': { staleDays: 3, minSeverityToNotify: 'data' }, 'stale:mid': { deadband: { mode: 'pct-of-band', value: 5 } }, 'limit:nope': {} },
     }, refs);
     expect(problems).toEqual([
       'Mill defaults: readings in a row must be a whole number from 1 to 9',
       'Mill defaults: days without an entry does not apply here',
       'Mill defaults: a deadband as an amount is set on one alert (the units differ) — use a % for every alert',
       'Vibration: days without an entry does not apply here',
-      'Vibration: repeat must be whole hours from 0 (once) to 168 (a week)',
+      'Vibration: messages are sent from critical or from warning up — data checks are never sent',
       'MID not filled: deadband does not apply here',
       'Unknown alert: limit:nope',
     ]);
@@ -106,10 +108,10 @@ describe('alert settings', () => {
   });
 
   test('null drops a setting; an emptied layer is gone', () => {
-    const a = applyLayer({ enabled: false, repeatHours: 4, by: 'A', at: 't0' }, { enabled: null }, 'B', 't1');
-    expect(a).toEqual({ next: { repeatHours: 4, by: 'B', at: 't1' }, changed: 1 });
+    const a = applyLayer({ enabled: false, onDelayReadings: 4, by: 'A', at: 't0' }, { enabled: null }, 'B', 't1');
+    expect(a).toEqual({ next: { onDelayReadings: 4, by: 'B', at: 't1' }, changed: 1 });
     expect(applyLayer(a.next, null, 'B', 't2')).toEqual({ next: undefined, changed: 1 });
-    expect(applyLayer({ repeatHours: 4, by: 'A', at: 't0' }, { repeatHours: 4 }, 'B', 't1')).toEqual({ next: { repeatHours: 4, by: 'A', at: 't0' }, changed: 0 });
+    expect(applyLayer({ onDelayReadings: 4, by: 'A', at: 't0' }, { onDelayReadings: 4 }, 'B', 't1')).toEqual({ next: { onDelayReadings: 4, by: 'A', at: 't0' }, changed: 0 });
   });
 
   test('every mill has a rule per limit, per form and one for typing slips', () => {
@@ -206,22 +208,45 @@ describe('saving alert settings', () => {
   test('saved into the same document as the limits, the limits carried forward; reset prunes it', async () => {
     const limits = { lsm: { 'flywheel-temp': { min: null, max: 70, by: 'A', at: '2026-11-18T00:00:00.000Z' } } };
     const added = fakeStore([{ result: { version: 1, updatedAt: '2026-11-18T00:00:00.000Z', updatedBy: 'A', limits }, createdAt: '2026-11-18T00:00:00.000Z' }]);
-    const r = await saveAlertSettings(env, 'lsm', { by: 'Ravi', defaults: { repeatHours: 6 }, rules: { 'limit:vibration': { enabled: false } } }, 'user-1');
+    const r = await saveAlertSettings(env, 'lsm', { by: 'Ravi', defaults: { minSeverityToNotify: 'critical' }, rules: { 'limit:vibration': { enabled: false } } }, 'user-1');
     expect(r).toMatchObject({ ok: true, changed: 2 });
     const doc = added[0].result as SettingsDoc;
     expect(doc.limits).toEqual(limits);
     expect(doc.alerts).toEqual({ lsm: {
-      defaults: { repeatHours: 6, by: 'Ravi', at: r.updatedAt },
+      defaults: { minSeverityToNotify: 'critical', by: 'Ravi', at: r.updatedAt },
       rules: { 'limit:vibration': { enabled: false, by: 'Ravi', at: r.updatedAt } },
     } });
     // In use at once.
     expect(alertSection(await loadSettings(env), 'lsm').rules?.['limit:vibration']?.enabled).toBe(false);
 
-    const back = await saveAlertSettings(env, 'lsm', { by: 'Ravi', defaults: { repeatHours: null }, rules: { 'limit:vibration': null } }, 'user-1');
+    const back = await saveAlertSettings(env, 'lsm', { by: 'Ravi', defaults: { minSeverityToNotify: null }, rules: { 'limit:vibration': null } }, 'user-1');
     expect(back.changed).toBe(2);
     expect((added[1].result as SettingsDoc).alerts).toBeUndefined();
     // Nothing different: nothing written.
     expect((await saveAlertSettings(env, 'lsm', { rules: { 'limit:vibration': null } }, 'user-1')).changed).toBe(0);
+    expect(added).toHaveLength(2);
+  });
+
+  test('the contact list: saved whole, checked, kept when other settings are saved', async () => {
+    const added = fakeStore([]);
+    const level = { everyMinutes: 0, sms: { enabled: true, contacts: ['+91 98765-43210', '+919876543210'] }, whatsapp: { enabled: false, contacts: ['98765 43210'] }, email: { enabled: true, contacts: ['Shift.Engg@MSP.in'] } };
+    const r = await saveAlertSettings(env, 'rmd', { by: 'Ravi', escalation: { onePerCrossing: true, levels: [level] } }, 'u');
+    expect(r.changed).toBe(1);
+    const saved = (added[0].result as { alerts: Record<string, { escalation: unknown }> }).alerts.rmd.escalation;
+    expect(saved).toEqual({
+      onePerCrossing: true,
+      levels: [{ everyMinutes: 0, sms: { enabled: true, contacts: ['+919876543210'] }, whatsapp: { enabled: false, contacts: ['9876543210'] }, email: { enabled: true, contacts: ['shift.engg@msp.in'] } }],
+      by: 'Ravi', at: r.updatedAt,
+    });
+    expect(alertSection(await loadSettings(env), 'rmd').escalation).toMatchObject({ onePerCrossing: true, setBy: 'Ravi', levels: [expect.objectContaining({ everyMinutes: 0 })] });
+    // A tuning save carries the contact list forward; the same list again changes nothing.
+    await saveAlertSettings(env, 'rmd', { by: 'Ravi', defaults: { onDelayReadings: 2 } }, 'u');
+    expect((added[1].result as { alerts: Record<string, { escalation: unknown }> }).alerts.rmd.escalation).toEqual(saved);
+    expect((await saveAlertSettings(env, 'rmd', { by: 'Ravi', escalation: { onePerCrossing: true, levels: [level] } }, 'u')).changed).toBe(0);
+    // Refused whole: a channel on with nobody, a bad number, a bad interval.
+    await expect(saveAlertSettings(env, 'rmd', { by: 'Ravi', escalation: { onePerCrossing: false, levels: [
+      { ...level, everyMinutes: 1.5, sms: { enabled: true, contacts: ['12ab'] }, email: { enabled: true, contacts: [] } },
+    ] } }, 'u')).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Level 1: every must be whole minutes.*"12ab" is not a phone number.*Level 1 SMS is on with nobody on it.*Level 1 Email is on with nobody on it/) });
     expect(added).toHaveLength(2);
   });
 

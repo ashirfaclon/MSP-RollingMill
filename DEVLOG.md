@@ -96,10 +96,38 @@ Guide: `SETTINGS_AND_ALERTS_REPLICATION.md` (from the CPP developer). Plan agree
 | 1 | Fix the shared IOsense login (audit S-01 / S-07) | **Deferred** by the user; needed before go-live |
 | 2 | Settings screen: every limit editable, readings coloured by them | **Done** 19 Nov (`2d8c53a`) |
 | 3 | Alerts page: limits crossed, data checks (not filled, typing slip, can't read) | **Done** 19 Nov (`119f13b`) |
-| 4 | Alert settings (on/off, readings in a row, deadband, severity, repeat, messages from) | **Done** 19 Nov (`119f13b`) |
-| 5 | Alert sender — its own deployment; memory of what was sent kept in IOsense | **Next** (paused until the RMD points are done) |
-| 6 | n8n webhook + recipients | Waiting for the user: webhook URL and a recipients md file |
+| 4 | Alert settings (on/off, readings in a row, deadband, severity, messages from) | **Done** 19 Nov (`119f13b`); per-alert "repeat" dropped 21 Nov (the contact list's timings replace it) |
+| 5 | Alert sender — its own deployment; memory of what was sent kept in IOsense | **Built 21 Nov, not committed, not deployed** (see below) |
+| 6 | n8n webhook + recipients | Received 21 Nov: `SMS-ALERTS.md` (the Melt Shop's working system — escalation matrix of SMS / WhatsApp / email per level; payload with `smsTo` / `whatsappTo` / `emailTo`, subject, 7-line body) and the n8n URLs, path `msp/rmsalerts` (prod `/webhook/`, test `/webhook-test/`). Build to match that payload |
 | 7–9 | Full tests, go-live one mill at a time (LSM / RMS first — fresh data), docs | Open |
+
+**User's answers, 21 Nov:** the `rmsalerts` n8n workflow already exists (built like the SMS one); ONE
+webhook for all four mills, each message names its **department** (HSM / RMD / LSM / RMS); **one contact
+list per mill**; data checks are **never** sent.
+
+**What was built 21 Nov (step 5 + the recipients part of 6):**
+- Settings → new tab **Escalation matrix** (renamed from "Who is told" by the user, 21 Nov) (`frontend/src/components/settings/ContactSettings.tsx`): per mill, up to
+  10 levels, each with "every N minutes" and SMS / WhatsApp / email (switch + comma list), and the switch
+  **One message per crossing** (on by default = level 1 told once). Stored in the settings document under
+  `alerts.<mill>.escalation`, saved whole through `POST /api/settings/:mill/alerts` (`escalation` in the
+  body); checked by `backend/src/modules/alerts/escalation.ts` (phones normalised, a channel on with nobody refused).
+- "Messages from" is critical or warning only; data checks never send (also enforced in the sender).
+- The sender: `backend/src/modules/alerts/sender/` — `main.ts` (loop + health page), `decide.ts` (what is
+  news), `message.ts` (SMS-ALERTS.md payload + `department`), `deliver.ts` (outbox, retries 1/2/4…30 min,
+  gives up after 24 h), `webhook.ts` (X-Alert-Token, `/webhook-test/` rehearsal copy), `state.ts` (memory),
+  `status.ts` (the Alerts page banner: running or not). It runs `millAlerts` itself (the same checker as the
+  page) with the PAT — no dashboard login involved, so the S-01 shared-login problem doesn't silence it.
+- Memory in IOsense, logbook insight: tag `rolling-mill-alerts/sender` (one row, updated in place, at least
+  every 30 min) and `rolling-mill-alerts/sent` (one row per message sent = the alert history). Memory older
+  than 6 h is not trusted (looks afresh quietly) so a long outage never floods old alerts.
+- Run: `npm --prefix backend run alerts` (local) / `alerts:prod` (built, `dist/alert-sender.js`). Env in
+  `backend/.env.example` (ALERT_*). **Run exactly one sender.**
+- Tested: unit tests (`backend/test/unit/alert-sender.test.ts`, 18) + Playwright `alerts.e2e.spec.ts`; and a
+  live run on real IOsense data with a local catcher instead of n8n and test memory tags: 5 real RMD oil-tank
+  alerts sent once each (main + rehearsal, token attached), nothing repeated; after a restart it read its
+  memory back (17 crossings) and sent nothing. Test rows deleted after.
+- **Not done yet:** nothing posted to the real n8n URL; not committed; not deployed; no contacts entered;
+  `ALERT_WEBHOOK_SECRET` must be agreed with whoever owns the n8n workflow.
 
 Decisions: limits the plant didn't give are **standard placeholders** (labelled so, with their basis)
 until the plant types its own; everything lives in one IOsense document (tag
@@ -133,3 +161,5 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   MSP Steel's logo in the sidebar (was an "MSP" text badge): the user's `frontend/public/msp-logo.png`
   (447 × 447, white background) cropped to its lettering as `msp-logo-wordmark.png`, on a white tile so
   the navy shows on the dark rail; smaller when the sidebar is collapsed.
+  Later 21 Nov: the user gave `SMS-ALERTS.md` + the n8n `rmsalerts` URLs; built the alert sender and the
+  Escalation matrix tab (section 5). Work on `main`, uncommitted (the HSM branch is untouched).

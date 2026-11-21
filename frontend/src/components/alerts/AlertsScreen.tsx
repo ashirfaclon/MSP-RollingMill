@@ -11,7 +11,7 @@
  *                    default never sent as a message
  *
  * An alert switched off in Settings still shows, muted (§6.1). No demo rows: an invented alert looks
- * identical to a real one (§10.3). Until the alert sender runs, the page says nothing is sent.
+ * identical to a real one (§10.3). The banner says whether the alert sender (its own deployment) is running.
  */
 import KpiCard from '@/components/visualization/KpiCard';
 import Panel from '@/components/Panel';
@@ -46,9 +46,10 @@ const limitOf = (a: Alarm) => {
 
 const RANK: Record<AlertSeverity, number> = { data: 0, warning: 1, critical: 2 };
 
-/** Whether this row will send a message: on, off in Settings, or below the alert's "Messages from" (screen only). */
+/** Whether this row will send a message: on, off in Settings, below the alert's "Messages from", or a data check (never sent). */
 function Messages({ a, report }: { a: Alarm; report: AlertsReport }) {
   if (a.muted) return <span className="pill pill--na" title="Messages are off for this alert in Settings — it still shows here">Off</span>;
+  if (a.kind !== 'limit') return <span className="al-on" title="Data checks are shown here and never sent">Screen only</span>;
   const floor = (report.rules.find((r) => r.ruleId === a.ruleId)?.controls ?? report.defaults).minSeverityToNotify;
   return RANK[a.severity] < RANK[floor]
     ? <span className="al-on" title={`Messages are sent from ${SEVERITY_LABEL[floor].toLowerCase()} up for this alert`}>Screen only</span>

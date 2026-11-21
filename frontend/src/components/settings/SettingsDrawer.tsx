@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * The Settings screen (the user, 19 Nov 2026; SETTINGS_AND_ALERTS_REPLICATION.md §10), two tabs:
- *   Limits   every limit of the mill a reading is judged by — and alerts raise on — with where it came
- *            from: the plant's own, a standard placeholder to replace, or "Set by <name> on <date>"
- *   Alerts   when each alert sends a message (AlertSettings.tsx)
+ * The Settings screen (the user, 19 Nov 2026; SETTINGS_AND_ALERTS_REPLICATION.md §10), three tabs:
+ *   Limits        every limit of the mill a reading is judged by — and alerts raise on — with where it came
+ *                 from: the plant's own, a standard placeholder to replace, or "Set by <name> on <date>"
+ *   Alerts        when each alert sends a message (AlertSettings.tsx)
+ *   Escalation matrix   the mill's contact list: levels, SMS / WhatsApp / email, how often (ContactSettings.tsx, 21 Nov 2026)
  * Opened from the top bar's Settings button, a drill-down's "Edit limits" (at that limit), or the
  * Alerts page (at that alert). One name box and one Save, for the tab that is open.
  *
@@ -23,6 +24,7 @@ import { postJson, type LimitSetting, type SettingsSaveResult } from '@/services
 import { HSM_MOTORS_URL, RMD_TANKS_URL, useHsmMotorRatings, useRmdOilTanks } from '@/services/equipment';
 import { settingsUrl, useMillSettings, type SettingsMill, type SettingsTab } from '@/services/settings';
 import { useAlertSettings } from './AlertSettings';
+import { useContactSettings } from './ContactSettings';
 import '@/components/plan/plan.css';
 import '@/components/checklist/checklist.css';
 import '@/components/asset/asset.css';
@@ -53,7 +55,8 @@ export default function SettingsDrawer({ mill, tab: openedAt = 'limits', focusId
   const [name, setName] = useState(savedName);
   const limits = useLimitSettings(mill, name, openedAt === 'limits' ? focusId : null, tab === 'limits');
   const alerts = useAlertSettings(mill, name, openedAt === 'alerts' ? focusId : null, tab === 'alerts');
-  const pane = tab === 'limits' ? limits : alerts;
+  const contacts = useContactSettings(mill, name);
+  const pane = tab === 'limits' ? limits : tab === 'alerts' ? alerts : contacts;
 
   const save = () => {
     try { if (name.trim()) window.localStorage.setItem(NAME_KEY, name.trim()); } catch { /* the name is only a convenience */ }
@@ -62,6 +65,7 @@ export default function SettingsDrawer({ mill, tab: openedAt = 'limits', focusId
   const tabs: { id: SettingsTab; label: string; pending: number }[] = [
     { id: 'limits', label: 'Limits', pending: limits.pending },
     { id: 'alerts', label: 'Alerts', pending: alerts.pending },
+    { id: 'contacts', label: 'Escalation matrix', pending: contacts.pending },
   ];
   const controls = (
     <div className="set-bar">
@@ -86,7 +90,7 @@ export default function SettingsDrawer({ mill, tab: openedAt = 'limits', focusId
 
   return (
     <DrillDrawer open onClose={onClose} title={`${MILL_NAME[mill]} · Settings`}
-      sub={tab === 'limits' ? 'The limits every screen judges a reading by — and alerts raise on' : 'When each alert sends a message'}
+      sub={tab === 'limits' ? 'The limits every screen judges a reading by — and alerts raise on' : tab === 'alerts' ? 'When each alert sends a message' : 'Who is told when an alert sends a message, and how often'}
       controls={controls} loading={!pane.data && !pane.error} error={pane.error} hasData={!!pane.data}>
       {pane.status && <p role="status" className={`set-msg${pane.status.kind === 'error' ? ' set-msg--error' : ''}`}>{pane.status.text}</p>}
       {pane.body}
