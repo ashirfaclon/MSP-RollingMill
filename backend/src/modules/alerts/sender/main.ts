@@ -150,6 +150,8 @@ function serveHealth() {
     res.end(JSON.stringify(body));
     void req;
   });
+  // A port already taken (locally, PORT in backend/.env is the API's) costs the health page, never the sending.
+  server.on('error', (e) => log(`health page not served on :${cfg.port} — ${e.message}; set ALERT_PORT. Alerts are still checked and sent.`));
   server.listen(cfg.port, () => log(`health on :${cfg.port}`));
   return server;
 }

@@ -163,3 +163,6 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   the navy shows on the dark rail; smaller when the sidebar is collapsed.
   Later 21 Nov: the user gave `SMS-ALERTS.md` + the n8n `rmsalerts` URLs; built the alert sender and the
   Escalation matrix tab (section 5). Work on `main`, uncommitted (the HSM branch is untouched).
+  Sender deployed by the user 21 Nov (`3318c69`), running and primed (17 standing alerts adopted quietly) but
+  with **0 receivers**: `ALERT_WEBHOOK_URL` / `ALERT_WEBHOOK_SECRET` still to be set on its deployment.
+  `a0c478f`: `alerts:prod` now builds first (the first deploy failed with MODULE_NOT_FOUND).
