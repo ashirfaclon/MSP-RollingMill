@@ -10,6 +10,11 @@
  *
  * Mass yield = production ÷ billet input × 100; mass difference = billet input − production.
  *
+ * Rolling in Casting % / Delivery % and Plant Efficiency % (the plant, 21 Nov 2026 — the Zoho TMT KPIs,
+ * the ERP's figures): each entry's ROLLING_IN_TOTAL_PERCENTAGE / ROLLING_IN_DELIVERY_PRCNT, over a period
+ * their average weighted by the entries' billet input; efficiency = Σ production ÷ Σ PRODUCTION_TARGET
+ * over the entries that have both, which for one entry is the ERP's PLANT_EFFICIENCY.
+ *
  * Online / Offline (`mode`, the user, 13 Nov 2026): only that rolling's entries (RMD_MODE_CODES);
  * all of them for Both. An entry synced before the split has no mode, so it counts under Both only.
  */
@@ -31,6 +36,24 @@ export const sumOf = (rows: RmdLogRow[], f: RmdLogField) => {
   return v.length ? round2(v.reduce((a, b) => a + b, 0)) : null;
 };
 
+/** A percentage of each entry, over several: weighted by the entry's billet input (equal weights where none is entered). */
+export function weightedPct(rows: RmdLogRow[], f: RmdLogField): number | null {
+  const v = rows.filter((r) => typeof r.v[f] === 'number');
+  if (!v.length) return null;
+  const w = (r: RmdLogRow) => (v.every((x) => (x.v.INPUT_MT ?? 0) > 0) ? r.v.INPUT_MT! : 1);
+  const total = v.reduce((a, r) => a + w(r), 0);
+  return round2(v.reduce((a, r) => a + r.v[f]! * w(r), 0) / total);
+}
+
+/** Σ production ÷ Σ target × 100 over the entries with both; null with none. */
+export function efficiencyPct(rows: RmdLogRow[]): number | null {
+  const both = rows.filter((r) => r.v.PRODUCT_PRIME_SLENGTH_MT !== null && (r.v.PRODUCTION_TARGET ?? 0) > 0);
+  if (!both.length) return null;
+  const prod = both.reduce((a, r) => a + r.v.PRODUCT_PRIME_SLENGTH_MT!, 0);
+  const target = both.reduce((a, r) => a + r.v.PRODUCTION_TARGET!, 0);
+  return round2((prod / target) * 100);
+}
+
 export function summarise(key: string, label: string, dates: string[], rows: RmdLogRow[]): RmdProductionPeriod {
   const mine = rows.filter((r) => r.date >= dates[0] && r.date <= dates[dates.length - 1]);
   const losses = [sumOf(mine, 'BLOSS_MT'), sumOf(mine, 'ENDCUT_MT'), sumOf(mine, 'MISROLL_MT'), sumOf(mine, 'CHIP_OFF_MT')];
@@ -47,6 +70,10 @@ export function summarise(key: string, label: string, dates: string[], rows: Rmd
     billetInputMt,
     massDiffMt: massDifference(billetInputMt, productionMt),
     massYieldPct: massYield(productionMt, billetInputMt),
+    rollingInCastingPct: weightedPct(mine, 'ROLLING_IN_TOTAL_PERCENTAGE'),
+    rollingInDeliveryPct: weightedPct(mine, 'ROLLING_IN_DELIVERY_PRCNT'),
+    plantEfficiencyPct: efficiencyPct(mine),
+    targetMt: sumOf(mine, 'PRODUCTION_TARGET'),
   };
 }
 

@@ -112,8 +112,8 @@ test('RMD mill mimic is the process twin: one infeed, two rows in the dashboard\
   await expect(twin).toBeVisible({ timeout: 60_000 });
   await expect(twin.locator('.mx-name')).toHaveText([
     'Billet infeed',
-    'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'FS', 'PRI', 'PR2', 'TB1', 'TB2',
-    'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'CS', 'PR pre', 'PR post', 'TB 1', 'TB 2',
+    'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'PR1', 'FS', 'PR2', 'TB1', 'TB2',
+    'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'PR1', 'CS', 'PR2', 'TB1', 'TB2',
     'Finished exit',
   ]);
   await expect(twin.locator('.mx-pipe')).toHaveCount(14 + 12);
@@ -124,7 +124,7 @@ test('RMD mill mimic is the process twin: one infeed, two rows in the dashboard\
   await expect(twin.locator('.mx-group')).toHaveCount(4);
   await page.waitForTimeout(800);
   await panel.screenshot({ path: `${SHOTS}/rmd-twin.png` });
-  await twin.locator('.mx-node', { hasText: 'PR pre' }).click();
+  await twin.locator('.mx-node', { hasText: 'CS' }).click();
   await expect(page.getByRole('dialog', { name: /Finishing/ })).toBeVisible();
   await page.keyboard.press('Escape');
 });
@@ -134,23 +134,23 @@ test('RMD the 01:38 case (fixture): line 2 stands carry the steel, line 1 finish
   await page.goto('/rmd/visualization');
   const panel = panelOf(page);
   const twin = panel.getByRole('img', { name: /^RMD mill/ });
-  await expect(twin.locator('.mx-pipe[data-k="r:L1_S8>L1_FS"]')).toHaveClass(/mx-pipe--idle/, { timeout: 60_000 });   // no feed path into FS: idle, no sentence
+  await expect(twin.locator('.mx-pipe[data-k="r:L1_S8>L1_PRI"]')).toHaveClass(/mx-pipe--idle/, { timeout: 60_000 });   // no feed path into PR1: idle, no sentence
   await expect(twin.locator('.mx-group')).toHaveText(['Line 1 · Route / diverter · 0 of 8 on', 'Line 1 · Finishing · 5 of 5 on', 'Line 2 · Route / diverter · 6 of 6 on', 'Line 2 · Finishing · 0 of 5 on']);
-  // Line 2: the fork and S1 → … → S6 → CS move (7); line 1's finishing moves its five; S8 → FS is still.
+  // Line 2: the fork and S1 → … → S6 → PR1 move (7); line 1's finishing moves its five; S8 → PR1 is still.
   await expect(twin.locator('.mx-pipe--active')).toHaveCount(12);
-  await expect(twin.locator('.mx-pipe[data-k="r:L2_S6>L2_CS_On_Off"]')).toHaveClass(/mx-pipe--active/);
+  await expect(twin.locator('.mx-pipe[data-k="r:L2_S6>L2_Pinch_Roll_Pre_On_Off"]')).toHaveClass(/mx-pipe--active/);
   const fs = twin.locator('.mx-node', { hasText: 'FS' });
   await expect(fs.locator('.mx-read')).toHaveText(/^-4 \? A$/);
   await expect(fs.locator('.mx-read')).toHaveClass(/mx-read--suspect/);
   await expect(fs.locator('.mx-lamp')).toHaveClass(/mx-lamp--warning/);
   await expect(fs.locator('.mx-bar')).toHaveCount(0);
-  await expect(twin.locator('.mx-sub', { hasText: /^LINE 2 SPEED/ })).toHaveText('LINE 2 SPEED 18.4 M/S');
+  await expect(twin.locator('.mx-sub', { hasText: /^LINE 2 SPEED/ })).toHaveText('LINE 2 SPEED 18.4 MPS');
   await expect(panel.locator('.chip')).toHaveText(/^Live · \d\d:\d\d IST$/);
-  // Selecting PRI lights its whole path: infeed … FS, PRI, PR2, TB1, TB2 … exit — not line 2.
-  await twin.locator('.mx-node', { hasText: 'PRI' }).click();
+  // Selecting line 1's PR1 lights its whole path: infeed … PR1, FS, PR2, TB1, TB2 … exit — not line 2.
+  await twin.locator('.mx-node', { hasText: 'PR1' }).first().click();
   await expect(twin.locator('.mx-select')).toHaveCount(1);
   await expect(twin.locator('.mx-node.is-on')).toHaveCount(2 + 13);
-  await expect(twin.locator('.mx-node', { hasText: 'PR post' })).toHaveClass(/is-off/);
+  await expect(twin.locator('.mx-node', { hasText: 'PR2' }).nth(1)).toHaveClass(/is-off/);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(600);
   await panel.screenshot({ path: `${SHOTS}/rmd-twin-crossover.png` });

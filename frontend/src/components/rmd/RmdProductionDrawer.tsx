@@ -5,7 +5,9 @@
  * week / month. Three views of the same data:
  *   production  production per period (Production card, Finished exit, Order allocation);
  *   yield       mass yield = production ÷ billet input (INPUT_MT) (Mass yield card);
- *   balance     billet input, production and where the rest went — the four losses (Material balance).
+ *   balance     billet input, production and where the rest went — the four losses (Material balance);
+ *   performance Rolling in Casting %, Rolling in Delivery %, Plant Efficiency % — the Zoho TMT KPIs as
+ *               the ERP log sheet holds them (the plant, 21 Nov 2026; the ERP is the source of truth).
  * Source, filters and codes exactly as the plant gave them (USER_CODE = 'FA-SKJ').
  */
 import { useMemo } from 'react';
@@ -17,7 +19,7 @@ import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdProductionPeriod, type RmdProductionReport } from '@/services/hsmApi';
 
-export type RmdProductionView = 'production' | 'yield' | 'balance';
+export type RmdProductionView = 'production' | 'yield' | 'balance' | 'performance';
 
 const f = (v: number | null) => (v === null ? '—' : fmtNum(v, 2));
 
@@ -40,14 +42,15 @@ export default function RmdProductionDrawer({ open, onClose, view }: { open: boo
       open={open}
       onClose={onClose}
       title={TITLE[view]}
-      sub={view === 'yield' ? 'RMD · %' : 'RMD · MT'}
+      sub={view === 'yield' || view === 'performance' ? 'RMD · %' : 'RMD · MT'}
       controls={r.controls}
       loading={loading}
       stale={!!data && dataUrl !== url}
       error={error}
       hasData={!!data}
     >
-      {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} /> : <BalanceContent data={data} />)}
+      {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} />
+        : view === 'performance' ? <PerformanceContent data={data} /> : <BalanceContent data={data} />)}
     </DrillDrawer>
   );
 }
@@ -56,6 +59,7 @@ const TITLE: Record<RmdProductionView, string> = {
   production: 'Production · ERP log sheet',
   yield: 'Mass yield · ERP log sheet',
   balance: 'Material balance · ERP log sheet',
+  performance: 'Rolling in casting, delivery and plant efficiency · ERP log sheet',
 };
 
 const label = (x: RmdProductionPeriod) => (
@@ -141,6 +145,60 @@ function YieldRow({ x }: { x: RmdProductionPeriod }) {
       <td className="num r">{f(x.billetInputMt)}</td>
       <td className="num r">{f(x.productionMt)}</td>
       <td className="num r v-val"><b>{f(x.massYieldPct)}</b></td>
+    </tr>
+  );
+}
+
+function PerformanceContent({ data }: { data: RmdProductionReport }) {
+  const rows = data.rows;
+  const t = data.totals;
+  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
+  const series = useMemo<DrillSeries[]>(() => [
+    { id: 'casting', name: 'Rolling in casting', token: '--s-prod', type: 'column', data: rows.map((x) => x.rollingInCastingPct), dp: 2 },
+    { id: 'delivery', name: 'Rolling in delivery', token: '--s-order', type: 'column', data: rows.map((x) => x.rollingInDeliveryPct), dp: 2 },
+    { id: 'efficiency', name: 'Plant efficiency', token: '--s-pred', type: 'column', data: rows.map((x) => x.plantEfficiencyPct), dp: 2 },
+  ], [rows]);
+  const axes = useMemo(() => [{ title: '%', unit: '%' }], []);
+
+  return (
+    <>
+      <Stats items={[
+        { label: 'Rolling in casting', value: f(t.rollingInCastingPct), unit: '%' },
+        { label: 'Rolling in delivery', value: f(t.rollingInDeliveryPct), unit: '%' },
+        { label: 'Plant efficiency', value: f(t.plantEfficiencyPct), unit: '%' },
+      ]} />
+      <DrillChart series={series} categories={categories} axes={axes}
+        ariaLabel={`Rolling performance by period: ${rows.map((x) => `${x.label} casting ${f(x.rollingInCastingPct)}%, delivery ${f(x.rollingInDeliveryPct)}%, efficiency ${f(x.plantEfficiencyPct)}%`).join('; ')}`} />
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label="Rolling performance by period">
+          <thead><tr><th>Period</th><th className="r">Rolling in casting (%)</th><th className="r">Rolling in delivery (%)</th><th className="r">Plant efficiency (%)</th><th className="r">Prime + SL (MT)</th><th className="r">Target (MT)</th></tr></thead>
+          <tbody>{rows.map((x) => <PerformanceRow key={x.key} x={x} />)}</tbody>
+          <tfoot><PerformanceRow x={t} /></tfoot>
+        </table>
+      </div>
+      <SourceBox
+        sources={sources(['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DELIVERY_PRCNT', 'PRODUCT_PRIME_SLENGTH_MT', 'PRODUCTION_TARGET', 'INPUT_MT'])}
+        formula={[
+          'Rolling in casting = ROLLING_IN_TOTAL_PERCENTAGE of each entry; over several entries, their average weighted by INPUT_MT',
+          'Rolling in delivery = ROLLING_IN_DELIVERY_PRCNT of each entry; over several entries, their average weighted by INPUT_MT',
+          'Plant efficiency = Σ PRODUCT_PRIME_SLENGTH_MT ÷ Σ PRODUCTION_TARGET × 100 (one entry: the ERP\'s PLANT_EFFICIENCY)',
+          'Target is the ERP\'s, used for efficiency only — the production plan is the one filled on the dashboard',
+        ]}
+      />
+      {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
+    </>
+  );
+}
+
+function PerformanceRow({ x }: { x: RmdProductionPeriod }) {
+  return (
+    <tr>
+      {label(x)}
+      <td className="num r v-val">{f(x.rollingInCastingPct)}</td>
+      <td className="num r v-val">{f(x.rollingInDeliveryPct)}</td>
+      <td className="num r v-val">{f(x.plantEfficiencyPct)}</td>
+      <td className="num r">{f(x.productionMt)}</td>
+      <td className="num r">{f(x.targetMt)}</td>
     </tr>
   );
 }

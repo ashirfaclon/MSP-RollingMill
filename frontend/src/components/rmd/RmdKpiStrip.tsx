@@ -9,6 +9,9 @@
  *                       PRODUCT_PRIME_SLENGTH_MT (Prime + SL, SL = short length, which every other
  *                       figure uses) and FINISH_PRODUCT_PRIME_MT (Prime); both open one drawer;
  *   Mass yield          Prime + SL ÷ billet input (INPUT_MT), both from the ERP log sheet;
+ *   Rolling in casting / Rolling in delivery / Plant efficiency  the Zoho TMT KPIs the plant asked for
+ *                       (21 Nov 2026), as the ERP log sheet holds them: ROLLING_IN_TOTAL_PERCENTAGE,
+ *                       ROLLING_IN_DELIVERY_PRCNT, production ÷ PRODUCTION_TARGET; all three open one drawer;
  *   Power consumption   the logbook forms Power Reading VCB 1 / 2 / 3 (live, as filled);
  *   Specific energy     power ÷ ERP production (backend power report);
  *   Mill MPS            Influx CR Mill1/2 · General · MILL1_MPS / MILL2_MPS, m/s (RmdMillSpeedCard);
@@ -32,6 +35,7 @@ const mt1 = (v: number | null | undefined) => (v == null ? 'NA' : fixed(v, 1));
 export default function RmdKpiStrip() {
   const [yieldOpen, setYieldOpen] = useState(false);
   const [prodOpen, setProdOpen] = useState(false);
+  const [perfOpen, setPerfOpen] = useState(false);
   const { dates } = useSelection();
   const { data, error, last } = useRmdProduction(dates);
   const t = data?.totals;
@@ -90,6 +94,28 @@ export default function RmdKpiStrip() {
         openLabel="Mass yield per day, from the ERP log sheet"
       />
       <RmdProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
+      {/* Row 1 ends with the Zoho TMT KPIs (the plant, 21 Nov 2026); one drawer for the three. */}
+      {([
+        ['Rolling in casting', 'rollingInCastingPct'],
+        ['Rolling in delivery', 'rollingInDeliveryPct'],
+        ['Plant efficiency', 'plantEfficiencyPct'],
+      ] as const).map(([label, k]) => (
+        <KpiCard
+          key={k}
+          label={label}
+          term={term}
+          value={t?.[k] == null ? 'NA' : fixed(t[k], 1)}
+          noEntries={up && t?.[k] == null}
+          lastEntry={lastOf(t?.[k], (lt) => lt[k])}
+          unit="%"
+          note={note}
+          series="ok"
+          loading={!data && !error}
+          onOpen={() => setPerfOpen(true)}
+          openLabel="Rolling in casting, rolling in delivery and plant efficiency per day, from the ERP log sheet"
+        />
+      ))}
+      <RmdProductionDrawer view="performance" open={perfOpen} onClose={() => setPerfOpen(false)} />
       <PowerKpiCard mill="rmd" />
       <SpecificEnergyCard mill="rmd" />
       <RmdMillSpeedCard />

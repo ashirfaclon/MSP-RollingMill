@@ -27,7 +27,7 @@ export const runKey = (a: string, b: string) => `r:${a}>${b}`;
 
 export interface TwinNode {
   id: string;
-  /** As the plant says it: RM1, FM6, S3, PR pre. */
+  /** As the plant says it: RM1, FM6, S3, PR1. */
   name: string;
   kind: TwinMachine;
   /** Which row and section of the drawing it belongs to. */

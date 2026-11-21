@@ -1,5 +1,7 @@
 # MSP-RollingMill - AI Assistant Guide
 
+    **Start every session by reading `DEVLOG.md`** (what is built, decided and pending), and add to it before ending.
+
     ## Project: IOsense Platform Integration
     Framework: react | Template: nextjs
 

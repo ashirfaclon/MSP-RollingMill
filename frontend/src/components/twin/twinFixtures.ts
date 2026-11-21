@@ -71,14 +71,15 @@ export function rmdFixtures(now: number) {
   });
   const L1_ROUTE = (on: (n: number) => boolean | null, a: (n: number) => number | null) => [1, 2, 3, 4, 5, 6, 7, 8].map((n) => st(`L1_S${n}`, 'route', 1, `S${n}`, on(n), a(n)));
   const L2_ROUTE = (on: boolean | null, a: (n: number) => number | null) => [1, 2, 3, 4, 5, 6].map((n) => st(`L2_S${n}`, 'route', 2, `S${n}`, on, a(n)));
+  // Currents in each fixture are listed shear first (FS / CS, then the first pinch roll …), as written before the 11 Nov reorder.
   const L1_FIN = (on: boolean | null, a: number[]) => [
-    st('L1_FS', 'finishing', 1, 'FS', on, a[0]), st('L1_PRI', 'finishing', 1, 'PRI', on, a[1]), st('L1_PR2', 'finishing', 1, 'PR2', on, a[2]),
+    st('L1_PRI', 'finishing', 1, 'PR1', on, a[1]), st('L1_FS', 'finishing', 1, 'FS', on, a[0]), st('L1_PR2', 'finishing', 1, 'PR2', on, a[2]),
     st('L1_TB1', 'finishing', 1, 'TB1', on, a[3]), st('L1_TB2', 'finishing', 1, 'TB2', on, a[4]),
   ];
   const L2_FIN = (on: boolean | null, a: number[]) => [
-    st('L2_CS_On_Off', 'finishing', 2, 'CS', on, a[0]), st('L2_Pinch_Roll_Pre_On_Off', 'finishing', 2, 'PR pre', on, a[1]),
-    st('L2_Pinch_Roll_Post_On_Off', 'finishing', 2, 'PR post', on, a[2]), st('L2_Tail_Breaker_01_On_Off', 'finishing', 2, 'TB 1', on, a[3]),
-    st('L2_Tail_Breaker_02_On_Off', 'finishing', 2, 'TB 2', on, a[4]),
+    st('L2_Pinch_Roll_Pre_On_Off', 'finishing', 2, 'PR1', on, a[1]), st('L2_CS_On_Off', 'finishing', 2, 'CS', on, a[0]),
+    st('L2_Pinch_Roll_Post_On_Off', 'finishing', 2, 'PR2', on, a[2]), st('L2_Tail_Breaker_01_On_Off', 'finishing', 2, 'TB1', on, a[3]),
+    st('L2_Tail_Breaker_02_On_Off', 'finishing', 2, 'TB2', on, a[4]),
   ];
   const speed = (mill1: number | null, mill2: number | null): RmdMillSpeedReport['latest'] => ({ mill1, mill2, at: AT });
   const off5 = [0, 0, 0, 0, 0];

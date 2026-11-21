@@ -179,6 +179,17 @@ export interface RmdProductionPeriod {
   massDiffMt: number | null;
   /** productionMt ÷ billetInputMt × 100; null without both. */
   massYieldPct: number | null;
+  /**
+   * The Zoho TMT KPIs, from the ERP log sheet (the plant, 21 Nov 2026). Rolling in Casting % =
+   * ROLLING_IN_TOTAL_PERCENTAGE, Rolling in Delivery % = ROLLING_IN_DELIVERY_PRCNT — each entry's
+   * figure, over a period the average weighted by billet input. Plant Efficiency % = Σ production ÷
+   * Σ PRODUCTION_TARGET (one entry: exactly the ERP's PLANT_EFFICIENCY). Null with no entry.
+   */
+  rollingInCastingPct: number | null;
+  rollingInDeliveryPct: number | null;
+  plantEfficiencyPct: number | null;
+  /** Σ PRODUCTION_TARGET of the entries — what efficiency is measured against (not the plan). */
+  targetMt: number | null;
 }
 
 export interface RmdProductionReport {

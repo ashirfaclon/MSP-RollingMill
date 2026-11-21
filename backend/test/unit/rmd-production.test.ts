@@ -1,11 +1,12 @@
 /** RMD production and losses from the ERP log sheet (FA-SKJ codes as the plant gave them). */
 import { describe, expect, test } from 'vitest';
-import { massDifference, massYield, ofMode, summarise } from '../../src/modules/rmd/production.service';
+import { efficiencyPct, massDifference, massYield, ofMode, summarise, weightedPct } from '../../src/modules/rmd/production.service';
 import type { RmdLogRow } from '../../src/integrations/erp/cache';
 
 const entry = (date: string, vrno: string, input: number, prod: number, prime: number, bloss: number, endcut: number, misroll: number, chip: number): RmdLogRow => ({
   date, vrno, mode: vrno.endsWith('-0002') ? 'offline' : 'online',
-  v: { INPUT_MT: input, ACTUAL_RUNNING_HRS: 5, PRODUCT_PRIME_SLENGTH_MT: prod, FINISH_PRODUCT_PRIME_MT: prime, BLOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, CHIP_OFF_MT: chip, TOTAL_POWER_CONSUMPTION: null, MILL_SINGLE_STAND: null },
+  v: { INPUT_MT: input, ACTUAL_RUNNING_HRS: 5, PRODUCT_PRIME_SLENGTH_MT: prod, FINISH_PRODUCT_PRIME_MT: prime, BLOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, CHIP_OFF_MT: chip, TOTAL_POWER_CONSUMPTION: null, MILL_SINGLE_STAND: null,
+    ROLLING_IN_TOTAL_PERCENTAGE: null, ROLLING_IN_DELIVERY_PRCNT: null, PLANT_EFFICIENCY: null, PRODUCTION_TARGET: null },
 });
 // 7 Oct 2026 as the ERP holds it: two entries.
 const ROWS = [
@@ -50,5 +51,28 @@ describe('RMD production from the log sheet', () => {
   test('a field missing from an older cache is no entry, not NaN', () => {
     const old = ROWS.map((r) => ({ ...r, v: { ...r.v, TOTAL_POWER_CONSUMPTION: undefined as unknown as null } }));
     expect(summarise('d', '7 Oct', ['2026-10-07'], old).productionMt).toBe(200.12);
+  });
+});
+
+describe('the Zoho TMT KPIs from the ERP (the plant, 21 Nov 2026)', () => {
+  // 14 Jul 2026 as the ERP holds it: Online 207.78 MT of a 309 MT target; Offline 93.04 of 52.
+  const zoho = (vrno: string, input: number, prod: number, target: number, casting: number, delivery: number, eff: number): RmdLogRow => {
+    const e = entry('2026-07-14', vrno, input, prod, prod, 0, 0, 0, 0);
+    return { ...e, v: { ...e.v, PRODUCTION_TARGET: target, ROLLING_IN_TOTAL_PERCENTAGE: casting, ROLLING_IN_DELIVERY_PRCNT: delivery, PLANT_EFFICIENCY: eff } };
+  };
+  const ON = zoho('L4P26J14-0001', 217.24, 207.78, 309, 93.008, 94.903, 67.243);
+  const OFF = zoho('L4P26J14-0002', 100.93, 93.04, 52, 94.332, 94.332, 178.923);
+
+  test('one entry: exactly the ERP\'s figures; efficiency = production ÷ target', () => {
+    expect(summarise('d', '14 Jul', ['2026-07-14'], [ON])).toMatchObject({ rollingInCastingPct: 93.01, rollingInDeliveryPct: 94.9, plantEfficiencyPct: 67.24, targetMt: 309 });
+  });
+
+  test('several entries: the percentages weighted by billet input; efficiency Σ production ÷ Σ target', () => {
+    expect(weightedPct([ON, OFF], 'ROLLING_IN_TOTAL_PERCENTAGE')).toBe(93.43);
+    expect(efficiencyPct([ON, OFF])).toBe(83.33);
+  });
+
+  test('entries synced before the fields were read: null, not 0', () => {
+    expect(summarise('d', '7 Oct', ['2026-10-07'], ROWS)).toMatchObject({ rollingInCastingPct: null, rollingInDeliveryPct: null, plantEfficiencyPct: null, targetMt: null });
   });
 });

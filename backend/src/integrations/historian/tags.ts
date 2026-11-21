@@ -150,7 +150,8 @@ export const RMD_BILLET_COUNT = { M1: rmdBillets('M1'), M2: rmdBillets('M2') } a
  *                     Line-2 · General · CS / Pinch_Roll_Pre / Pinch_Roll_Post /
  *                     Tail_Breaker_01 / Tail_Breaker_02 _On_Off.
  * The sheet places line 2's finishing points under "Line-2" with no group; the historian has
- * them in Group "General" (seen 9 Oct 2026). Labels are the tag codes, not guessed names.
+ * them in Group "General" (seen 9 Oct 2026). Labels are the tag codes, except the pinch rolls and tail
+ * breakers, named as the plant says them (PR1, PR2, TB1, TB2 on both lines).
  */
 export type RmdZone = 'route' | 'finishing';
 export interface RmdStationDef {
@@ -176,11 +177,12 @@ export const RMD_STATIONS: RmdStationDef[] = [
   ] as const).map(([c, label, cur, spd]): RmdStationDef => ({
     id: `L1_${c}`, zone: 'finishing', line: 1, label, unitTag: 'Line-1', group: 'M1', field: `RUNNING_STATUS_${c}`, currentField: cur, speedField: spd,
   })),
+  // Line 2 named as line 1 (the plant: "PR1 should come before CS"): Pinch_Roll_Pre / _Post are PR1 / PR2.
   ...([
-    ['PR pre', 'Pinch_Roll_Pre_On_Off', 'Pinch_Roll_Pre_Current', 'Pinch_Roll_Pre_RPM'], ['CS', 'CS_On_Off', 'CS_Current', 'CS_RPM'],
-    ['PR post', 'Pinch_Roll_Post_On_Off', 'Pinch_Roll_Post_Current', 'Pinch_Roll_Post_RPM'],
-    ['TB 1', 'Tail_Breaker_01_On_Off', 'Tail_Break_01_Current', 'Tail_Break_01_RPM'],
-    ['TB 2', 'Tail_Breaker_02_On_Off', 'Tail_Break_02_Current', 'Tail_Break_02_RPM'],
+    ['PR1', 'Pinch_Roll_Pre_On_Off', 'Pinch_Roll_Pre_Current', 'Pinch_Roll_Pre_RPM'], ['CS', 'CS_On_Off', 'CS_Current', 'CS_RPM'],
+    ['PR2', 'Pinch_Roll_Post_On_Off', 'Pinch_Roll_Post_Current', 'Pinch_Roll_Post_RPM'],
+    ['TB1', 'Tail_Breaker_01_On_Off', 'Tail_Break_01_Current', 'Tail_Break_01_RPM'],
+    ['TB2', 'Tail_Breaker_02_On_Off', 'Tail_Break_02_Current', 'Tail_Break_02_RPM'],
   ] as const).map(([label, field, cur, spd]): RmdStationDef => ({
     id: `L2_${field}`, zone: 'finishing', line: 2, label, unitTag: 'Line-2', group: 'General', field, currentField: cur, speedField: spd,
   })),

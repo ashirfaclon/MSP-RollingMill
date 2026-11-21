@@ -85,7 +85,17 @@ export function readErpPm(env: Env): ErpPmCache | null {
  * time for TPH (the plant, 13 Nov 2026) — entered in minutes, already inside ACTUAL_RUNNING_HRS
  * (every entry Jun–Nov 2026: 5–50, on days running hours equal the scheduled hours).
  */
-export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT', 'TOTAL_POWER_CONSUMPTION', 'MILL_SINGLE_STAND'] as const;
+/**
+ * The Zoho TMT KPIs the plant asked for (21 Nov 2026: "Rolling on Casting, Delivery and Efficiency"),
+ * as the ERP log sheet holds them per entry — the ERP is the source of truth, Zoho's figures only a
+ * reference (the plant). Rolling in Casting % = ROLLING_IN_TOTAL_PERCENTAGE, the only casting-related
+ * percentage; PLANT_EFFICIENCY = PRODUCT_PRIME_SLENGTH_MT ÷ PRODUCTION_TARGET × 100 (checked on the
+ * entries of 14–20 Jul 2026). PRODUCTION_TARGET is read for efficiency only — the plan is typed on
+ * the dashboard (the plant).
+ */
+export const RMD_ROLLING_FIELDS = ['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DELIVERY_PRCNT', 'PLANT_EFFICIENCY', 'PRODUCTION_TARGET'] as const;
+export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT', 'TOTAL_POWER_CONSUMPTION', 'MILL_SINGLE_STAND',
+  ...RMD_ROLLING_FIELDS] as const;
 export type RmdLogField = (typeof RMD_LOG_FIELDS)[number];
 /**
  * Online / Offline: the log sheet head's TRAN_COLUMN_NAME1, RO001 = Online, RO002 = Offline (Management
