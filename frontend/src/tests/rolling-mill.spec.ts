@@ -38,15 +38,14 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
 
   const main = page.getByRole('main');
   for (const text of [
-    'Mill mimic', 'Production by shift', 'Finished stock', 'Material & operating balance',
+    'Mill mimic', 'Production vs plan', 'Finished stock', 'Material & operating balance',
     'Finished stock by size',
   ]) {
     await expect(main.getByText(text, { exact: false }).first()).toBeVisible();
   }
-  // Shift output is live (production split by shift); the order split has no source: 0.
-  const shifts = page.locator('.rm-flip-face--front section.panel');
-  await expect(shifts.locator('.rm-shift-name')).toHaveText(['Day', 'Night']);
-  await expect(shifts.locator('.rm-shift-val')).toHaveText([/^\d[\d,]*\.\d MT/, /^\d[\d,]*\.\d MT/]);   // live, split by shift
+  // Production vs plan: the whole day only, no shift breakdown (the user, 24 Nov 2026).
+  const shifts = page.locator('section.panel', { hasText: 'Production vs plan' });
+  await expect(shifts.locator('.rm-shift-val')).toHaveText([/^(NA|\d[\d,]*\.\d MT)/]);
   await expect(shifts.getByRole('button', { name: /Running rate/ })).toContainText(/\d+\.\d{2} TPH|NA/);
   // No Order allocation panel (the user, 31 Oct 2026), so no Made To Order / Made To Stock anywhere.
   await expect(main.getByText('Made To')).toHaveCount(0);
@@ -297,10 +296,9 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   await expect(mimic.locator('.mx-node', { hasText: 'Finished exit' })).toBeVisible();
   await expect(mimic.locator('image.mx-sprite--dark[href^="/twin/stand"]')).toHaveCount(14);   // L1 S1–S8 + L2 S1–S6
   await expect(mimic.locator('.mx-lamp')).toHaveCount(24);   // + 5 finishing machines per line
-  // No output per shift in the ERP: the whole day only — no By shift view, no switch (the user, 28 Oct 2026).
-  const shifts = page.locator('section.panel', { hasText: 'Production · whole day' });
+  // The whole day only — no By shift view, no switch (the user, 24 Nov 2026).
+  const shifts = page.locator('section.panel', { hasText: 'Production vs plan' });
   await expect(shifts.getByRole('group', { name: 'Shift view' })).toHaveCount(0);
-  await expect(shifts.locator('.rm-shift-name')).toHaveText(['Total']);
   await expect(shifts.locator('.panel-sub')).toHaveText('09:00 IST → 09:00 IST');
   await expect(shifts.locator('.rm-shift-val')).toHaveText([/^(NA|[\d,]+\.\d MT)/]);
   await expect(shifts.locator('.chip')).toHaveText(/^Plan \d/);
@@ -325,11 +323,10 @@ for (const mill of ['lsm', 'rms'] as const) {
     await expect(page.locator('.tb-mark--mill')).toHaveText(mill.toUpperCase());
     // Each mill's own day and shifts (plant, 12 Oct 2026): LSM 09:00, RMS 09:30.
     const start = mill === 'lsm' ? '09:00' : '09:30';
-    const mid = mill === 'lsm' ? '21:00' : '21:30';
     await expect(page.getByRole('button', { name: /Duration/ })).toContainText(new RegExp(`${start} IST → \\d{1,2} \\w{3} ${start} IST`));
-    // By shift when the period has output per shift; else the whole day only (today: the ERP comes a day late).
-    const shiftPanel = page.locator('section.panel', { hasText: /Production (by shift|· whole day)/ }).first();
-    await expect(shiftPanel.locator('.panel-sub')).toHaveText(new RegExp(`^(Day ${start}–${mid} IST · Night ${mid}–${start} IST|${start} IST → ${start} IST)$`));
+    // Production vs plan: the plant day's window, whole day only (the user, 24 Nov 2026).
+    const shiftPanel = page.locator('section.panel', { hasText: 'Production vs plan' }).first();
+    await expect(shiftPanel.locator('.panel-sub')).toHaveText(`${start} IST → ${start} IST`);
     const strip = page.getByRole('region', { name: 'Headline KPIs' });
     // LSM: prime yield (was Mass yield) and yield with non-prime (the user, 23 Nov 2026); Finished stock at the end (31 Oct).
     await expect(strip.locator('.rm-card-label')).toHaveText(mill === 'lsm'
@@ -344,7 +341,7 @@ for (const mill of ['lsm', 'rms'] as const) {
     await expect(page.getByRole('img', { name: /^(HSM|RMD) mill:/ })).toHaveCount(0);
     await expect(page.locator('section.panel', { hasText: 'Mill mimic' })).toHaveCount(0);
     // No Order allocation panel: Finished stock card instead (the user, 31 Oct 2026).
-    for (const title of [/Production (by shift|· whole day)/, 'Material & operating balance', 'Finished stock by size']) {
+    for (const title of ['Production vs plan', 'Material & operating balance', 'Finished stock by size']) {
       await expect(page.locator('section.panel', { hasText: title }).first()).toBeVisible();
     }
     // No sample figures anywhere.

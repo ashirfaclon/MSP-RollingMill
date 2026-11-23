@@ -229,3 +229,29 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
     asset health, RMD visualization; ~12 LSM / RMS tests in wiring.e2e.spec.ts that expect removed panels).
   - Shift setup checklist: the logbook form itself still needs the two time fields (spec xlsx given to the user).
 
+- **24 Nov 2026** — **Production by shift → "Production vs plan", whole day only, all four mills** (the user):
+  a compliance KPI — the plant day's output against the day's target, compliance %, plan chip, Edit plan,
+  running rate and plan gap. No Day / Night breakdown, no By shift / Whole day toggle, no flip card; the
+  drill-downs show only the whole-day table. User's answers: the plant still types **Day + Night** targets in
+  Edit plan (the panel shows their total); running rate and plan gap stay.
+  **Backup of the shift-wise version: `archive/shift-breakdown/`** — ShiftBars.tsx, ShiftProduction.tsx (HSM),
+  RmdShiftProduction.tsx (RMD / LSM / RMS), ShiftPlanDrawer.tsx, RmdPlanDrawer.tsx and the two test files as they
+  were at commit `f1222fd`, with a README on how to restore (`git checkout f1222fd -- <files>`). Not built from
+  there. Left live so a restore needs nothing else: the backend's per-shift figures (/api/hsm/plan `actualByShift`,
+  shift-split.ts; /api/{rmd,lsm,rms}/plan `totals.shifts`) and the flip-card CSS (`.rm-flip*`).
+  Tests: wiring.e2e.spec.ts (HSM / LSM / RMS production vs plan, running rate) and rolling-mill.spec.ts rewritten
+  for whole day; the RMS test now uses the plan as saved (435.46 MT a day → 5,225.5 MT for 1–12 Oct).
+  Still failing from before (not this change): rolling-mill.spec.ts "root redirects…" (mill mimic zones), "RMD
+  visualization…" (card list); wiring "RMD: running rate opens its drill-down" (table header); LSM / RMS
+  condition analytics. Committed 24 Nov.
+- **24 Nov 2026** — Production vs plan redesigned (the user rejected the first cut: one thin bar in a tall empty
+  box, compliance the smallest figure, a pointless "Whole day" label, two plan numbers unexplained, figures in
+  four corners). Now built around compliance: the big headline % beside one thick bar with the target marked;
+  under it a **daily compliance strip** (one column per day against a 100 % line; a one-day period shows the 7
+  days up to it, the day outlined — `usePlanTrend.ts`); at the foot four equal cells: Actual, Target, Plan gap,
+  Running rate. A line explains when the target (days with production entered) differs from the period's plan
+  chip. No plan: compliance NA, empty track, "fill it in with Edit plan", no strip. Styles `.rm-pvp*`
+  (visualization.css). Same tests pass; the 3 old failures unchanged. Committed 24 Nov.
+  Note reworded in plain words (the user didn't follow "Target is for the days with production entered"):
+  "23 Nov not entered in ERP yet — compared up to 22 Nov" (several: "21 Nov – 23 Nov …"; gaps in the middle:
+  "N days not entered in ERP yet — compared over the days entered"). No "no plan" note while loading.

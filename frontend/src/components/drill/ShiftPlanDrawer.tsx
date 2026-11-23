@@ -1,10 +1,9 @@
 'use client';
 
 /**
- * Production by shift drill-down — output against the plan target, per day / week / month
- * over the dashboard's period, and the plan gap: which days missed. It follows the card's
- * view: BY SHIFT (each shift against its own target) or WHOLE DAY (all shifts together
- * against the day's plan, with its compliance).
+ * HSM production vs plan drill-down — the whole day's output against the day's plan, per day / week /
+ * month over the dashboard's period, with compliance and the plan gap: which days missed. Whole day
+ * only, no shift breakdown (the user, 24 Nov 2026; the shift view is kept in archive/shift-breakdown/).
  * Everything comes from /api/hsm/plan; the grouping is done here.
  */
 import { useMemo } from 'react';
@@ -18,10 +17,6 @@ import type { Grain } from '@contracts';
 import { rangeUrl, useApi, type PlanDay, type PlanReport } from '@/services/hsmApi';
 
 const SHIFTS = ['Day', 'Night'] as const;
-const TOKENS: Record<(typeof SHIFTS)[number], { out: string; plan: string }> = {
-  Day: { out: '--s-prod', plan: '--s-prod' },
-  Night: { out: '--s-order', plan: '--s-order' },
-};
 
 interface ShiftPeriod {
   key: string; label: string; fromDate: string; toDate: string;
@@ -34,8 +29,6 @@ interface ShiftPeriod {
   /** All shifts together: output, plan, and compliance (actual ÷ plan over the planned days). */
   all: { out: number | null; plan: number | null; compliance: number | null };
 }
-
-export type ShiftView = 'shift' | 'day';
 
 const sumOrNull = (xs: (number | null)[]) => {
   const v = xs.filter((x): x is number => x !== null);
@@ -68,7 +61,7 @@ const gapTone = (v: number | null) => (v === null ? 'v-na' : v < 0 ? 'v-warn' : 
 /** Plan gap (production − plan): "+" when ahead of plan; short of it, the number alone (the user, 17 Oct 2026). */
 const g = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v > 0 ? '+' : ''}${fmtNum(Math.abs(v), 1)}`);
 
-export default function ShiftPlanDrawer({ open, onClose, view }: { open: boolean; onClose: () => void; view: ShiftView }) {
+export default function ShiftPlanDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   // The dashboard's period; only the grouping is chosen here.
   const r = useDrillRange(['selection'], 'selection');
   const url = open && r.dates ? rangeUrl('/api/hsm/plan', r.dates) : null;
@@ -78,7 +71,7 @@ export default function ShiftPlanDrawer({ open, onClose, view }: { open: boolean
     <DrillDrawer
       open={open}
       onClose={onClose}
-      title={view === 'day' ? 'Production · whole day · plan vs actual' : 'Production by shift · plan vs actual'}
+      title="Production vs plan · whole day"
       sub="HSM · MT"
       controls={r.controls}
       loading={loading}
@@ -86,79 +79,8 @@ export default function ShiftPlanDrawer({ open, onClose, view }: { open: boolean
       error={error}
       hasData={!!data}
     >
-      {data && (view === 'day' ? <DayContent data={data} grain={r.grain} /> : <Content data={data} grain={r.grain} />)}
+      {data && <DayContent data={data} grain={r.grain} />}
     </DrillDrawer>
-  );
-}
-
-function Content({ data, grain }: { data: PlanReport; grain: Grain }) {
-  const t = data.totals;
-  const planned = t.plannedDays > 0;
-  const rows = useMemo(() => shiftPeriods(data.days, grain), [data.days, grain]);
-  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
-  const series = useMemo<DrillSeries[]>(() => SHIFTS.flatMap((s) => [
-    { id: `${s}-out`, name: `${s} output`, token: TOKENS[s].out, type: 'column' as const, data: rows.map((x) => x.out[s]), dp: 1 },
-    { id: `${s}-plan`, name: `${s} target`, token: TOKENS[s].plan, type: 'line' as const, dashed: true, data: rows.map((x) => x.plan[s]), dp: 1 },
-  ]), [rows]);
-  const axes = useMemo(() => [{ title: 'MT', unit: 'MT' }], []);
-
-  return (
-    <>
-      <Stats items={[
-        ...SHIFTS.map((s) => ({
-          label: s,
-          value: f(t.actualByShift[s] ?? 0),
-          unit: planned ? `MT · target ${f(t.byShift[s] ?? 0)}` : 'MT · no plan',
-        })),
-        { label: 'Plan gap', value: g(t.gapMt), unit: planned && t.plannedDays < t.days ? `MT · over ${t.plannedDays} of ${t.days} days` : 'MT', tone: gapTone(t.gapMt) },
-      ]} />
-
-      <DrillChart
-        series={series}
-        categories={categories}
-        axes={axes}
-        ariaLabel={`Production by shift: ${rows.map((x) => `${x.label} Day ${f(x.out.Day)} of ${f(x.plan.Day)}, Night ${f(x.out.Night)} of ${f(x.plan.Night)}`).join('; ')}`}
-      />
-
-      <div className="pd-table-wrap">
-        <table className="grid pd-table" aria-label="Production by shift by period">
-          <thead>
-            <tr>
-              <th>Period</th>
-              {SHIFTS.map((s) => [
-                <th key={`${s}-o`} className="r">{s} output</th>,
-                <th key={`${s}-p`} className="r">{s} target</th>,
-              ])}
-              <th className="r">Plan gap</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((x) => (
-              <tr key={x.key}>
-                <td><b>{x.label}</b>{x.fromDate !== x.toDate && <span className="pd-dim"> · {dm(x.fromDate)}–{dm(x.toDate)}</span>}</td>
-                {SHIFTS.map((s) => [
-                  <td key={`${s}-o`} className="num r v-val">{f(x.out[s])}</td>,
-                  <td key={`${s}-p`} className="num r">{f(x.plan[s])}</td>,
-                ])}
-                <td className={`num r ${gapTone(x.gap)}`}>{g(x.gap)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>Total</td>
-              {SHIFTS.map((s) => [
-                <td key={`${s}-o`} className="num r">{f(t.actualByShift[s] ?? 0)}</td>,
-                <td key={`${s}-p`} className="num r">{planned ? f(t.byShift[s] ?? 0) : '—'}</td>,
-              ])}
-              <td className={`num r ${gapTone(t.gapMt)}`}>{g(t.gapMt)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <SourceBox sources={SOURCES} formula={FORMULA} />
-    </>
   );
 }
 
@@ -240,12 +162,6 @@ const SOURCES: SourceSystem[] = [
       ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
     ],
   },
-];
-
-const FORMULA = [
-  'Day = 08:00 IST → 20:00 IST, Night = 20:00 IST → 08:00 IST',
-  "Shift output = counter increases in the shift's window, scaled so Day + Night = the day's production",
-  'Plan gap = production − plan  (days the plan covers); + = ahead of plan, no sign = short',
 ];
 
 const DAY_FORMULA = [

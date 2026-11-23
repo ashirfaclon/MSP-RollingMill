@@ -186,11 +186,65 @@
   font-size: 9px; font-weight: 800; letter-spacing: 0.7px; text-transform: uppercase; color: var(--muted-3);
 }
 
-/* --------------------------- Production by shift -------------------------- */
+/* ---------------------------- Production vs plan ---------------------------- */
+/* Whole day only since 24 Nov 2026. The flip card (.rm-flip*) below is the By shift view's, kept so the
+   backup in archive/shift-breakdown/ can be restored as it is. */
+
+/* The compliance panel (the user, 24 Nov 2026): the headline figure beside one thick bar, the daily strip
+   taking the spare height, and the four figures in one row at the foot. */
+.rm-pvp { gap: 14px; }
+.rm-pvp-main { flex: 1; display: flex; flex-direction: column; gap: 18px; min-height: 0; border-radius: var(--radius-sm); }
+.rm-pvp-main--button { cursor: pointer; }
+/* No strip to take the spare height: the headline sits in the middle of it. */
+.rm-pvp-main--solo { justify-content: center; }
+.rm-pvp-main--button:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.rm-pvp-hero { display: grid; grid-template-columns: minmax(150px, auto) minmax(0, 1fr); align-items: center; column-gap: 28px; }
+.rm-pvp-headline { display: flex; flex-direction: column; gap: 4px; }
+.rm-pvp .rm-pvp-pct { font-size: 46px; font-weight: 800; line-height: 1; letter-spacing: -1.2px; white-space: nowrap; text-align: left; }
+.rm-pvp-gauge { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rm-pvp-target-label { position: relative; display: block; height: 12px; }
+.rm-pvp-target-label > span {
+  position: absolute; left: var(--target); transform: translateX(-50%); white-space: nowrap;
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--gold);
+}
+.rm-pvp-track { position: relative; display: block; height: 30px; border-radius: 6px; background: var(--panel-3); }
+.rm-pvp-fill { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: currentColor; opacity: 0.9; }
+.rm-pvp-fill.v-na { color: var(--s-prod); }
+.rm-pvp-target { position: absolute; left: var(--target); top: -5px; bottom: -5px; width: 0; border-left: 2px dashed var(--gold); }
+.rm-pvp-note { font-size: 10.5px; font-weight: 600; color: var(--muted-2); }
+
+.rm-pvp-strip { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 76px; }
+.rm-pvp-cols {
+  position: relative; flex: 1; min-height: 44px; display: flex; align-items: flex-end; gap: 3px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rm-pvp-col { flex: 1; min-width: 2px; border-radius: 3px 3px 0 0; background: currentColor; opacity: 0.8; }
+.rm-pvp-col.v-na { opacity: 0.45; }
+.rm-pvp-col.is-selected { opacity: 1; outline: 1.5px solid var(--text); outline-offset: 1px; }
+.rm-pvp-line { position: absolute; left: 0; right: 0; bottom: var(--line); height: 0; border-top: 1.5px dashed var(--gold); opacity: 0.7; pointer-events: none; }
+.rm-pvp-axis { display: flex; justify-content: space-between; gap: 8px; font-size: 9.5px; font-weight: 700; color: var(--muted-3); }
+.rm-pvp-axis-mid { color: var(--gold); opacity: 0.85; }
+
+/* Four figures, equal cells, label over value; the two that open a drill-down are buttons in the same cell shape. */
+.rm-pvp .rm-pvp-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 0; padding-top: 12px; }
+.rm-pvp .rm-pvp-stats .rm-foot-item {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 5px;
+  min-width: 0; width: 100%; margin: 0; padding: 2px 8px 2px 16px;
+  border: 0; border-left: 1px solid var(--border-soft); border-radius: 0; text-align: left;
+}
+.rm-pvp .rm-pvp-stats > :first-child { padding-left: 0; border-left: 0; }
+.rm-pvp .rm-pvp-stats .rm-foot-v { font-size: 17px; white-space: nowrap; text-align: left; }
+.rm-pvp .rm-pvp-stats .rm-foot-btn:hover { background: var(--panel-2); }
+@media (max-width: 760px) {
+  .rm-pvp-hero { grid-template-columns: minmax(0, 1fr); row-gap: 12px; }
+  .rm-pvp .rm-pvp-pct { font-size: 36px; }
+  .rm-pvp .rm-pvp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
+  .rm-pvp .rm-pvp-stats > :nth-child(odd) { border-left: 0; padding-left: 0; }
+}
 
 .rm-shifts { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding-top: 4px; }
 .rm-shift, .rm-shift-target-label {
-  display: grid; grid-template-columns: 64px minmax(0, 1fr) 128px 64px; align-items: center; gap: 14px;
+  display: grid; grid-template-columns: 80px minmax(0, 1fr) 128px 64px; align-items: center; gap: 14px;
 }
 .rm-shift-target-label { margin-bottom: -8px; }
 .rm-shift-target-label > span {
@@ -199,7 +253,7 @@
   font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--gold);
 }
 .rm-shift-name {
-  font-size: 10px; font-weight: 800; letter-spacing: 0.7px; text-transform: uppercase; color: var(--muted-2);
+  white-space: nowrap; font-size: 10px; font-weight: 800; letter-spacing: 0.7px; text-transform: uppercase; color: var(--muted-2);
 }
 .rm-shift-track {
   position: relative; display: block; height: 20px; border-radius: 4px; background: var(--panel-3);
@@ -428,7 +482,7 @@
   .rm-mimic { grid-template-columns: minmax(0, 1fr); }
   .rm-mimic-arrow { transform: rotate(90deg); height: 14px; }
   .rm-mimic-arrow:nth-child(4) { display: grid; }
-  .rm-shift, .rm-shift-target-label { grid-template-columns: 52px minmax(0, 1fr) 108px 52px; gap: 10px; }
+  .rm-shift, .rm-shift-target-label { grid-template-columns: 72px minmax(0, 1fr) 108px 52px; gap: 10px; }
   .rm-legend-end { margin-left: 0; }
   .panel-head { flex-wrap: wrap; row-gap: 4px; }
   .panel-head .panel-sub { order: 3; flex-basis: 100%; }

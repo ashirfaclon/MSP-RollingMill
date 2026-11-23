@@ -1,13 +1,11 @@
 'use client';
 
 /**
- * Production by shift drill-down (RMD, LSM) — the plan against ERP production, per day / week /
- * month over the dashboard's period, in the card's view:
- *   BY SHIFT   each shift's target (half the day's plan) and output — RMD NA (the ERP has no
- *              shift), LSM the ERP day split by the shifts' prime pieces (LSM Production Sheet);
- *   WHOLE DAY  ERP production against the day's plan, with compliance and plan gap.
+ * Production vs plan drill-down (RMD, LSM, RMS) — ERP production against the day's plan, per day /
+ * week / month over the dashboard's period, with compliance and plan gap. Whole day only, no shift
+ * breakdown (the user, 24 Nov 2026; the shift views are kept in archive/shift-breakdown/).
  * Gap and compliance compare only the days that have both plan and ERP production. RMD measures
- * Prime + SL (PRODUCT_PRIME_SLENGTH_MT), LSM PRODUTION_MT.
+ * Prime + SL (PRODUCT_PRIME_SLENGTH_MT), LSM PRODUTION_MT, RMS PRODUCTION_MT.
  */
 import { useMemo } from 'react';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
@@ -19,22 +17,16 @@ import { dm } from '@/services/hsmProduction';
 import type { Grain } from '@contracts';
 import { rangeUrl, useApi, type RmdPlanDay, type RmdPlanReport } from '@/services/hsmApi';
 
-export type RmdShiftView = 'shift' | 'day';
 export type PlanMill = 'rmd' | 'lsm' | 'rms';
 
-/** What differs between the mills: the measure, the shifts, the plan form and the ERP field. */
-interface MillPlan {
-  sub: string; measure: string; field: string; dayPlan: string; shifts: string; plan: SourceSystem; erp: SourceSystem;
-  /** Where output per shift comes from; none = NA. */
-  split?: { source: SourceSystem; formula: string[] };
-}
+/** What differs between the mills: the measure, the plan form and the ERP field. */
+interface MillPlan { sub: string; measure: string; field: string; dayPlan: string; plan: SourceSystem; erp: SourceSystem }
 const MILL: Record<PlanMill, MillPlan> = {
   rmd: {
     sub: 'RMD · MT',
     measure: 'Prime + SL',
     field: 'PRODUCT_PRIME_SLENGTH_MT',
     dayPlan: 'Day plan = Day (MT) + Night (MT) as saved, Prime + SL',
-    shifts: 'Shift target = Day (MT) / Night (MT) as saved  (Day 09:00–21:00 IST, Night 21:00–09:00 IST)',
     plan: { name: 'Plan', rows: [
       ['Form', 'PRODUCTION PLAN → RMD ROLLING PLAN (saved on the dashboard, Edit plan)'],
       ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
@@ -50,7 +42,6 @@ const MILL: Record<PlanMill, MillPlan> = {
     measure: 'Production',
     field: 'PRODUTION_MT',
     dayPlan: 'Day plan = Day (MT) + Night (MT) as saved',
-    shifts: 'Shift target = Day (MT) / Night (MT) as saved  (Day 09:00–21:00 IST, Night 21:00–09:00 IST)',
     plan: { name: 'Plan', rows: [
       ['Form', 'PRODUCTION PLAN → LSM ROLLING PLAN (saved on the dashboard, Edit plan)'],
       ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
@@ -60,23 +51,12 @@ const MILL: Record<PlanMill, MillPlan> = {
       ['Filter', "USER_CODE = 'FA-LP-P' (division LS)"],
       ['Field', "ATTR_CODE = 'PRODUTION_MT' (value in ATTR_VALUE)"],
     ] },
-    split: {
-      source: { name: 'Logbook', rows: [
-        ['Form', 'Light Structure Mill → LSM Production Sheet → PRODUCTION SHEET'],
-        ['Field', 'prime (pcs) per entry, by its date and shift (DAY / NIGHT)'],
-      ] },
-      formula: [
-        'Day output = PRODUTION_MT × Day prime pcs ÷ (Day + Night prime pcs); Night the same',
-        'Shift compliance = shift output ÷ shift target × 100  (days with both)',
-      ],
-    },
   },
   rms: {
     sub: 'RMS · MT',
     measure: 'Production',
     field: 'PRODUCTION_MT',
     dayPlan: 'Day plan = Day (MT) + Night (MT) as saved',
-    shifts: 'Shift target = Day (MT) / Night (MT) as saved  (Day 09:30–21:30 IST, Night 21:30–09:30 IST)',
     plan: { name: 'Plan', rows: [
       ['Form', 'PRODUCTION PLAN → RMS ROLLING PLAN (saved on the dashboard, Edit plan)'],
       ['Field', 'Day (MT) and Night (MT) per date; a shift shut down has 0'],
@@ -86,20 +66,8 @@ const MILL: Record<PlanMill, MillPlan> = {
       ['Filter', "ENTITY_CODE = 'MP', DIV_CODE = 'RS', TNATURE = 'PRLOG', SERIES = 'L5P'"],
       ['Field', "ATTR_CODE = 'PRODUCTION_MT' (value in ATTR_VALUE)"],
     ] },
-    split: {
-      source: { name: 'Logbook', rows: [
-        ['Form', 'Rolling Mill Structure (RMS) → RMS Production Sheet → PRODUCTION SHEET'],
-        ['Field', 'prime (pcs) per entry, by its date and shift (DAY / NIGHT)'],
-      ] },
-      formula: [
-        'Day output = PRODUCTION_MT × Day prime pcs ÷ (Day + Night prime pcs); Night the same',
-        'Shift compliance = shift output ÷ shift target × 100  (days with both)',
-      ],
-    },
   },
 };
-const SHIFTS = ['Day', 'Night'] as const;
-
 const f = (v: number | null | undefined) => (v === null || v === undefined ? '—' : fmtNum(v, 1));
 const pct = (v: number | null) => (v === null ? 'NA' : `${fmtNum(v, 1)}%`);
 const gapTone = (v: number | null) => (v === null ? 'v-na' : v < 0 ? 'v-warn' : 'v-ok');
@@ -110,11 +78,8 @@ const compTone = (v: number | null) => (v === null ? 'v-na' : v >= 100 ? 'v-ok' 
 interface Period {
   key: string; label: string; fromDate: string; toDate: string;
   plan: number | null;
-  shiftPlan: Record<string, number | null>;
-  /** ERP Prime + SL over the days with an entry. */
+  /** ERP production over the days with an entry. */
   out: number | null;
-  /** Output per shift over the days that have it (LSM); null without. */
-  shiftOut: Record<string, number | null>;
   /** Over the days with both plan and ERP production. */
   gap: number | null;
   compliance: number | null;
@@ -131,19 +96,14 @@ function periods(days: RmdPlanDay[], grain: Grain): Period[] {
     return {
       key: g.key, label: g.label, fromDate: g.fromDate, toDate: g.toDate,
       plan: planned.length ? sum(planned.map((d) => d.planMt!)) : null,
-      shiftPlan: Object.fromEntries(SHIFTS.map((s) => [s, planned.length ? sum(planned.map((d) => d.byShift[s] ?? 0)) : null])),
       out: entered.length ? sum(entered.map((d) => d.actualMt!)) : null,
-      shiftOut: Object.fromEntries(SHIFTS.map((s) => {
-        const split = g.days.filter((d) => d.actualByShift?.[s] != null);
-        return [s, split.length ? sum(split.map((d) => d.actualByShift![s]!)) : null];
-      })),
       gap: cPlan !== null && cOut !== null ? cOut - cPlan : null,
       compliance: cPlan && cOut !== null ? (cOut / cPlan) * 100 : null,
     };
   });
 }
 
-export default function RmdPlanDrawer({ open, onClose, view, mill = 'rmd' }: { open: boolean; onClose: () => void; view: RmdShiftView; mill?: PlanMill }) {
+export default function RmdPlanDrawer({ open, onClose, mill = 'rmd' }: { open: boolean; onClose: () => void; mill?: PlanMill }) {
   const r = useDrillRange(['selection'], 'selection');
   const url = open && r.dates ? rangeUrl(`/api/${mill}/plan`, r.dates) : null;
   const m = MILL[mill];
@@ -152,7 +112,7 @@ export default function RmdPlanDrawer({ open, onClose, view, mill = 'rmd' }: { o
     <DrillDrawer
       open={open}
       onClose={onClose}
-      title={view === 'day' ? 'Production · whole day · plan vs actual' : 'Production by shift · plan'}
+      title="Production vs plan · whole day"
       sub={m.sub}
       controls={r.controls}
       loading={loading}
@@ -160,57 +120,12 @@ export default function RmdPlanDrawer({ open, onClose, view, mill = 'rmd' }: { o
       error={error}
       hasData={!!data}
     >
-      {data && (view === 'day' ? <DayContent data={data} grain={r.grain} m={m} /> : <ShiftContent data={data} grain={r.grain} m={m} />)}
+      {data && <DayContent data={data} grain={r.grain} m={m} />}
     </DrillDrawer>
   );
 }
 
 const label = (x: Period) => <td><b>{x.label}</b>{x.fromDate !== x.toDate && <span className="pd-dim"> · {dm(x.fromDate)}–{dm(x.toDate)}</span>}</td>;
-
-function ShiftContent({ data, grain, m }: { data: RmdPlanReport; grain: Grain; m: MillPlan }) {
-  const t = data.totals;
-  const rows = useMemo(() => periods(data.days, grain), [data.days, grain]);
-  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
-  // Day and Night targets are equal (half the day each): one series; output per shift beside it where there is one.
-  const series = useMemo<DrillSeries[]>(() => [
-    ...(m.split ? [
-      { id: 'day-out', name: 'Day output', token: '--s-prod', type: 'column' as const, data: rows.map((x) => x.shiftOut.Day), dp: 1 },
-      { id: 'night-out', name: 'Night output', token: '--s-order', type: 'column' as const, data: rows.map((x) => x.shiftOut.Night), dp: 1 },
-    ] : []),
-    { id: 'shift-plan', name: 'Target per shift', token: '--gold', type: m.split ? 'line' : 'column', dashed: !!m.split, data: rows.map((x) => x.shiftPlan.Day), dp: 1 },
-  ], [rows, m.split]);
-  const outCell = (v: number | null) => <td className={`num r ${v === null ? 'v-na' : 'v-val'}`}>{v === null ? 'NA' : f(v)}</td>;
-  const axes = useMemo(() => [{ title: 'MT', unit: 'MT' }], []);
-  return (
-    <>
-      <Stats items={[
-        ...SHIFTS.map((s) => {
-          const o = t.shifts?.[s];
-          return o?.actualMt != null
-            ? { label: s, value: f(o.actualMt), unit: `MT · target ${f(o.comparedPlanMt)}` }
-            : { label: s, value: 'NA', unit: `MT · target ${f(t.byShift[s])}`, tone: 'v-na' };
-        }),
-        { label: 'Plan', value: f(t.planMt), unit: 'MT' },
-      ]} />
-      <DrillChart series={series} categories={categories} axes={axes}
-        ariaLabel={m.split
-          ? `Output per shift against the target: ${rows.map((x) => `${x.label} Day ${f(x.shiftOut.Day)}, Night ${f(x.shiftOut.Night)} of ${f(x.shiftPlan.Day)} MT`).join('; ')}`
-          : `Target per shift: ${rows.map((x) => `${x.label} ${f(x.shiftPlan.Day)} MT`).join('; ')}`} />
-      <div className="pd-table-wrap">
-        <table className="grid pd-table" aria-label="Production by shift by period">
-          <thead><tr><th>Period</th><th className="r">Day output</th><th className="r">Day target</th><th className="r">Night output</th><th className="r">Night target</th></tr></thead>
-          <tbody>
-            {rows.map((x) => (
-              <tr key={x.key}>{label(x)}{outCell(x.shiftOut.Day)}<td className="num r">{f(x.shiftPlan.Day)}</td>{outCell(x.shiftOut.Night)}<td className="num r">{f(x.shiftPlan.Night)}</td></tr>
-            ))}
-          </tbody>
-          <tfoot><tr><td>Total</td>{outCell(t.shifts?.Day?.actualMt ?? null)}<td className="num r">{f(t.byShift.Day)}</td>{outCell(t.shifts?.Night?.actualMt ?? null)}<td className="num r">{f(t.byShift.Night)}</td></tr></tfoot>
-        </table>
-      </div>
-      <SourceBox sources={m.split ? [m.erp, m.split.source, m.plan] : [m.plan]} formula={[m.dayPlan, m.shifts, ...(m.split?.formula ?? [])]} />
-    </>
-  );
-}
 
 function DayContent({ data, grain, m }: { data: RmdPlanReport; grain: Grain; m: MillPlan }) {
   const t = data.totals;

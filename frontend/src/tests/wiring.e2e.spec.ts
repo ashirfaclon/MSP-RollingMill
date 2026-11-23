@@ -345,41 +345,31 @@ test('power consumption: the logbook form summed by the date entered, entry by e
   await se.screenshot({ path: `${SHOTS}/drill-specific-energy.png` });
 });
 
-test('production by shift: targets from the rolling plan as filled, plan gap over the planned days', async ({ page }) => {
+test('production vs plan: whole day only — output against the rolling plan as filled, compliance and plan gap over the planned days', async ({ page }) => {
   await page.goto('/hsm/visualization');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
   await dialog.getByLabel('Start Date').fill('2026-10-01');
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  const panel = page.locator('.rm-flip-face--front section.panel');
-  // Plan for 1–8 Oct: 1,592 MT, all written as Day shift. Every day is planned, so no coverage note.
+  // No shift breakdown on any mill (the user, 24 Nov 2026): one bar, no By shift view, no flip card.
+  const panel = page.locator('section.panel', { hasText: 'Production vs plan' });
+  await expect(panel.getByRole('group', { name: 'Shift view' })).toHaveCount(0);
+  await expect(page.locator('.rm-flip')).toHaveCount(0);
+  // Plan for 1–8 Oct: 1,592 MT (Day + Night as written). Every day is planned: the plant day's window.
   await expect(panel.locator('.chip')).toHaveText('Plan 1,592 MT');
-  await expect(panel.locator('.panel-sub')).toHaveCount(0);
-  // Output: the Production card's 1–8 Oct figure split by where the counter ticked — mostly at night.
-  await expect(panel.locator('.rm-shift-val')).toHaveText(['200.5 MT / 1,592', '1,274.2 MT / 0']);
-  // Gap = production on 1–8 Oct (1,474.65, 08:00 → 08:00) − 1,592 = −117.35: short — shown without a sign.
+  await expect(panel.locator('.panel-sub')).toHaveText('08:00 IST → 08:00 IST');
+  // Whole day: 1,474.65 ÷ 1,592 = 92.6 %.
+  await expect(panel.locator('.rm-shift-val')).toHaveText([/^1,474\.[67] MT$/]);
+  await expect(panel.locator('.rm-shift-comp')).toHaveText(['92.6%']);
+  // Gap = 1,474.65 − 1,592 = −117.35: short — shown without a sign.
   await expect(panel).toContainText(/117\.[34] MT/);
   await expect(panel).not.toContainText('-117.');
-  // Compliance over the planned days: Day 200.5 ÷ 1,592 = 12.6 %; Night has a 0 target → NA.
-  await expect(panel.locator('.rm-shift-comp')).toHaveText(['12.6%', 'NA']);
-  await panel.screenshot({ path: `${SHOTS}/wired-shift-plan.png` });
+  await panel.screenshot({ path: `${SHOTS}/wired-plan-whole-day.png` });
 
-  // The toggle turns the card over to the whole day: one bar, 1,474.65 ÷ 1,592 = 92.6 %.
-  const flip = page.locator('.rm-flip');
-  await panel.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' }).click();
-  await expect(flip).toHaveClass(/is-flipped/);
-  await expect(page.locator('.rm-flip-face--front')).toHaveAttribute('aria-hidden', 'true');
-  const back = page.locator('.rm-flip-face--back section.panel');
-  await expect(back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(back.locator('.rm-shift-name')).toHaveText(['Total']);
-  await expect(back.locator('.rm-shift-val')).toHaveText([/^1,474\.[67] MT$/]);
-  await expect(back.locator('.rm-shift-comp')).toHaveText(['92.6%']);
-  await page.waitForTimeout(700);   // the turn
-  await back.screenshot({ path: `${SHOTS}/wired-shift-whole-day.png` });
-  // The drill-down follows the view: whole day, with compliance per day.
-  await back.getByRole('button', { name: 'Whole-day production, plan vs actual per day' }).click();
-  const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
+  // The drill-down: whole day, with compliance per day.
+  await panel.getByRole('button', { name: 'Production against the plan, per day' }).click();
+  const dd = page.getByRole('dialog', { name: 'Production vs plan · whole day' });
   await expect(dd).toBeVisible();
   const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
   await expect(dt.locator('thead th')).toHaveText(['Period', 'Output', 'Target', 'Compliance', 'Plan gap']);
@@ -394,41 +384,12 @@ test('production by shift: targets from the rolling plan as filled, plan gap ove
   await expect(dt.locator('tfoot')).not.toContainText('-117.');
   await expect(dd.getByRole('region', { name: 'Formula' })).toContainText('Compliance = production ÷ plan × 100');
   await page.waitForTimeout(700);
-  await dd.screenshot({ path: `${SHOTS}/drill-shift-whole-day.png` });
+  await dd.screenshot({ path: `${SHOTS}/drill-plan-whole-day.png` });
   await page.keyboard.press('Escape');
   await expect(dd).toBeHidden();
-  // And back again.
-  await back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'By shift' }).click();
-  await expect(flip).not.toHaveClass(/is-flipped/);
-});
-
-test('production by shift: the bars open plan vs actual per shift, per day', async ({ page }) => {
-  await page.goto('/hsm/visualization');
-  await page.getByRole('button', { name: /Duration/ }).click();
-  const dialog = page.getByRole('dialog', { name: 'Select period' });
-  await dialog.getByLabel('Start Date').fill('2026-10-01');
-  await dialog.getByLabel('End Date').fill('2026-10-06');
-  await dialog.getByRole('button', { name: 'Apply' }).click();
-  await page.getByRole('button', { name: 'Production by shift, plan vs actual per day' }).click();
-  const drawer = page.getByRole('dialog', { name: 'Production by shift · plan vs actual' });
-  await expect(drawer).toBeVisible();
-  const table = drawer.getByRole('table', { name: 'Production by shift by period' });
-  await expect(table.locator('thead th')).toHaveText(['Period', 'Day output', 'Day target', 'Night output', 'Night target', 'Plan gap']);
-  await expect(table.locator('tbody tr')).toHaveCount(6);
-  // 1 Oct: plan 140 MT, all on Day; production 134.4 → gap −5.6.
-  const oct1 = table.getByRole('row', { name: /^1 Oct/ });
-  await expect(oct1).toContainText('140.0');
-  await expect(oct1).toContainText('5.6');
-  await expect(oct1).not.toContainText('-5.6');
-  // Plan 1,224 over 1–6 Oct.
-  await expect(table.locator('tfoot')).toContainText('1,224.0');
-  await expect(drawer.getByRole('region', { name: 'Formula' })).toContainText('Plan gap = production − plan');
-  await page.waitForTimeout(700);
-  await drawer.screenshot({ path: `${SHOTS}/drill-shift-plan.png` });
-  await page.keyboard.press('Escape');
   // Plan gap opens the same drawer.
-  await page.getByRole('button', { name: /^Plan gap/ }).click();
-  await expect(drawer).toBeVisible();
+  await panel.getByRole('button', { name: /^Plan gap/ }).click();
+  await expect(dd).toBeVisible();
 });
 
 test('RMD: mass yield from the ERP log sheet (Prime + SL ÷ INPUT_MT); billets in from Influx; power from the VCB forms', async ({ page }) => {
@@ -526,7 +487,7 @@ test('RMD: production and losses from the ERP log sheet (FA-SKJ), and what they 
   await expect(page.locator('section.panel', { hasText: 'Mill mimic' }).locator('.mx-node', { hasText: 'Finished exit' }).locator('.mx-read')).toContainText('1,689.9');
   await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('1,689.9 MT');
   // Running rate now calculates: production ÷ running hours.
-  await expect(page.locator('section.panel', { hasText: 'Production · whole day' }).locator('.rm-foot')).toContainText(/Running rate\s*\d+\.\d{2} TPH/);
+  await expect(page.locator('section.panel', { hasText: 'Production vs plan' }).locator('.rm-foot')).toContainText(/Running rate\s*\d+\.\d{2} TPH/);
 
   await card.click();
   const prod = page.getByRole('dialog', { name: 'Production · ERP log sheet' });
@@ -624,15 +585,14 @@ test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, a
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
 
-  // Output per shift is not in the ERP: the whole day only — no By shift view, no switch (the user, 28 Oct 2026).
-  const panel = page.locator('section.panel', { hasText: 'Production · whole day' });
+  // Whole day only on every mill (the user, 24 Nov 2026) — no By shift view, no switch.
+  const panel = page.locator('section.panel', { hasText: 'Production vs plan' });
   await expect(panel.getByRole('group', { name: 'Shift view' })).toHaveCount(0);
   await expect(page.locator('.rm-flip')).toHaveCount(0);
   await expect(panel.locator('.panel-sub')).toHaveText('09:00 IST → 09:00 IST');
   // Oct plan 8,220.638 MT ÷ 31 calendar days (shutdown dates not given) = 265.18 a day → 1–8 Oct 2,121.4 MT.
   await expect(panel.locator('.chip')).toHaveText('Plan 2,121 MT');
   // Whole day: ERP Prime + SL 1,689.86 ÷ 2,121.44 = 79.7 %.
-  await expect(panel.locator('.rm-shift-name')).toHaveText(['Total']);
   await expect(panel.locator('.rm-shift-val')).toHaveText(['1,689.9 MT']);
   await expect(panel.locator('.rm-shift-comp')).toHaveText(['79.7%']);
   // Plan gap over the days with both: 1,689.86 − 2,121.44 = −431.58: short, shown without a sign.
@@ -640,8 +600,8 @@ test('RMD: production by shift — the FY plan (Prime + SL) per day and shift, a
   await expect(panel).not.toContainText('-431.6');
   await panel.screenshot({ path: `${SHOTS}/rmd-shift-whole-day.png` });
 
-  await panel.getByRole('button', { name: 'Whole-day production, plan vs actual per day' }).click();
-  const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
+  await panel.getByRole('button', { name: 'Production against the plan, per day' }).click();
+  const dd = page.getByRole('dialog', { name: 'Production vs plan · whole day' });
   const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
   await expect(dt.locator('thead th')).toHaveText(['Period', 'Prime + SL', 'Target', 'Compliance', 'Plan gap']);
   // 7 Oct: 200.12 of 265.18 → 75.5 %, gap −65.1.
@@ -746,8 +706,8 @@ test('RMD: running rate opens its drill-down — Prime + SL ÷ running hours fro
   await dialog.getByLabel('Start Date').fill('2026-10-01');
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
-  // RMD: the whole day only (no output per shift).
-  const foot = page.locator('section.panel', { hasText: 'Production · whole day' }).locator('.rm-foot').getByRole('button', { name: /Running rate/ });
+  // Whole day only (the user, 24 Nov 2026).
+  const foot = page.locator('section.panel', { hasText: 'Production vs plan' }).locator('.rm-foot').getByRole('button', { name: /Running rate/ });
   await expect(foot).toContainText(/\d+\.\d{2} TPH/);
   const shown = (await foot.locator('.rm-foot-v').innerText()).replace(' TPH', '');
   await foot.click();
@@ -997,7 +957,7 @@ test('RMD asset health: motor current — live with a Live chip while drives run
   await card.screenshot({ path: `${SHOTS}/rmd-motor-current-chip.png` });
 });
 
-test('LSM: production by shift — the October plan (8,750 MT) per day and shift; output per shift = ERP day split by the form\'s prime pieces', async ({ page }) => {
+test('LSM: production vs plan — the October plan (8,750 MT), whole day only, against ERP PRODUTION_MT', async ({ page }) => {
   await page.goto('/lsm/visualization');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
@@ -1005,55 +965,33 @@ test('LSM: production by shift — the October plan (8,750 MT) per day and shift
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
 
-  // 8,750 MT ÷ 31 days = 282.26 a day → 1–8 Oct 2,258.1 MT, 1,129.0 a shift (Day 09–21, Night 21–09).
-  const panel = page.locator('.rm-flip-face--front section.panel');
+  // 8,750 MT ÷ 31 days = 282.26 a day → 1–8 Oct 2,258.1 MT. Whole day only (the user, 24 Nov 2026).
+  const panel = page.locator('section.panel', { hasText: 'Production vs plan' });
+  await expect(panel.getByRole('group', { name: 'Shift view' })).toHaveCount(0);
   await expect(panel.locator('.chip')).toHaveText('Plan 2,258 MT');
-  await expect(panel.locator('.panel-sub')).toHaveText('Day 09:00–21:00 IST · Night 21:00–09:00 IST');
-  // Output per shift: each date's PRODUTION_MT split by the LSM Production Sheet's Day / Night prime pieces
-  // (1 Oct: 302.96 → Day 203.26, Night 99.70); 1–8 Oct Day 1,115.2 (98.8 %), Night 991.0 (87.8 %).
-  await expect(panel.locator('.rm-shift-val')).toHaveText(['1,115.2 MT', '991.0 MT']);
-  await expect(panel.locator('.rm-shift-comp')).toHaveText(['98.8%', '87.8%']);
-  await expect(panel.locator('.rm-shift-target-label')).toContainText('1,129 MT target');
+  await expect(panel.locator('.panel-sub')).toHaveText('09:00 IST → 09:00 IST');
+  // Whole day: PRODUTION_MT 2,106.12 ÷ 2,258.08 = 93.3 %.
+  await expect(panel.locator('.rm-shift-val')).toHaveText(['2,106.1 MT']);
+  await expect(panel.locator('.rm-shift-comp')).toHaveText(['93.3%']);
   // Plan gap: 2,106.12 − 2,258.08 = −151.96: short, shown without a sign.
   await expect(panel).toContainText('152.0 MT');
   await expect(panel).not.toContainText('-152.0');
-  await panel.screenshot({ path: `${SHOTS}/lsm-shift-plan.png` });
+  await panel.screenshot({ path: `${SHOTS}/lsm-plan-whole-day.png` });
 
-  // Whole day: PRODUTION_MT 2,106.12 ÷ 2,258.08 = 93.3 %.
-  await panel.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' }).click();
-  const back = page.locator('.rm-flip-face--back section.panel');
-  await expect(back.locator('.rm-shift-val')).toHaveText(['2,106.1 MT']);
-  await expect(back.locator('.rm-shift-comp')).toHaveText(['93.3%']);
-
-  await back.getByRole('button', { name: 'Whole-day production, plan vs actual per day' }).click();
-  const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
+  await panel.getByRole('button', { name: 'Production against the plan, per day' }).click();
+  const dd = page.getByRole('dialog', { name: 'Production vs plan · whole day' });
   const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
   await expect(dt.locator('thead th')).toHaveText(['Period', 'Production', 'Target', 'Compliance', 'Plan gap']);
   // 7 Oct: 359.61 of 282.26 → 127.4 %, gap +77.4.
   for (const v of ['359.6', '282.3', '127.4%', '+77.4']) await expect(dt.getByRole('row', { name: /^7 Oct/ })).toContainText(v);
   for (const v of ['2,106.1', '2,258.1', '93.3%', '152.0']) await expect(dt.locator('tfoot')).toContainText(v);
-  await expect(dd.getByRole('region', { name: 'Data source' })).toContainText('PRODUCTION PLAN FOR LSM Oct-2026');
   await expect(dd.getByRole('region', { name: 'Data source' })).toContainText("USER_CODE = 'FA-LP-P'");
   await expect(dd.getByRole('region', { name: 'Formula' })).toContainText('Compliance = PRODUTION_MT ÷ plan × 100');
   await page.waitForTimeout(700);
   await dd.screenshot({ path: `${SHOTS}/lsm-drill-plan-day.png` });
-  await page.keyboard.press('Escape');
-  await back.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'By shift' }).click();
-
-  // By shift: each shift's output beside its target, per day.
-  await panel.getByRole('button', { name: 'Production by shift, plan vs actual per day' }).click();
-  const ds = page.getByRole('dialog', { name: 'Production by shift · plan' });
-  const st = ds.getByRole('table', { name: 'Production by shift by period' });
-  await expect(st.locator('thead th')).toHaveText(['Period', 'Day output', 'Day target', 'Night output', 'Night target']);
-  for (const v of ['203.3', '141.1', '99.7']) await expect(st.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
-  for (const v of ['1,115.2', '1,129.0', '991.0']) await expect(st.locator('tfoot')).toContainText(v);
-  await expect(ds.getByRole('region', { name: 'Data source' })).toContainText('LSM Production Sheet');
-  await expect(ds.getByRole('region', { name: 'Formula' })).toContainText('Day output = PRODUTION_MT × Day prime pcs ÷ (Day + Night prime pcs)');
-  await page.waitForTimeout(700);
-  await ds.screenshot({ path: `${SHOTS}/lsm-drill-plan-shift.png` });
 });
 
-test('RMS: production by shift — the monthly plan (Oct 13,499 MT) per day and shift, against ERP PRODUCTION_MT', async ({ page }) => {
+test('RMS: production vs plan — the monthly plan (Oct 13,499 MT), whole day only, against ERP PRODUCTION_MT', async ({ page }) => {
   await page.goto('/rms/visualization');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
@@ -1061,28 +999,23 @@ test('RMS: production by shift — the monthly plan (Oct 13,499 MT) per day and 
   await dialog.getByLabel('End Date').fill('2026-10-12');
   await dialog.getByRole('button', { name: 'Apply' }).click();
 
-  // 13,499 MT ÷ 31 days (the shutdown day is not dated) = 435.45 a day → 1–12 Oct 5,225.4 MT, 2,612.8 a shift.
-  const panel = page.locator('.rm-flip-face--front section.panel');
-  await expect(panel.locator('.chip')).toHaveText('Plan 5,225 MT');
-  await expect(panel.locator('.panel-sub')).toHaveText('Day 09:30–21:30 IST · Night 21:30–09:30 IST');
-  // Ahead of plan: 6,244.75 − 5,225.4 → plan gap +1,019.4.
-  await expect(panel).toContainText('+1,019.4 MT');
+  // The plan as saved with Edit plan: 435.46 MT a day → 1–12 Oct 5,225.5 MT.
+  const panel = page.locator('section.panel', { hasText: 'Production vs plan' });
+  await expect(panel.getByRole('group', { name: 'Shift view' })).toHaveCount(0);
+  await expect(panel.locator('.chip')).toHaveText('Plan 5,226 MT');
+  await expect(panel.locator('.panel-sub')).toHaveText('09:30 IST → 09:30 IST');
+  // Whole day: PRODUCTION_MT 6,244.75 ÷ 5,225.52 = 119.5 %; ahead of plan → plan gap +1,019.2.
+  await expect(panel.locator('.rm-shift-val')).toHaveText(['6,244.8 MT']);
+  await expect(panel.locator('.rm-shift-comp')).toHaveText(['119.5%']);
+  await expect(panel).toContainText('+1,019.2 MT');
+  await panel.screenshot({ path: `${SHOTS}/rms-plan-whole-day.png` });
 
-  // Whole day: PRODUCTION_MT 6,244.75 ÷ 5,225.4 = 119.5 %.
-  await panel.getByRole('group', { name: 'Shift view' }).getByRole('button', { name: 'Whole day' }).click();
-  const back = page.locator('.rm-flip-face--back section.panel');
-  await expect(back.locator('.rm-shift-val')).toHaveText(['6,244.8 MT']);
-  await expect(back.locator('.rm-shift-comp')).toHaveText(['119.5%']);
-  await page.waitForTimeout(700);
-  await back.screenshot({ path: `${SHOTS}/rms-shift-whole-day.png` });
-
-  await back.getByRole('button', { name: 'Whole-day production, plan vs actual per day' }).click();
-  const dd = page.getByRole('dialog', { name: 'Production · whole day · plan vs actual' });
+  await panel.getByRole('button', { name: 'Production against the plan, per day' }).click();
+  const dd = page.getByRole('dialog', { name: 'Production vs plan · whole day' });
   const dt = dd.getByRole('table', { name: 'Whole-day production by period' });
   await expect(dt.locator('thead th')).toHaveText(['Period', 'Production', 'Target', 'Compliance', 'Plan gap']);
   for (const v of ['577.5', '435.5', '132.6%']) await expect(dt.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
-  for (const v of ['6,244.8', '5,225.4', '119.5%']) await expect(dt.locator('tfoot')).toContainText(v);
-  await expect(dd.getByRole('region', { name: 'Data source' })).toContainText('RMS_Production_Plan');
+  for (const v of ['6,244.8', '5,225.5', '119.5%']) await expect(dt.locator('tfoot')).toContainText(v);
   await expect(dd.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'RS'");
   await expect(dd.getByRole('region', { name: 'Formula' })).toContainText('Compliance = PRODUCTION_MT ÷ plan × 100');
   await page.waitForTimeout(700);
@@ -1102,7 +1035,7 @@ for (const c of [
     await dialog.getByLabel('Start Date').fill(c.from);
     await dialog.getByLabel('End Date').fill(c.to);
     await dialog.getByRole('button', { name: 'Apply' }).click();
-    const foot = page.locator('.rm-flip-face--front').getByRole('button', { name: /Running rate/ });
+    const foot = page.locator('section.panel', { hasText: 'Production vs plan' }).getByRole('button', { name: /Running rate/ });
     await expect(foot).toContainText(`${c.rate} TPH`);
     await foot.click();
     const d = page.getByRole('dialog', { name: 'Running rate' });
@@ -1384,7 +1317,7 @@ test('HSM checklists: production variance — per day, the production figures fi
     return route.fulfill({ json: { ok: true, form: 'f', entries: 1 } });
   });
   await page.goto('/hsm/visualization');
-  // Each checklist's button sits in the header of its panel (31 Oct 2026): variance by Production by shift, setup by the mill mimic.
+  // Each checklist's button sits in the header of its panel (31 Oct 2026): variance by Production vs plan, setup by the mill mimic.
   const panel = page.getByRole('main');
   await panel.getByRole('button', { name: /Production variance checklist/ }).click();
   const v = page.getByRole('dialog', { name: 'Production variance checklist' });
