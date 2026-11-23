@@ -129,8 +129,8 @@ list per mill**; data checks are **never** sent.
 - **Not done yet:** nothing posted to the real n8n URL; not committed; not deployed; no contacts entered;
   `ALERT_WEBHOOK_SECRET` must be agreed with whoever owns the n8n workflow.
 
-Decisions: limits the plant didn't give are **standard placeholders** (labelled so, with their basis)
-until the plant types its own; everything lives in one IOsense document (tag
+Decisions: limits the plant didn't give are standard placeholders until the plant types its own (no
+labels for this on screen any more: 23 Nov); everything lives in one IOsense document (tag
 `rolling-mill-settings/settings`, newest row wins); data checks show on screen but send no message by
 default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `backend/src/modules/alerts`,
 `frontend/src/components/settings`, `frontend/src/components/alerts`.
@@ -166,3 +166,66 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   Sender deployed by the user 21 Nov (`3318c69`), running and primed (17 standing alerts adopted quietly) but
   with **0 receivers**: `ALERT_WEBHOOK_URL` / `ALERT_WEBHOOK_SECRET` still to be set on its deployment.
   `a0c478f`: `alerts:prod` now builds first (the first deploy failed with MODULE_NOT_FOUND).
+- **22 Nov 2026** — Live end-to-end test passed on RMD: n8n's Webhook node was GET and the live link 404'd
+  (21 Nov's 14 messages were given up after 24 h); fixed by the user (POST, active). Oil-tank min 35 → 45 at
+  18:02 UTC: 5 raised alerts delivered at 18:04, then L1 + L2 reminders every minute, all accepted
+  (RMD: one message per crossing OFF, every 1 min — the user accepts the volume). Open: RMD phone number has
+  no +91; HSM / LSM / RMS have no contacts; ALERT_WEBHOOK_SECRET not confirmed; the Alerts page should say per
+  row whether a message was sent.
+- **23 Nov 2026** — HSM shift setup checklist: the user asked for the shift's own start and end time.
+  Two time boxes after Shift (`Shift start time`, `Shift end time`, HH:MM 24 h), filled with HSM's usual
+  Day 08:00–20:00 / Night 20:00–08:00 until typed; the backend checks them (`checklist.store.ts`). The
+  logbook form Shift Setup Checklist itself still needs these two fields added (spec for the logbook builder).
+  The old checklist browser test was pointed at the panel-header buttons (moved 31 Oct). Committed 23 Nov.
+- **23 Nov 2026** — Settings → Limits: the "Where it comes from" column (Plant / placeholder, basis) is gone;
+  the dashboard is in UAT and those labels were not wanted. What is left is who changed a limit and when
+  ("Set by … · date", Reset), shown under the limit's name only when it was changed. The table is just
+  Limit / Min / Max. Committed 23 Nov.
+- **23 Nov 2026** — Management Dash All.xlsx, LSM sheet, the 8 "Online" KPIs (read-only ERP query). The
+  LSM log sheet (FA-LP-P) already holds 7 of them: PLANT_AVAILABILITY, PLANT_PERFORMANCE, PLANT_EFFICIENCY,
+  ROLLING_PERCENTAGE_CASTING, ROLLING_PERCENTAGE_DELIVERY, YIELD_PERCENTAGE (prime = PRODUTION_MT ÷ INPUT_MT,
+  same as our Mass yield), TOTAL_PROD_YEILD (prime + short length). No mill breakdown-hours field (only
+  SMS_BREAKDOWN_HOURS, DELAY_HRS). The sheet's filter "P11P" is RMS's mark (division RS, L5P); every LSM
+  entry is P6P (LS, L7P), so LSM has no Online / Offline split in the ERP.
+  **Built (user: show them as plain LSM figures; rename Mass yield → Prime yield + add Yield with non-prime):**
+  synced fields LSM_KPI_FIELDS (`cache.ts`); `lsm/production.service.ts` — one entry = the ERP's figure; several =
+  weighted (availability & efficiency by run + delay h, performance by run h, rolling by billet input), so
+  efficiency over a period still = availability × performance. LSM Visualization: a 6-card top row (Production,
+  Prime yield, Yield with non-prime, Power, Specific energy, Finished stock) and a "Mill performance" row of five,
+  one drawer (`view="performance"`). Checked 1–8 Oct by hand against the ERP rows. ERP rolling in delivery is 0 on
+  13 Sep, 4 Oct and 14 Oct (-0001) though the mill ran — shown as the ERP has it (told the user). The old test
+  "LSM / RMS visualization … every figure NA" in rolling-mill.spec.ts was already failing (RMS too); not fixed.
+  Committed 23 Nov.
+  Layout (same day): the user rejected the second row of five big cards. The five are now one slim band
+  (`.rm-perf`, visualization.css) under the six headline cards: a title and five small clickable figures.
+  LSM Breakdown (h) = Σ DELAY_HRS (the user, 23 Nov 2026); drawer column "Breakdown (h)".
+  Then (same day) the band was dropped: LSM's twelve figures are one grid of six per row, as RMD's
+  (`rm-strip--six`) — row 1 the headline figures, row 2 availability, performance, efficiency, rolling in
+  casting / delivery, breakdown.
+- **23 Nov 2026** — HSM.xlsx, "CRITICAL PARAMETER → VISUALIZATION" (7 rows), read-only ERP check. All on the
+  HSM log sheet (MP/S1/PRLOG/L6P), split by head TRAN_COLUMN_NAME1 ST001 Online / ST002 Offline:
+  TOTAL_CAST_QTY, PRODUCTION_MT, DELIVERY_QTY, PRIME_MT, ROLLING_PERCENTAGE_DELIVERY (= INPUT_MT ÷ DELIVERY_QTY),
+  ROLLING_PERCENTAGE_CASTING (= INPUT_MT ÷ TOTAL_CAST_QTY), cold power = ST002 POWER_CONSUMPTION_IN_KWH (and
+  _KWH_MT = kWh ÷ PRODUCTION_MT). Our HSM sync has no mode and none of cast / delivery / rolling % / power yet.
+  Recent ST002 entries are all 1.25 MT in, 1.21 MT out, ~770 kWh (≈630 kWh/MT) — told the user.
+  **Built (same day).** User's rules: the two rolling % are ONLINE only (Offline's 100 % is filler, never counted);
+  the five existing HSM cards never change with the switch; Online = five + Online set, Offline = five + Offline
+  set, Both = five + both; cold power as kWh and kWh/MT. Layout was left to me (see memory decide-ui-yourself):
+  Both adds Online + Offline (12 cards, six per row); Online / Offline have 11, so Production spans two columns.
+  Backend: LOG_FIELDS + TOTAL_CAST_QTY / DELIVERY_QTY / POWER_CONSUMPTION_IN_KWH, row `mode` (HSM_MODE_CODES),
+  `hsm/rolling.service.ts`, GET /api/hsm/rolling?mode=. Rolling % = Σ INPUT ÷ Σ CAST (÷ Σ DELIVERY) over Online.
+  Frontend: HsmRollingCards + HsmRollingDrawer, KpiStrip (six per row), the Rolling picker on HSM Visualization
+  (shares `rmdMode`). Tests: hsm-rolling.test.ts (4), hsm-rolling.e2e.spec.ts (1–18 Nov, checked by hand).
+  Old test "root redirects to HSM Visualization…" (rolling-mill.spec.ts): card list brought up to date, but it
+  still fails further down on the mill mimic's zone buttons — stale from before today, not fixed. Committed 23 Nov.
+- **23 Nov 2026 — end of day, all of the above committed and pushed to main.** Also in the commit: the plant's
+  sheets (HSM.xlsx, Management Dash All.xlsx), the updated HSM Checklists Form Spec.xlsx and the sample screens
+  (HSM Shift Timing - Sample Screens.html). Open:
+  - LSM: rolling in delivery is 0 in the ERP on 13 Sep, 4 Oct, 14 Oct (-0001) though the mill ran — ask the plant.
+  - HSM: recent Offline (ST002) entries identical every day (1.25 MT, ~770 kWh) — ask the plant before trusting cold power.
+  - HSM ERP log sheet has no entries after 18 Nov.
+  - LSM sheet: pump house form and bearing temperature & lubrication form not compared yet.
+  - Old browser tests still failing from before today (rolling-mill.spec.ts: HSM home screen mill-mimic zones, HSM
+    asset health, RMD visualization; ~12 LSM / RMS tests in wiring.e2e.spec.ts that expect removed panels).
+  - Shift setup checklist: the logbook form itself still needs the two time fields (spec xlsx given to the user).
+

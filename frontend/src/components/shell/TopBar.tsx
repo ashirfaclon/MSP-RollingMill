@@ -45,7 +45,8 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
 
         {/* RMD: the ERP figures for Online, Offline or both rollings (the user, 13 Nov 2026) — a dropdown
             like the Mill beside it (the user, 21 Nov 2026). */}
-        {mill === 'rmd' && dated && (
+        {/* HSM: the same switch for the Visualization's log-sheet KPIs (the user, 23 Nov 2026). */}
+        {((mill === 'rmd' && dated) || (mill === 'hsm' && screen === 'visualization')) && (
           <Picker label="Rolling" title="Rolling" value={sel.rmdMode} onChoose={(m) => setGlobalSel({ rmdMode: m })}
             options={(['all', 'online', 'offline'] as RmdModeSel[]).map((m) => ({ id: m, text: RMD_MODE_LABELS[m] }))} />
         )}

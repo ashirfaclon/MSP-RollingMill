@@ -2,14 +2,14 @@
  * HSM checklists in their logbook forms (HSM Checklists Form Spec), one entry per save:
  *   production variance — the production figures filled here from the Production card's source (the
  *     Influx counter and the ERP log sheet for the plant day), the reasons as typed;
- *   shift setup — every column as typed.
+ *   shift setup — every column as typed, with the shift's start and end time (HH:MM).
  */
 import type { Env } from '../../config/env';
 import type { SetupSaveBody, VarianceSaveBody } from '../../contracts';
 import { saveFormEntries, type FormWrite } from '../../integrations/logbook/client';
 import { HttpError } from '../../shared/http-error';
 import { isDate, productionComparison, round2 } from '../hsm/production.service';
-import { SETUP_FORM, SETUP_KEYS, SETUP_TEXT, VARIANCE_FORM, VARIANCE_KEYS as V } from './forms';
+import { SETUP_FORM, SETUP_KEYS, SETUP_TEXT, SETUP_TIMES, VARIANCE_FORM, VARIANCE_KEYS as V } from './forms';
 
 const reason = (v: unknown, name: string) => {
   if (v === null || v === undefined || v === '') return null;
@@ -41,6 +41,12 @@ export function saveSetup(env: Env, body: SetupSaveBody, filledBy: string): Prom
   const v = body?.values ?? {};
   if (!isDate(String(v.Date))) throw new HttpError(400, 'bad_date', 'Date must be YYYY-MM-DD');
   if (v.Shift !== 'Day' && v.Shift !== 'Night') throw new HttpError(400, 'bad_shift', 'Shift must be Day or Night');
+  // The shift's start and end: HH:MM, 24 h; the end may be the next morning (a night shift), never the start itself.
+  for (const k of SETUP_TIMES) {
+    const t = v[k];
+    if (t !== undefined && t !== null && t !== '' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(t))) throw new HttpError(400, 'bad_time', `${k} must be a time, HH:MM (24 h)`);
+  }
+  if (v['Shift start time'] && v['Shift start time'] === v['Shift end time']) throw new HttpError(400, 'bad_time', 'The shift must end at a different time than it starts');
   const entry: Record<string, unknown> = {};
   for (const k of SETUP_KEYS) {
     const x = v[k];

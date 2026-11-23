@@ -23,17 +23,17 @@ const test = base.extend<{ page: Page }>({
 test.describe.configure({ timeout: 120_000 });
 test.skip(!live, 'needs backend/.env (IOsense)');
 
-test('LSM: Settings lists every limit with where it came from; a slip is refused before saving', async ({ page }) => {
+test('LSM: Settings lists every limit, and who last changed it; a slip is refused before saving', async ({ page }) => {
   await page.goto('/lsm/asset-health');
   await page.getByRole('button', { name: 'Settings' }).click();
   const drawer = page.getByRole('dialog', { name: 'LSM · Settings' });
   await expect(drawer.getByRole('table', { name: 'Temperatures limits' })).toBeVisible();
 
-  // The shipped placeholders, labelled as such, with their basis.
+  // Only who changed a limit, and when, under its name; no column of dashes (the user, 23 Nov 2026).
   const fly = drawer.locator('#set-flywheel-temp');
   await expect(fly.getByLabel(/Flywheel bearings maximum/)).toHaveValue('75');
-  await expect(fly.getByText('Standard placeholder', { exact: true })).toBeVisible();
-  await expect(drawer.locator('#set-motor-current').getByText('Not set — no alert')).toBeVisible();
+  await expect(drawer.getByRole('table', { name: 'Temperatures limits' }).getByRole('columnheader')).toHaveText(['Limit', 'Min', 'Max']);
+  await expect(drawer.getByText(/Standard placeholder|Plant's limit|Not set — no alert/)).toHaveCount(0);
   await expect(drawer.getByText(/Saved in IOsense|Defaults in use/)).toBeVisible();
   await drawer.screenshot({ path: `${SHOTS}/settings-lsm.png` });
 
@@ -56,7 +56,6 @@ test('RMD: the plant\'s own limits, chemistry and the tank sizes in one place', 
   const bearing = drawer.locator('#set-bearing-temp');
   await expect(bearing.getByLabel(/minimum/)).toHaveValue('45');
   await expect(bearing.getByLabel(/maximum/)).toHaveValue('65');
-  await expect(bearing.getByText('Plant\'s limit', { exact: true })).toBeVisible();
   await expect(drawer.locator('#set-chem-sp').getByLabel(/maximum/)).toHaveValue('0.075');
   await expect(drawer.getByRole('table', { name: 'Oil tank size' })).toBeVisible();
   await page.setViewportSize({ width: 1600, height: 1400 });

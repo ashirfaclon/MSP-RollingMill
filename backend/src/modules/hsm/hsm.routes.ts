@@ -8,7 +8,8 @@ import { HttpError } from '../../shared/http-error';
 import { sharedFresh } from '../../shared/shared-fresh';
 import { searchParams } from '../../shared/request';
 import { HSM_DISCHARGED_BILLET } from '../../integrations/historian/tags';
-import { parseGrain, parseRange } from './params';
+import { parseGrain, parseRange, parseRmdMode } from './params';
+import { hsmRolling } from './rolling.service';
 import { PLANT_DAY_START_HOUR, counterComparison, isDate, istDate, productionComparison, type CounterSpec } from './production.service';
 import { logSheetReport, ordersReport, sizeReport, stockReport } from './erp-kpis.service';
 import { electricalDelays } from './electrical-delays.service';
@@ -72,6 +73,13 @@ export async function hsmRoutes(app: FastifyInstance) {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
     return logSheetReport(loadEnv(), from, to, parseGrain(q));
+  });
+
+  /** The plant's management KPIs from the log sheet: cast, delivery, prime, rolling %, cold power; Online / Offline / both. */
+  app.get('/rolling', { config: { errorCode: 'hsm_rolling_failed' } }, async (req) => {
+    const q = searchParams(req);
+    const { from, to } = parseRange(q);
+    return hsmRolling(loadEnv(), from, to, parseGrain(q), parseRmdMode(q));
   });
 
   /** Strip produced (stores receipts) and dispatched (sale lines) per size. */

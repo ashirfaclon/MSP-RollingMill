@@ -26,7 +26,8 @@ export type ThemeSel = 'dark' | 'light';
 /** Screen rail: full labels, or an icon strip that gives the dashboard the width. */
 export type SidebarSel = 'expanded' | 'collapsed';
 
-/** RMD's ERP figures: Online (RO001), Offline (RO002) or both rollings together (the user, 13 Nov 2026). */
+/** RMD's ERP figures: Online (RO001), Offline (RO002) or both rollings together (the user, 13 Nov 2026).
+ *  HSM Visualization uses the same switch for its log-sheet KPIs (ST001 / ST002; the user, 23 Nov 2026). */
 export type RmdModeSel = 'all' | 'online' | 'offline';
 export const RMD_MODE_LABELS: Record<RmdModeSel, string> = { all: 'Both', online: 'Online', offline: 'Offline' };
 
@@ -119,7 +120,7 @@ export function resetFilters() {
  * when RMD is switched to one rolling; '' otherwise, so Both asks exactly what it always did.
  * Read outside React: every caller renders under useSelection, so a switch re-renders it.
  */
-const RMD_MODE_PATHS = ['/api/rmd/production', '/api/rmd/running-rate', '/api/rmd/power', '/api/rmd/plan', '/api/ca/rmd'];
+const RMD_MODE_PATHS = ['/api/hsm/rolling', '/api/rmd/production', '/api/rmd/running-rate', '/api/rmd/power', '/api/rmd/plan', '/api/ca/rmd'];
 export const rmdModeQuery = (path: string) =>
   (state.rmdMode !== 'all' && RMD_MODE_PATHS.includes(path) ? `&mode=${state.rmdMode}` : '');
 

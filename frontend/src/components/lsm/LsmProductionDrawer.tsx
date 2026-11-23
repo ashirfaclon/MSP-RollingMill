@@ -2,10 +2,14 @@
 
 /**
  * LSM production from the ERP Production Log Sheet (USER_CODE = 'FA-LP-P'), for the dashboard's
- * period, per day / week / month. Two views of the same data:
+ * period, per day / week / month. Four views of the same data:
  *   production  production per period (Production card, Order allocation);
- *   yield       mass yield = production ÷ billet input (INPUT_MT) (Mass yield card);
- *   balance     billet input, production and the six losses (Material balance).
+ *   yield       prime yield = production ÷ billet input (INPUT_MT), and yield with non-prime =
+ *               TOTAL_PRODUCTION ÷ INPUT_MT (the two yield cards);
+ *   balance     billet input, production and the six losses (Material balance);
+ *   performance availability, performance, efficiency, rolling in casting and in delivery — the
+ *               plant's management KPIs as the log sheet holds them — and breakdown hours = DELAY_HRS
+ *               (the user, 23 Nov 2026).
  * Codes exactly as the plant gave them; production is PRODUTION_MT, as the table spells it.
  */
 import { useMemo } from 'react';
@@ -17,7 +21,14 @@ import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type LsmProductionPeriod, type LsmProductionReport } from '@/services/hsmApi';
 
-export type LsmProductionView = 'production' | 'yield' | 'balance';
+export type LsmProductionView = 'production' | 'yield' | 'balance' | 'performance';
+
+const TITLES: Record<LsmProductionView, string> = {
+  production: 'Production · ERP log sheet',
+  yield: 'Yield · ERP log sheet',
+  balance: 'Material balance · ERP log sheet',
+  performance: 'Mill performance · ERP log sheet',
+};
 
 const f = (v: number | null) => (v === null ? '—' : fmtNum(v, 2));
 
@@ -39,15 +50,16 @@ export default function LsmProductionDrawer({ open, onClose, view }: { open: boo
     <DrillDrawer
       open={open}
       onClose={onClose}
-      title={view === 'production' ? 'Production · ERP log sheet' : view === 'yield' ? 'Mass yield · ERP log sheet' : 'Material balance · ERP log sheet'}
-      sub={view === 'yield' ? 'LSM · %' : 'LSM · MT'}
+      title={TITLES[view]}
+      sub={view === 'yield' || view === 'performance' ? 'LSM · %' : 'LSM · MT'}
       controls={r.controls}
       loading={loading}
       stale={!!data && dataUrl !== url}
       error={error}
       hasData={!!data}
     >
-      {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} /> : <BalanceContent data={data} />)}
+      {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} />
+        : view === 'performance' ? <PerformanceContent data={data} /> : <BalanceContent data={data} />)}
     </DrillDrawer>
   );
 }
@@ -90,26 +102,31 @@ function YieldContent({ data }: { data: LsmProductionReport }) {
   const t = data.totals;
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const series = useMemo<DrillSeries[]>(() => [
-    { id: 'yield', name: 'Mass yield', token: '--s-order', type: 'line', data: rows.map((x) => x.massYieldPct), dp: 2 },
+    { id: 'prime', name: 'Prime yield', token: '--s-order', type: 'line', data: rows.map((x) => x.massYieldPct), dp: 2 },
+    { id: 'nonprime', name: 'Yield with non-prime', token: '--s-prod', type: 'line', data: rows.map((x) => x.nonPrimeYieldPct), dp: 2 },
   ], [rows]);
   const axes = useMemo(() => [{ title: '%', unit: '%' }], []);
   return (
     <>
       <Stats items={[
-        { label: 'Mass yield', value: f(t.massYieldPct), unit: '%' },
+        { label: 'Prime yield', value: f(t.massYieldPct), unit: '%' },
+        { label: 'Yield with non-prime', value: f(t.nonPrimeYieldPct), unit: '%' },
         { label: 'Billet input', value: f(t.billetInputMt), unit: 'MT' },
         { label: 'Production', value: f(t.productionMt), unit: 'MT' },
       ]} />
       <DrillChart series={series} categories={categories} axes={axes}
-        ariaLabel={`Mass yield by period: ${rows.map((x) => `${x.label} ${f(x.massYieldPct)}%`).join('; ')}`} />
+        ariaLabel={`Yield by period: ${rows.map((x) => `${x.label} prime ${f(x.massYieldPct)}%, with non-prime ${f(x.nonPrimeYieldPct)}%`).join('; ')}`} />
       <div className="pd-table-wrap">
-        <table className="grid pd-table" aria-label="Mass yield by period">
-          <thead><tr><th>Period</th><th className="r">Billet input (MT)</th><th className="r">Production (MT)</th><th className="r">Mass yield (%)</th></tr></thead>
+        <table className="grid pd-table" aria-label="Yield by period">
+          <thead><tr><th>Period</th><th className="r">Billet input (MT)</th><th className="r">Production (MT)</th><th className="r">Prime yield (%)</th><th className="r">Production + short length (MT)</th><th className="r">Yield with non-prime (%)</th></tr></thead>
           <tbody>{rows.map((x) => <YieldRow key={x.key} x={x} />)}</tbody>
           <tfoot><YieldRow x={t} /></tfoot>
         </table>
       </div>
-      <SourceBox sources={sources(['INPUT_MT', 'PRODUTION_MT'])} formula={['Mass yield = PRODUTION_MT ÷ INPUT_MT × 100']} />
+      <SourceBox sources={sources(['INPUT_MT', 'PRODUTION_MT', 'TOTAL_PRODUCTION'])} formula={[
+        'Prime yield = PRODUTION_MT ÷ INPUT_MT × 100',
+        'Yield with non-prime = TOTAL_PRODUCTION ÷ INPUT_MT × 100 (TOTAL_PRODUCTION = PRODUTION_MT + SHORTLENGTH_MT)',
+      ]} />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
     </>
   );
@@ -122,6 +139,61 @@ function YieldRow({ x }: { x: LsmProductionPeriod }) {
       <td className="num r">{f(x.billetInputMt)}</td>
       <td className="num r">{f(x.productionMt)}</td>
       <td className="num r v-val"><b>{f(x.massYieldPct)}</b></td>
+      <td className="num r">{f(x.totalProductionMt)}</td>
+      <td className="num r v-val"><b>{f(x.nonPrimeYieldPct)}</b></td>
+    </tr>
+  );
+}
+
+const PERF_COLS: { key: 'availabilityPct' | 'performancePct' | 'efficiencyPct' | 'rollingInCastingPct' | 'rollingInDeliveryPct'; name: string; token: string }[] = [
+  { key: 'availabilityPct', name: 'Availability', token: '--s-prod' },
+  { key: 'performancePct', name: 'Performance', token: '--s-order' },
+  { key: 'efficiencyPct', name: 'Efficiency', token: '--s-pred' },
+  { key: 'rollingInCastingPct', name: 'Rolling in casting', token: '--s-alt' },
+  { key: 'rollingInDeliveryPct', name: 'Rolling in delivery', token: '--violet' },
+];
+
+function PerformanceContent({ data }: { data: LsmProductionReport }) {
+  const rows = data.rows;
+  const t = data.totals;
+  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
+  const series = useMemo<DrillSeries[]>(() => PERF_COLS.map((c) => (
+    { id: c.key, name: c.name, token: c.token, type: 'line', data: rows.map((x) => x[c.key]), dp: 2 }
+  )), [rows]);
+  const axes = useMemo(() => [{ title: '%', unit: '%' }], []);
+  return (
+    <>
+      <Stats items={[...PERF_COLS.map((c) => ({ label: c.name, value: f(t[c.key]), unit: '%' })), { label: 'Breakdown', value: f(t.delayHrs), unit: 'h' }]} />
+      <DrillChart series={series} categories={categories} axes={axes}
+        ariaLabel={`Mill performance by period: ${rows.map((x) => `${x.label} ${PERF_COLS.map((c) => `${c.name.toLowerCase()} ${f(x[c.key])}%`).join(', ')}`).join('; ')}`} />
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label="Mill performance by period">
+          <thead><tr><th>Period</th>{PERF_COLS.map((c) => <th key={c.key} className="r">{c.name} (%)</th>)}<th className="r">Running (h)</th><th className="r">Breakdown (h)</th></tr></thead>
+          <tbody>{rows.map((x) => <PerformanceRow key={x.key} x={x} />)}</tbody>
+          <tfoot><PerformanceRow x={t} /></tfoot>
+        </table>
+      </div>
+      <SourceBox
+        sources={sources(['PLANT_AVAILABILITY', 'PLANT_PERFORMANCE', 'PLANT_EFFICIENCY', 'ROLLING_PERCENTAGE_CASTING', 'ROLLING_PERCENTAGE_DELIVERY', 'NET_RUNNING_HRS', 'DELAY_HRS', 'INPUT_MT'])}
+        formula={[
+          'One entry: the ERP\'s own figure. Availability = NET_RUNNING_HRS ÷ (NET_RUNNING_HRS + DELAY_HRS); efficiency = availability × performance',
+          'Several entries: availability and efficiency weighted by running + delay hours, performance by running hours',
+          'Rolling in casting / delivery over several entries: weighted by INPUT_MT',
+          'Breakdown hours = Σ DELAY_HRS',
+        ]}
+      />
+      {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
+    </>
+  );
+}
+
+function PerformanceRow({ x }: { x: LsmProductionPeriod }) {
+  return (
+    <tr>
+      {label(x)}
+      {PERF_COLS.map((c) => <td key={c.key} className="num r v-val">{f(x[c.key])}</td>)}
+      <td className="num r">{f(x.runningHrs)}</td>
+      <td className="num r">{f(x.delayHrs)}</td>
     </tr>
   );
 }

@@ -58,15 +58,17 @@ export const VARIANCE_KEYS = {
 } as const;
 const R = ['R1', 'R2', 'R3', 'R4', 'R5'];
 const F = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6'];
+/** The shift's own start and end, typed as HH:MM, 24 h (the user, 23 Nov 2026). */
+export const SETUP_TIMES = ['Shift start time', 'Shift end time'];
 /** Every column of the shift setup checklist, in the form's order. */
 export const SETUP_KEYS: string[] = [
-  'Date', 'Shift', 'Shift in-charge', 'Employee ID', 'Manpower availability',
+  'Date', 'Shift', ...SETUP_TIMES, 'Shift in-charge', 'Employee ID', 'Manpower availability',
   ...R.map((s) => `RM guide setting ${s}`), ...F.map((s) => `FM guide setting ${s}`),
   'Vertical edger gap V1', 'Vertical edger gap V2', 'Vertical pinch roll gap',
   ...R.map((s) => `Roll type ${s}`), ...[...R, ...F].map((s) => `Work roll dia ${s}`), 'Remark',
 ];
 /** Setup columns that hold text or a choice (the rest are numbers). */
-export const SETUP_TEXT = new Set(['Date', 'Shift', 'Shift in-charge', 'Employee ID', 'Remark', ...R.map((s) => `Roll type ${s}`)]);
+export const SETUP_TEXT = new Set(['Date', 'Shift', ...SETUP_TIMES, 'Shift in-charge', 'Employee ID', 'Remark', ...R.map((s) => `Roll type ${s}`)]);
 
 /**
  * Equipment settings (the user, 31 Oct 2026): an edit made on the dashboard to a default of

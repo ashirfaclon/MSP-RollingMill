@@ -28,15 +28,17 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   await expect(strip.getByRole('button', { name: 'Power consumption', exact: true })).toBeVisible();
   // Descriptive sub-texts are gone: cards with nothing to flag carry no note.
   await expect(strip.getByRole('button', { name: 'Specific energy', exact: true })).toBeVisible();
-  // No order / stock split on any mill (the user, 27 Oct 2026): four cards.
-  await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/]);
+  // No order / stock split on any mill (the user, 27 Oct 2026). Finished stock ends the headline five (31 Oct);
+  // then the plant's log-sheet KPIs for both rollings (the user, 23 Nov 2026) — twelve, six per row.
+  await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/, /^Finished stock/,
+    /^Cast qty/, /^Delivery/, /^Prime qty/, /^Rolling w\.r\.t\. casting/, /^Rolling w\.r\.t\. delivery/, /^Cold power/, /^Cold power per tonne/]);
   await expect(card('Stock with order')).toHaveCount(0);
   for (const sample of ['30.78', '90.0', '72.0', '420', '210', '342.0']) await expect(strip).not.toContainText(sample);
   await expect(page.locator('.rm-pending')).toHaveCount(0);
 
   const main = page.getByRole('main');
   for (const text of [
-    'Mill mimic', 'Production by shift', 'Order allocation', 'Finished stock', 'Material & operating balance',
+    'Mill mimic', 'Production by shift', 'Finished stock', 'Material & operating balance',
     'Finished stock by size',
   ]) {
     await expect(main.getByText(text, { exact: false }).first()).toBeVisible();
@@ -46,8 +48,8 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   await expect(shifts.locator('.rm-shift-name')).toHaveText(['Day', 'Night']);
   await expect(shifts.locator('.rm-shift-val')).toHaveText([/^\d[\d,]*\.\d MT/, /^\d[\d,]*\.\d MT/]);   // live, split by shift
   await expect(shifts.getByRole('button', { name: /Running rate/ })).toContainText(/\d+\.\d{2} TPH|NA/);
-  const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
-  await expect(split).not.toContainText('Made To');
+  // No Order allocation panel (the user, 31 Oct 2026), so no Made To Order / Made To Stock anywhere.
+  await expect(main.getByText('Made To')).toHaveCount(0);
   // Live panels: the mimic has infeed, the two stand groups that exist, and the exit.
   for (const zone of [/Billet infeed/, /Roughing group/, /Finishing group/, /Finished exit/]) {
     await expect(main.getByRole('button', { name: zone })).toBeVisible();
@@ -318,7 +320,7 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
 });
 
 for (const mill of ['lsm', 'rms'] as const) {
-  test(`${mill.toUpperCase()} visualization: the same screen as HSM / RMD, every figure NA until its source is confirmed`, async ({ page }) => {
+  test(`${mill.toUpperCase()} visualization: the same screen as HSM / RMD — its own cards, each a real figure or NA`, async ({ page }) => {
     await page.goto(`/${mill}/visualization`);
     await expect(page.locator('.tb-mark--mill')).toHaveText(mill.toUpperCase());
     // Each mill's own day and shifts (plant, 12 Oct 2026): LSM 09:00, RMS 09:30.
@@ -329,17 +331,20 @@ for (const mill of ['lsm', 'rms'] as const) {
     const shiftPanel = page.locator('section.panel', { hasText: /Production (by shift|· whole day)/ }).first();
     await expect(shiftPanel.locator('.panel-sub')).toHaveText(new RegExp(`^(Day ${start}–${mid} IST · Night ${mid}–${start} IST|${start} IST → ${start} IST)$`));
     const strip = page.getByRole('region', { name: 'Headline KPIs' });
-    await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/]);
-    // LSM: Production is wired (ERP log sheet FA-LP-P) and opens its drawer; Today's entry comes a day late, so NA.
-    // Everything else NA, and nothing else opens.
-    await expect(strip.locator('.rm-card-value').nth(0)).toHaveText(mill === 'lsm' ? /^(NA|[\d,]+\.\d)/ : /^NA/);
-    // Power and specific energy: each mill's Daily Power Consumption Record holds only a test entry so far — NA.
-    for (const i of [2, 3]) await expect(strip.locator('.rm-card-value').nth(i)).toHaveText(/^NA/);
-    await expect(strip.getByRole('button')).toHaveCount(4);   // Production, Mass yield, Power consumption, Specific energy
+    // LSM: prime yield (was Mass yield) and yield with non-prime (the user, 23 Nov 2026); Finished stock at the end (31 Oct).
+    await expect(strip.locator('.rm-card-label')).toHaveText(mill === 'lsm'
+      ? [/^Production/, 'Prime yield', 'Yield with non-prime', 'Power consumption', 'Specific energy', /^Finished stock/,
+        'Availability', 'Performance', 'Efficiency', 'Rolling in casting', 'Rolling in delivery', 'Breakdown']
+      : [/^Production/, 'Mass yield', 'Power consumption', 'Specific energy', /^Finished stock/]);
+    // Every card is wired now (ERP log sheets, power forms, stock): a figure, or NA when its source has nothing.
+    const values = strip.locator('.rm-card-value');
+    await expect(values.first()).toBeVisible();
+    for (const v of await values.allTextContents()) expect(v).toMatch(/^(NA|[\d,]+(\.\d+)?)/);
     // No mill mimic on LSM or RMS.
     await expect(page.getByRole('img', { name: /^(HSM|RMD) mill:/ })).toHaveCount(0);
     await expect(page.locator('section.panel', { hasText: 'Mill mimic' })).toHaveCount(0);
-    for (const title of [/Production (by shift|· whole day)/, 'Order allocation', 'Material & operating balance', 'Finished stock by size']) {
+    // No Order allocation panel: Finished stock card instead (the user, 31 Oct 2026).
+    for (const title of [/Production (by shift|· whole day)/, 'Material & operating balance', 'Finished stock by size']) {
       await expect(page.locator('section.panel', { hasText: title }).first()).toBeVisible();
     }
     // No sample figures anywhere.

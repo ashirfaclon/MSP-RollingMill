@@ -665,14 +665,13 @@ test('LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant 
   const card = page.getByRole('button', { name: 'Production', exact: true });
   await expect(card.locator('.rm-card-value')).toContainText('2,106.1');
   await expect(card.locator('.rm-card-note')).toHaveText('');
-  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('2,106.1 MT');
 
-  // Mass yield: PRODUTION_MT 2,106.12 ÷ INPUT_MT 2,226.89 = 94.58 %.
-  await expect(page.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-value')).toContainText('94.6');
+  // Prime yield (was Mass yield): PRODUTION_MT 2,106.12 ÷ INPUT_MT 2,226.89 = 94.58 %.
+  await expect(page.getByRole('button', { name: 'Prime yield', exact: true }).locator('.rm-card-value')).toContainText('94.6');
   // Material balance: input 2,226.9, finished 2,106.1, difference 120.8; cold is 0 so it isn't shown.
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
   await expect(balance).toContainText('Billet input2,226.9 MT');
-  await expect(balance).toContainText('Yield94.6%');
+  await expect(balance).toContainText('Prime yield94.6%');
   await expect(balance).toContainText('Finished 2,106.1 MT');
   await expect(balance).toContainText('Mass difference 120.8 MT');
   // Billets in: Σ INPUT_PCS, 1–8 Oct = 8,429.
@@ -696,6 +695,48 @@ test('LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant 
   await expect(bt.locator('tfoot')).toContainText('120.77');
   await page.waitForTimeout(700);
   await bal.screenshot({ path: `${SHOTS}/lsm-drill-balance.png` });
+});
+
+test('LSM: the plant\'s management KPIs from the ERP log sheet — two yields, availability, performance, efficiency, rolling in casting / delivery', async ({ page }) => {
+  await page.goto('/lsm/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-10-01');
+  await dialog.getByLabel('End Date').fill('2026-10-08');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+
+  // 1–8 Oct, checked against the ERP rows by hand (23 Nov 2026): prime 2,106.12 ÷ 2,226.89 = 94.58 %;
+  // with non-prime Σ TOTAL_PRODUCTION ÷ Σ INPUT_MT = 95.17 %.
+  const value = (name: string) => page.getByRole('button', { name, exact: true }).locator('.rm-card-value');
+  await expect(value('Prime yield')).toContainText('94.6');
+  await expect(value('Yield with non-prime')).toContainText('95.2');
+  // Availability = Σ run ÷ Σ (run + delay) = 99.34 ÷ 100.19; efficiency = availability × performance.
+  // Two rows of six, as RMD's: the headline figures, then the mill performance KPIs (the user, 23 Nov 2026).
+  const strip = page.getByRole('region', { name: 'Headline KPIs' });
+  await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, 'Prime yield', 'Yield with non-prime', 'Power consumption', 'Specific energy', /^Finished stock/,
+    'Availability', 'Performance', 'Efficiency', 'Rolling in casting', 'Rolling in delivery', 'Breakdown']);
+  // Breakdown hours = Σ DELAY_HRS, 1–8 Oct = 0.85 h (the user, 23 Nov 2026).
+  for (const [name, v] of [['Availability', '99.2'], ['Performance', '98.5'], ['Efficiency', '97.7'], ['Rolling in casting', '96.6'], ['Rolling in delivery', '85.6'], ['Breakdown', '0.9']]) {
+    await expect(value(name)).toContainText(v);
+  }
+  await page.locator('.rm-viz').screenshot({ path: `${SHOTS}/lsm-kpis.png` });
+
+  await page.getByRole('button', { name: 'Efficiency', exact: true }).click();
+  const d = page.getByRole('dialog', { name: 'Mill performance · ERP log sheet' });
+  const tb = d.getByRole('table', { name: 'Mill performance by period' });
+  await expect(tb.locator('thead th')).toHaveText(['Period', 'Availability (%)', 'Performance (%)', 'Efficiency (%)', 'Rolling in casting (%)', 'Rolling in delivery (%)', 'Running (h)', 'Breakdown (h)']);
+  await expect(tb.locator('tbody tr')).toHaveCount(8);
+  await expect(tb.locator('tfoot')).toContainText('99.15');
+  await expect(tb.locator('tfoot')).toContainText('97.65');
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('PLANT_AVAILABILITY');
+  await page.waitForTimeout(700);
+  await d.screenshot({ path: `${SHOTS}/lsm-drill-performance.png` });
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Yield with non-prime', exact: true }).click();
+  const y = page.getByRole('dialog', { name: 'Yield · ERP log sheet' });
+  await expect(y.getByRole('table', { name: 'Yield by period' }).locator('tfoot')).toContainText('95.17');
+  await expect(y.getByRole('region', { name: 'Formula' })).toContainText('TOTAL_PRODUCTION ÷ INPUT_MT');
 });
 
 test('RMD: running rate opens its drill-down — Prime + SL ÷ running hours from the billet counters', async ({ page }) => {
@@ -1343,7 +1384,8 @@ test('HSM checklists: production variance — per day, the production figures fi
     return route.fulfill({ json: { ok: true, form: 'f', entries: 1 } });
   });
   await page.goto('/hsm/visualization');
-  const panel = page.getByRole('main').locator('section.panel', { hasText: 'Checklists' });
+  // Each checklist's button sits in the header of its panel (31 Oct 2026): variance by Production by shift, setup by the mill mimic.
+  const panel = page.getByRole('main');
   await panel.getByRole('button', { name: /Production variance checklist/ }).click();
   const v = page.getByRole('dialog', { name: 'Production variance checklist' });
   await expect(v.getByLabel('Shift')).toHaveCount(0);
@@ -1368,9 +1410,15 @@ test('HSM checklists: production variance — per day, the production figures fi
   await panel.getByRole('button', { name: /Shift setup checklist/ }).click();
   const s = page.getByRole('dialog', { name: 'Shift setup checklist' });
   await expect(s.locator('.ck-group-head h3')).toHaveText(['RM guide setting', 'FM guide setting', 'Vertical edger gap · pinch roll gap', 'Roll type', 'Work roll dia']);
-  await expect(s.locator('.ck-f > span')).toHaveCount(5 + 5 + 6 + 3 + 5 + 11 + 1);
+  await expect(s.locator('.ck-f > span')).toHaveCount(7 + 5 + 6 + 3 + 5 + 11 + 1);
+  // The shift's times: HSM's usual ones filled in, moved with the shift until typed.
+  await expect(s.getByLabel('Shift start')).toHaveValue('08:00');
+  await expect(s.getByLabel('Shift end')).toHaveValue('20:00');
   await s.getByLabel('Date').fill('2026-10-21');
   await s.locator('label', { has: page.locator('span', { hasText: /^Shift$/ }) }).locator('select').selectOption('Night');
+  await expect(s.getByLabel('Shift start')).toHaveValue('20:00');
+  await expect(s.getByLabel('Shift end')).toHaveValue('08:00');
+  await s.getByLabel('Shift end').fill('07:30');
   await s.getByLabel('Shift in-charge').fill('A. Kumar');
   // Typing stays in the field (a number box keeps focus over several keys).
   const r1 = s.locator('.ck-group', { hasText: 'RM guide setting' }).getByLabel('R1');
@@ -1381,7 +1429,7 @@ test('HSM checklists: production variance — per day, the production figures fi
   await s.getByRole('button', { name: 'Save' }).click();
   await expect(s.getByRole('status')).toHaveText('Saved to the logbook (Shift Setup Checklist).');
   expect(posts.at(-1)).toEqual({ url: expect.stringMatching(/\/api\/forms\/hsm\/setup$/), body: { values: {
-    Date: '2026-10-21', Shift: 'Night', 'Shift in-charge': 'A. Kumar', 'RM guide setting R1': 125, 'Roll type R2': 'Plain', 'Work roll dia F6': 412.5,
+    Date: '2026-10-21', 'Shift start time': '20:00', 'Shift end time': '07:30', Shift: 'Night', 'Shift in-charge': 'A. Kumar', 'RM guide setting R1': 125, 'Roll type R2': 'Plain', 'Work roll dia F6': 412.5,
   } } });
   await page.waitForTimeout(500);
   await s.screenshot({ path: `${SHOTS}/hsm-checklist-setup.png` });

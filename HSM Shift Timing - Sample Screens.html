@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HSM shift timing — sample screens</title>
+<style>
+  :root {
+    --bg: #0b1626; --panel: #10213a; --panel-2: #0d1b30; --border: #22406a; --border-soft: #1a3354;
+    --text: #e8eef7; --muted: #9fb3cf; --muted-2: #7f96b6;
+    --info: #4cb3ff; --ok: #3ecf8e; --warn: #f7b731; --risk: #ff6b6b; --idle: #2a3b55;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 Inter, "Segoe UI", system-ui, sans-serif; }
+  .page { max-width: 1240px; margin: 0 auto; padding: 28px 20px 60px; display: flex; flex-direction: column; gap: 28px; }
+  .sample { display: inline-block; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--warn); color: var(--warn); font-size: 12px; font-weight: 700; }
+  h1 { margin: 6px 0 4px; font-size: 22px; }
+  h2 { margin: 0; font-size: 17px; }
+  h3 { margin: 0 0 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  p { margin: 0; color: var(--muted); }
+  .screen { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 18px; border-bottom: 1px solid var(--border); background: #0e1d33; }
+  .badge { padding: 4px 10px; border-radius: 6px; background: #1d63c4; font-weight: 800; font-size: 13px; }
+  .crumb { font-weight: 800; letter-spacing: .04em; }
+  .pill { margin-left: auto; padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 12px; }
+  .body { padding: 18px; display: flex; flex-direction: column; gap: 18px; }
+  .panel { background: var(--panel); border: 1px solid var(--border-soft); border-radius: 8px; padding: 14px 16px; }
+  .panel-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 12px; }
+  .panel-head p { font-size: 12.5px; }
+
+  /* The timeline: one plant day, 08:00 → 08:00 */
+  .tl-row { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 12px; align-items: center; margin-bottom: 14px; }
+  .tl-label b { display: block; font-size: 13px; }
+  .tl-label span { font-size: 12px; color: var(--muted); }
+  .track { position: relative; height: 62px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border-soft); overflow: hidden; }
+  .shift { position: absolute; top: 0; height: 24px; display: flex; align-items: center; padding: 0 8px; font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+  .shift.day { background: #183a63; color: #cfe6ff; }
+  .shift.night { background: #24264f; color: #d9d9ff; border-left: 1px solid var(--border); }
+  .shift.real { background: #155a46; color: #d6fff0; }
+  .shift.none { background: repeating-linear-gradient(45deg, #142338, #142338 6px, #18293f 6px, #18293f 12px); color: var(--muted); }
+  .act { position: absolute; top: 30px; height: 26px; }
+  .run { background: var(--ok); }
+  .stop { background: var(--warn); }
+  .lost { background: repeating-linear-gradient(45deg, rgba(255,107,107,.55), rgba(255,107,107,.55) 5px, rgba(255,107,107,.2) 5px, rgba(255,107,107,.2) 10px); }
+  .free { background: transparent; }
+  .ticks { position: relative; height: 18px; margin-left: 222px; font-size: 11px; color: var(--muted-2); }
+  .ticks span { position: absolute; transform: translateX(-50%); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft); text-align: left; vertical-align: top; }
+  th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  td.r, th.r { text-align: right; }
+  td:nth-child(-n+4) { white-space: nowrap; }
+  .bad { color: var(--risk); font-weight: 700; }
+  .good { color: var(--ok); font-weight: 700; }
+  .wrap { overflow-x: auto; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  .kpi { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 12px 14px; }
+  .kpi .k { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .kpi .v { font-size: 26px; font-weight: 800; margin-top: 2px; }
+  .kpi .v small { font-size: 13px; color: var(--muted); font-weight: 600; margin-left: 4px; }
+  .kpi .n { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .chip { display: inline-block; padding: 1px 7px; margin: 1px 2px 1px 0; border-radius: 4px; font-size: 11.5px; font-weight: 700; }
+  .chip.pr { background: #2b3f72; color: #d6e2ff; }
+  .chip.pl { background: #3d3a28; color: #f3e6b5; }
+  .cmp { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 90px); gap: 6px 10px; font-size: 13px; align-items: center; }
+  .cmp .h { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; text-align: right; }
+  .cmp .h:first-child { text-align: left; }
+  .cmp .n { text-align: right; font-weight: 700; }
+  .note { font-size: 12.5px; color: var(--muted); border: 1px solid rgba(76,179,255,.3); padding: 8px 12px; background: rgba(76,179,255,.06); border-radius: 6px; }
+  .callout { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .callout div { border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  .callout .before { background: rgba(255,107,107,.08); border: 1px solid rgba(255,107,107,.35); }
+  .callout .after { background: rgba(62,207,142,.08); border: 1px solid rgba(62,207,142,.35); }
+  .callout b { display: block; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<main class="page">
+  <header>
+    <span class="sample">SAMPLE SCREENS · MADE-UP FIGURES</span>
+    <h1>HSM — what the real shift times from the Shift Setup Checklist would add</h1>
+    <p>Two ideas from the list: <b>2. Running time and downtime within the real shift</b> and <b>4. Results by shift setup</b>. One example day: the mill ran one shift, 08:00–16:00, as entered in the checklist.</p>
+  </header>
+
+  <!-- ============================== SCREEN 2 ============================== -->
+  <section class="screen" aria-label="Sample screen: running time and downtime within the real shift">
+    <div class="bar">
+      <span class="badge">HSM</span><span class="crumb">ROLLING MILL / VISUALIZATION</span>
+      <span class="pill">Duration · 17 Nov 08:00 → 18 Nov 08:00 IST</span>
+    </div>
+    <div class="body">
+      <h2>2 · Running time and downtime — against the real shift</h2>
+
+      <div class="panel">
+        <div class="panel-head"><h3>One plant day, 08:00 → 08:00</h3><p>Green = mill running · Amber = stopped during the shift · Red stripes = counted as lost time today</p></div>
+
+        <div class="tl-row">
+          <div class="tl-label"><b>Today — fixed shifts</b><span>Day 08:00–20:00 · Night 20:00–08:00</span></div>
+          <div class="track">
+            <div class="shift day" style="left:0;width:50%">Day 08:00–20:00 (12 h)</div>
+            <div class="shift night" style="left:50%;width:50%">Night 20:00–08:00 (12 h)</div>
+            <div class="act run" style="left:0;width:6.67%"></div>
+            <div class="act stop" style="left:6.67%;width:2.08%"></div>
+            <div class="act run" style="left:8.75%;width:10.42%"></div>
+            <div class="act stop" style="left:19.17%;width:2.92%"></div>
+            <div class="act run" style="left:22.08%;width:10.42%"></div>
+            <div class="act stop" style="left:32.5%;width:0.83%"></div>
+            <div class="act lost" style="left:33.33%;width:66.67%"></div>
+          </div>
+        </div>
+
+        <div class="tl-row">
+          <div class="tl-label"><b>With the checklist's times</b><span>Shift 08:00–16:00 (entered by the in-charge)</span></div>
+          <div class="track">
+            <div class="shift real" style="left:0;width:33.33%">Shift 08:00–16:00 (8 h)</div>
+            <div class="shift none" style="left:33.33%;width:66.67%">No shift — not counted</div>
+            <div class="act run" style="left:0;width:6.67%"></div>
+            <div class="act stop" style="left:6.67%;width:2.08%"></div>
+            <div class="act run" style="left:8.75%;width:10.42%"></div>
+            <div class="act stop" style="left:19.17%;width:2.92%"></div>
+            <div class="act run" style="left:22.08%;width:10.42%"></div>
+            <div class="act stop" style="left:32.5%;width:0.83%"></div>
+          </div>
+        </div>
+
+        <div class="ticks" aria-hidden="true">
+          <span style="left:0">08:00</span><span style="left:16.67%">12:00</span><span style="left:33.33%">16:00</span>
+          <span style="left:50%">20:00</span><span style="left:66.67%">00:00</span><span style="left:83.33%">04:00</span><span style="left:100%">08:00</span>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--ok)"></i>Running 6.6 h</span>
+          <span><i style="background:var(--warn)"></i>Stopped in the shift 1.4 h</span>
+          <span><i class="lost" style="background:repeating-linear-gradient(45deg, rgba(255,107,107,.55), rgba(255,107,107,.55) 3px, rgba(255,107,107,.2) 3px, rgba(255,107,107,.2) 6px)"></i>Counted as lost today, but no shift was planned (16 h)</span>
+        </div>
+      </div>
+
+      <div class="cards">
+        <div class="kpi"><div class="k">Shift time</div><div class="v">8.0<small>h</small></div><div class="n">From the checklist, 08:00–16:00 · today: 24 h</div></div>
+        <div class="kpi"><div class="k">Running</div><div class="v">6.6<small>h</small></div><div class="n">Same either way — from the mill counter</div></div>
+        <div class="kpi"><div class="k">Stopped in the shift</div><div class="v">1.4<small>h</small></div><div class="n">3 stops · today counted as 17.4 h</div></div>
+        <div class="kpi"><div class="k">Utilisation</div><div class="v" style="color:var(--ok)">83<small>%</small></div><div class="n">Running ÷ shift time · today: Day 55 %, Night 0 %</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Today vs with the real shift</h3></div>
+        <div class="wrap">
+          <table>
+            <thead><tr><th></th><th>Today (fixed 08:00 / 20:00)</th><th>With the checklist's shift time</th></tr></thead>
+            <tbody>
+              <tr><td>Time the mill was expected to run</td><td>Day 12 h + Night 12 h</td><td>8 h (08:00–16:00)</td></tr>
+              <tr><td>Running</td><td>6.6 h</td><td>6.6 h</td></tr>
+              <tr><td>Counted as stopped / lost</td><td class="bad">Day 5.4 h · Night 12 h</td><td class="good">1.4 h, all inside the shift</td></tr>
+              <tr><td>Utilisation (running ÷ shift time)</td><td class="bad">Day 55 % · Night 0 %</td><td class="good">83 %</td></tr>
+              <tr><td>Production of the shift</td><td>Day 132.0 MT · Night 0 MT</td><td>132.0 MT</td></tr>
+              <tr><td>Running rate</td><td>20.0 t/h</td><td>20.0 t/h</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Stops inside the shift</h3><p>Only these count as delay; the mill standing after 16:00 is not a delay, the shift was over.</p></div>
+        <div class="wrap">
+          <table>
+            <thead><tr><th>From</th><th>To</th><th class="r">Minutes</th><th>Inside the shift?</th></tr></thead>
+            <tbody>
+              <tr><td>09:36</td><td>10:06</td><td class="r">30</td><td>Yes — counted</td></tr>
+              <tr><td>12:36</td><td>13:18</td><td class="r">42</td><td>Yes — counted</td></tr>
+              <tr><td>15:48</td><td>16:00</td><td class="r">12</td><td>Yes — counted</td></tr>
+              <tr><td>16:00</td><td>08:00 next day</td><td class="r">960</td><td>No shift — not counted (today it is)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="before"><b>Today</b>The mill looks idle for half the Day shift and all of the Night shift: 55 % and 0 %.</div>
+        <div class="after"><b>With the checklist's times</b>It ran 6.6 of its 8 planned hours: 83 %. Only the real stops count as delay.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== SCREEN 4 ============================== -->
+  <section class="screen" aria-label="Sample screen: results by shift setup">
+    <div class="bar">
+      <span class="badge">HSM</span><span class="crumb">ROLLING MILL / VISUALIZATION</span>
+      <span class="pill">Duration · 17 Nov → 22 Nov</span>
+    </div>
+    <div class="body">
+      <h2>4 · Results by shift setup — each shift's production next to its checklist</h2>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Shift by shift</h3><p>Left: from the Shift Setup Checklist · right: from the mill counter and the ERP</p></div>
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Shift</th><th>Time (checklist)</th><th>In-charge</th><th>Roll type R1–R5</th><th class="r">Work roll dia (avg)</th>
+                <th class="r">Production MT</th><th class="r">Running h</th><th class="r">Rate t/h</th><th class="r">Yield %</th><th class="r">Miss roll MT</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>17 Nov</td><td>Day</td><td>08:00–16:00</td><td>In-charge A</td><td><span class="chip pr">Profile R1–R3</span><span class="chip pl">Plain R4–R5</span></td><td class="r">612</td><td class="r">132.0</td><td class="r">6.6</td><td class="r">20.0</td><td class="r">97.0</td><td class="r">0.0</td></tr>
+              <tr><td>18 Nov</td><td>Day</td><td>08:00–16:00</td><td>In-charge A</td><td><span class="chip pr">Profile R1–R3</span><span class="chip pl">Plain R4–R5</span></td><td class="r">610</td><td class="r">128.4</td><td class="r">6.3</td><td class="r">20.4</td><td class="r">97.2</td><td class="r">0.0</td></tr>
+              <tr><td>19 Nov</td><td>Day</td><td>07:00–15:00</td><td>In-charge B</td><td><span class="chip pl">Plain R1–R5</span></td><td class="r">604</td><td class="r">112.7</td><td class="r">6.1</td><td class="r">18.5</td><td class="r">96.1</td><td class="r">0.8</td></tr>
+              <tr><td>20 Nov</td><td>Day</td><td>07:00–15:00</td><td>In-charge B</td><td><span class="chip pl">Plain R1–R5</span></td><td class="r">603</td><td class="r">109.3</td><td class="r">5.9</td><td class="r">18.5</td><td class="r">96.4</td><td class="r">0.6</td></tr>
+              <tr><td>21 Nov</td><td>Night</td><td>20:00–04:00</td><td>In-charge A</td><td><span class="chip pr">Profile R1–R3</span><span class="chip pl">Plain R4–R5</span></td><td class="r">615</td><td class="r">134.9</td><td class="r">6.5</td><td class="r">20.8</td><td class="r">97.3</td><td class="r">0.0</td></tr>
+              <tr><td>22 Nov</td><td>Night</td><td>20:00–04:00</td><td>In-charge B</td><td><span class="chip pr">Profile R1–R3</span><span class="chip pl">Plain R4–R5</span></td><td class="r">614</td><td class="r">125.2</td><td class="r">6.2</td><td class="r">20.2</td><td class="r">96.9</td><td class="r">0.6</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="cards">
+        <div class="panel">
+          <h3>By roll setup</h3>
+          <div class="cmp">
+            <span class="h">Setup</span><span class="h">Rate t/h</span><span class="h">Yield %</span><span class="h">Miss roll</span>
+            <span>Profile R1–R3 · Plain R4–R5 <span style="color:var(--muted)">(4 shifts)</span></span><span class="n good">20.4</span><span class="n good">97.1</span><span class="n good">0.15</span>
+            <span>Plain R1–R5 <span style="color:var(--muted)">(2 shifts)</span></span><span class="n">18.5</span><span class="n">96.3</span><span class="n bad">0.70</span>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>By shift in-charge</h3>
+          <div class="cmp">
+            <span class="h">In-charge</span><span class="h">Avg MT</span><span class="h">Rate t/h</span><span class="h">Yield %</span>
+            <span>In-charge A <span style="color:var(--muted)">(3 shifts)</span></span><span class="n good">131.8</span><span class="n good">20.4</span><span class="n good">97.2</span>
+            <span>In-charge B <span style="color:var(--muted)">(3 shifts)</span></span><span class="n">115.7</span><span class="n">19.1</span><span class="n">96.5</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="note">What this answers once the checklist is filled for a few weeks: which roll setup gives the best rate, yield and fewest miss rolls, and how each shift performs with its own setup. Here In-charge B also ran the all-Plain setup twice, so the two comparisons overlap; with more shifts the screen separates them.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

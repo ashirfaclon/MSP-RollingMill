@@ -130,9 +130,20 @@ export const STOCK_DIVISIONS = ['RM', 'RS', 'LS', 'PL', 'SI', 'SM', 'S1'] as con
  * Run hours: NET_RUNNING_HRS, the ERP running hours (LSM asset health sheet: Run Hours ← ERP; the
  * user, 22 Oct 2026).
  */
+/**
+ * The plant's management KPIs as the LSM log sheet holds them per entry (Management Dash All.xlsx, LSM
+ * sheet; the user, 23 Nov 2026). Checked on the Oct–Nov 2026 entries: PLANT_AVAILABILITY =
+ * NET_RUNNING_HRS ÷ (NET_RUNNING_HRS + DELAY_HRS); PLANT_EFFICIENCY = availability × PLANT_PERFORMANCE;
+ * TOTAL_PRODUCTION = PRODUTION_MT + SHORTLENGTH_MT. The sheet's filter P11P is RMS's (division RS):
+ * every LSM entry is P6P, so LSM has no Online / Offline split.
+ */
+export const LSM_KPI_FIELDS = [
+  'DELAY_HRS', 'PLANT_AVAILABILITY', 'PLANT_PERFORMANCE', 'PLANT_EFFICIENCY',
+  'ROLLING_PERCENTAGE_CASTING', 'ROLLING_PERCENTAGE_DELIVERY', 'TOTAL_PRODUCTION',
+] as const;
 export const LSM_LOG_FIELDS = [
   'INPUT_MT', 'INPUT_PCS', 'PRODUTION_MT', 'B_LOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'COLD_MT', 'REJECT_MT', 'SHORTLENGTH_MT',
-  'LSM_BY_PASS_MT', 'CCM_BY_PASS_MT', 'END_CRACK_BY_PASS_CCM_MT', 'NET_RUNNING_HRS',
+  'LSM_BY_PASS_MT', 'CCM_BY_PASS_MT', 'END_CRACK_BY_PASS_CCM_MT', 'NET_RUNNING_HRS', ...LSM_KPI_FIELDS,
 ] as const;
 export type LsmLogField = (typeof LSM_LOG_FIELDS)[number];
 export interface LsmLogRow { date: string; vrno: string; v: Record<LsmLogField, number | null> }
@@ -206,8 +217,15 @@ export const LOG_FIELDS = [
   'BLOSS_MT', 'ENDCUT_MT', 'MISSROLL_MT', 'MISSROLL_PCS', 'REJECT_MT', 'REJECTION_PCS',
   // Operator-entered hours; PROD_RATE_ON_RUNNING_HRS = PRODUCTION_MT ÷ NET_RUNNING_HRS (checked 6 Oct 2026).
   'NET_RUNNING_HRS', 'DELAY_HRS',
+  // The plant's management KPIs (HSM.xlsx, the user, 23 Nov 2026): cast and delivered quantity, and the
+  // entry's power. ROLLING_PERCENTAGE_CASTING = INPUT_MT ÷ TOTAL_CAST_QTY and _DELIVERY = INPUT_MT ÷
+  // DELIVERY_QTY (269 of 275 entries, Jun–Nov 2026), so the percentages are worked out from the sums.
+  'TOTAL_CAST_QTY', 'DELIVERY_QTY', 'POWER_CONSUMPTION_IN_KWH',
 ] as const;
 export type LogField = (typeof LOG_FIELDS)[number];
+/** Online / Offline: the log sheet head's TRAN_COLUMN_NAME1, ST001 = Online, ST002 = Offline (cold rolling) — HSM.xlsx, 23 Nov 2026. */
+export const HSM_MODE_CODES = { ST001: 'online', ST002: 'offline' } as const;
+export type HsmLogMode = (typeof HSM_MODE_CODES)[keyof typeof HSM_MODE_CODES];
 
 /**
  * HSM (Hot Strip Mill) daily production, as the ERP Production Log Sheet records it.
@@ -232,6 +250,8 @@ export interface ErpProductionRow {
   mt: number | null;
   /** Every LOG_FIELDS value of the voucher; absent in caches from before the field was pulled. */
   v?: Partial<Record<LogField, number | null>>;
+  /** Online / Offline; missing on a cache synced before the split. */
+  mode?: HsmLogMode | null;
 }
 export interface ErpProductionCache { syncedAt: string; source: string; fromDate: string; rows: ErpProductionRow[] }
 

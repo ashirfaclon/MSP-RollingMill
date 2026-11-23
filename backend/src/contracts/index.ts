@@ -11,6 +11,7 @@ export type * from './running-rate';
 export type * from './system';
 export type * from './rmd';
 export type * from './lsm';
+export type * from './hsm-rolling';
 export type * from './mid';
 export type * from './pm';
 export type * from './forms';

@@ -1,16 +1,24 @@
+'use client';
+
 import ProductionKpiCard from '@/components/production/ProductionKpiCard';
 import YieldKpiCard from '@/components/production/YieldKpiCard';
 import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import FinishedStockCard from '@/components/production/FinishedStockCard';
+import HsmRollingCards from './HsmRollingCards';
+import { useGlobalSel } from '@/state/globalSel';
 
 /**
  * The headline figures, left to right as on the comp. No Made To Order / Made To Stock and no Stock
  * with order / Free stock cards: the order split is dropped on every mill (the user, 27 Oct 2026).
+ * After the five, the plant's management KPIs for the Rolling chosen in the top bar (HsmRollingCards; the
+ * user, 23 Nov 2026) — six per row, as RMD and LSM. The five do not change with the Rolling. Both makes
+ * twelve; Online or Offline eleven, so Production takes two columns and the rows stay full.
  */
 export default function KpiStrip() {
+  const mode = useGlobalSel().rmdMode;
   return (
-    <section className="rm-strip rm-strip--five" aria-label="Headline KPIs">
+    <section className={`rm-strip rm-strip--six${mode === 'all' ? '' : ' rm-strip--lead-wide'}`} aria-label="Headline KPIs">
       {/* Live from the ERP, for the Duration filter's period; opens the ERP-vs-Influx drawer. */}
       <ProductionKpiCard />
       {/* Live from the ERP log sheet: Σ production ÷ Σ billet input; opens the yield drawer. */}
@@ -21,6 +29,7 @@ export default function KpiStrip() {
       <SpecificEnergyCard />
       {/* The ERP stock at the period's end, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
       <FinishedStockCard mill="hsm" />
+      <HsmRollingCards />
     </section>
   );
 }

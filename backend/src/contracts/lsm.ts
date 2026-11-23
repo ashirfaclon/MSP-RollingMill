@@ -33,6 +33,22 @@ export interface LsmProductionPeriod {
   endCrackBypassMt: number | null;
   /** NET_RUNNING_HRS — ERP run hours, Σ over the period's entries; null with none filled. */
   runningHrs: number | null;
+  /** DELAY_HRS, Σ over the period's entries. */
+  delayHrs: number | null;
+  /** TOTAL_PRODUCTION — production + short length, Σ over the period's entries. */
+  totalProductionMt: number | null;
+  /** Yield with non-prime: totalProductionMt ÷ billetInputMt × 100 (massYieldPct is the prime yield). */
+  nonPrimeYieldPct: number | null;
+  /** PLANT_AVAILABILITY; over several entries weighted by running + delay hours. */
+  availabilityPct: number | null;
+  /** PLANT_PERFORMANCE; over several entries weighted by running hours. */
+  performancePct: number | null;
+  /** PLANT_EFFICIENCY (availability × performance); over several entries weighted by running + delay hours. */
+  efficiencyPct: number | null;
+  /** ROLLING_PERCENTAGE_CASTING; over several entries weighted by billet input. */
+  rollingInCastingPct: number | null;
+  /** ROLLING_PERCENTAGE_DELIVERY; over several entries weighted by billet input. */
+  rollingInDeliveryPct: number | null;
 }
 
 export interface LsmProductionReport {

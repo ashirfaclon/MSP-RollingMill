@@ -5,7 +5,11 @@
  * source (lsm ERP DATA (1).xlsx, ERP Production Log Sheet FA-LP-P); NA everywhere else, never
  * a sample figure:
  *   Production            PRODUTION_MT (card, Order allocation, the balance's Finished);
- *   Mass yield            PRODUTION_MT ÷ INPUT_MT (billet input).
+ *   Prime yield           PRODUTION_MT ÷ INPUT_MT (billet input) — was "Mass yield" (the user, 23 Nov 2026).
+ *   Yield with non-prime  TOTAL_PRODUCTION (production + short length) ÷ INPUT_MT.
+ *   Mill performance      availability, performance, efficiency, rolling in casting and in delivery — the
+ *                         plant's management KPIs as the ERP log sheet holds them (Management Dash All.xlsx,
+ *                         the user, 23 Nov 2026); LSM has no Online / Offline split in the ERP.
  *   Billets               INPUT_PCS (billets in, pieces).
  *   Finished stock        by section (Angle 65×8, Channel 75×40 …), the ERP's Stock Sheet Engine
  *                         for division LS; Order allocation's Finished stock is its total.
@@ -39,6 +43,16 @@ import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import '@/components/rmd/rmd.css';
 
 
+/** Breakdown hours = DELAY_HRS, Σ over the period (the user, 23 Nov 2026); the rest are percentages. */
+const PERFORMANCE = [
+  ['Availability', 'availabilityPct', '%'],
+  ['Performance', 'performancePct', '%'],
+  ['Efficiency', 'efficiencyPct', '%'],
+  ['Rolling in casting', 'rollingInCastingPct', '%'],
+  ['Rolling in delivery', 'rollingInDeliveryPct', '%'],
+  ['Breakdown', 'delayHrs', 'h'],
+] as const;
+
 const mt = (v: number | null | undefined) => (v === null || v === undefined ? 'NA' : `${fixed(v, 1)} MT`);
 
 export default function LsmVisualization() {
@@ -47,11 +61,12 @@ export default function LsmVisualization() {
   const t = data?.totals ?? null;
   const [prodOpen, setProdOpen] = useState(false);
   const [yieldOpen, setYieldOpen] = useState(false);
+  const [perfOpen, setPerfOpen] = useState(false);
   const note = error ? 'ERP data unavailable' : data?.erp.connection === 'down' ? data.erp.message : '';
 
   return (
     <div className="rm-viz">
-      <section className="rm-strip rm-strip--five" aria-label="Headline KPIs">
+      <section className="rm-strip rm-strip--six" aria-label="Headline KPIs">
         <KpiCard
           label="Production"
           term={data ? productionTermText(data.from, data.to, data.erp.lastDate) : null}
@@ -65,23 +80,47 @@ export default function LsmVisualization() {
           onOpen={() => setProdOpen(true)}
           openLabel="Production per day, from the ERP log sheet"
         />
-        <KpiCard
-          label="Mass yield"
-          value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
-          noEntries={!!data && data.erp.connection === 'up' && t?.massYieldPct == null}
-          lastEntry={lastFigure(t?.massYieldPct, last, (d) => d.totals.massYieldPct, (n) => fixed(n, 1))}
-          unit="%"
-          note={note}
-          series="order"
-          loading={!data && !error}
-          onOpen={() => setYieldOpen(true)}
-          openLabel="Mass yield per day, from the ERP log sheet"
-        />
+        {([
+          ['Prime yield', 'massYieldPct', 'Prime yield per day, from the ERP log sheet'],
+          ['Yield with non-prime', 'nonPrimeYieldPct', 'Yield with non-prime per day, from the ERP log sheet'],
+        ] as const).map(([label, k, openLabel]) => (
+          <KpiCard
+            key={k}
+            label={label}
+            value={t?.[k] == null ? 'NA' : fixed(t[k], 1)}
+            noEntries={!!data && data.erp.connection === 'up' && t?.[k] == null}
+            lastEntry={lastFigure(t?.[k], last, (d) => d.totals[k], (n) => fixed(n, 1))}
+            unit="%"
+            note={note}
+            series="order"
+            loading={!data && !error}
+            onOpen={() => setYieldOpen(true)}
+            openLabel={openLabel}
+          />
+        ))}
         <PowerKpiCard mill="lsm" />
         <SpecificEnergyCard mill="lsm" />
         {/* The total of Finished stock by size, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
         <FinishedStockCard mill="lsm" />
+        {/* Row 2: the plant's management KPIs (Management Dash All.xlsx, 23 Nov 2026) — two rows of six, as RMD's
+            (the user, 23 Nov 2026); one drawer for the six. */}
+        {PERFORMANCE.map(([label, k, unit]) => (
+          <KpiCard
+            key={k}
+            label={label}
+            value={t?.[k] == null ? 'NA' : fixed(t[k], 1)}
+            noEntries={!!data && data.erp.connection === 'up' && t?.[k] == null}
+            lastEntry={lastFigure(t?.[k], last, (d) => d.totals[k], (n) => fixed(n, 1))}
+            unit={unit}
+            note={note}
+            series="ok"
+            loading={!data && !error}
+            onOpen={() => setPerfOpen(true)}
+            openLabel="Availability, performance, efficiency, rolling in casting / delivery and breakdown hours per day, from the ERP log sheet"
+          />
+        ))}
       </section>
+      <LsmProductionDrawer view="performance" open={perfOpen} onClose={() => setPerfOpen(false)} />
       <LsmProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
       <LsmProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
 
@@ -135,7 +174,7 @@ function MaterialBalance() {
       >
         <div className="rm-mb-head">
           <Figure label="Billet input" value={mt(t?.billetInputMt)} />
-          <Figure label="Yield" value={t?.massYieldPct == null ? 'NA' : `${fixed(t.massYieldPct, 1)}%`} tone="order" end />
+          <Figure label="Prime yield" value={t?.massYieldPct == null ? 'NA' : `${fixed(t.massYieldPct, 1)}%`} tone="order" end />
         </div>
         <span className="rm-mb-bar rm-mb-bar--input" role="img" aria-label={t?.billetInputMt == null ? 'Billet input: not available' : `Finished ${fixed(finishedPct, 1)}% of billet input`}>
           {t?.billetInputMt != null && <i className="rm-mb-seg rm-tone--order" style={{ width: `${finishedPct}%` }} />}

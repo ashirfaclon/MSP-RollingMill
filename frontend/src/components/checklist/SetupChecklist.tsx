@@ -2,7 +2,8 @@
 
 /**
  * HSM · Shift setup checklist — the plant's "Checklist" sheet (Rolling_Mill_Checklists_Data.xlsx)
- * as a form, field for field: who is on shift, RM / FM guide settings, vertical edger and pinch
+ * as a form, field for field: who is on shift and when it starts and ends (the user, 23 Nov 2026: the plant
+ * types the shift's own times; HSM's usual Day 08:00–20:00 / Night 20:00–08:00 is filled in), RM / FM guide settings, vertical edger and pinch
  * roll gaps, roll type (R1–R5) and work roll diameter (R1–R5, F1–F6). Everything is typed. Save
  * writes one entry to the logbook form (HSM Checklists → Shift Setup Checklist); the values are kept
  * under the form's own column names.
@@ -16,6 +17,8 @@ import './checklist.css';
 const R = ['R1', 'R2', 'R3', 'R4', 'R5'];
 const F = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6'];
 type Values = Record<string, string>;
+/** HSM's usual shift times (its plant day starts 08:00), filled in until the user types their own. */
+const TIMES: Record<string, { start: string; end: string }> = { Day: { start: '08:00', end: '20:00' }, Night: { start: '20:00', end: '08:00' } };
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -31,6 +34,10 @@ export default function SetupChecklist({ open, onClose }: { open: boolean; onClo
   const [v, setV] = useState<Values>({ Shift: 'Day' });
   const [status, setStatus] = useState<{ kind: 'saving' | 'saved' | 'error'; text: string } | null>(null);
   const date = v.Date || today || '';
+  const shift = v.Shift ?? 'Day';
+  // The shift's usual times until a time is typed: picking Night moves untouched times with it.
+  const start = v['Shift start time'] ?? TIMES[shift].start;
+  const end = v['Shift end time'] ?? TIMES[shift].end;
   const set = (k: string, x: string) => { setV((s) => ({ ...s, [k]: x })); setStatus(null); };
   /** A number field: `k` is the form's column, `label` what the screen shows. */
   // Called as a function, not <Num/>: a component made inside render would remount and drop focus.
@@ -41,9 +48,11 @@ export default function SetupChecklist({ open, onClose }: { open: boolean; onClo
   );
 
   const save = async () => {
-    const values: Record<string, string | number | null> = { Date: date };
+    if (!start || !end) { setStatus({ kind: 'error', text: 'Enter the shift\'s start and end time.' }); return; }
+    if (start === end) { setStatus({ kind: 'error', text: 'The shift must end at a different time than it starts.' }); return; }
+    const values: Record<string, string | number | null> = { Date: date, 'Shift start time': start, 'Shift end time': end };
     for (const [k, x] of Object.entries(v)) {
-      if (k === 'Date') continue;
+      if (k === 'Date' || k === 'Shift start time' || k === 'Shift end time') continue;
       const t = x.trim();
       const text = ['Shift', 'Shift in-charge', 'Employee ID', 'Remark'].includes(k) || k.startsWith('Roll type');
       values[k] = t === '' ? null : text ? t : Number(t);
@@ -66,7 +75,13 @@ export default function SetupChecklist({ open, onClose }: { open: boolean; onClo
               <input type="date" value={date} max={today ?? undefined} onChange={(e) => set('Date', e.target.value)} />
             </label>
             <label className="ck-f"><span>Shift</span>
-              <select value={v.Shift ?? 'Day'} onChange={(e) => set('Shift', e.target.value)}><option>Day</option><option>Night</option></select>
+              <select value={shift} onChange={(e) => set('Shift', e.target.value)}><option>Day</option><option>Night</option></select>
+            </label>
+            <label className="ck-f"><span>Shift start</span>
+              <input type="time" value={start} onChange={(e) => set('Shift start time', e.target.value)} />
+            </label>
+            <label className="ck-f"><span>Shift end</span>
+              <input type="time" value={end} onChange={(e) => set('Shift end time', e.target.value)} />
             </label>
             <label className="ck-f"><span>Shift in-charge</span><input type="text" value={v['Shift in-charge'] ?? ''} onChange={(e) => set('Shift in-charge', e.target.value)} /></label>
             <label className="ck-f"><span>Employee ID</span><input type="text" value={v['Employee ID'] ?? ''} onChange={(e) => set('Employee ID', e.target.value)} /></label>

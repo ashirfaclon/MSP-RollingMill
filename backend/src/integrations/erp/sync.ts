@@ -23,6 +23,7 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import oracledb from 'oracledb';
 import { loadEnv, type Env } from '../../config/env';
 import {
+  HSM_MODE_CODES,
   ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, PM_DIVISIONS, RMD_LOG_FIELDS, RMD_MODE_CODES, RMD_STOCK_RULE, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
   type ErpPmCache, type PmMill,
   type LsmLogField, type LsmProductionCache, type LsmStockCache, type RmsProductionCache, type RmdLogField, type RmdProductionCache, type RmdStockCache,
@@ -96,7 +97,7 @@ async function pull(env: Env, p: Paths, t0: number, log: (line: string) => void)
       `MAX(CASE WHEN b.ATTR_CODE = '${f}' THEN TO_NUMBER(b.ATTR_VALUE DEFAULT NULL ON CONVERSION ERROR) END) AS "${f}"`,
     ).join(',\n             ');
     const log = await q<Record<string, unknown>>(`
-      SELECT TO_CHAR(h.VRDATE, 'YYYY-MM-DD') AS "D", h.VRNO AS "VRNO",
+      SELECT TO_CHAR(h.VRDATE, 'YYYY-MM-DD') AS "D", h.VRNO AS "VRNO", MAX(h.TRAN_COLUMN_NAME1) AS "MODE",
              ${pivot}
         FROM MSPV7ERP1.ATTR_TRAN_DATA_HEAD h
         JOIN MSPV7ERP1.ATTR_TRAN_DATA_BODY b
@@ -108,7 +109,7 @@ async function pull(env: Env, p: Paths, t0: number, log: (line: string) => void)
        ORDER BY h.VRDATE, h.VRNO`, { fromDate: FROM });
     const rows: ErpProductionRow[] = log.map((r) => {
       const v = Object.fromEntries(LOG_FIELDS.map((f) => [f, num(r[f])])) as Record<LogField, number | null>;
-      return { date: String(r.D), vrno: String(r.VRNO), mt: v.PRODUCTION_MT, v };
+      return { date: String(r.D), vrno: String(r.VRNO), mt: v.PRODUCTION_MT, v, mode: HSM_MODE_CODES[String(r.MODE) as keyof typeof HSM_MODE_CODES] ?? null };
     });
     production = { syncedAt, source: 'ATTR_TRAN_DATA_HEAD/BODY · MP/S1 · PRLOG/L6P', fromDate: FROM, rows };
 

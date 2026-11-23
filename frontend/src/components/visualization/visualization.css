@@ -40,6 +40,14 @@
 .rm-strip.rm-strip--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 /* Five: the four headline figures and Finished stock at the right end (the user, 31 Oct 2026). */
 .rm-strip.rm-strip--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* Six per row: LSM's twelve — the headline figures, then the plant's mill performance KPIs (the user, 23 Nov 2026). */
+.rm-strip.rm-strip--six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+/* Narrow cards: a card's date on its own line under the label, as RMD's. */
+.rm-strip--six .rm-card-term { display: block; margin-top: 2px; }
+.rm-strip--six .rm-card-term::before { content: none; }
+/* Eleven cards in a grid of six: the first takes two columns, so both rows are full. */
+.rm-strip--lead-wide > :first-child { grid-column: span 2; }
+@media (max-width: 760px) { .rm-strip--lead-wide > :first-child { grid-column: auto; } }
 
 /*
  * Each card spans four rows of the strip and adopts them as a subgrid, so label, value,
@@ -415,7 +423,7 @@
 }
 
 @media (max-width: 760px) {
-  .rm-strip, .rm-strip.rm-strip--four, .rm-strip.rm-strip--five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rm-strip, .rm-strip.rm-strip--four, .rm-strip.rm-strip--five, .rm-strip.rm-strip--six { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rm-card-value { font-size: 22px; }
   .rm-mimic { grid-template-columns: minmax(0, 1fr); }
   .rm-mimic-arrow { transform: rotate(90deg); height: 14px; }

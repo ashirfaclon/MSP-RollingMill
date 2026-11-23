@@ -2,8 +2,8 @@
 
 /**
  * The Settings screen (the user, 19 Nov 2026; SETTINGS_AND_ALERTS_REPLICATION.md §10), three tabs:
- *   Limits        every limit of the mill a reading is judged by — and alerts raise on — with where it came
- *                 from: the plant's own, a standard placeholder to replace, or "Set by <name> on <date>"
+ *   Limits        every limit of the mill a reading is judged by — and alerts raise on — and, for one changed
+ *                 here, who changed it and when, with Reset
  *   Alerts        when each alert sends a message (AlertSettings.tsx)
  *   Escalation matrix   the mill's contact list: levels, SMS / WhatsApp / email, how often (ContactSettings.tsx, 21 Nov 2026)
  * Opened from the top bar's Settings button, a drill-down's "Edit limits" (at that limit), or the
@@ -169,8 +169,8 @@ function useLimitSettings(mill: SettingsMill, name: string, focusId: string | nu
             <h3 className="rm-k">{g}</h3>
             <div className="pd-table-wrap">
               <table className="grid pd-table set-table" aria-label={`${g} limits`}>
-                <colgroup><col className="set-c-label" /><col className="set-c-num" /><col className="set-c-num" /><col className="set-c-src" /></colgroup>
-                <thead><tr><th>Limit</th><th className="r">Min</th><th className="r">Max</th><th>Where it comes from</th></tr></thead>
+                <colgroup><col className="set-c-label" /><col className="set-c-num" /><col className="set-c-num" /></colgroup>
+                <thead><tr><th>Limit</th><th className="r">Min</th><th className="r">Max</th></tr></thead>
                 <tbody>
                   {rows.map((l) => {
                     const v = valueOf(l);
@@ -181,6 +181,11 @@ function useLimitSettings(mill: SettingsMill, name: string, focusId: string | nu
                         <td>
                           <b>{l.label}</b> <span className="set-unit">{l.unit}</span>
                           <span className="set-reading">{l.reading}</span>
+                          <SourceChip l={l} changed={changed} resetting={resetting} />
+                          {l.source === 'edited' && !resetting && (
+                            <button type="button" className="set-reset" onClick={() => reset(l)}
+                              title={`Back to the default: ${limitPair(l.defaults.min, l.defaults.max, l.unit)}`}>Reset</button>
+                          )}
                         </td>
                         {(['min', 'max'] as const).map((side) => (
                           <td key={side} className="num r">
@@ -189,14 +194,6 @@ function useLimitSettings(mill: SettingsMill, name: string, focusId: string | nu
                               onChange={(e) => edit(l, side, e.target.value)} />
                           </td>
                         ))}
-                        <td className="set-source">
-                          <SourceChip l={l} changed={changed} resetting={resetting} />
-                          {l.source === 'edited' && !resetting && (
-                            <button type="button" className="set-reset" onClick={() => reset(l)}
-                              title={`Back to the default: ${limitPair(l.defaults.min, l.defaults.max, l.unit)}`}>Reset</button>
-                          )}
-                          <span className="set-basis">{l.defaults.basis}</span>
-                        </td>
                       </tr>
                     );
                   })}
@@ -216,14 +213,12 @@ function useLimitSettings(mill: SettingsMill, name: string, focusId: string | nu
 const limitPair = (min: number | null, max: number | null, unit: string) =>
   (min === null && max === null ? 'no limit' : `${min ?? '—'} to ${max ?? '—'} ${unit}`);
 
-/** Where the limit in use came from, in words. */
+/** Who last changed a limit and when, under its name; nothing when it was never changed. */
 function SourceChip({ l, changed, resetting }: { l: LimitSetting; changed: boolean; resetting: boolean }) {
   if (changed) return <span className="chip chip--info">Changed — not saved</span>;
   if (resetting) return <span className="chip chip--info">Back to the default on Save</span>;
-  if (l.source === 'edited') return <span className="chip chip--ok">Set by {l.setBy ?? 'the plant'}{l.setAt ? ` · ${dm(l.setAt.slice(0, 10))}` : ''}</span>;
-  if (l.source === 'plant') return <span className="chip chip--ok">Plant&apos;s limit</span>;
-  if (l.source === 'placeholder') return <span className="chip chip--warn" title="A standard figure to start with — replace it with the plant's own">Standard placeholder</span>;
-  return <span className="chip chip--na">Not set — no alert</span>;
+  if (l.source === 'edited') return <span className="chip chip--ok">Set by {l.setBy ?? 'someone'}{l.setAt ? ` · ${dm(l.setAt.slice(0, 10))}` : ''}</span>;
+  return null;
 }
 
 /** HSM: each stand motor's rated current, which Motor loading % is worked out with. */
