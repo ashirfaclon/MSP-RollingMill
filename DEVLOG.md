@@ -284,3 +284,12 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   without TOTAL uses KGMT × Prime + SL). 21–22 Nov: 18.5 + 13.2 MT ÷ 338.02 = 93.78 kg/MT. Card after Specific
   energy, drill-down "Coal consumption · ERP log sheet". Under Offline the two Mill MPS cards share one (Mill 1 |
   Mill 2) so the strip stays two rows of six. Test rmd-coal.test.ts (4). Committed 24 Nov.
+- **24 Nov 2026** — **HSM Production card: Influx = production in the working hours** from the Shift Setup Checklist
+  (the user). Each entry's Shift start → end time is a window of its plant date (a time before 08:00 is the next
+  calendar day; an end at or before the start is the next day). Day + Night entries: both windows added, the gap
+  left out. A day with no checklist times: NA (not the full day). Counter ticks less noise, summed inside the
+  windows (`hsm/working-hours.ts`; `PRODUCTION_WORKING_SPEC` — only the /api/hsm/production route reads the
+  checklist; power, plan and running rate still use the full plant day). Card: ERP | Influx (working hours), the
+  delta only when every day has both; "no shift times in the checklist" / "shift times on N of M days". Drill-down:
+  Influx · working hours column and each day's hours ("Night 21:00–08:00"). Only 1 Nov has times so far: 189.71
+  of the day's 193.04 MT. Tests working-hours.test.ts (6). Committed 24 Nov.

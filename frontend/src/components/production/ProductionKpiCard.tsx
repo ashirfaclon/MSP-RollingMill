@@ -4,8 +4,10 @@
  * The Production headline card: two figures for the period chosen in the Duration filter,
  * side by side —
  *   ERP    — the production log sheet (PRODUCTION_MT), entered 1–2 days late (no note about it);
- *   INFLUX — the mill counter Total_Production_Ton, reset events less noise, per 08:00
- *            plant day. Live — today counts up as the mill rolls. Publishes from 21 Sep 2026.
+ *   INFLUX — the mill counter Total_Production_Ton, less noise, inside the day's working hours from the
+ *            Shift Setup Checklist (the user, 24 Nov 2026): each shift's start → end, a Day and a Night
+ *            entry both counted, the gap between them not; a day without checklist times is NA.
+ *            Live — today counts up as the mill rolls. Publishes from 21 Sep 2026.
  * Clicking it opens the ERP-vs-Influx drawer, where the two are compared day by day.
  */
 import { useState, type ReactNode } from 'react';
@@ -34,18 +36,23 @@ export default function ProductionKpiCard() {
   if (current) {
     const t = current.totals;
     erp = t.erpDays ? t.erpMt : null;
-    influx = t.influxMt;
+    influx = t.workingMt ?? null;
     if (current.influx.connection === 'down') note = current.influx.message;
-    else if (t.influxMt === null) note = 'No counter data in this period';
+    else if (current.checklist?.connection === 'down') note = current.checklist.message;
+    // NA: no shift times in the checklist for the period (the user, 24 Nov 2026).
+    else if (!t.workingDays) note = <span className="rm-card-empty">Influx · no shift times in the checklist</span>;
+    else if (t.workingMt == null) note = 'No counter data in this period';
     // No coverage notes ("entered to …"). Both cover the whole period: the line under the two figures is Influx − ERP.
-    else if (t.erpDays === t.days && t.varianceMt !== null) {
+    else if (t.workingComparedDays === t.days && t.workingVarianceMt != null) {
       // Highlighted like the shift panel's plan gap: amber when the two disagree, green when they match.
       note = (
         <span className="rm-card-delta">
-          Delta <b className={`num ${Math.abs(t.varianceMt) < 0.05 ? 'v-ok' : 'v-warn'}`}>{fmt1(t.varianceMt)} MT</b>
+          Delta <b className={`num ${Math.abs(t.workingVarianceMt) < 0.05 ? 'v-ok' : 'v-warn'}`}>{fmt1(t.workingVarianceMt)} MT</b>
         </span>
       );
     }
+    // Shift times on only some days: Influx covers those days only — say so, or it reads as low against ERP.
+    else if (t.workingDays < t.days) note = <span className="rm-card-last">Influx · shift times on {t.workingDays} of {t.days} days</span>;
     // ERP not entered for the period yet (the counter has figures): the last day booked, else say so.
     else if (!t.erpDays && lastErp !== null && last.date) note = <span className="rm-card-last">ERP · last entry · {dm(last.date)}</span>;
     else if (!t.erpDays) note = <span className="rm-card-empty">ERP · {NO_ENTRIES}</span>;
@@ -64,7 +71,7 @@ export default function ProductionKpiCard() {
         series="prod"
         loading={(loading && !data) || (!current && !error)}
         onOpen={() => setOpen(true)}
-        openLabel="Compare the mill counter with ERP production"
+        openLabel="Compare the mill counter in the working hours with ERP production"
       />
       <ProductionDrawer open={open} onClose={() => setOpen(false)} />
     </>

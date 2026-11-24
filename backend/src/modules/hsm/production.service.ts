@@ -24,6 +24,7 @@ import {
   NOISE_WINDOW_MS, counterEvents, denoise, eventIncrements, readCounterEvents, removeNoise, type CounterEvent,
 } from './counter-events';
 import type { ByProductKey, ByProducts, DayValue, Grain, PeriodRow, ProductionComparison } from '../../contracts';
+import { productionIn, readShiftWindows } from './working-hours';
 export type { ByProductKey, ByProducts, DayValue, Grain, PeriodRow, ProductionComparison };
 
 /** The plant day, as used for the Influx side of the comparison. */
@@ -172,6 +173,21 @@ export function summarise(key: string, label: string, days: DayValue[]): PeriodR
     varianceMt: variance,
     variancePct: variance !== null && cmpErp ? round2((variance / cmpErp) * 100) : null,
     ...netOf(infDays),
+    ...workingOf(days),
+  };
+}
+
+/** Production inside the checklist's working hours, over the days that have them (production only). */
+function workingOf(days: DayValue[]): Pick<PeriodRow, 'workingMt' | 'workingDays' | 'workingVarianceMt' | 'workingComparedDays'> {
+  if (!days.some((d) => d.workingMt !== undefined)) return {};
+  const sum = (xs: number[]) => round2(xs.reduce((a, b) => a + b, 0));
+  const worked = days.filter((d) => d.workingMt != null);
+  const both = worked.filter((d) => d.erpMt !== null);
+  return {
+    workingMt: worked.length ? sum(worked.map((d) => d.workingMt!)) : null,
+    workingDays: worked.length,
+    workingVarianceMt: both.length ? sum(both.map((d) => d.workingMt! - d.erpMt!)) : null,
+    workingComparedDays: both.length,
   };
 }
 
@@ -243,9 +259,13 @@ export interface CounterSpec {
   denoise?: boolean;
   /** Attach the four ERP by-products per day, and net production. */
   byProducts?: boolean;
+  /** Attach production inside the Shift Setup Checklist's working hours per day (working-hours.ts). */
+  workingHours?: boolean;
 }
 
 export const PRODUCTION_SPEC: CounterSpec = { key: 'production', tag: HSM_TOTAL_PRODUCTION, erp: (r) => r.mt, denoise: true, byProducts: true };
+/** The /api/hsm/production report: the same, with the working hours — the figures built on production need none. */
+export const PRODUCTION_WORKING_SPEC: CounterSpec = { ...PRODUCTION_SPEC, key: 'production-working', workingHours: true };
 
 const memo = new Map<string, { at: number; value: Promise<ProductionComparison> }>();
 const MEMO_MS = 60_000;
@@ -282,13 +302,17 @@ async function compute(env: Env, spec: CounterSpec, from: string, to: string, gr
   let events = counterEvents(dates, counter, nowMs);
   // Noise: ticks with no billet discharged in the minutes before are dropped from their events.
   let noise: ProductionComparison['noise'] = { applied: false, ticks: 0, value: 0, windowMinutes: NOISE_WINDOW_MS / 60_000 };
+  // The counter's single increases, less noise: what the working-hours windows are cut from.
+  let keptTicks: Increment[] | null = null;
   if (spec.denoise && counter.connection === 'up') {
     const [ticks, billets] = await Promise.all([
       readCounter(env, spec.tag, fromMs, toMs),
       readCounter(env, HSM_DISCHARGED_BILLET, fromMs - NOISE_WINDOW_MS, toMs),
     ]);
+    if (ticks.connection === 'up') keptTicks = ticks.increments;
     if (ticks.connection === 'up' && billets.connection === 'up') {
-      const { dropped } = denoise(ticks.increments, billets.increments);
+      const { kept, dropped } = denoise(ticks.increments, billets.increments);
+      keptTicks = kept;
       events = removeNoise(events, dropped);
       noise = { applied: true, ticks: dropped.length, value: round2(dropped.reduce((a, d) => a + d.v, 0)), windowMinutes: NOISE_WINDOW_MS / 60_000 };
     }
@@ -299,6 +323,16 @@ async function compute(env: Env, spec: CounterSpec, from: string, to: string, gr
     const bp = readByProducts(env, from, to);
     byProductsLastDate = bp.lastDate;
     days = days.map((d) => ({ ...d, byProducts: bp.perDay.get(d.date) ?? null }));
+  }
+  let checklist: ProductionComparison['checklist'];
+  if (spec.workingHours) {
+    const sw = await readShiftWindows(env, from, to);
+    checklist = { connection: sw.connection, message: sw.message };
+    days = days.map((d) => {
+      const windows = sw.byDate.get(d.date) ?? [];
+      const workingMt = !windows.length || d.influxCoverage === 'none' || !keptTicks ? null : productionIn(keptTicks, windows);
+      return { ...d, workingMt, workingWindows: windows.map(({ shift, start, end }) => ({ shift, start, end })) };
+    });
   }
   const iso = (ms: number | null) => (ms === null ? null : new Date(ms).toISOString());
   return {
@@ -316,6 +350,7 @@ async function compute(env: Env, spec: CounterSpec, from: string, to: string, gr
     },
     noise,
     byProductsLastDate,
+    ...(checklist ? { checklist } : {}),
     events: events.map((e) => ({
       date: e.date, start: iso(e.start)!, end: iso(e.end)!,
       startValue: round2(e.startValue), endValue: round2(e.endValue), value: round2(e.value), noise: round2(e.noise),

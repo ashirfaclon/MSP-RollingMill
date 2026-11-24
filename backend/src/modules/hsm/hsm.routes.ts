@@ -10,7 +10,7 @@ import { searchParams } from '../../shared/request';
 import { HSM_DISCHARGED_BILLET } from '../../integrations/historian/tags';
 import { parseGrain, parseRange, parseRmdMode } from './params';
 import { hsmRolling } from './rolling.service';
-import { PLANT_DAY_START_HOUR, counterComparison, isDate, istDate, productionComparison, type CounterSpec } from './production.service';
+import { PLANT_DAY_START_HOUR, PRODUCTION_WORKING_SPEC, counterComparison, isDate, istDate, type CounterSpec } from './production.service';
 import { logSheetReport, ordersReport, sizeReport, stockReport } from './erp-kpis.service';
 import { electricalDelays } from './electrical-delays.service';
 import { hsmMillLoad } from './mill-load.service';
@@ -31,7 +31,8 @@ export async function hsmRoutes(app: FastifyInstance) {
   app.get('/production', { config: { errorCode: 'hsm_production_failed' } }, async (req) => {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
-    return productionComparison(loadEnv(), from, to, parseGrain(q));
+    // With the Shift Setup Checklist's working hours (the Production card's Influx figure — the user, 24 Nov 2026).
+    return counterComparison(loadEnv(), PRODUCTION_WORKING_SPEC, from, to, parseGrain(q));
   });
 
   /** Billets: ERP INPUT_PCS vs the Dicharged_Billet counter. */

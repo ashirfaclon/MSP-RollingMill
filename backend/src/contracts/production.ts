@@ -16,7 +16,17 @@ export interface DayValue {
   influxCoverage: 'full' | 'partial' | 'none';
   /** The four by-products booked into ERP stores for the day (production only); null if none booked yet. */
   byProducts?: ByProducts | null;
+  /**
+   * Production only: the counter's production inside the day's working hours from the Shift Setup Checklist
+   * (the user, 24 Nov 2026); null when the day has no checklist times (NA) or the counter had no readings.
+   */
+  workingMt?: number | null;
+  /** The day's checklist windows, in order; empty when none is filled in. */
+  workingWindows?: WorkingWindow[];
 }
+
+/** One shift's working hours from the Shift Setup Checklist, HH:MM IST. */
+export interface WorkingWindow { shift: string; start: string; end: string }
 
 export interface PeriodRow {
   key: string;
@@ -42,6 +52,14 @@ export interface PeriodRow {
   byProductDays?: number;
   /** Net production = influxMt − all four by-products booked on those days; null when none booked. */
   netMt?: number | null;
+  /** Production only: Σ workingMt over the days with checklist times; null with none. */
+  workingMt?: number | null;
+  /** Days with checklist times. */
+  workingDays?: number;
+  /** Σ (workingMt − ERP) over the days with both; null with none. */
+  workingVarianceMt?: number | null;
+  /** Days with both checklist times and an ERP entry. */
+  workingComparedDays?: number;
 }
 
 export interface ProductionComparison {
@@ -61,6 +79,8 @@ export interface ProductionComparison {
   noise: { applied: boolean; ticks: number; value: number; windowMinutes: number };
   /** Latest date with a by-product booked in ERP stores (production only). */
   byProductsLastDate: string | null;
+  /** Production only: the Shift Setup Checklist read for the working hours. */
+  checklist?: { connection: 'up' | 'down'; message: string };
   days: DayValue[];
   rows: PeriodRow[];
   totals: PeriodRow;
