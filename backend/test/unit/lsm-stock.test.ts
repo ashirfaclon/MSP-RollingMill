@@ -36,6 +36,14 @@ describe('LSM stock by section', () => {
     expect(s[0].items.map((i) => i.stockMt)).toEqual([527.89, 83.43, 7.01]);
   });
 
+  test('not rolled steel (paver blocks, held in pieces) is not finished stock; a steel item with no readable size is Other', () => {
+    const odd = {
+      items: { A6: 'MS ANGLE 50 X 6 6 mtr', P: "PAVER BLOCK (9'' X 5''X 4'')", S: 'MS SCRAP CUTTING' },
+      moves: [{ date: '2026-10-01', item: 'A6', netMt: 10 }, { date: '2026-10-01', item: 'P', netMt: 7000 }, { date: '2026-10-01', item: 'S', netMt: 2.5 }],
+    };
+    expect(stockBySection(odd, '2026-10-13').map((x) => [x.label, x.stockMt])).toEqual([['A 50×50×6', 10], ['Other', 2.5]]);
+  });
+
   test('RMS (no plant list): sections by type and size, the same names', () => {
     const rms = {
       items: { C2: 'MS CHANNEL 200 MM 6 mtr', B2: 'MS BEAM 200 MM 12 mtr', A13: 'M.S. ANGLE 130 X 10  12 mtr ', H: 'H  BEAM 152MM  12 mtrs' },

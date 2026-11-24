@@ -293,3 +293,9 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   delta only when every day has both; "no shift times in the checklist" / "shift times on N of M days". Drill-down:
   Influx · working hours column and each day's hours ("Night 21:00–08:00"). Only 1 Nov has times so far: 189.71
   of the day's 193.04 MT. Tests working-hours.test.ts (6). Committed 24 Nov.
+- **24 Nov 2026** — **LSM finished stock: paver blocks removed** (the user). "Other" held one item, PAVER BLOCK
+  (9" × 5" × 4"), filed under division LS and held in pieces: 7,000 read as 7,000 MT, doubling LSM's stock
+  (14,254.76 → 7,254.76 MT). Rule in `lsm/stock.service.ts` (LSM and RMS): an item whose name gives no section and
+  nothing saying steel (MS, steel, angle, channel, beam, joist, round, flat, bar, TMT) is not finished stock; a steel
+  item with no readable size still goes to Other. RMS, RMD and HSM checked: no such items. Test in lsm-stock.test.ts.
+  The user asked that data oddities like this be caught while developing (memory: sanity-check-data). Committed 24 Nov.

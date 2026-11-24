@@ -10,7 +10,10 @@
  * item's name ("MS ANGLE 65X8 12 mtr" → Angle 65×8); its lengths (6 m, 12 m, special length) and
  * defective item are summed into it. LSM's 19 sections as the plant listed them (Section wise R/M
  * length sheet) come first, in their names and order; any other section (Angle 40×5, Channel 150,
- * rounds …) follows, angles → channels → beams → rounds; a name giving no section goes to Other.
+ * rounds …) follows, angles → channels → beams → rounds; a steel name giving no section goes to Other.
+ * An item that is not rolled steel at all — no section and nothing in its name saying steel, e.g. PAVER
+ * BLOCK (9" × 5" × 4"), filed under LS and held in pieces, 7,000 of them read as 7,000 MT — is left out of
+ * finished stock (the user, 24 Nov 2026).
  *
  * RMS is the same rule for division RS (rmsStock), its sections ordered angles → channels →
  * beams → H beams, by size.
@@ -50,6 +53,9 @@ function labelOf(s: { label: string; type: string; a: number; b: number }) {
 const sortOf = (s: { label: string; type: string; a: number; b: number } | null, plant: boolean) =>
   !s ? 1e9 : plant && RANK.has(s.label) ? RANK.get(s.label)! : 1000 + TYPE_ORDER.indexOf(s.type) * 10000 + s.a * 10 + s.b / 100;
 
+/** A name that says rolled steel even without a readable section (MS …, steel, a shape, a bar, TMT). */
+const STEEL = /\b(M\.?S\.?|STEEL|ANGLE|CHANNEL|BEAM|JOIST|ROUND|FLAT|BAR|TMT)\b/i;
+
 /** The section an item name gives, e.g. { label: 'Angle 65×8', type: 'Angle', a: 65, b: 8 }; null for none. */
 export function sectionOf(name: string): { label: string; type: string; a: number; b: number } | null {
   const u = name.toUpperCase().replace(/M\.S\.?/g, 'MS ').replace(/\s+/g, ' ');
@@ -71,6 +77,8 @@ export function stockBySection(cache: Pick<LsmStockCache, 'moves' | 'items'>, as
   for (const [code, kgs] of byItem) {
     const name = (cache.items[code] ?? code).replace(/\s+/g, ' ').trim();
     const s = sectionOf(name);
+    // Not rolled steel (paver blocks …): not finished stock.
+    if (!s && !STEEL.test(name)) continue;
     const key = s ? (plantList ? LABEL.get(s.label) : undefined) ?? labelOf(s) : 'Other';
     const g = groups.get(key) ?? { sort: sortOf(s, plantList), items: [] };
     g.items.push({ code, name, kg: kgs });
