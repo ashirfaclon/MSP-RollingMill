@@ -333,8 +333,7 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   own drill-down (`LogMetricDrawer.tsx`). API checked against the ERP rows (Online Jun–Nov: defective 187.42,
   end cut 439.14, reject 74.08, miss-roll 115.96, CCM 1,081.45, HSM 1,899.16 MT, breakdown 74.73 h; Offline:
   bypasses and breakdown always 0). Screen check blocked: Influx (10.135.80.145) jammed again — not accepting
-  connections, so the browser's connections to the backend sat waiting and nothing loaded. Committed 25 Nov (not
-  pushed). Screen check done after the Influx guard (below): 1 day / year × Online / Offline / Both × 1920 / 1366,
+  connections, so the browser's connections to the backend sat waiting and nothing loaded. Committed 25 Nov. Screen check done after the Influx guard (below): 1 day / year × Online / Offline / Both × 1920 / 1366,
   no overflow, drill-downs open; fixed "NAMT" → NA, and billet / coil counts kept whole ("60,619.6 coils").
 - **25 Nov 2026** — **Influx guard** (the user; Influx jammed twice in a day). Root cause on our side: every query
   built a new Influx client, so connections were never reused (hundreds per backend); identical queries ran once per
@@ -350,3 +349,12 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   long periods (the Influx owner); server-side query limits (the Influx owner — other apps on this server hold
   hundreds of connections too). Committed 25 Nov.
 
+- **25 Nov 2026** — **HSM corrections** (the user, furious): (1) CCM bypass and HSM bypass were shown under Offline —
+  the sheet marks them ONLINE: now only under Online and Both. (2) Breakdown was inside the panel while LSM has it as
+  a card: now **its own card** in HSM's strip in every mode, own drill-down (LogMetricDrawer), out of the panel.
+  To keep rows full, cold power's two cards are one (kWh | kWh/MT): Both 12 cards (6 + 6), Online 7 in one row
+  (`rm-strip--seven`, figure scales with the screen so value + unit stay inside), Offline 6. Panel's operating
+  figures are one compact line like Billets (Defective · CCM bypass · HSM bypass; Offline: Defective only).
+  Plan-panel foot figures scale on narrow screens. Checked 1 day / year × 3 modes × 1920 / 1366: full rows, no
+  figure outside its card, no overflow. hsm-rolling test updated, passes. A stray `}` in visualization.css gave a
+  500 for a minute during this — fixed. Rule saved: memory kpi-consistency-ui. Committed and pushed 25 Nov.

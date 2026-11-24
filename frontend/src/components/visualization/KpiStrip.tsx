@@ -13,13 +13,13 @@ import { useGlobalSel } from '@/state/globalSel';
  * with order / Free stock cards: the order split is dropped on every mill (the user, 27 Oct 2026).
  * After the five, the plant's management KPIs for the Rolling chosen in the top bar (HsmRollingCards; the
  * user, 23 Nov 2026) — six per row, as RMD and LSM. Both: the five and the seven, twelve in two rows.
- * Online or Offline: that rolling's six alone, one row — the five are for both rollings together and
- * are not shown (the user, 24 Nov 2026). The panels below stay as they are.
+ * Online or Offline: that rolling's cards alone, one row (Online seven, Offline six) — the five are for
+ * both rollings together and are not shown (the user, 24 Nov 2026). The panels below stay as they are.
  */
 export default function KpiStrip() {
   const mode = useGlobalSel().rmdMode;
   return (
-    <section className="rm-strip rm-strip--six" aria-label="Headline KPIs">
+    <section className={`rm-strip ${mode === 'online' ? 'rm-strip--seven' : 'rm-strip--six'}`} aria-label="Headline KPIs">
       {mode === 'all' && (
         <>
           {/* Live from the ERP, for the Duration filter's period; opens the ERP-vs-Influx drawer. */}

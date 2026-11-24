@@ -15,8 +15,9 @@
  * the mill flow.
  *
  * Follows the Rolling switch: Online (ST001), Offline (ST002) or both (performance.xlsx, the user, 25 Nov 2026).
- * Under it, the operating figures — defective (ROLLING_DEFECT_MT, the user), CCM bypass, HSM bypass and
- * breakdown hours (DELAY_HRS) — each opening its own drill-down.
+ * Under it, the operating figures, each opening its own drill-down: defective (ROLLING_DEFECT_MT, the user)
+ * and — under Online and Both only, as the plant's sheet marks them ONLINE (the user, 25 Nov 2026) — CCM bypass
+ * and HSM bypass. Breakdown hours are a card of their own in the strip, as on LSM.
  */
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import Panel from '@/components/Panel';
@@ -35,6 +36,9 @@ const LOSSES: { key: keyof LogPeriod; label: string; series: Series; hint: strin
   { key: 'missRollMt', label: 'Miss-roll', series: 'missroll', hint: 'Pieces lost in the mill (miss-roll strip)' },
   { key: 'rejectMt', label: 'Reject', series: 'reject', hint: 'Pieces rejected at the finish (strip finish end cut)' },
 ];
+
+/** The panel's operating figures; the two bypasses are Online's (not shown under Offline). Breakdown is a card. */
+const OPS: LogMetric[] = ['rollingDefectMt', 'ccmBypassMt', 'hsmBypassMt'];
 
 /** Smallest remainder worth drawing — the ERP's own rounding. */
 const MIN_MT = 0.05;
@@ -147,7 +151,7 @@ export default function MaterialBalance() {
 
       {/* Operating figures: each its own drill-down (performance.xlsx, the user, 25 Nov 2026). */}
       <div className="rm-mb-ops" role="group" aria-label="Operating figures">
-        {(Object.keys(LOG_METRICS) as LogMetric[]).map((k) => {
+        {OPS.filter((k) => mode !== 'offline' || k === 'rollingDefectMt').map((k) => {
           const m = LOG_METRICS[k];
           const v = has ? (t![k] as number | null) : null;
           return (

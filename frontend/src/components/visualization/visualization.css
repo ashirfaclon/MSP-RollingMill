@@ -43,8 +43,10 @@
 /* Six per row: LSM's twelve — the headline figures, then the plant's mill performance KPIs (the user, 23 Nov 2026). */
 .rm-strip.rm-strip--six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 /* Narrow cards: a card's date on its own line under the label, as RMD's. */
-.rm-strip--six .rm-card-term { display: block; margin-top: 2px; }
-.rm-strip--six .rm-card-term::before { content: none; }
+.rm-strip--six .rm-card-term, .rm-strip--seven .rm-card-term { display: block; margin-top: 2px; }
+.rm-strip--six .rm-card-term::before, .rm-strip--seven .rm-card-term::before { content: none; }
+/* Seven narrow cards (HSM Online): the figure scales with the screen so value + unit stay inside the card. */
+.rm-strip--seven .rm-card-value { font-size: clamp(16px, 1.4vw, 30px); }
 
 /*
  * Each card spans four rows of the strip and adopts them as a subgrid, so label, value,
@@ -231,7 +233,7 @@
   border: 0; border-left: 1px solid var(--border-soft); border-radius: 0; text-align: left;
 }
 .rm-pvp .rm-pvp-stats > :first-child { padding-left: 0; border-left: 0; }
-.rm-pvp .rm-pvp-stats .rm-foot-v { font-size: 17px; white-space: nowrap; text-align: left; }
+.rm-pvp .rm-pvp-stats .rm-foot-v { font-size: clamp(13px, 1.1vw, 17px); white-space: nowrap; text-align: left; }
 .rm-pvp .rm-pvp-stats .rm-foot-btn:hover { background: var(--panel-2); }
 @media (max-width: 760px) {
   .rm-pvp-hero { grid-template-columns: minmax(0, 1fr); row-gap: 12px; }
@@ -372,21 +374,18 @@
   background: transparent; font: inherit; color: inherit; text-align: left;
 }
 .rm-mb-pieces .rm-mb-bar { grid-column: 1 / -1; }
-/* HSM operating figures under the balance: four equal cells, each a door to its own drill-down. */
-.rm-mb-ops { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 8px; border-top: 1px solid var(--border-soft); }
+/* HSM operating figures under the balance: one compact line like Billets above it — label then figure, each a
+   door to its own drill-down; reads the same with one figure (Offline) or three. */
+.rm-mb-ops { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 28px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
 .rm-mb-op {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 10px 12px 6px;
-  font: inherit; color: inherit; text-align: left; cursor: pointer; background: none; border: 0; border-left: 1px solid var(--border-soft);
+  display: inline-flex; align-items: baseline; gap: 10px; min-width: 0; margin: 0 -6px; padding: 4px 6px;
+  font: inherit; color: inherit; text-align: left; cursor: pointer; background: none; border: 0;
   border-radius: var(--radius-sm); transition: background-color 130ms ease;
 }
-.rm-mb-op:first-child { border-left: 0; padding-left: 0; }
 .rm-mb-op:hover { background: var(--panel-2); }
 .rm-mb-op:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.rm-mb-op-v { font-size: 17px; font-weight: 800; white-space: nowrap; }
-@media (max-width: 760px) {
-  .rm-mb-ops { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .rm-mb-op:nth-child(odd) { border-left: 0; padding-left: 0; }
-}
+.rm-mb-op-v { font-size: 13px; font-weight: 800; white-space: nowrap; }
+.rm-mb-op-v .rm-card-unit { font-size: 10.5px; margin-left: 4px; }
 .rm-mb-pieces-v { font-size: 11.5px; font-weight: 600; color: var(--text-2); justify-self: end; }
 .rm-mb-pieces-v b { font-weight: 800; color: var(--text); }
 
