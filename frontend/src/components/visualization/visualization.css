@@ -190,7 +190,7 @@
 /* The compliance panel (the user, 24 Nov 2026): the headline figure beside one thick bar, the daily strip
    taking the spare height, and the four figures in one row at the foot. */
 .rm-pvp { gap: 14px; }
-.rm-pvp-main { flex: 1; display: flex; flex-direction: column; gap: 18px; min-height: 0; border-radius: var(--radius-sm); }
+.rm-pvp-main { flex: 1; display: flex; flex-direction: column; gap: 18px; min-height: 0; min-width: 0; border-radius: var(--radius-sm); }
 .rm-pvp-main--button { cursor: pointer; }
 /* No strip to take the spare height: the headline sits in the middle of it. */
 .rm-pvp-main--solo { justify-content: center; }
@@ -210,14 +210,15 @@
 .rm-pvp-target { position: absolute; left: var(--target); top: -5px; bottom: -5px; width: 0; border-left: 2px dashed var(--gold); }
 .rm-pvp-note { font-size: 10.5px; font-weight: 600; color: var(--muted-2); }
 
-.rm-pvp-strip { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 76px; }
+/* The strip can never be wider than its panel: bars share the width and are clipped to it. */
+.rm-pvp-strip { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 76px; min-width: 0; }
 .rm-pvp-cols {
-  position: relative; flex: 1; min-height: 44px; display: flex; align-items: flex-end; gap: 3px;
-  border-bottom: 1px solid var(--border-soft);
+  position: relative; flex: 1; min-height: 44px; min-width: 0; display: flex; align-items: flex-end; gap: 3px;
+  overflow: hidden; border-bottom: 1px solid var(--border-soft);
 }
-.rm-pvp-col { flex: 1; min-width: 2px; border-radius: 3px 3px 0 0; background: currentColor; opacity: 0.8; }
+.rm-pvp-col { flex: 1 1 0; min-width: 0; border-radius: 3px 3px 0 0; background: currentColor; opacity: 0.8; }
 .rm-pvp-col.v-na { opacity: 0.45; }
-.rm-pvp-col.is-selected { opacity: 1; outline: 1.5px solid var(--text); outline-offset: 1px; }
+.rm-pvp-col.is-selected { opacity: 1; box-shadow: inset 0 0 0 1.5px var(--text); }
 .rm-pvp-line { position: absolute; left: 0; right: 0; bottom: var(--line); height: 0; border-top: 1.5px dashed var(--gold); opacity: 0.7; pointer-events: none; }
 .rm-pvp-axis { display: flex; justify-content: space-between; gap: 8px; font-size: 9.5px; font-weight: 700; color: var(--muted-3); }
 .rm-pvp-axis-mid { color: var(--gold); opacity: 0.85; }

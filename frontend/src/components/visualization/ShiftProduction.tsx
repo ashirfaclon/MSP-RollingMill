@@ -49,6 +49,7 @@ export default function ShiftProduction({ actions }: { actions?: ReactNode }) {
         : '08:00 IST → 08:00 IST'}
       rate={<RunningRateFoot />}
       trend={trend}
+      lateText="has no counter data yet"
       loading={!plan}
       onOpen={() => setOpen(true)}
       onEditPlan={() => setPlanOpen(true)}

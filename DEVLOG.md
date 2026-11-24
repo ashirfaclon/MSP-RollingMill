@@ -299,3 +299,13 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   nothing saying steel (MS, steel, angle, channel, beam, joist, round, flat, bar, TMT) is not finished stock; a steel
   item with no readable size still goes to Other. RMS, RMD and HSM checked: no such items. Test in lsm-stock.test.ts.
   The user asked that data oddities like this be caught while developing (memory: sanity-check-data). Committed 24 Nov.
+- **25 Nov 2026** — **Production vs plan strip broke on long periods** (the user, angry: RMD Current Year drew 329
+  day-bars at ~5 px each, ran out of the panel over Finished stock and made the whole page scroll sideways; never
+  tested beyond 23 days). Fixed in `ShiftBars.tsx` (`stripBars`): by day up to 31 days, by week up to 183, by month
+  beyond (never more than ~31 bars; a bar = Σ output ÷ Σ plan over its days with both); starts at the first bar with
+  a plan (no empty stubs); title Daily / Weekly / Monthly compliance; CSS: bars share the width, min-width 0, the
+  strip is clipped to the panel. The note now says what is compared whenever it is not the whole period:
+  "Plan starts 1 Apr · 23 Nov – 24 Nov not entered in ERP yet — compared 1 Apr to 22 Nov", "Plan ends 31 Oct …",
+  "Plan covers 1 Oct – 31 Oct …" (HSM: "has no counter data yet"). Checked on all four mills × 1 day, 8 days,
+  month, quarter, year × 1920 and 1366 wide: no page overflow, strip inside the panel. Committed 25 Nov.
+
