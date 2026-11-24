@@ -668,15 +668,15 @@ test('LSM: the plant\'s management KPIs from the ERP log sheet — two yields, a
   // 1–8 Oct, checked against the ERP rows by hand (23 Nov 2026): prime 2,106.12 ÷ 2,226.89 = 94.58 %;
   // with non-prime Σ TOTAL_PRODUCTION ÷ Σ INPUT_MT = 95.17 %.
   const value = (name: string) => page.getByRole('button', { name, exact: true }).locator('.rm-card-value');
-  await expect(value('Prime yield')).toContainText('94.6');
-  await expect(value('Yield with non-prime')).toContainText('95.2');
+  await expect(value('Prime yield')).toContainText('94.58');
+  await expect(value('Yield with non-prime')).toContainText('95.17');
   // Availability = Σ run ÷ Σ (run + delay) = 99.34 ÷ 100.19; efficiency = availability × performance.
   // Two rows of six, as RMD's: the headline figures, then the mill performance KPIs (the user, 23 Nov 2026).
   const strip = page.getByRole('region', { name: 'Headline KPIs' });
   await expect(strip.locator('.rm-card-label')).toHaveText([/^Production/, 'Prime yield', 'Yield with non-prime', 'Power consumption', 'Specific energy', /^Finished stock/,
     'Availability', 'Performance', 'Efficiency', 'Rolling in casting', 'Rolling in delivery', 'Breakdown']);
   // Breakdown hours = Σ DELAY_HRS, 1–8 Oct = 0.85 h (the user, 23 Nov 2026).
-  for (const [name, v] of [['Availability', '99.2'], ['Performance', '98.5'], ['Efficiency', '97.7'], ['Rolling in casting', '96.6'], ['Rolling in delivery', '85.6'], ['Breakdown', '0.9']]) {
+  for (const [name, v] of [['Availability', '99.15'], ['Performance', '98.48'], ['Efficiency', '97.65'], ['Rolling in casting', '96.63'], ['Rolling in delivery', '85.62'], ['Breakdown', '0.85']]) {
     await expect(value(name)).toContainText(v);
   }
   await page.locator('.rm-viz').screenshot({ path: `${SHOTS}/lsm-kpis.png` });
@@ -691,6 +691,17 @@ test('LSM: the plant\'s management KPIs from the ERP log sheet — two yields, a
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText('PLANT_AVAILABILITY');
   await page.waitForTimeout(700);
   await d.screenshot({ path: `${SHOTS}/lsm-drill-performance.png` });
+  await page.keyboard.press('Escape');
+
+  // Breakdown opens its own drill-down: its own chart and table, in hours (the user, 25 Nov 2026). 1–8 Oct: 0.85 h.
+  await page.getByRole('button', { name: 'Breakdown', exact: true }).click();
+  const bd = page.getByRole('dialog', { name: 'Breakdown · ERP log sheet' });
+  const bt = bd.getByRole('table', { name: 'Breakdown by period' });
+  await expect(bt.locator('thead th')).toHaveText(['Period', 'Breakdown (h)', 'Running (h)']);
+  await expect(bt.locator('tfoot')).toContainText('0.85');
+  await expect(bd.getByRole('region', { name: 'Formula' })).toContainText('Σ DELAY_HRS');
+  await page.waitForTimeout(700);
+  await bd.screenshot({ path: `${SHOTS}/lsm-drill-breakdown.png` });
   await page.keyboard.press('Escape');
 
   await page.getByRole('button', { name: 'Yield with non-prime', exact: true }).click();

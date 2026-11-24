@@ -62,6 +62,7 @@ export default function LsmVisualization() {
   const [prodOpen, setProdOpen] = useState(false);
   const [yieldOpen, setYieldOpen] = useState(false);
   const [perfOpen, setPerfOpen] = useState(false);
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
   const note = error ? 'ERP data unavailable' : data?.erp.connection === 'down' ? data.erp.message : '';
 
   return (
@@ -115,12 +116,14 @@ export default function LsmVisualization() {
             note={note}
             series="ok"
             loading={!data && !error}
-            onOpen={() => setPerfOpen(true)}
-            openLabel="Availability, performance, efficiency, rolling in casting / delivery and breakdown hours per day, from the ERP log sheet"
+            // Breakdown opens its own drill-down (the user, 25 Nov 2026).
+            onOpen={() => (k === 'delayHrs' ? setBreakdownOpen(true) : setPerfOpen(true))}
+            openLabel={k === 'delayHrs' ? 'Breakdown hours per day, from the ERP log sheet' : 'Availability, performance, efficiency and rolling in casting / delivery per day, from the ERP log sheet'}
           />
         ))}
       </section>
       <LsmProductionDrawer view="performance" open={perfOpen} onClose={() => setPerfOpen(false)} />
+      <LsmProductionDrawer view="breakdown" open={breakdownOpen} onClose={() => setBreakdownOpen(false)} />
       <LsmProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
       <LsmProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
 

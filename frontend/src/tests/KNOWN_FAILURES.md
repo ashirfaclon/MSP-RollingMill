@@ -32,7 +32,6 @@ Note: some numbers in hsm-rolling, production, rolling-mill and wiring specs wer
 | wiring.e2e.spec.ts:525 | RMD: finished stock by size from the ERP item ledger (FGYRDP), and a size opens its SKUs | Number differs — likely 2-decimal rule or newer data | "793.0 MT" | "794.95 MT" |
 | wiring.e2e.spec.ts:580 | RMD: production by shift — the FY plan (Prime + SL) per day and shift, against ERP Prime + SL | Number differs — likely 2-decimal rule or newer data | "Plan 2,121 MT" | "Plan 2,139.48 MT" |
 | wiring.e2e.spec.ts:616 | LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant gave the codes | Old 1-decimal text (2-decimal rule, 24 Nov) | "94.6" | "94.58%" |
-| wiring.e2e.spec.ts:660 | LSM: the plant's management KPIs from the ERP log sheet — two yields, availability, performance, efficiency, r | Old 1-decimal text (2-decimal rule, 24 Nov) | "94.6" | "94.58%" |
 | wiring.e2e.spec.ts:702 | RMD: running rate opens its drill-down — Prime + SL ÷ running hours from the billet counters | Unknown — check before trusting |  |  |
 | wiring.e2e.spec.ts:747 | LSM: finished stock by section, as the ERP Stock Sheet Engine for division LS | Stock size list changed (live ERP stock) | "A 50×50×6" | "MC 75×40" |
 | wiring.e2e.spec.ts:780 | RMS: finished stock by section, by the ERP stock rule for division RS | Stock size list changed (live ERP stock) | /^A 130×130×/ | "MC 175" |

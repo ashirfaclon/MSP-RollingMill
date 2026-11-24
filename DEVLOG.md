@@ -309,3 +309,9 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   "Plan covers 1 Oct – 31 Oct …" (HSM: "has no counter data yet"). Checked on all four mills × 1 day, 8 days,
   month, quarter, year × 1920 and 1366 wide: no page overflow, strip inside the panel. Committed 25 Nov.
 
+- **25 Nov 2026** — **LSM Breakdown: its own drill-down** (the user: no combined chart — "make separate for all",
+  Breakdown first, then the others). The Breakdown card opens "Breakdown · ERP log sheet": a column chart of
+  DELAY_HRS per day / week / month, stats Breakdown and Running hours, table Period | Breakdown (h) | Running (h)
+  (`LsmProductionDrawer.tsx` view `breakdown`). The other five still share "Mill performance" — next: one each.
+  Checked day / quarter / year at 1920 and 1366 (no overflow). The LSM KPI test's numbers moved to 2 decimals
+  and it passes (removed from KNOWN_FAILURES.md). Committed 25 Nov.

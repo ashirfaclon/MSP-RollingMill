@@ -8,8 +8,8 @@
  *               TOTAL_PRODUCTION ÷ INPUT_MT (the two yield cards);
  *   balance     billet input, production and the six losses (Material balance);
  *   performance availability, performance, efficiency, rolling in casting and in delivery — the
- *               plant's management KPIs as the log sheet holds them — and breakdown hours = DELAY_HRS
- *               (the user, 23 Nov 2026).
+ *               plant's management KPIs as the log sheet holds them (the user, 23 Nov 2026);
+ *   breakdown   breakdown hours = DELAY_HRS, its own chart (the user, 25 Nov 2026).
  * Codes exactly as the plant gave them; production is PRODUTION_MT, as the table spells it.
  */
 import { useMemo } from 'react';
@@ -21,13 +21,14 @@ import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type LsmProductionPeriod, type LsmProductionReport } from '@/services/hsmApi';
 
-export type LsmProductionView = 'production' | 'yield' | 'balance' | 'performance';
+export type LsmProductionView = 'production' | 'yield' | 'balance' | 'performance' | 'breakdown';
 
 const TITLES: Record<LsmProductionView, string> = {
   production: 'Production · ERP log sheet',
   yield: 'Yield · ERP log sheet',
   balance: 'Material balance · ERP log sheet',
   performance: 'Mill performance · ERP log sheet',
+  breakdown: 'Breakdown · ERP log sheet',
 };
 
 const f = (v: number | null) => (v === null ? '—' : fmtNum(v, 2));
@@ -51,7 +52,7 @@ export default function LsmProductionDrawer({ open, onClose, view }: { open: boo
       open={open}
       onClose={onClose}
       title={TITLES[view]}
-      sub={view === 'yield' || view === 'performance' ? 'LSM · %' : 'LSM · MT'}
+      sub={view === 'breakdown' ? 'LSM · hours' : view === 'yield' || view === 'performance' ? 'LSM · %' : 'LSM · MT'}
       controls={r.controls}
       loading={loading}
       stale={!!data && dataUrl !== url}
@@ -59,7 +60,7 @@ export default function LsmProductionDrawer({ open, onClose, view }: { open: boo
       hasData={!!data}
     >
       {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} />
-        : view === 'performance' ? <PerformanceContent data={data} /> : <BalanceContent data={data} />)}
+        : view === 'performance' ? <PerformanceContent data={data} /> : view === 'breakdown' ? <BreakdownContent data={data} /> : <BalanceContent data={data} />)}
     </DrillDrawer>
   );
 }
@@ -152,6 +153,46 @@ const PERF_COLS: { key: 'availabilityPct' | 'performancePct' | 'efficiencyPct' |
   { key: 'rollingInCastingPct', name: 'Rolling in casting', token: '--s-alt' },
   { key: 'rollingInDeliveryPct', name: 'Rolling in delivery', token: '--violet' },
 ];
+
+/** Breakdown on its own (the user, 25 Nov 2026): DELAY_HRS per period, beside the running hours. */
+function BreakdownContent({ data }: { data: LsmProductionReport }) {
+  const rows = data.rows;
+  const t = data.totals;
+  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
+  const series = useMemo<DrillSeries[]>(() => [
+    { id: 'breakdown', name: 'Breakdown', token: '--risk', type: 'column', data: rows.map((x) => x.delayHrs), dp: 2 },
+  ], [rows]);
+  const axes = useMemo(() => [{ title: 'h', unit: 'h', min: 0 }], []);
+  return (
+    <>
+      <Stats items={[
+        { label: 'Breakdown', value: f(t.delayHrs), unit: 'h' },
+        { label: 'Running', value: f(t.runningHrs), unit: 'h' },
+      ]} />
+      <DrillChart series={series} categories={categories} axes={axes}
+        ariaLabel={`Breakdown by period: ${rows.map((x) => `${x.label} ${f(x.delayHrs)} h`).join('; ')}`} />
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label="Breakdown by period">
+          <thead><tr><th>Period</th><th className="r">Breakdown (h)</th><th className="r">Running (h)</th></tr></thead>
+          <tbody>{rows.map((x) => <BreakdownRow key={x.key} x={x} />)}</tbody>
+          <tfoot><BreakdownRow x={t} /></tfoot>
+        </table>
+      </div>
+      <SourceBox sources={sources(['DELAY_HRS', 'NET_RUNNING_HRS'])} formula={['Breakdown hours = Σ DELAY_HRS of the period\'s entries']} />
+      {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
+    </>
+  );
+}
+
+function BreakdownRow({ x }: { x: LsmProductionPeriod }) {
+  return (
+    <tr>
+      {label(x)}
+      <td className="num r v-val"><b>{f(x.delayHrs)}</b></td>
+      <td className="num r">{f(x.runningHrs)}</td>
+    </tr>
+  );
+}
 
 function PerformanceContent({ data }: { data: LsmProductionReport }) {
   const rows = data.rows;
