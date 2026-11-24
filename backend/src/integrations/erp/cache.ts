@@ -226,6 +226,9 @@ export const LOG_FIELDS = [
   // entry's power. ROLLING_PERCENTAGE_CASTING = INPUT_MT ÷ TOTAL_CAST_QTY and _DELIVERY = INPUT_MT ÷
   // DELIVERY_QTY (269 of 275 entries, Jun–Nov 2026), so the percentages are worked out from the sums.
   'TOTAL_CAST_QTY', 'DELIVERY_QTY', 'POWER_CONSUMPTION_IN_KWH',
+  // Billets cast but not rolled here (performance.xlsx, the user, 25 Nov 2026): TOTAL_CAST_QTY = INPUT_MT +
+  // CCM_BY_PASSMT + HSM_BYPASS_MT + END_CRACK_BY_PASS_CCMMT on all 275 entries checked (Jun–Nov 2026).
+  'CCM_BY_PASSMT', 'HSM_BYPASS_MT',
 ] as const;
 export type LogField = (typeof LOG_FIELDS)[number];
 /** Online / Offline: the log sheet head's TRAN_COLUMN_NAME1, ST001 = Online, ST002 = Offline (cold rolling) — HSM.xlsx, 23 Nov 2026. */

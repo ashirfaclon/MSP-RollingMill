@@ -22,6 +22,11 @@ export interface LogPeriod {
   endCutMt: number | null;
   missRollMt: number | null;
   rejectMt: number | null;
+  /** CCM_BY_PASSMT, HSM_BYPASS_MT — billets cast and not rolled in the HSM (Online entries only, so far). */
+  ccmBypassMt: number | null;
+  hsmBypassMt: number | null;
+  /** DELAY_HRS — breakdown hours, as LSM's (performance.xlsx, the user, 25 Nov 2026). */
+  breakdownHrs: number | null;
   /** input − production. */
   massDiffMt: number | null;
   /** Σ production ÷ Σ input × 100. */
@@ -44,6 +49,8 @@ export interface LogSheetReport {
   from: string;
   to: string;
   grain: Grain;
+  /** The rolling the figures are for: Online (ST001), Offline (ST002) or both (the Rolling switch). */
+  mode: import('./rmd').RmdMode;
   erp: ErpMeta;
   rows: LogPeriod[];
   totals: LogPeriod;

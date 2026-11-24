@@ -21,7 +21,7 @@ import {
   readErpCommercial, readErpProduction, type ErpCommercialCache, type ErpProductionRow, type LogField,
 } from '../../integrations/erp/cache';
 import { dateRange, dayIndex, periodOf, round2, type Grain } from './production.service';
-import type { ErpMeta, LogPeriod, LogSheetReport, SizeRow, SizeReport, OrderPeriod, OpenLine, OrdersReport, StockSize, StockReport } from '../../contracts';
+import type { ErpMeta, LogPeriod, LogSheetReport, RmdMode, SizeRow, SizeReport, OrderPeriod, OpenLine, OrdersReport, StockSize, StockReport } from '../../contracts';
 export type { ErpMeta, LogPeriod, LogSheetReport, SizeRow, SizeReport, OrderPeriod, OpenLine, OrdersReport, StockSize, StockReport };
 
 /** Two sums agree when they differ by no more than the ERP's own rounding. */
@@ -43,7 +43,7 @@ interface LogDay extends DayFields { date: string }
 
 const SUMMED = [
   'inputMt', 'inputPcs', 'productionMt', 'productionPcs', 'primeMt', 'defectiveMt', 'rollingDefectMt',
-  'burningLossMt', 'endCutMt', 'missRollMt', 'rejectMt', 'massDiffMt', 'storesMt',
+  'burningLossMt', 'endCutMt', 'missRollMt', 'rejectMt', 'ccmBypassMt', 'hsmBypassMt', 'breakdownHrs', 'massDiffMt', 'storesMt',
   'balanceGapMt', 'qualityGapMt', 'storesGapMt',
 ] as const satisfies readonly (keyof DayFields)[];
 
@@ -51,6 +51,7 @@ const FIELD_OF: Record<Exclude<(typeof SUMMED)[number], 'massDiffMt' | 'storesMt
   inputMt: 'INPUT_MT', inputPcs: 'INPUT_PCS', productionMt: 'PRODUCTION_MT', productionPcs: 'PRODUCTION_PCS',
   primeMt: 'PRIME_MT', defectiveMt: 'DEFECTIVE_MT', rollingDefectMt: 'ROLLING_DEFECT_MT',
   burningLossMt: 'BLOSS_MT', endCutMt: 'ENDCUT_MT', missRollMt: 'MISSROLL_MT', rejectMt: 'REJECT_MT',
+  ccmBypassMt: 'CCM_BY_PASSMT', hsmBypassMt: 'HSM_BYPASS_MT', breakdownHrs: 'DELAY_HRS',
 };
 
 /**
@@ -82,6 +83,7 @@ export function buildLogDays(
       ...base,
       inputMt: input, inputPcs: f('inputPcs'), productionMt: prod, productionPcs: f('productionPcs'),
       ...quality, ...losses,
+      ccmBypassMt: f('ccmBypassMt'), hsmBypassMt: f('hsmBypassMt'), breakdownHrs: f('breakdownHrs'),
       massDiffMt: round2(input - prod),
       yieldPct: input > 0 ? round2((prod / input) * 100) : null,
       storesMt: stores ?? 0,
@@ -104,8 +106,9 @@ export function summariseLog(key: string, label: string, days: LogDay[]): LogPer
   const stored = days.filter((d) => d.storesMt !== null);
   out.storesMt = stored.length ? sum(stored.map((d) => d.storesMt!)) : null;
   out.yieldPct = out.inputMt ? round2((out.productionMt! / out.inputMt) * 100) : null;
+  // A check with no figure (stores under one rolling) holds on no day, not on all of them.
   const ok = (k: 'balanceGapMt' | 'qualityGapMt' | 'storesGapMt') =>
-    entered.filter((d) => Math.abs(d[k] ?? 0) <= CHECK_TOLERANCE_MT).length;
+    entered.filter((d) => d[k] !== null && Math.abs(d[k]!) <= CHECK_TOLERANCE_MT).length;
   out.balanceOkDays = ok('balanceGapMt');
   out.qualityOkDays = ok('qualityGapMt');
   out.storesOkDays = ok('storesGapMt');
@@ -125,17 +128,23 @@ function groupBy<T extends { date: string }>(days: T[], grain: Grain): { key: st
 
 const isFinished = (item: string) => item.startsWith('F');
 
-export function logSheetReport(env: Env, from: string, to: string, grain: Grain): LogSheetReport {
+/**
+ * `mode`: the Rolling switch — Online (ST001) or Offline (ST002) entries only, or both (the user, 25 Nov 2026).
+ * Stores receipts have no rolling, so the stores check is made only for both.
+ */
+export function logSheetReport(env: Env, from: string, to: string, grain: Grain, mode: RmdMode = 'all'): LogSheetReport {
   const prod = readErpProduction(env);
   const com = readErpCommercial(env);
   const stores = new Map<string, number>();
-  for (const l of com?.prodLines ?? []) {
+  for (const l of mode === 'all' ? com?.prodLines ?? [] : []) {
     if (l.date >= from && l.date <= to && isFinished(l.item)) stores.set(l.date, (stores.get(l.date) ?? 0) + l.mt);
   }
-  const rows = (prod?.rows ?? []).filter((r) => r.date >= from && r.date <= to);
-  const days = buildLogDays(dateRange(from, to), rows, stores);
+  const rows = (prod?.rows ?? []).filter((r) => r.date >= from && r.date <= to && (mode === 'all' || r.mode === mode));
+  // One rolling: stores receipts can't be split by it — no stores figure or check, rather than a false 0.
+  const days = buildLogDays(dateRange(from, to), rows, stores)
+    .map((d) => (mode === 'all' ? d : { ...d, storesMt: null, storesGapMt: null }));
   return {
-    from, to, grain,
+    from, to, grain, mode,
     erp: meta(prod, prod?.rows.at(-1)?.date ?? null),
     rows: groupBy(days, grain).map((g) => summariseLog(g.key, g.label, g.days)),
     totals: summariseLog('total', 'Total', days),

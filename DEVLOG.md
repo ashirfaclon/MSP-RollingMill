@@ -323,3 +323,15 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   Checked all six × day / quarter / year × 1920 / 1366: one series each, no overflow. LSM KPI test updated, passes.
   Committed 25 Nov.
 
+- **25 Nov 2026** — **HSM operating figures from the ERP log sheet** (performance.xlsx "ISSUE LOG", the user). Defective =
+  ROLLING_DEFECT_MT (the user), end cut ENDCUT_MT, strip finish end cut / reject REJECT_MT, miss-roll MISSROLL_MT,
+  yield = production ÷ billet input (the ERP's YIELD_PERCENTAGE is a fraction on 210 of 275 entries, a % on the
+  rest — not used), CCM bypass CCM_BY_PASSMT, HSM bypass HSM_BYPASS_MT (cast = input + the bypasses on all 275),
+  breakdown DELAY_HRS (as LSM; SMS_BREAKDOWN_HOURS filled once). Dropped by the user: Strip Mill Power kWh and
+  HSM Power kWh/MT. /api/hsm/logsheet takes `mode`; Material & operating balance follows the Rolling switch
+  (stores check only under Both); under it four buttons — Defective, CCM bypass, HSM bypass, Breakdown — each its
+  own drill-down (`LogMetricDrawer.tsx`). API checked against the ERP rows (Online Jun–Nov: defective 187.42,
+  end cut 439.14, reject 74.08, miss-roll 115.96, CCM 1,081.45, HSM 1,899.16 MT, breakdown 74.73 h; Offline:
+  bypasses and breakdown always 0). Screen check blocked: Influx (10.135.80.145) jammed again — not accepting
+  connections, so the browser's connections to the backend sat waiting and nothing loaded. Committed 25 Nov (not
+  pushed); screen check still to do once Influx answers.

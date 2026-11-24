@@ -120,7 +120,7 @@ export function resetFilters() {
  * when RMD is switched to one rolling; '' otherwise, so Both asks exactly what it always did.
  * Read outside React: every caller renders under useSelection, so a switch re-renders it.
  */
-const RMD_MODE_PATHS = ['/api/hsm/rolling', '/api/rmd/production', '/api/rmd/running-rate', '/api/rmd/power', '/api/rmd/plan', '/api/ca/rmd'];
+const RMD_MODE_PATHS = ['/api/hsm/rolling', '/api/hsm/logsheet', '/api/rmd/production', '/api/rmd/running-rate', '/api/rmd/power', '/api/rmd/plan', '/api/ca/rmd'];
 export const rmdModeQuery = (path: string) =>
   (state.rmdMode !== 'all' && RMD_MODE_PATHS.includes(path) ? `&mode=${state.rmdMode}` : '');
 

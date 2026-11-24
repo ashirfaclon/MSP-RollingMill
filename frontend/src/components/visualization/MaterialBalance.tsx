@@ -13,11 +13,17 @@
  * balance drawer (the same split per day / week / month). The figures inside are not
  * separate doors — yield and billets have their own drawers from the Mass yield card and
  * the mill flow.
+ *
+ * Follows the Rolling switch: Online (ST001), Offline (ST002) or both (performance.xlsx, the user, 25 Nov 2026).
+ * Under it, the operating figures — defective (ROLLING_DEFECT_MT, the user), CCM bypass, HSM bypass and
+ * breakdown hours (DELAY_HRS) — each opening its own drill-down.
  */
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import Panel from '@/components/Panel';
 import { fixed } from '@/lib/num';
 import BalanceDrawer from '@/components/drill/BalanceDrawer';
+import LogMetricDrawer, { LOG_METRICS, type LogMetric } from '@/components/drill/LogMetricDrawer';
+import { RMD_MODE_LABELS, useGlobalSel } from '@/state/globalSel';
 import { useErpPeriod } from '@/components/production/useErpPeriod';
 import type { LogPeriod } from '@/services/hsmApi';
 import type { Series } from './KpiCard';
@@ -40,6 +46,8 @@ const mt = (v: number | null | undefined) => `${fixed(v, 1)} MT`;
 export default function MaterialBalance() {
   const { current, loading, note } = useErpPeriod();
   const [open, setOpen] = useState(false);
+  const [metric, setMetric] = useState<LogMetric | null>(null);
+  const mode = useGlobalSel().rmdMode;
   const openOnKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } };
   const t = current?.totals;
   const has = !!t?.entryDays;
@@ -66,7 +74,7 @@ export default function MaterialBalance() {
     : 'Losses: not in ERP yet';
 
   return (
-    <Panel title="Material & operating balance" className="rm-panel" bodyClass="rm-body">
+    <Panel title="Material & operating balance" sub={mode === 'all' ? undefined : `${RMD_MODE_LABELS[mode]} rolling`} className="rm-panel" bodyClass="rm-body">
       <div
         className="rm-mb rm-mb--button"
         role="button"
@@ -135,7 +143,24 @@ export default function MaterialBalance() {
         </div>
       </div>
 
+      {/* Operating figures: each its own drill-down (performance.xlsx, the user, 25 Nov 2026). */}
+      <div className="rm-mb-ops" role="group" aria-label="Operating figures">
+        {(Object.keys(LOG_METRICS) as LogMetric[]).map((k) => {
+          const m = LOG_METRICS[k];
+          const v = has ? (t![k] as number | null) : null;
+          return (
+            <button key={k} type="button" className="rm-mb-op" aria-haspopup="dialog" onClick={() => setMetric(k)} title={`${m.name} per day`}>
+              <span className="rm-k">{m.name}</span>
+              {loading
+                ? <span className="skel skel--num" role="status" aria-label="Loading" />
+                : <span className={`rm-mb-op-v num ${v === null ? 'v-na' : ''}`}>{v === null ? 'NA' : fixed(v)}<span className="rm-card-unit">{m.unit}</span></span>}
+            </button>
+          );
+        })}
+      </div>
+
       <BalanceDrawer open={open} onClose={() => setOpen(false)} />
+      <LogMetricDrawer metric={metric} onClose={() => setMetric(null)} />
     </Panel>
   );
 }

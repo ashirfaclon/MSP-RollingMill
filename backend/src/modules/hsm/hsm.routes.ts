@@ -73,7 +73,7 @@ export async function hsmRoutes(app: FastifyInstance) {
   app.get('/logsheet', { config: { errorCode: 'hsm_logsheet_failed' } }, async (req) => {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
-    return logSheetReport(loadEnv(), from, to, parseGrain(q));
+    return logSheetReport(loadEnv(), from, to, parseGrain(q), parseRmdMode(q));
   });
 
   /** The plant's management KPIs from the log sheet: cast, delivery, prime, rolling %, cold power; Online / Offline / both. */
