@@ -42,6 +42,8 @@ const MIN_MT = 0.05;
 const pct = (v: number | null | undefined, of: number | null | undefined) =>
   v === null || v === undefined || !of ? 0 : (v / of) * 100;
 const mt = (v: number | null | undefined) => `${fixed(v, 1)} MT`;
+/** Billets and coils are whole pieces — never decimals, whatever the number rule (the ERP's sums can carry a fraction). */
+const pcs = (v: number | null | undefined) => (v == null ? 'NA' : Math.round(v).toLocaleString('en-IN'));
 
 export default function MaterialBalance() {
   const { current, loading, note } = useErpPeriod();
@@ -135,7 +137,7 @@ export default function MaterialBalance() {
           <span className="rm-k">Billets</span>
           {loading
             ? <span className="skel skel--num" role="status" aria-label="Loading" />
-            : <span className="rm-mb-pieces-v num">{has ? <><b>{fixed(t!.inputPcs, 0)}</b> in · <b className="rm-text--order">{fixed(t!.productionPcs, 0)}</b> coils out</> : 'NA'}</span>}
+            : <span className="rm-mb-pieces-v num">{has ? <><b>{pcs(t!.inputPcs)}</b> in · <b className="rm-text--order">{pcs(t!.productionPcs)}</b> coils out</> : 'NA'}</span>}
           <span className="rm-mb-bar rm-mb-bar--pieces" aria-hidden>
             <i className="rm-mb-seg rm-tone--order" style={{ width: `${has ? pct(t!.productionPcs, t!.inputPcs) : 0}%` }} />
             <i className="rm-mb-seg rm-tone--diff" style={{ width: `${has ? Math.max(0, 100 - pct(t!.productionPcs, t!.inputPcs)) : 0}%` }} />
@@ -153,7 +155,7 @@ export default function MaterialBalance() {
               <span className="rm-k">{m.name}</span>
               {loading
                 ? <span className="skel skel--num" role="status" aria-label="Loading" />
-                : <span className={`rm-mb-op-v num ${v === null ? 'v-na' : ''}`}>{v === null ? 'NA' : fixed(v)}<span className="rm-card-unit">{m.unit}</span></span>}
+                : <span className={`rm-mb-op-v num ${v === null ? 'v-na' : ''}`}>{v === null ? 'NA' : <>{fixed(v)}<span className="rm-card-unit">{m.unit}</span></>}</span>}
             </button>
           );
         })}

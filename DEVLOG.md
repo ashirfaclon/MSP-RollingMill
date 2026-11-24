@@ -334,4 +334,19 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   end cut 439.14, reject 74.08, miss-roll 115.96, CCM 1,081.45, HSM 1,899.16 MT, breakdown 74.73 h; Offline:
   bypasses and breakdown always 0). Screen check blocked: Influx (10.135.80.145) jammed again — not accepting
   connections, so the browser's connections to the backend sat waiting and nothing loaded. Committed 25 Nov (not
-  pushed); screen check still to do once Influx answers.
+  pushed). Screen check done after the Influx guard (below): 1 day / year × Online / Offline / Both × 1920 / 1366,
+  no overflow, drill-downs open; fixed "NAMT" → NA, and billet / coil counts kept whole ("60,619.6 coils").
+- **25 Nov 2026** — **Influx guard** (the user; Influx jammed twice in a day). Root cause on our side: every query
+  built a new Influx client, so connections were never reused (hundreds per backend); identical queries ran once per
+  screen; nothing capped how many ran; each waited 2–3 min while Influx was down, and the browser's few connections
+  to the backend sat waiting on them, so even ERP figures stopped loading. Fixed in `integrations/influx.ts` (every
+  Influx query goes through `collect`): one client and one keep-alive pool per server (≤ 6 sockets); ≤ 4 queries at
+  a time per server, the rest queue and give up after 20 s; identical queries share one answer, in flight and for
+  30 s; after 3 failures in a row the server is left alone for 30 s (queries fail at once — each screen shows its
+  "historian unreachable" message — then one query tries again); no query waits more than 45 s. RMD mill speed: the
+  latest reading from the period's last day only (was a scan of the whole period). Tests influx-guard.test.ts (3).
+  Live: our backend held a steady 4 Influx connections while all four mills loaded on Current Year (was 109 in two
+  minutes before); everything loaded. Not done: cancelling a query when the viewer leaves; pre-summarised data for
+  long periods (the Influx owner); server-side query limits (the Influx owner — other apps on this server hold
+  hundreds of connections too). Committed 25 Nov.
+

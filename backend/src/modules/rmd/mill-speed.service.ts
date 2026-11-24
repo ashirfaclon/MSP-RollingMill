@@ -38,9 +38,16 @@ export async function rmdMillSpeed(env: Env, from: string, to: string, nowMs = D
       and (r._field == "${FIELDS.mill1}" or r._field == "${FIELDS.mill2}"))
   |> map(fn: (r) => ({ r with _value: float(v: r._value) }))`;
   try {
+    // The latest reading: from the period's last day only, not a scan of the whole period (a year was 11 months
+    // of 10 s readings read twice — the user, 25 Nov 2026).
+    const lastFrom = Math.max(fromMs, toMs - 24 * H_MS);
     const [last, trend] = await Promise.all([
-      collect<{ _field: string; _value: number; _time: string }>(q(env), `${src}
+      collect<{ _field: string; _value: number; _time: string }>(q(env), `from(bucket: "${esc(env.influxBucket!)}")
+  |> range(start: ${fluxTime(lastFrom)}, stop: ${fluxTime(toMs)})
+  |> filter(fn: (r) => r._measurement == "TMT-RMD" and r.Unit == "CR Mill1/2" and r.Group == "General"
+      and (r._field == "${FIELDS.mill1}" or r._field == "${FIELDS.mill2}"))
   |> last()
+  |> map(fn: (r) => ({ r with _value: float(v: r._value) }))
   |> keep(columns: ["_field", "_value", "_time"])`),
       collect<{ _time: string } & Record<string, unknown>>(q(env), `${src}
   |> aggregateWindow(every: ${bucketMinutes}m, fn: mean, createEmpty: false, timeSrc: "_start")
