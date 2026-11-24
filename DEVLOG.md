@@ -315,3 +315,11 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   (`LsmProductionDrawer.tsx` view `breakdown`). The other five still share "Mill performance" — next: one each.
   Checked day / quarter / year at 1920 and 1366 (no overflow). The LSM KPI test's numbers moved to 2 decimals
   and it passes (removed from KNOWN_FAILURES.md). Committed 25 Nov.
+- **25 Nov 2026** — **LSM: every performance KPI has its own drill-down** (the user). Availability, Performance,
+  Efficiency, Rolling in casting and Rolling in delivery each open "<KPI> · ERP log sheet": one line, a 100 %
+  reference, and in the table the figures it is worked out from (availability: running and breakdown hours;
+  performance: running hours; efficiency: availability and performance; rolling: billet input), with its own source
+  and formula (`LsmProductionDrawer.tsx`, views = the KPI keys; the shared "Mill performance" view is gone).
+  Checked all six × day / quarter / year × 1920 / 1366: one series each, no overflow. LSM KPI test updated, passes.
+  Committed 25 Nov.
+

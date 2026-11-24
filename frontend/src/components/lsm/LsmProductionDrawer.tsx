@@ -7,8 +7,8 @@
  *   yield       prime yield = production ÷ billet input (INPUT_MT), and yield with non-prime =
  *               TOTAL_PRODUCTION ÷ INPUT_MT (the two yield cards);
  *   balance     billet input, production and the six losses (Material balance);
- *   performance availability, performance, efficiency, rolling in casting and in delivery — the
- *               plant's management KPIs as the log sheet holds them (the user, 23 Nov 2026);
+ *   availabilityPct … rollingInDeliveryPct  each of the plant's management KPIs on its own (the user, 23 /
+ *               25 Nov 2026): its line against 100 %, beside the figures it is worked out from;
  *   breakdown   breakdown hours = DELAY_HRS, its own chart (the user, 25 Nov 2026).
  * Codes exactly as the plant gave them; production is PRODUTION_MT, as the table spells it.
  */
@@ -21,14 +21,18 @@ import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type LsmProductionPeriod, type LsmProductionReport } from '@/services/hsmApi';
 
-export type LsmProductionView = 'production' | 'yield' | 'balance' | 'performance' | 'breakdown';
+export type LsmProductionView = 'production' | 'yield' | 'balance' | 'breakdown' | PerfKey;
 
 const TITLES: Record<LsmProductionView, string> = {
   production: 'Production · ERP log sheet',
   yield: 'Yield · ERP log sheet',
   balance: 'Material balance · ERP log sheet',
-  performance: 'Mill performance · ERP log sheet',
   breakdown: 'Breakdown · ERP log sheet',
+  availabilityPct: 'Availability · ERP log sheet',
+  performancePct: 'Performance · ERP log sheet',
+  efficiencyPct: 'Efficiency · ERP log sheet',
+  rollingInCastingPct: 'Rolling in casting · ERP log sheet',
+  rollingInDeliveryPct: 'Rolling in delivery · ERP log sheet',
 };
 
 const f = (v: number | null) => (v === null ? '—' : fmtNum(v, 2));
@@ -52,7 +56,7 @@ export default function LsmProductionDrawer({ open, onClose, view }: { open: boo
       open={open}
       onClose={onClose}
       title={TITLES[view]}
-      sub={view === 'breakdown' ? 'LSM · hours' : view === 'yield' || view === 'performance' ? 'LSM · %' : 'LSM · MT'}
+      sub={view === 'breakdown' ? 'LSM · hours' : view === 'yield' || view in PERF ? 'LSM · %' : 'LSM · MT'}
       controls={r.controls}
       loading={loading}
       stale={!!data && dataUrl !== url}
@@ -60,7 +64,7 @@ export default function LsmProductionDrawer({ open, onClose, view }: { open: boo
       hasData={!!data}
     >
       {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} />
-        : view === 'performance' ? <PerformanceContent data={data} /> : view === 'breakdown' ? <BreakdownContent data={data} /> : <BalanceContent data={data} />)}
+        : view in PERF ? <KpiContent data={data} k={view as PerfKey} /> : view === 'breakdown' ? <BreakdownContent data={data} /> : <BalanceContent data={data} />)}
     </DrillDrawer>
   );
 }
@@ -146,14 +150,6 @@ function YieldRow({ x }: { x: LsmProductionPeriod }) {
   );
 }
 
-const PERF_COLS: { key: 'availabilityPct' | 'performancePct' | 'efficiencyPct' | 'rollingInCastingPct' | 'rollingInDeliveryPct'; name: string; token: string }[] = [
-  { key: 'availabilityPct', name: 'Availability', token: '--s-prod' },
-  { key: 'performancePct', name: 'Performance', token: '--s-order' },
-  { key: 'efficiencyPct', name: 'Efficiency', token: '--s-pred' },
-  { key: 'rollingInCastingPct', name: 'Rolling in casting', token: '--s-alt' },
-  { key: 'rollingInDeliveryPct', name: 'Rolling in delivery', token: '--violet' },
-];
-
 /** Breakdown on its own (the user, 25 Nov 2026): DELAY_HRS per period, beside the running hours. */
 function BreakdownContent({ data }: { data: LsmProductionReport }) {
   const rows = data.rows;
@@ -194,47 +190,89 @@ function BreakdownRow({ x }: { x: LsmProductionPeriod }) {
   );
 }
 
-function PerformanceContent({ data }: { data: LsmProductionReport }) {
+export type PerfKey = 'availabilityPct' | 'performancePct' | 'efficiencyPct' | 'rollingInCastingPct' | 'rollingInDeliveryPct';
+type Col = { key: keyof LsmProductionPeriod; name: string; unit: string };
+
+/**
+ * Each of the five on its own (the user, 25 Nov 2026 — no combined chart): its own line against 100 %, and
+ * beside it in the table the figures it is worked out from.
+ */
+const PERF: Record<PerfKey, { name: string; token: string; cols: Col[]; codes: string[]; formula: string[] }> = {
+  availabilityPct: {
+    name: 'Availability', token: '--s-prod',
+    cols: [{ key: 'runningHrs', name: 'Running', unit: 'h' }, { key: 'delayHrs', name: 'Breakdown', unit: 'h' }],
+    codes: ['PLANT_AVAILABILITY', 'NET_RUNNING_HRS', 'DELAY_HRS'],
+    formula: ['Availability = NET_RUNNING_HRS ÷ (NET_RUNNING_HRS + DELAY_HRS) × 100 — one entry: the ERP\'s PLANT_AVAILABILITY',
+      'Several entries: weighted by running + delay hours'],
+  },
+  performancePct: {
+    name: 'Performance', token: '--s-order',
+    cols: [{ key: 'runningHrs', name: 'Running', unit: 'h' }],
+    codes: ['PLANT_PERFORMANCE', 'NET_RUNNING_HRS'],
+    formula: ['Performance = the ERP\'s PLANT_PERFORMANCE of each entry', 'Several entries: weighted by running hours'],
+  },
+  efficiencyPct: {
+    name: 'Efficiency', token: '--s-pred',
+    cols: [{ key: 'availabilityPct', name: 'Availability', unit: '%' }, { key: 'performancePct', name: 'Performance', unit: '%' }],
+    codes: ['PLANT_EFFICIENCY', 'PLANT_AVAILABILITY', 'PLANT_PERFORMANCE', 'NET_RUNNING_HRS', 'DELAY_HRS'],
+    formula: ['Efficiency = availability × performance — one entry: the ERP\'s PLANT_EFFICIENCY',
+      'Several entries: weighted by running + delay hours'],
+  },
+  rollingInCastingPct: {
+    name: 'Rolling in casting', token: '--s-alt',
+    cols: [{ key: 'billetInputMt', name: 'Billet input', unit: 'MT' }],
+    codes: ['ROLLING_PERCENTAGE_CASTING', 'INPUT_MT'],
+    formula: ['Rolling in casting = the ERP\'s ROLLING_PERCENTAGE_CASTING of each entry', 'Several entries: weighted by INPUT_MT'],
+  },
+  rollingInDeliveryPct: {
+    name: 'Rolling in delivery', token: '--violet',
+    cols: [{ key: 'billetInputMt', name: 'Billet input', unit: 'MT' }],
+    codes: ['ROLLING_PERCENTAGE_DELIVERY', 'INPUT_MT'],
+    formula: ['Rolling in delivery = the ERP\'s ROLLING_PERCENTAGE_DELIVERY of each entry', 'Several entries: weighted by INPUT_MT'],
+  },
+};
+
+const val = (x: LsmProductionPeriod, k: keyof LsmProductionPeriod) => {
+  const v = x[k];
+  return typeof v === 'number' ? v : null;
+};
+
+function KpiContent({ data, k }: { data: LsmProductionReport; k: PerfKey }) {
+  const c = PERF[k];
   const rows = data.rows;
   const t = data.totals;
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
-  const series = useMemo<DrillSeries[]>(() => PERF_COLS.map((c) => (
-    { id: c.key, name: c.name, token: c.token, type: 'line', data: rows.map((x) => x[c.key]), dp: 2 }
-  )), [rows]);
-  const axes = useMemo(() => [{ title: '%', unit: '%' }], []);
+  const series = useMemo<DrillSeries[]>(() => [
+    { id: k, name: c.name, token: c.token, type: 'line', data: rows.map((x) => x[k]), dp: 2 },
+  ], [rows, k, c]);
+  const axes = useMemo(() => [{ title: '%', unit: '%', line: { value: 100, label: '100 %' } }], []);
   return (
     <>
-      <Stats items={[...PERF_COLS.map((c) => ({ label: c.name, value: f(t[c.key]), unit: '%' })), { label: 'Breakdown', value: f(t.delayHrs), unit: 'h' }]} />
+      <Stats items={[
+        { label: c.name, value: f(t[k]), unit: '%' },
+        ...c.cols.map((col) => ({ label: col.name, value: f(val(t, col.key)), unit: col.unit })),
+      ]} />
       <DrillChart series={series} categories={categories} axes={axes}
-        ariaLabel={`Mill performance by period: ${rows.map((x) => `${x.label} ${PERF_COLS.map((c) => `${c.name.toLowerCase()} ${f(x[c.key])}%`).join(', ')}`).join('; ')}`} />
+        ariaLabel={`${c.name} by period: ${rows.map((x) => `${x.label} ${f(x[k])}%`).join('; ')}`} />
       <div className="pd-table-wrap">
-        <table className="grid pd-table" aria-label="Mill performance by period">
-          <thead><tr><th>Period</th>{PERF_COLS.map((c) => <th key={c.key} className="r">{c.name} (%)</th>)}<th className="r">Running (h)</th><th className="r">Breakdown (h)</th></tr></thead>
-          <tbody>{rows.map((x) => <PerformanceRow key={x.key} x={x} />)}</tbody>
-          <tfoot><PerformanceRow x={t} /></tfoot>
+        <table className="grid pd-table" aria-label={`${c.name} by period`}>
+          <thead><tr><th>Period</th><th className="r">{c.name} (%)</th>{c.cols.map((col) => <th key={col.key} className="r">{col.name} ({col.unit})</th>)}</tr></thead>
+          <tbody>{rows.map((x) => <KpiRow key={x.key} x={x} k={k} />)}</tbody>
+          <tfoot><KpiRow x={t} k={k} /></tfoot>
         </table>
       </div>
-      <SourceBox
-        sources={sources(['PLANT_AVAILABILITY', 'PLANT_PERFORMANCE', 'PLANT_EFFICIENCY', 'ROLLING_PERCENTAGE_CASTING', 'ROLLING_PERCENTAGE_DELIVERY', 'NET_RUNNING_HRS', 'DELAY_HRS', 'INPUT_MT'])}
-        formula={[
-          'One entry: the ERP\'s own figure. Availability = NET_RUNNING_HRS ÷ (NET_RUNNING_HRS + DELAY_HRS); efficiency = availability × performance',
-          'Several entries: availability and efficiency weighted by running + delay hours, performance by running hours',
-          'Rolling in casting / delivery over several entries: weighted by INPUT_MT',
-          'Breakdown hours = Σ DELAY_HRS',
-        ]}
-      />
+      <SourceBox sources={sources(c.codes)} formula={c.formula} />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
     </>
   );
 }
 
-function PerformanceRow({ x }: { x: LsmProductionPeriod }) {
+function KpiRow({ x, k }: { x: LsmProductionPeriod; k: PerfKey }) {
   return (
     <tr>
       {label(x)}
-      {PERF_COLS.map((c) => <td key={c.key} className="num r v-val">{f(x[c.key])}</td>)}
-      <td className="num r">{f(x.runningHrs)}</td>
-      <td className="num r">{f(x.delayHrs)}</td>
+      <td className="num r v-val"><b>{f(x[k])}</b></td>
+      {PERF[k].cols.map((col) => <td key={col.key} className="num r">{f(val(x, col.key))}</td>)}
     </tr>
   );
 }

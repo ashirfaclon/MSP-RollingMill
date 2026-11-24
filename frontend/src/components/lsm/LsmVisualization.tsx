@@ -61,8 +61,8 @@ export default function LsmVisualization() {
   const t = data?.totals ?? null;
   const [prodOpen, setProdOpen] = useState(false);
   const [yieldOpen, setYieldOpen] = useState(false);
-  const [perfOpen, setPerfOpen] = useState(false);
-  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  /** The KPI whose own drill-down is open (the user, 25 Nov 2026: one drill-down each). */
+  const [kpiOpen, setKpiOpen] = useState<(typeof PERFORMANCE)[number][1] | null>(null);
   const note = error ? 'ERP data unavailable' : data?.erp.connection === 'down' ? data.erp.message : '';
 
   return (
@@ -104,7 +104,7 @@ export default function LsmVisualization() {
         {/* The total of Finished stock by size, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
         <FinishedStockCard mill="lsm" />
         {/* Row 2: the plant's management KPIs (Management Dash All.xlsx, 23 Nov 2026) — two rows of six, as RMD's
-            (the user, 23 Nov 2026); one drawer for the six. */}
+            (the user, 23 Nov 2026); each opens its own drill-down (25 Nov). */}
         {PERFORMANCE.map(([label, k, unit]) => (
           <KpiCard
             key={k}
@@ -116,14 +116,13 @@ export default function LsmVisualization() {
             note={note}
             series="ok"
             loading={!data && !error}
-            // Breakdown opens its own drill-down (the user, 25 Nov 2026).
-            onOpen={() => (k === 'delayHrs' ? setBreakdownOpen(true) : setPerfOpen(true))}
-            openLabel={k === 'delayHrs' ? 'Breakdown hours per day, from the ERP log sheet' : 'Availability, performance, efficiency and rolling in casting / delivery per day, from the ERP log sheet'}
+            // Each opens its own drill-down (the user, 25 Nov 2026).
+            onOpen={() => setKpiOpen(k)}
+            openLabel={`${label} per day, from the ERP log sheet`}
           />
         ))}
       </section>
-      <LsmProductionDrawer view="performance" open={perfOpen} onClose={() => setPerfOpen(false)} />
-      <LsmProductionDrawer view="breakdown" open={breakdownOpen} onClose={() => setBreakdownOpen(false)} />
+      <LsmProductionDrawer view={kpiOpen === 'delayHrs' ? 'breakdown' : kpiOpen ?? 'availabilityPct'} open={kpiOpen !== null} onClose={() => setKpiOpen(null)} />
       <LsmProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
       <LsmProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
 

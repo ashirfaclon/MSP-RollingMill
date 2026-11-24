@@ -681,16 +681,21 @@ test('LSM: the plant\'s management KPIs from the ERP log sheet — two yields, a
   }
   await page.locator('.rm-viz').screenshot({ path: `${SHOTS}/lsm-kpis.png` });
 
+  // Each KPI opens its own drill-down, its own chart (the user, 25 Nov 2026). Efficiency = availability × performance.
   await page.getByRole('button', { name: 'Efficiency', exact: true }).click();
-  const d = page.getByRole('dialog', { name: 'Mill performance · ERP log sheet' });
-  const tb = d.getByRole('table', { name: 'Mill performance by period' });
-  await expect(tb.locator('thead th')).toHaveText(['Period', 'Availability (%)', 'Performance (%)', 'Efficiency (%)', 'Rolling in casting (%)', 'Rolling in delivery (%)', 'Running (h)', 'Breakdown (h)']);
+  const d = page.getByRole('dialog', { name: 'Efficiency · ERP log sheet' });
+  const tb = d.getByRole('table', { name: 'Efficiency by period' });
+  await expect(tb.locator('thead th')).toHaveText(['Period', 'Efficiency (%)', 'Availability (%)', 'Performance (%)']);
   await expect(tb.locator('tbody tr')).toHaveCount(8);
-  await expect(tb.locator('tfoot')).toContainText('99.15');
-  await expect(tb.locator('tfoot')).toContainText('97.65');
-  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('PLANT_AVAILABILITY');
+  for (const v of ['97.65', '99.15', '98.48']) await expect(tb.locator('tfoot')).toContainText(v);
+  await expect(d.getByRole('region', { name: 'Data source' })).toContainText('PLANT_EFFICIENCY');
   await page.waitForTimeout(700);
-  await d.screenshot({ path: `${SHOTS}/lsm-drill-performance.png` });
+  await d.screenshot({ path: `${SHOTS}/lsm-drill-efficiency.png` });
+  await page.keyboard.press('Escape');
+  // Availability beside the hours it is worked out from.
+  await page.getByRole('button', { name: 'Availability', exact: true }).click();
+  const av = page.getByRole('dialog', { name: 'Availability · ERP log sheet' });
+  await expect(av.getByRole('table', { name: 'Availability by period' }).locator('thead th')).toHaveText(['Period', 'Availability (%)', 'Running (h)', 'Breakdown (h)']);
   await page.keyboard.press('Escape');
 
   // Breakdown opens its own drill-down: its own chart and table, in hours (the user, 25 Nov 2026). 1–8 Oct: 0.85 h.
