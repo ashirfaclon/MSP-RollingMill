@@ -1,5 +1,7 @@
 'use client';
 
+import { num } from '@/lib/num';
+
 /**
  * The drill-down chart. Highcharts, per the design system's chart layer: colours come from
  * the theme tokens at draw time (and redraw on a theme flip), the tooltip renders outside
@@ -19,8 +21,8 @@ import { useGlobalSel } from '@/state/globalSel';
 const tok = (name: string) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888';
 
-export const fmtNum = (v: number | null | undefined, dp = 1) =>
-  v === null || v === undefined ? '—' : v.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+/** Up to 2 decimals, only those needed (lib/num.ts — the user, 24 Nov 2026). */
+export const fmtNum = (v: number | null | undefined, dp = 2) => (v === null || v === undefined ? '—' : num(v, dp));
 
 export interface DrillSeries {
   id: string;

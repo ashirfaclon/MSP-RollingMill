@@ -42,15 +42,15 @@ test('the Production card shows ERP and Influx production for the Duration filte
   // Default period is Yesterday (the user, 30 Oct 2026): Influx has the whole day; the ERP may not be in yet.
   await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('ERP');
   await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('Influx');
-  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText(/\d[\d,]*\.\d|NA/);
+  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText(/\d[\d,]*(\.\d{1,2})?|NA/);
 
   await pickCustom(page);
   // 22–28 Sep. ERP log sheet PRODUCTION_MT: 1,076.51.
-  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('1,076.5');
+  await expect(card.locator('.rm-card-pair-item').nth(0)).toContainText('1,076.51');
   // Influx counter reset events less noise: 217.94 + 154.03 + 172.43 + 120.62 + 133.57 + 178.91 + 162.78 = 1,140.28 (08:00 → 08:00 days)
-  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('1,140.3');
+  await expect(card.locator('.rm-card-pair-item').nth(1)).toContainText('1,140.28');
   // The ERP covers every day of the period: the note gives Influx − ERP, 1,140.28 − 1,076.51 = 63.77.
-  await expect(card.locator('.rm-card-note')).toHaveText('Delta 63.8 MT');
+  await expect(card.locator('.rm-card-note')).toHaveText('Delta 63.77 MT');
   await card.screenshot({ path: `${SHOTS}/production-card.png` });
 });
 
@@ -75,7 +75,7 @@ test('clicking the card opens the ERP-vs-Influx drawer on the dashboard period �
   const table = drawer.getByRole('table', { name: 'Production by period' });
   await expect(table.locator('thead th')).toHaveText(['Period', 'ERP (MT)', 'Influx (MT)', 'Delta (MT)']);
   const row = (label: string) => table.getByRole('row', { name: new RegExp(`^${label}\\b`) });
-  await expect(row('22 Sep')).toContainText('202.40');
+  await expect(row('22 Sep')).toContainText('202.4');
   await expect(row('22 Sep')).toContainText('217.94');
   await expect(row('22 Sep')).toContainText('15.54');
   await expect(row('28 Sep')).toContainText('152.21');

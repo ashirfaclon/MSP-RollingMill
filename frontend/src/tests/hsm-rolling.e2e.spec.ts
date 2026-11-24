@@ -19,7 +19,7 @@ const test = base.extend<{ page: Page }>({
 
 test.describe.configure({ timeout: 120_000 });
 
-test('HSM: six cards per row; the Rolling switch adds the Online, Offline or both sets after the five headline cards', async ({ page }) => {
+test('HSM: six cards per row; Both shows the five headline cards and both sets, Online or Offline only that rolling\'s row', async ({ page }) => {
   await page.goto('/hsm/visualization');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
@@ -38,23 +38,25 @@ test('HSM: six cards per row; the Rolling switch adds the Online, Offline or bot
 
   // Both: Online + Offline added; rolling % from the Online entries, cold power from the Offline ones. Twelve cards.
   await expect(labels).toHaveText([...FIVE, /^Cast qty/, /^Delivery/, /^Prime qty/, /^Rolling w\.r\.t\. casting/, /^Rolling w\.r\.t\. delivery/, /^Cold power/, /^Cold power per tonne/]);
-  for (const [name, v] of [['Cast qty', '3,253.9'], ['Delivery', '3,123.1'], ['Prime qty', '2,884.2'], ['Rolling w.r.t. casting', '92.3'], ['Rolling w.r.t. delivery', '96.2'], ['Cold power', '10,097'], ['Cold power per tonne', '668.7']]) {
+  for (const [name, v] of [['Cast qty', '3,253.86'], ['Delivery', '3,123.06'], ['Prime qty', '2,884.18'], ['Rolling w.r.t. casting', '92.3'], ['Rolling w.r.t. delivery', '96.2'], ['Cold power', '10,097'], ['Cold power per tonne', '668.68']]) {
     await expect(value(name)).toContainText(v);
   }
   await strip.screenshot({ path: `${SHOTS}/hsm-rolling-both.png` });
 
-  // Online: its own production, cast, delivery, prime and the two rolling percentages; no cold power.
+  // Online: its own row alone — production, cast, delivery, prime and the two rolling percentages (the user, 24 Nov 2026).
   await choose('Online');
-  await expect(labels).toHaveText([...FIVE, /^Production/, /^Cast qty/, /^Delivery/, /^Prime qty/, /^Rolling w\.r\.t\. casting/, /^Rolling w\.r\.t\. delivery/]);
-  await expect(strip.locator('.rm-card-value').nth(5)).toContainText('2,870.3');
+  await expect(labels).toHaveText([/^Production/, /^Cast qty/, /^Delivery/, /^Prime qty/, /^Rolling w\.r\.t\. casting/, /^Rolling w\.r\.t\. delivery/]);
+  await expect(strip.locator('.rm-card-value').nth(0)).toContainText('2,870.29');
   await expect(value('Cast qty')).toContainText('3,237.6');
   await expect(value('Rolling w.r.t. casting')).toContainText('92.3');
   await strip.screenshot({ path: `${SHOTS}/hsm-rolling-online.png` });
 
-  // Offline: its own quantities and cold power; no rolling percentages (Offline's are never counted).
+  // Offline: its own row alone — quantities and cold power; no rolling percentages (Offline's are never counted).
   await choose('Offline');
-  await expect(labels).toHaveText([...FIVE, /^Production/, /^Cast qty/, /^Delivery/, /^Prime qty/, /^Cold power/, /^Cold power per tonne/]);
-  await expect(strip.locator('.rm-card-value').nth(5)).toContainText('15.1');
+  await expect(labels).toHaveText([/^Production/, /^Cast qty/, /^Delivery/, /^Prime qty/, /^Cold power/, /^Cold power per tonne/]);
+  await expect(strip.locator('.rm-card-value').nth(0)).toContainText('15.1');
+  // The panels below stay as they are.
+  await expect(page.locator('section.panel', { hasText: 'Production vs plan' })).toBeVisible();
   await expect(value('Cast qty')).toContainText('16.2');
   await expect(value('Cold power')).toContainText('10,097');
   await strip.screenshot({ path: `${SHOTS}/hsm-rolling-offline.png` });

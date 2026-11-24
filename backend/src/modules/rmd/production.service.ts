@@ -70,6 +70,7 @@ export function summarise(key: string, label: string, dates: string[], rows: Rmd
     billetInputMt,
     massDiffMt: massDifference(billetInputMt, productionMt),
     massYieldPct: massYield(productionMt, billetInputMt),
+    primeYieldPct: massYield(sumOf(mine, 'FINISH_PRODUCT_PRIME_MT'), billetInputMt),
     rollingInCastingPct: weightedPct(mine, 'ROLLING_IN_TOTAL_PERCENTAGE'),
     rollingInDeliveryPct: weightedPct(mine, 'ROLLING_IN_DELIVERY_PRCNT'),
     plantEfficiencyPct: efficiencyPct(mine),

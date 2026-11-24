@@ -27,6 +27,7 @@ import { Sprite } from './twinArt';
 import { Lamp, Readout, RefBar, Run, SelectRing, TwinDefs, flowOf, nozzle, spriteBox, spriteMetres, type Box, type RunState } from './twinDraw';
 import { BILLETS, CURRENT, RPM } from './twinSignals';
 import './twin.css';
+import { fixed } from '@/lib/num';
 
 /* ------------------------------- geometry -------------------------------- */
 
@@ -293,7 +294,7 @@ export default function ProcessTwin({ model, onOpen, selected, onSelect }: {
           const readY = b.y + b.h + LANE.reading - 4;
           const mt = model.exit.mt;
           return (
-            <g className={cls(EXIT)} {...pick(EXIT, () => onOpen({ kind: 'exit' }), `Finished exit, ${mt === null ? 'NA' : `${mt.toFixed(1)} tonnes`} for the period`)}>
+            <g className={cls(EXIT)} {...pick(EXIT, () => onOpen({ kind: 'exit' }), `Finished exit, ${mt === null ? 'NA' : `${fixed(mt)} tonnes`} for the period`)}>
               <Sprite name={END[model.mill]} b={b} />
               <text className="mx-name" x={b.cx} y={b.y - 5} textAnchor="middle">Finished exit</text>
               <Readout cx={b.cx} y={readY} signal={{ value: mt, ts: mt === null ? null : model.now, quality: mt === null ? 'missing' : 'good' }} spec={{ staleAfterMs: Infinity }} now={model.now} unit="MT" dp={1} accumulated />

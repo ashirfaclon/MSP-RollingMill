@@ -4,6 +4,7 @@
  * different facts and each is drawn differently; `null` never becomes 0.
  */
 import type { SignalSpec } from './twinSignals';
+import { decimals } from '@/lib/num';
 
 export type Quality = 'good' | 'stale' | 'suspect' | 'missing';
 
@@ -52,7 +53,7 @@ export function ageOf(ts: number | null, now: number): string {
  * "≈0"; stale in grey with its age; suspect with "?"; missing "NA".
  */
 export function readingText(s: Signal, spec: SignalSpec, now: number, dp = 0): { text: string; suffix: string; quality: Quality } {
-  const fmt = (v: number) => v.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  const fmt = (v: number) => v.toLocaleString('en-IN', decimals(dp));
   if (s.quality === 'missing' || s.value === null) return { text: 'NA', suffix: '', quality: 'missing' };
   if (s.quality === 'suspect') return { text: `${fmt(s.value)} ?`, suffix: '', quality: 'suspect' };
   const v = spec.zeroBand !== undefined && Math.abs(s.value) <= spec.zeroBand ? '≈0' : fmt(s.value);

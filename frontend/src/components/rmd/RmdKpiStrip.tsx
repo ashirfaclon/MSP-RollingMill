@@ -81,17 +81,27 @@ export default function RmdKpiStrip() {
         openLabel="Production per day, prime + SL and prime, from the ERP log sheet"
       />
       <RmdProductionDrawer view="production" open={prodOpen} onClose={() => setProdOpen(false)} />
+      {/* Two yields in one card, so the strip keeps its two rows of six: Prime + SL (mass yield) and
+          Prime alone (the user, 24 Nov 2026), each ÷ billet input. */}
       <KpiCard
         label="Mass yield"
         value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
+        pair={t ? [
+          { source: 'Prime + SL', value: t.massYieldPct == null ? 'NA' : fixed(t.massYieldPct) },
+          { source: 'Prime', value: t.primeYieldPct == null ? 'NA' : fixed(t.primeYieldPct) },
+        ] : undefined}
         noEntries={up && t?.massYieldPct == null}
-        lastEntry={lastOf(t?.massYieldPct, (lt) => lt.massYieldPct)}
+        lastEntry={(() => {
+          const l = lastOf(t?.massYieldPct, (lt) => lt.massYieldPct);
+          const lp = last.data?.totals.primeYieldPct;
+          return l ? { ...l, pair: [{ source: 'Prime + SL', value: l.value }, { source: 'Prime', value: lp == null ? 'NA' : fixed(lp) }] } : null;
+        })()}
         unit="%"
         note={note}
         series="order"
         loading={!data && !error}
         onOpen={() => setYieldOpen(true)}
-        openLabel="Mass yield per day, from the ERP log sheet"
+        openLabel="Mass yield per day, prime + SL and prime, from the ERP log sheet"
       />
       <RmdProductionDrawer view="yield" open={yieldOpen} onClose={() => setYieldOpen(false)} />
       {/* Row 1 ends with the Zoho TMT KPIs (the plant, 21 Nov 2026); one drawer for the three. */}

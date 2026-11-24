@@ -47,15 +47,15 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   await expect(yieldCard.locator('.rm-card-note')).toHaveText(/^(ERP · No entries recorded yet|.*)$/);
 
   await pickWeek(page);
-  // Before rejection, both sides. ERP: PRODUCTION_MT 1,076.51 ÷ INPUT_MT 1,121.34 = 96.00 %.
-  await expect(yieldCard.locator('.rm-card-pair-item').nth(0)).toContainText('96.0');
-  // Influx: net output 1,095.45 (counter 1,140.28 − by-products 44.83) ÷ input 1,137.57 = 96.30 %.
+  // Before rejection, both sides. ERP: PRODUCTION_MT 1,076.51 ÷ INPUT_MT 1,121.34 = 96 %.
+  await expect(yieldCard.locator('.rm-card-pair-item').nth(0)).toContainText('96');
+  // Influx: net output 1,095.45 (counter 1,140.28 − by-products 44.83) ÷ input 1,137.57 = 96.3 %.
   await expect(yieldCard.locator('.rm-card-pair-item').nth(1)).toContainText('96.3');
-  // ERP entered and losses booked for all 7 days: the note is Influx − ERP, 96.30 − 96.00.
+  // ERP entered and losses booked for all 7 days: the note is Influx − ERP, 96.3 − 96.
   await expect(yieldCard.locator('.rm-card-note')).toHaveText('Delta 0.3 %');
   // Finished exit = the Production card's Influx figure: Σ Total_Production_Ton increases, 22–28 Sep.
   const exit = page.locator('.mx-node', { hasText: 'Finished exit' }).locator('.mx-read');
-  await expect(exit).toContainText('1,140.3');
+  await expect(exit).toContainText('1,140.28');
   // Order allocation: ERP production only (the user, 30 Oct 2026) — 22–28 Sep 1,076.5 MT — with the days it covers.
   const split = page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-block').first();
   await expect(split.locator('.rm-alloc-total')).toHaveText('1,076.5 MT');
@@ -67,21 +67,21 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   // One click target for the whole balance; the figures inside are plain text.
   const mb = panel.getByRole('button', { name: 'Material balance, per day' });
   await expect(panel.getByRole('button')).toHaveCount(1);
-  await expect(mb).toContainText('Billet input1,121.3 MT');
-  await expect(mb).toContainText('Yield96.0%');
-  await expect(mb).toContainText('Finished 1,076.5 MT');
-  await expect(mb).toContainText('Mass difference 44.8 MT · 4.0% of input');
+  await expect(mb).toContainText('Billet input1,121.34 MT');
+  await expect(mb).toContainText('Yield96%');
+  await expect(mb).toContainText('Finished 1,076.51 MT');
+  await expect(mb).toContainText('Mass difference 44.83 MT · 4% of input');
   await expect(mb).toContainText('1,496 in · 1,481 coils out');
   const losses = panel.locator('.rm-mb-legend');
-  for (const [k, v] of [['Burning loss', '14.8 MT 1.3%'], ['End cut', '19.1 MT 1.7%'], ['Miss-roll', '10.9 MT 1.0%']]) {
+  for (const [k, v] of [['Burning loss', '14.84 MT 1.32%'], ['End cut', '19.07 MT 1.7%'], ['Miss-roll', '10.92 MT 0.97%']]) {
     await expect(losses.locator('.rm-mb-link', { hasText: new RegExp(`^${k}`) })).toContainText(v);
   }
   // Reject is 0 for the period, so it isn't listed at all.
   await expect(losses.locator('.rm-mb-link')).toHaveCount(3);
   await expect(losses).not.toContainText('Reject');
   await expect(panel.locator('.chip')).toHaveCount(0);   // no "Balances" chip
-  // The bars are the balance drawn to scale: finished is 96.0 % of the input bar, and the
-  // loss bar is the 4.0 % difference opened out — 14.8 + 19.1 + 10.9 = 44.8, so it fills.
+  // The bars are the balance drawn to scale: finished is 96 % of the input bar, and the
+  // loss bar is the 4 % difference opened out — 14.84 + 19.07 + 10.92 = 44.83, so it fills.
   const widths = (sel: string) => panel.locator(sel).evaluateAll((els) => {
     const track = els[0].parentElement!.getBoundingClientRect().width;
     return els.map((e) => Math.round((e.getBoundingClientRect().width / track) * 1000) / 10);
@@ -93,7 +93,7 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   expect(loss.length).toBe(3);                                       // reject 0 → no segment; nothing unaccounted
   expect(loss.reduce((a, b) => a + b, 0)).toBeGreaterThan(98);
   expect(Math.max(...loss)).toBe(loss[1]);                           // end cut is the biggest loss this week
-  await expect(panel.getByRole('img', { name: /^Billet input 1,121\.3 MT: finished 1,076\.5 MT \(96\.0% yield\)/ })).toBeVisible();
+  await expect(panel.getByRole('img', { name: /^Billet input 1,121\.34 MT: finished 1,076\.51 MT \(96% yield\)/ })).toBeVisible();
   await page.locator('.rm-strip').screenshot({ path: `${SHOTS}/wired-kpi-strip.png` });
   await panel.screenshot({ path: `${SHOTS}/wired-material-balance.png` });
 });

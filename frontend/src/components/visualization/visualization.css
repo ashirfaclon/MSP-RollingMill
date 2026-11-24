@@ -45,9 +45,6 @@
 /* Narrow cards: a card's date on its own line under the label, as RMD's. */
 .rm-strip--six .rm-card-term { display: block; margin-top: 2px; }
 .rm-strip--six .rm-card-term::before { content: none; }
-/* Eleven cards in a grid of six: the first takes two columns, so both rows are full. */
-.rm-strip--lead-wide > :first-child { grid-column: span 2; }
-@media (max-width: 760px) { .rm-strip--lead-wide > :first-child { grid-column: auto; } }
 
 /*
  * Each card spans four rows of the strip and adopts them as a subgrid, so label, value,

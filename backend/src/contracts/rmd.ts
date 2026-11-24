@@ -179,6 +179,8 @@ export interface RmdProductionPeriod {
   massDiffMt: number | null;
   /** productionMt ÷ billetInputMt × 100; null without both. */
   massYieldPct: number | null;
+  /** Prime yield: primeMt (FINISH_PRODUCT_PRIME_MT) ÷ billetInputMt × 100; null without both (the user, 24 Nov 2026). */
+  primeYieldPct: number | null;
   /**
    * The Zoho TMT KPIs, from the ERP log sheet (the plant, 21 Nov 2026). Rolling in Casting % =
    * ROLLING_IN_TOTAL_PERCENTAGE, Rolling in Delivery % = ROLLING_IN_DELIVERY_PRCNT — each entry's

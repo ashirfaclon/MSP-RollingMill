@@ -255,3 +255,25 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   Note reworded in plain words (the user didn't follow "Target is for the days with production entered"):
   "23 Nov not entered in ERP yet — compared up to 22 Nov" (several: "21 Nov – 23 Nov …"; gaps in the middle:
   "N days not entered in ERP yet — compared over the days entered"). No "no plan" note while loading.
+- **24 Nov 2026** — HSM Visualization, Rolling switch: **Online or Offline shows only that rolling's row of six**
+  (Online: Production, Cast qty, Delivery, Prime qty, Rolling w.r.t. casting / delivery; Offline: Production, Cast
+  qty, Delivery, Prime qty, Cold power, Cold power per tonne). The five headline cards (Production, Mass yield,
+  Power, Specific energy, Finished stock) show only under Both. Panels below unchanged (the user). `KpiStrip.tsx`;
+  the double-width first card (`.rm-strip--lead-wide`) is gone. hsm-rolling.e2e.spec.ts updated, passes.
+  Committed 24 Nov.
+- **24 Nov 2026** — **Numbers: up to 2 decimals everywhere, only as many as needed** (the user): 8,511.43, 92.3, 100,
+  Plan 9,638.64 MT — nothing rounded to a whole number any more (plan chip, target, kWh included, the user).
+  One rule in `lib/num.ts` (`decimals()`, `num()`, `fixed()`; `dp` above 2 still allowed — chemistry 0.075) and
+  DrillChart `fmtNum`; the hand-rolled formatters (production card, sparkline, twin readings, CA costing, tank
+  litres, HSM rolling cards) use it. Backend already rounds to 2 or finer. Old browser tests that expected the
+  1-decimal text: some numbers updated in hsm-rolling / production / rolling-mill / wiring specs, not re-run.
+  **All 58 failing browser tests are recorded in `frontend/src/tests/KNOWN_FAILURES.md`** (reason, expected vs
+  shown) instead of being fixed now (the user). When something breaks: a failure not on that list is new.
+  Fix a screen's listed tests when that screen is next worked on, and delete their rows.
+- **24 Nov 2026** — RMD 22 Nov Online / Offline checked against the ERP: L4P26N22-0002 RO001 Online 316.85,
+  -0001 RO002 Offline 140.39 — the dashboard matches the ERP; nothing swapped here (the user's other source
+  may differ; the entries were last edited in the ERP on 23 Nov). User said ignore.
+- **24 Nov 2026** — **RMD prime yield** (the user): FINISH_PRODUCT_PRIME_MT ÷ INPUT_MT × 100 (`primeYieldPct`,
+  rmd/production.service.ts), follows the Rolling switch. Shown in the Mass yield card as a pair, Prime + SL |
+  Prime, so the strip keeps two rows of six; the yield drill-down ("Yield · ERP log sheet") has both, per day.
+  22 Nov: 451.08 ÷ 472.69 = 95.43 %. Committed 24 Nov.

@@ -295,7 +295,7 @@ export default function RmdAssetHealth() {
                   id: r.tank, label: r.label, values: { l: r.lengthM, w: r.widthM, d: r.depthM },
                   defaults: { l: r.defaults.lengthM, w: r.defaults.widthM, d: r.defaults.depthM },
                   edited: r.edited, editedAt: r.editedAt, editedBy: r.editedBy,
-                  derived: (v) => (Number.isFinite(v.l * v.w * v.d) ? Math.round(v.l * v.w * v.d * 1000).toLocaleString('en-IN') : '—'),
+                  derived: (v) => (Number.isFinite(v.l * v.w * v.d) ? fixed(v.l * v.w * v.d * 1000) : '—'),
                 }))}
                 saveUrl={RMD_TANKS_URL}
                 toBody={(changed) => ({ rows: changed.map((c) => ({ tank: c.id, lengthM: c.values.l, widthM: c.values.w, depthM: c.values.d })) })}

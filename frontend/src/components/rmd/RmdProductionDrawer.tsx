@@ -57,7 +57,7 @@ export default function RmdProductionDrawer({ open, onClose, view }: { open: boo
 
 const TITLE: Record<RmdProductionView, string> = {
   production: 'Production · ERP log sheet',
-  yield: 'Mass yield · ERP log sheet',
+  yield: 'Yield · ERP log sheet',
   balance: 'Material balance · ERP log sheet',
   performance: 'Rolling in casting, delivery and plant efficiency · ERP log sheet',
 };
@@ -109,29 +109,32 @@ function YieldContent({ data }: { data: RmdProductionReport }) {
   const t = data.totals;
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const series = useMemo<DrillSeries[]>(() => [
-    { id: 'yield', name: 'Mass yield', token: '--s-order', type: 'line', data: rows.map((x) => x.massYieldPct), dp: 2 },
+    { id: 'yield', name: 'Mass yield (Prime + SL)', token: '--s-order', type: 'line', data: rows.map((x) => x.massYieldPct), dp: 2 },
+    { id: 'prime', name: 'Prime yield', token: '--s-alt', type: 'line', data: rows.map((x) => x.primeYieldPct), dp: 2 },
   ], [rows]);
   const axes = useMemo(() => [{ title: '%', unit: '%' }], []);
 
   return (
     <>
       <Stats items={[
-        { label: 'Mass yield', value: f(t.massYieldPct), unit: '%' },
+        { label: 'Mass yield (Prime + SL)', value: f(t.massYieldPct), unit: '%' },
+        { label: 'Prime yield', value: f(t.primeYieldPct), unit: '%' },
         { label: 'Billet input', value: f(t.billetInputMt), unit: 'MT' },
         { label: 'Prime + SL', value: f(t.productionMt), unit: 'MT' },
+        { label: 'Prime', value: f(t.primeMt), unit: 'MT' },
       ]} />
       <DrillChart series={series} categories={categories} axes={axes}
-        ariaLabel={`Mass yield by period: ${rows.map((x) => `${x.label} ${f(x.massYieldPct)}%`).join('; ')}`} />
+        ariaLabel={`Yield by period: ${rows.map((x) => `${x.label} prime + SL ${f(x.massYieldPct)}%, prime ${f(x.primeYieldPct)}%`).join('; ')}`} />
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Mass yield by period">
-          <thead><tr><th>Period</th><th className="r">Billet input (MT)</th><th className="r">Prime + SL (MT)</th><th className="r">Mass yield (%)</th></tr></thead>
+          <thead><tr><th>Period</th><th className="r">Billet input (MT)</th><th className="r">Prime + SL (MT)</th><th className="r">Mass yield (%)</th><th className="r">Prime (MT)</th><th className="r">Prime yield (%)</th></tr></thead>
           <tbody>{rows.map((x) => <YieldRow key={x.key} x={x} />)}</tbody>
           <tfoot><YieldRow x={t} /></tfoot>
         </table>
       </div>
       <SourceBox
-        sources={sources(['INPUT_MT', 'PRODUCT_PRIME_SLENGTH_MT'])}
-        formula={['Mass yield = PRODUCT_PRIME_SLENGTH_MT ÷ INPUT_MT × 100']}
+        sources={sources(['INPUT_MT', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT'])}
+        formula={['Mass yield = PRODUCT_PRIME_SLENGTH_MT ÷ INPUT_MT × 100', 'Prime yield = FINISH_PRODUCT_PRIME_MT ÷ INPUT_MT × 100']}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
     </>
@@ -145,6 +148,8 @@ function YieldRow({ x }: { x: RmdProductionPeriod }) {
       <td className="num r">{f(x.billetInputMt)}</td>
       <td className="num r">{f(x.productionMt)}</td>
       <td className="num r v-val"><b>{f(x.massYieldPct)}</b></td>
+      <td className="num r">{f(x.primeMt)}</td>
+      <td className="num r v-val"><b>{f(x.primeYieldPct)}</b></td>
     </tr>
   );
 }

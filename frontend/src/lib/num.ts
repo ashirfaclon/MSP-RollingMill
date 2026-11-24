@@ -1,21 +1,20 @@
 /**
- * Fixed-decimal number formatting for the rolling-mill screens (ported from pellet-frontend).
- *
- * A locale formatter that drops the decimal on a whole number, which is right for a production
- * tonnage but wrong on an instrument panel: 48.0 TPH printed as "48" beside 43.1 TPH, and
- * a +1.0 % auxiliary overshoot as "+1", read as coarser measurements rather than as the
- * same measurement to the same precision. Here the decimal places are the caller's choice
- * and are always honoured.
+ * Number formatting for the rolling-mill screens. One rule everywhere (the user, 24 Nov 2026): up to
+ * 2 decimal places, and only the ones a value needs — 8,511.43, 92.3, 100, 9,638.64 — never a
+ * trailing zero, never a figure rounded to a whole number. `dp` above 2 keeps that many at most
+ * (chemistry: 0.075). `dp` is kept for callers; at 2 or less it no longer changes anything.
  */
+export const decimals = (dp = 2): Intl.NumberFormatOptions => ({ minimumFractionDigits: 0, maximumFractionDigits: Math.max(2, dp) });
 
-export function fixed(v: number | null | undefined, dp = 1): string {
-  return v === null || v === undefined
-    ? 'NA'
-    : v.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+/** A number as the dashboard writes it (see above), en-IN grouping. */
+export const num = (v: number, dp = 2) => v.toLocaleString('en-IN', decimals(dp));
+
+export function fixed(v: number | null | undefined, dp = 2): string {
+  return v === null || v === undefined ? 'NA' : num(v, dp);
 }
 
 /** Same, with an explicit + on positives — for gaps, deviations and variances. */
-export function fixedSigned(v: number | null | undefined, dp = 1): string {
+export function fixedSigned(v: number | null | undefined, dp = 2): string {
   return v === null || v === undefined ? 'NA' : `${v > 0 ? '+' : ''}${fixed(v, dp)}`;
 }
 

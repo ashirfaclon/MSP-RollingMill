@@ -45,8 +45,8 @@ test('root redirects to HSM Visualization and shows every KPI from the comp', as
   }
   // Production vs plan: the whole day only, no shift breakdown (the user, 24 Nov 2026).
   const shifts = page.locator('section.panel', { hasText: 'Production vs plan' });
-  await expect(shifts.locator('.rm-shift-val')).toHaveText([/^(NA|\d[\d,]*\.\d MT)/]);
-  await expect(shifts.getByRole('button', { name: /Running rate/ })).toContainText(/\d+\.\d{2} TPH|NA/);
+  await expect(shifts.locator('.rm-shift-val')).toHaveText([/^(NA|\d[\d,]*(\.\d{1,2})? MT)/]);
+  await expect(shifts.getByRole('button', { name: /Running rate/ })).toContainText(/\d+(\.\d{1,2})? TPH|NA/);
   // No Order allocation panel (the user, 31 Oct 2026), so no Made To Order / Made To Stock anywhere.
   await expect(main.getByText('Made To')).toHaveCount(0);
   // Live panels: the mimic has infeed, the two stand groups that exist, and the exit.
@@ -87,7 +87,7 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; the h
   for (const i of [3]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
   await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^(NA|\d[\d,]*)%$/);
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^(NA|\d[\d,]*\.\d)h$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^(NA|\d[\d,]*(\.\d{1,2})?)h$/);
   for (const t of ['Condition trends', 'Remarks']) {
     await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
   }
@@ -108,7 +108,7 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; the h
   await groups.getByRole('button', { name: 'Auxiliary' }).click();
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Auxiliary · pumps');
   await expect(main.locator('.ah-status')).toHaveCount(0);   // the pumps have no PLC signal: no status
-  await expect(cards.getByRole('button', { name: 'Vibration RMS', exact: true }).locator('.rm-card-value')).toHaveText(/^\d+\.\d\s*mm\/s$/, { timeout: 60_000 });
+  await expect(cards.getByRole('button', { name: 'Vibration RMS', exact: true }).locator('.rm-card-value')).toHaveText(/^\d+(\.\d{1,2})?\s*mm\/s$/, { timeout: 60_000 });
   await page.screenshot({ path: `${SHOTS}/hsm-asset-health.png`, fullPage: true });
   // Switching mill keeps the screen: every mill has Asset Health.
   const trigger = page.getByRole('button', { name: /^Rolling mill:/ });
@@ -300,7 +300,7 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   const shifts = page.locator('section.panel', { hasText: 'Production vs plan' });
   await expect(shifts.getByRole('group', { name: 'Shift view' })).toHaveCount(0);
   await expect(shifts.locator('.panel-sub')).toHaveText('09:00 IST → 09:00 IST');
-  await expect(shifts.locator('.rm-shift-val')).toHaveText([/^(NA|[\d,]+\.\d MT)/]);
+  await expect(shifts.locator('.rm-shift-val')).toHaveText([/^(NA|[\d,]+(\.\d{1,2})? MT)/]);
   await expect(shifts.locator('.chip')).toHaveText(/^Plan \d/);
   await expect(shifts.locator('.rm-foot')).toContainText(/Running rate\s*NA/);
   // Order allocation: production from the ERP log sheet, finished stock from the item ledger; no MTO / MTS split.

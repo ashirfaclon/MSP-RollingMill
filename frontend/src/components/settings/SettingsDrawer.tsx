@@ -29,6 +29,7 @@ import '@/components/plan/plan.css';
 import '@/components/checklist/checklist.css';
 import '@/components/asset/asset.css';
 import './settings.css';
+import { fixed } from '@/lib/num';
 
 const GROUPS: LimitSetting['group'][] = ['Temperatures', 'Oil', 'Motors', 'Vibration', 'Chemistry', 'Daily production'];
 const NAME_KEY = 'rm-settings-name';
@@ -254,7 +255,7 @@ function RmdTanks() {
           id: r.tank, label: r.label, values: { l: r.lengthM, w: r.widthM, d: r.depthM },
           defaults: { l: r.defaults.lengthM, w: r.defaults.widthM, d: r.defaults.depthM },
           edited: r.edited, editedAt: r.editedAt, editedBy: r.editedBy,
-          derived: (v) => (Number.isFinite(v.l * v.w * v.d) ? Math.round(v.l * v.w * v.d * 1000).toLocaleString('en-IN') : '—'),
+          derived: (v) => (Number.isFinite(v.l * v.w * v.d) ? fixed(v.l * v.w * v.d * 1000) : '—'),
         }))}
         saveUrl={RMD_TANKS_URL}
         toBody={(changed) => ({ rows: changed.map((c) => ({ tank: c.id, lengthM: c.values.l, widthM: c.values.w, depthM: c.values.d })) })}

@@ -10,7 +10,7 @@
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import SourceBox from '@/components/drill/SourceBox';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
-import { fixed } from '@/lib/num';
+import { fixed, decimals } from '@/lib/num';
 import { rangeUrl, useApi, type CaReport, type FormRunningRateReport } from '@/services/hsmApi';
 import { addDays, dm, useSelection } from '@/services/hsmProduction';
 import { useLastEntry } from '@/services/lastEntry';
@@ -55,7 +55,7 @@ export function useCa(mill: CaMillId): CaView {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthLabel = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
 export const inr = (v: number, dp = 0) =>
-  `${v < 0 ? '−' : ''}₹${Math.abs(v).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
+  `${v < 0 ? '−' : ''}₹${Math.abs(v).toLocaleString('en-IN', decimals(dp))}`;
 const signed = (v: number, dp = 0) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fixed(Math.abs(v), dp)}`;
 
 /** Why a card is empty: a month without inputs, else nothing recorded at the source. */

@@ -1,12 +1,13 @@
 'use client';
 
 /**
- * HSM: the plant's management KPIs from the ERP log sheet (HSM.xlsx, the user, 23 Nov 2026), after the
- * five headline cards, for the Rolling chosen in the top bar:
- *   Both     cast, delivery, prime (Online + Offline added), rolling w.r.t. casting / delivery (Online),
- *            cold power and cold power per tonne (Offline) — with the headline five, two rows of six;
- *   Online   the Online production, cast, delivery, prime and the two rolling percentages;
- *   Offline  the Offline production, cast, delivery, prime and the two cold power figures.
+ * HSM: the plant's management KPIs from the ERP log sheet (HSM.xlsx, the user, 23 Nov 2026), for the
+ * Rolling chosen in the top bar:
+ *   Both     after the five headline cards: cast, delivery, prime (Online + Offline added), rolling w.r.t.
+ *            casting / delivery (Online), cold power and cold power per tonne (Offline) — two rows of six;
+ *   Online   alone, one row: the Online production, cast, delivery, prime and the two rolling percentages;
+ *   Offline  alone, one row: the Offline production, cast, delivery, prime and the two cold power figures
+ *            (the headline five are hidden under either — the user, 24 Nov 2026).
  * The rolling percentages are always the Online entries' (Offline's are filled 100 % just to fill them)
  * and cold power always the Offline entries' — so neither shows under the other rolling.
  */
@@ -56,7 +57,7 @@ export default function HsmRollingCards() {
   const [open, setOpen] = useState(false);
   const t: HsmRollingPeriod | null = data?.totals ?? null;
   const note = s.error ? 'ERP data unavailable' : data?.erp.connection === 'down' ? data.erp.message : '';
-  const num = (n: number, dp: number) => (dp ? fixed(n, dp) : Math.round(n).toLocaleString('en-IN'));
+  const num = (n: number, dp: number) => fixed(n, dp);
 
   return (
     <>

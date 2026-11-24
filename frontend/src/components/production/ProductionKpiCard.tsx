@@ -12,11 +12,12 @@ import { useState, type ReactNode } from 'react';
 import { useLastEntry } from '@/services/lastEntry';
 import type { ProductionComparison } from '@/services/hsmProduction';
 import KpiCard, { NO_ENTRIES } from '@/components/visualization/KpiCard';
+import { fixed } from '@/lib/num';
 import { productionTermText } from './productionTerm';
 import ProductionDrawer from './ProductionDrawer';
 import { dm, useProduction, useSelection } from '@/services/hsmProduction';
 
-const fmt1 = (v: number | null) => (v === null ? 'NA' : v.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+const fmt1 = (v: number | null) => fixed(v);
 
 export default function ProductionKpiCard() {
   const { dates } = useSelection();

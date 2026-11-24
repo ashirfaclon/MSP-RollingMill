@@ -7,6 +7,7 @@
  * a dot on the line and a tooltip with its time and value.
  */
 import { useRef, useState, type MouseEvent } from 'react';
+import { decimals } from '@/lib/num';
 
 const AT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
 
@@ -66,7 +67,7 @@ export default function Sparkline({ values, times, label, unit = '', dp = 2 }: S
           <span className="rm-spark-dot" style={{ left: `${leftPct}%`, top: `${(yOf(hv) / 24) * 100}%` }} aria-hidden />
           <span className={`rm-spark-tip${leftPct > 60 ? ' is-left' : ''}`} style={{ left: `${leftPct}%` }} role="tooltip">
             {times?.[hover] !== undefined && <span className="rm-spark-tip-at">{AT.format(new Date(times[hover]))} IST</span>}
-            <b>{hv.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp })}{unit ? ` ${unit}` : ''}</b>
+            <b>{hv.toLocaleString('en-IN', decimals(dp))}{unit ? ` ${unit}` : ''}</b>
           </span>
         </>
       )}
