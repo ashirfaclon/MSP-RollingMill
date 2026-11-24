@@ -182,6 +182,13 @@ export interface RmdProductionPeriod {
   /** Prime yield: primeMt (FINISH_PRODUCT_PRIME_MT) ÷ billetInputMt × 100; null without both (the user, 24 Nov 2026). */
   primeYieldPct: number | null;
   /**
+   * Coal, Offline entries only (the user, 24 Nov 2026): Σ TOTAL_COAL_CONSUMPTION, MT (an entry without it:
+   * COAL_CONSUMPTION_KGMT × Prime + SL ÷ 1000); null with no Offline coal in the period.
+   */
+  coalMt: number | null;
+  /** coalMt × 1000 ÷ Σ Prime + SL of those entries, kg/MT — one entry: the ERP's COAL_CONSUMPTION_KGMT. */
+  coalKgPerMt: number | null;
+  /**
    * The Zoho TMT KPIs, from the ERP log sheet (the plant, 21 Nov 2026). Rolling in Casting % =
    * ROLLING_IN_TOTAL_PERCENTAGE, Rolling in Delivery % = ROLLING_IN_DELIVERY_PRCNT — each entry's
    * figure, over a period the average weighted by billet input. Plant Efficiency % = Σ production ÷

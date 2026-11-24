@@ -94,8 +94,13 @@ export function readErpPm(env: Env): ErpPmCache | null {
  * the dashboard (the plant).
  */
 export const RMD_ROLLING_FIELDS = ['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DELIVERY_PRCNT', 'PLANT_EFFICIENCY', 'PRODUCTION_TARGET'] as const;
+/**
+ * Coal, Offline (RO002) entries only — Online ones hold 0 (the user, 24 Nov 2026). COAL_CONSUMPTION_KGMT =
+ * TOTAL_COAL_CONSUMPTION (MT) × 1000 ÷ PRODUCT_PRIME_SLENGTH_MT on every Offline entry checked (58, Sep–Nov 2026).
+ */
+export const RMD_COAL_FIELDS = ['COAL_CONSUMPTION_KGMT', 'TOTAL_COAL_CONSUMPTION'] as const;
 export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT', 'TOTAL_POWER_CONSUMPTION', 'MILL_SINGLE_STAND',
-  ...RMD_ROLLING_FIELDS] as const;
+  ...RMD_ROLLING_FIELDS, ...RMD_COAL_FIELDS] as const;
 export type RmdLogField = (typeof RMD_LOG_FIELDS)[number];
 /**
  * Online / Offline: the log sheet head's TRAN_COLUMN_NAME1, RO001 = Online, RO002 = Offline (Management

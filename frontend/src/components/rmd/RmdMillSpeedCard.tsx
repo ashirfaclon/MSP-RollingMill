@@ -4,6 +4,8 @@
  * RMD Mill MPS — as the plant gave it: CR Mill1/2 · General · MILL1_MPS and MILL2_MPS (m/s).
  * Two cards, Mill 1 and Mill 2 (the user, 30 Oct 2026): each its last reading of the period (now,
  * for today) with the period's trend as a sparkline under it; either opens both mills' speed.
+ * `combined`: one card, Mill 1 | Mill 2 side by side — under Offline, where Coal consumption takes the other
+ * slot so the strip keeps two rows of six (24 Nov 2026).
  */
 import { useMemo, useState } from 'react';
 import KpiCard from '@/components/visualization/KpiCard';
@@ -17,7 +19,7 @@ import { rangeUrl, useApi, type RmdMillSpeedReport } from '@/services/hsmApi';
 const AT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
 const mps = (v: number | null | undefined) => (v == null ? 'NA' : fixed(v, 2));
 
-export default function RmdMillSpeedCard() {
+export default function RmdMillSpeedCard({ combined = false }: { combined?: boolean }) {
   const { dates } = useSelection();
   const url = rangeUrl('/api/rmd/mill-speed', dates);
   const { data, dataUrl, error } = useApi<RmdMillSpeedReport>(url);
@@ -43,8 +45,25 @@ export default function RmdMillSpeedCard() {
   };
   return (
     <>
-      {card('mill1', 'Mill 1 MPS', 'prod')}
-      {card('mill2', 'Mill 2 MPS', 'order')}
+      {combined ? (
+        <KpiCard
+          label="Mill MPS"
+          value={mps(r?.latest.mill1)}
+          pair={r ? [{ source: 'Mill 1', value: mps(r.latest.mill1) }, { source: 'Mill 2', value: mps(r.latest.mill2) }] : undefined}
+          unit="m/s"
+          note={r?.historian.connection === 'down' ? r.historian.message : ''}
+          noEntries={!!r && r.historian.connection === 'up' && r.latest.mill1 == null && r.latest.mill2 == null ? 'No readings in this period' : false}
+          series="prod"
+          loading={!r && !error}
+          onOpen={() => setOpen(true)}
+          openLabel="Mill 1 and mill 2 speed over the period"
+        />
+      ) : (
+        <>
+          {card('mill1', 'Mill 1 MPS', 'prod')}
+          {card('mill2', 'Mill 2 MPS', 'order')}
+        </>
+      )}
       <DrillDrawer open={open} onClose={() => setOpen(false)} title="Mill MPS" sub="RMD · m/s"
         loading={!r && !error} error={error} hasData={!!r}>
         {r && <Content r={r} />}

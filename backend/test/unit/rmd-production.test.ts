@@ -6,7 +6,8 @@ import type { RmdLogRow } from '../../src/integrations/erp/cache';
 const entry = (date: string, vrno: string, input: number, prod: number, prime: number, bloss: number, endcut: number, misroll: number, chip: number): RmdLogRow => ({
   date, vrno, mode: vrno.endsWith('-0002') ? 'offline' : 'online',
   v: { INPUT_MT: input, ACTUAL_RUNNING_HRS: 5, PRODUCT_PRIME_SLENGTH_MT: prod, FINISH_PRODUCT_PRIME_MT: prime, BLOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, CHIP_OFF_MT: chip, TOTAL_POWER_CONSUMPTION: null, MILL_SINGLE_STAND: null,
-    ROLLING_IN_TOTAL_PERCENTAGE: null, ROLLING_IN_DELIVERY_PRCNT: null, PLANT_EFFICIENCY: null, PRODUCTION_TARGET: null },
+    ROLLING_IN_TOTAL_PERCENTAGE: null, ROLLING_IN_DELIVERY_PRCNT: null, PLANT_EFFICIENCY: null, PRODUCTION_TARGET: null,
+    COAL_CONSUMPTION_KGMT: null, TOTAL_COAL_CONSUMPTION: null },
 });
 // 7 Oct 2026 as the ERP holds it: two entries.
 const ROWS = [

@@ -277,3 +277,10 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   rmd/production.service.ts), follows the Rolling switch. Shown in the Mass yield card as a pair, Prime + SL |
   Prime, so the strip keeps two rows of six; the yield drill-down ("Yield · ERP log sheet") has both, per day.
   22 Nov: 451.08 ÷ 472.69 = 95.43 %. Committed 24 Nov.
+- **24 Nov 2026** — **RMD Coal consumption** (the user): kg per MT of Prime + SL, **Offline tab only** (hidden under
+  Both and Online). ERP: COAL_CONSUMPTION_KGMT and TOTAL_COAL_CONSUMPTION, filled on Offline (RO002) entries only
+  (0 on Online); KGMT = TOTAL × 1000 ÷ PRODUCT_PRIME_SLENGTH_MT on all 58 Offline entries checked (Sep–Nov).
+  Over several days: Σ coal ÷ Σ Prime + SL of the Offline entries (`coal()` in rmd/production.service.ts; an entry
+  without TOTAL uses KGMT × Prime + SL). 21–22 Nov: 18.5 + 13.2 MT ÷ 338.02 = 93.78 kg/MT. Card after Specific
+  energy, drill-down "Coal consumption · ERP log sheet". Under Offline the two Mill MPS cards share one (Mill 1 |
+  Mill 2) so the strip stays two rows of six. Test rmd-coal.test.ts (4). Committed 24 Nov.

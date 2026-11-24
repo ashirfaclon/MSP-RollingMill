@@ -19,7 +19,7 @@ import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdProductionPeriod, type RmdProductionReport } from '@/services/hsmApi';
 
-export type RmdProductionView = 'production' | 'yield' | 'balance' | 'performance';
+export type RmdProductionView = 'production' | 'yield' | 'balance' | 'performance' | 'coal';
 
 const f = (v: number | null) => (v === null ? '—' : fmtNum(v, 2));
 
@@ -50,7 +50,7 @@ export default function RmdProductionDrawer({ open, onClose, view }: { open: boo
       hasData={!!data}
     >
       {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} />
-        : view === 'performance' ? <PerformanceContent data={data} /> : <BalanceContent data={data} />)}
+        : view === 'performance' ? <PerformanceContent data={data} /> : view === 'coal' ? <CoalContent data={data} /> : <BalanceContent data={data} />)}
     </DrillDrawer>
   );
 }
@@ -60,6 +60,7 @@ const TITLE: Record<RmdProductionView, string> = {
   yield: 'Yield · ERP log sheet',
   balance: 'Material balance · ERP log sheet',
   performance: 'Rolling in casting, delivery and plant efficiency · ERP log sheet',
+  coal: 'Coal consumption · ERP log sheet',
 };
 
 const label = (x: RmdProductionPeriod) => (
@@ -138,6 +139,54 @@ function YieldContent({ data }: { data: RmdProductionReport }) {
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
     </>
+  );
+}
+
+/** Coal, Offline entries only (the user, 24 Nov 2026): MT and kg per MT of Prime + SL, per day. */
+function CoalContent({ data }: { data: RmdProductionReport }) {
+  const rows = data.rows;
+  const t = data.totals;
+  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
+  const series = useMemo<DrillSeries[]>(() => [
+    { id: 'coal', name: 'Coal (kg/MT)', token: '--s-alt', type: 'column', data: rows.map((x) => x.coalKgPerMt), dp: 2 },
+  ], [rows]);
+  const axes = useMemo(() => [{ title: 'kg/MT', unit: 'kg/MT' }], []);
+  return (
+    <>
+      <Stats items={[
+        { label: 'Coal consumption', value: f(t.coalKgPerMt), unit: 'kg/MT' },
+        { label: 'Coal', value: f(t.coalMt), unit: 'MT' },
+        { label: 'Prime + SL', value: f(t.productionMt), unit: 'MT' },
+      ]} />
+      <DrillChart series={series} categories={categories} axes={axes}
+        ariaLabel={`Coal consumption by period: ${rows.map((x) => `${x.label} ${f(x.coalKgPerMt)} kg/MT`).join('; ')}`} />
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label="Coal consumption by period">
+          <thead><tr><th>Period</th><th className="r">Coal (MT)</th><th className="r">Prime + SL (MT)</th><th className="r">Coal (kg/MT)</th></tr></thead>
+          <tbody>{rows.map((x) => <CoalRow key={x.key} x={x} />)}</tbody>
+          <tfoot><CoalRow x={t} /></tfoot>
+        </table>
+      </div>
+      <SourceBox
+        sources={sources(['TOTAL_COAL_CONSUMPTION', 'COAL_CONSUMPTION_KGMT', 'PRODUCT_PRIME_SLENGTH_MT'])}
+        formula={[
+          'Offline entries only (ATTR_TRAN_DATA_HEAD.TRAN_COLUMN_NAME1 = RO002)',
+          'Coal (kg/MT) = Σ TOTAL_COAL_CONSUMPTION × 1000 ÷ Σ PRODUCT_PRIME_SLENGTH_MT — one entry: the ERP\'s COAL_CONSUMPTION_KGMT',
+        ]}
+      />
+      {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
+    </>
+  );
+}
+
+function CoalRow({ x }: { x: RmdProductionPeriod }) {
+  return (
+    <tr>
+      {label(x)}
+      <td className="num r">{f(x.coalMt)}</td>
+      <td className="num r">{f(x.productionMt)}</td>
+      <td className="num r v-val"><b>{f(x.coalKgPerMt)}</b></td>
+    </tr>
   );
 }
 

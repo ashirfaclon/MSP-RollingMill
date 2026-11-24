@@ -16,6 +16,9 @@
  *   Specific energy     power ÷ ERP production (backend power report);
  *   Mill MPS            Influx CR Mill1/2 · General · MILL1_MPS / MILL2_MPS, m/s (RmdMillSpeedCard);
  *   Chemical composition  SMS → CCM Lolipop Sample, the RMD samples (RmdChemistryCard).
+ *   Coal consumption    Offline only (the user, 24 Nov 2026): the ERP log sheet's coal, kg per MT of Prime + SL
+ *                       (COAL_CONSUMPTION_KGMT; over several entries Σ TOTAL_COAL_CONSUMPTION ÷ Σ Prime + SL);
+ *                       under Offline the two Mill MPS cards share one, so the strip stays two rows of six.
  * A card with nothing behind it opens nothing.
  */
 import { useState } from 'react';
@@ -28,6 +31,7 @@ import FinishedStockCard from '@/components/production/FinishedStockCard';
 import { productionTermText } from '@/components/production/productionTerm';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
+import { useGlobalSel } from '@/state/globalSel';
 import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
 
 const mt1 = (v: number | null | undefined) => (v == null ? 'NA' : fixed(v, 1));
@@ -36,6 +40,8 @@ export default function RmdKpiStrip() {
   const [yieldOpen, setYieldOpen] = useState(false);
   const [prodOpen, setProdOpen] = useState(false);
   const [perfOpen, setPerfOpen] = useState(false);
+  const [coalOpen, setCoalOpen] = useState(false);
+  const offline = useGlobalSel().rmdMode === 'offline';
   const { dates } = useSelection();
   const { data, error, last } = useRmdProduction(dates);
   const t = data?.totals;
@@ -128,7 +134,25 @@ export default function RmdKpiStrip() {
       <RmdProductionDrawer view="performance" open={perfOpen} onClose={() => setPerfOpen(false)} />
       <PowerKpiCard mill="rmd" />
       <SpecificEnergyCard mill="rmd" />
-      <RmdMillSpeedCard />
+      {offline && (
+        <>
+          <KpiCard
+            label="Coal consumption"
+            term={term}
+            value={t?.coalKgPerMt == null ? 'NA' : fixed(t.coalKgPerMt)}
+            noEntries={up && t?.coalKgPerMt == null}
+            lastEntry={lastOf(t?.coalKgPerMt, (lt) => lt.coalKgPerMt, 2)}
+            unit="kg/MT"
+            note={note}
+            series="hold"
+            loading={!data && !error}
+            onOpen={() => setCoalOpen(true)}
+            openLabel="Coal consumption per day, from the ERP log sheet"
+          />
+          <RmdProductionDrawer view="coal" open={coalOpen} onClose={() => setCoalOpen(false)} />
+        </>
+      )}
+      <RmdMillSpeedCard combined={offline} />
       <RmdChemistryCard />
       {/* The ERP stock at the period's end, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
       <FinishedStockCard mill="rmd" />

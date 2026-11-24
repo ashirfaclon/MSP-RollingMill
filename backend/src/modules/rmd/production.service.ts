@@ -45,6 +45,24 @@ export function weightedPct(rows: RmdLogRow[], f: RmdLogField): number | null {
   return round2(v.reduce((a, r) => a + r.v[f]! * w(r), 0) / total);
 }
 
+/** Coal of one entry, MT: TOTAL_COAL_CONSUMPTION, else COAL_CONSUMPTION_KGMT × Prime + SL ÷ 1000; null with none. */
+const coalOf = (r: RmdLogRow): number | null => {
+  const total = r.v.TOTAL_COAL_CONSUMPTION;
+  if (typeof total === 'number' && total > 0) return total;
+  const perMt = r.v.COAL_CONSUMPTION_KGMT;
+  const prod = r.v.PRODUCT_PRIME_SLENGTH_MT;
+  return typeof perMt === 'number' && perMt > 0 && typeof prod === 'number' ? (perMt * prod) / 1000 : null;
+};
+
+/** Coal over the Offline entries that have it: Σ MT, and kg per MT of their Prime + SL. */
+export function coal(rows: RmdLogRow[]): { coalMt: number | null; coalKgPerMt: number | null } {
+  const burnt = rows.filter((r) => r.mode === 'offline' && coalOf(r) !== null);
+  if (!burnt.length) return { coalMt: null, coalKgPerMt: null };
+  const mt = burnt.reduce((a, r) => a + coalOf(r)!, 0);
+  const prod = burnt.reduce((a, r) => a + (r.v.PRODUCT_PRIME_SLENGTH_MT ?? 0), 0);
+  return { coalMt: round2(mt), coalKgPerMt: prod > 0 ? round2((mt * 1000) / prod) : null };
+}
+
 /** Σ production ÷ Σ target × 100 over the entries with both; null with none. */
 export function efficiencyPct(rows: RmdLogRow[]): number | null {
   const both = rows.filter((r) => r.v.PRODUCT_PRIME_SLENGTH_MT !== null && (r.v.PRODUCTION_TARGET ?? 0) > 0);
@@ -71,6 +89,7 @@ export function summarise(key: string, label: string, dates: string[], rows: Rmd
     massDiffMt: massDifference(billetInputMt, productionMt),
     massYieldPct: massYield(productionMt, billetInputMt),
     primeYieldPct: massYield(sumOf(mine, 'FINISH_PRODUCT_PRIME_MT'), billetInputMt),
+    ...coal(mine),
     rollingInCastingPct: weightedPct(mine, 'ROLLING_IN_TOTAL_PERCENTAGE'),
     rollingInDeliveryPct: weightedPct(mine, 'ROLLING_IN_DELIVERY_PRCNT'),
     plantEfficiencyPct: efficiencyPct(mine),
