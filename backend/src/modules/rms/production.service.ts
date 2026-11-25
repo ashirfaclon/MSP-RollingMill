@@ -36,6 +36,28 @@ export function distinctEntries(rows: RmsLogRow[]): RmsLogRow[] {
   });
 }
 
+/**
+ * The ERP's % of each entry, over several: weighted by the entry's billet input (equal weights where an entry has
+ * none) — as RMD's and LSM's rolling % (the user, 25 Nov 2026). One entry: exactly the ERP's figure.
+ */
+export function weightedRmsPct(rows: RmsLogRow[], k: 'rollingInDeliveryPct' | 'rollingInCastingPct'): number | null {
+  const v = rows.filter((r) => typeof r[k] === 'number');
+  if (!v.length) return null;
+  const w = (r: RmsLogRow) => (v.every((x) => (x.inputMt ?? 0) > 0) ? r.inputMt! : 1);
+  return round2(v.reduce((a, r) => a + r[k]! * w(r), 0) / v.reduce((a, r) => a + w(r), 0));
+}
+
+/**
+ * Prime yield (the user, 25 Nov 2026): Σ prime ÷ Σ billet input × 100, over the entries that have both — an entry
+ * without prime filled (11 of 422) would otherwise count its billets against no prime. To become (prime + repairable)
+ * ÷ billet input once the plant says where repairable is booked: it is in no ERP field, item or yard yet (25 Nov 2026).
+ */
+export function primeYield(rows: RmsLogRow[]): number | null {
+  const both = rows.filter((r) => typeof r.primeMt === 'number' && (r.inputMt ?? 0) > 0);
+  if (!both.length) return null;
+  return massYield(round2(both.reduce((a, r) => a + r.primeMt!, 0)), round2(both.reduce((a, r) => a + r.inputMt!, 0)));
+}
+
 export function summariseRms(key: string, label: string, dates: string[], rows: RmsLogRow[]): RmsProductionPeriod {
   const mine = rows.filter((r) => r.date >= dates[0] && r.date <= dates[dates.length - 1]);
   const v = mine.map((r) => r.productionMt).filter((x): x is number => x !== null);
@@ -43,7 +65,7 @@ export function summariseRms(key: string, label: string, dates: string[], rows: 
   const input = mine.map((r) => r.inputMt ?? null).filter((x): x is number => x !== null);
   const productionMt = v.length ? round2(v.reduce((a, b) => a + b, 0)) : null;
   const billetInputMt = input.length ? round2(input.reduce((a, b) => a + b, 0)) : null;
-  const lossOf = (k: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'rejectMt' | 'runningHrs') => {
+  const lossOf = (k: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'rejectMt' | 'runningHrs' | 'primeMt' | 'defectiveMt') => {
     const xs = mine.map((r) => r[k] ?? null).filter((x): x is number => x !== null);
     return xs.length ? round2(xs.reduce((a, b) => a + b, 0)) : null;
   };
@@ -54,10 +76,15 @@ export function summariseRms(key: string, label: string, dates: string[], rows: 
     entryDays: new Set(mine.map((r) => r.date)).size,
     entries: mine.length,
     productionMt,
+    primeMt: lossOf('primeMt'),
+    defectiveMt: lossOf('defectiveMt'),
+    rollingInDeliveryPct: weightedRmsPct(mine, 'rollingInDeliveryPct'),
+    rollingInCastingPct: weightedRmsPct(mine, 'rollingInCastingPct'),
     billetsPcs: pcs.length ? pcs.reduce((a, b) => a + b, 0) : null,
     billetInputMt,
     massDiffMt: massDifference(billetInputMt, productionMt),
     massYieldPct: massYield(productionMt, billetInputMt),
+    primeYieldPct: primeYield(mine),
     ...losses,
     lossesMt: lossVals.every((l) => l === null) ? null : round2(lossVals.reduce<number>((a, l) => a + (l ?? 0), 0)),
     runningHrs: lossOf('runningHrs'),

@@ -92,6 +92,16 @@ export interface RmsProductionPeriod {
   entries: number;
   /** Σ PRODUCTION_MT; null with no entry. */
   productionMt: number | null;
+  /** Prime only, MT (PRIME_MT1 + PRIME_MT2); productionMt is the actual production — prime + defective (the user, 25 Nov 2026). */
+  primeMt: number | null;
+  /** Defective, MT (defective cut + rolling defect, as the ERP books them); prime + defective = productionMt. */
+  defectiveMt: number | null;
+  /**
+   * On-line rolling % (the user, 25 Nov 2026; every RMS entry is Online, P11P): the ERP's ROLLING_PERCENTAGE_DELIVERY /
+   * ROLLING_PERCENATGE_CASTING, over a period weighted by billet input. Null with no entry.
+   */
+  rollingInDeliveryPct: number | null;
+  rollingInCastingPct: number | null;
   /** Σ INPUT_PCS — billets in, pieces; null with no entry. */
   billetsPcs: number | null;
   /** Σ (INPUT_MT1 + INPUT_MT2) — billet input, MT; null with none filled. */
@@ -100,6 +110,8 @@ export interface RmsProductionPeriod {
   massDiffMt: number | null;
   /** productionMt ÷ billetInputMt × 100. */
   massYieldPct: number | null;
+  /** Prime ÷ billet input × 100, over the entries with both (the user, 25 Nov 2026); null with none. */
+  primeYieldPct: number | null;
   /** The losses that make up the mass difference, MT (…_MT1 + …_MT2 where split). */
   burningLossMt: number | null;
   endCutMt: number | null;

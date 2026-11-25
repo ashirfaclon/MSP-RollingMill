@@ -824,8 +824,10 @@ test('RMS: production from the ERP log sheet (division RS, series L5P) — a day
   await dialog.getByLabel('End Date').fill('2026-10-12');
   await dialog.getByRole('button', { name: 'Apply' }).click();
   // Σ PRODUCTION_MT 1–12 Oct, 1 / 3 / 10 Oct once each = the finished goods the ERP received: 6,244.75 MT.
-  const card = page.getByRole('button', { name: 'Production', exact: true });
+  // The actual production (PRODUCTION_MT); its defective part under the figure, prime beside it (the user, 25 Nov 2026).
+  const card = page.getByRole('button', { name: 'Production · Actual', exact: true });
   await expect(card.locator('.rm-card-value')).toContainText('6,244.75');
+  await expect(card.locator('.rm-card-note')).toHaveText(/^Defective [\d,.]+ MT · [\d.]+ %$/);
   // Billets in: Σ INPUT_PCS (repeated entries once).
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
   await expect(balance.locator('.rm-mb-stat').first()).toContainText(/Billets in[\d,]+pcs/);
@@ -845,7 +847,7 @@ test('RMS: production from the ERP log sheet (division RS, series L5P) — a day
   const t = d.getByRole('table', { name: 'Production by period' });
   for (const v of ['627.37', '577.45', '92.04%', '49.92']) await expect(t.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
   await expect(t.getByRole('row', { name: /^4 Oct/ })).toContainText('568.45');
-  await expect(t.locator('thead th')).toHaveText(['Period', 'Billets in (pcs)', 'Billet input (MT)', 'Production (MT)', 'Mass yield', 'Mass difference (MT)']);
+  await expect(t.locator('thead th')).toHaveText(['Period', 'Billets in (pcs)', 'Billet input (MT)', 'Actual (MT)', 'Prime (MT)', 'Defective (MT)', 'Mass yield', 'Prime yield', 'Mass difference (MT)']);
   for (const v of ['6,648.09', '6,244.75', '93.93%', '403.34']) await expect(t.locator('tfoot')).toContainText(v);
   await expect(d.getByRole('region', { name: 'Formula' })).toContainText('Billet input = Σ (INPUT_MT1 + INPUT_MT2)');
   // The section(s) rolled, from the ERP's finished receipts (PROD_TRAN): 1 Oct — MB 300 only, all 577.45 MT of it.

@@ -312,8 +312,14 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
  * (the user, 16 Oct 2026; they add up to it on every October 2026 entry), and NET_RUNNING_HRS —
  * the ERP run hours (RMS asset health sheet: Run Hours ← ERP; the user, 26 Oct 2026). Its own failure.
  */
-/** RMS loss codes, each pulled as its own column. */
-const RMS_LOSS_CODES = ['BURNING_LOSS_MT1', 'BURNING_LOSS_MT2', 'ENDCUT_MT1', 'ENDCUT_MT2', 'MISROLL_MT1', 'MISROLL_MT2', 'COLD_MT', 'REJECT_MT1', 'REJECT_MT2'] as const;
+/**
+ * RMS codes pulled as their own columns: the losses, and prime (PRIME_MT1 / PRIME_MT2, one filled per entry — the user,
+ * 25 Nov 2026: PRODUCTION_MT is the actual production, prime + defective cut + rolling defect).
+ */
+const RMS_LOSS_CODES = ['BURNING_LOSS_MT1', 'BURNING_LOSS_MT2', 'ENDCUT_MT1', 'ENDCUT_MT2', 'MISROLL_MT1', 'MISROLL_MT2', 'COLD_MT', 'REJECT_MT1', 'REJECT_MT2', 'PRIME_MT1', 'PRIME_MT2',
+  'DEFECTIVE_CUTMT1', 'DEFECTIVE_CUTMT2', 'ROLLING_DEFECT_MT1', 'ROLLING_DEFECT_MT2',
+  // On-line rolling % (Management Dash All.xlsx, RMS, rows 43–44 — the user, 25 Nov 2026); the ERP spells casting PERCENATGE.
+  'ROLLING_PERCENTAGE_DELIVERY', 'ROLLING_PERCENATGE_CASTING'] as const;
 type RmsLossCode = (typeof RMS_LOSS_CODES)[number];
 
 /** Σ of the codes filled (to the gram); null when none is. */
@@ -357,6 +363,10 @@ async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
           missRollMt: sumOfCodes(r, ['MISROLL_MT1', 'MISROLL_MT2']),
           coldMt: sumOfCodes(r, ['COLD_MT']),
           rejectMt: sumOfCodes(r, ['REJECT_MT1', 'REJECT_MT2']),
+          primeMt: sumOfCodes(r, ['PRIME_MT1', 'PRIME_MT2']),
+          defectiveMt: sumOfCodes(r, ['DEFECTIVE_CUTMT1', 'DEFECTIVE_CUTMT2', 'ROLLING_DEFECT_MT1', 'ROLLING_DEFECT_MT2']),
+          rollingInDeliveryPct: num(r.ROLLING_PERCENTAGE_DELIVERY),
+          rollingInCastingPct: num(r.ROLLING_PERCENATGE_CASTING),
           runningHrs: num(r.RUN_H),
         };
       }),

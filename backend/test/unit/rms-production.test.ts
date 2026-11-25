@@ -36,3 +36,28 @@ describe('RMS production', () => {
     expect(summariseRms('d', '2 Oct', ['2026-10-02'], distinctEntries(ROWS))).toMatchObject({ entryDays: 0, productionMt: null });
   });
 });
+
+test('actual and prime production apart (the user, 25 Nov 2026): PRODUCTION_MT is prime + defective', () => {
+  // 24 Nov 2026 as the ERP holds it: PRODUCTION_MT 269.59 = PRIME_MT2 230.60 + DEFECTIVE_CUTMT2 38.99.
+  const row = { date: '2026-11-24', vrno: 'L5P26N24-0001', productionMt: 269.59, productionPcs: 283, primeMt: 230.6 };
+  expect(summariseRms('d', '24 Nov', ['2026-11-24'], [row])).toMatchObject({ productionMt: 269.59, primeMt: 230.6 });
+  expect(summariseRms('d', '24 Nov', ['2026-11-24'], [{ ...row, primeMt: null }]).primeMt).toBeNull();
+});
+
+test('on-line rolling %: the ERP\'s per entry, weighted by billet input (the user, 25 Nov 2026)', () => {
+  // 22–23 Nov 2026 as the ERP holds them: delivery 97.015 % on 360.10 MT input, 98.621 % on 465.60 MT.
+  const e = (date: string, input: number, del: number, cast: number) => ({ date, vrno: `L5P-${date}`, productionMt: 300, productionPcs: 300, inputMt: input, rollingInDeliveryPct: del, rollingInCastingPct: cast });
+  const rows = [e('2026-11-22', 360.1, 97.015, 95.116), e('2026-11-23', 465.6, 98.621, 93.301)];
+  expect(summariseRms('d', '22 Nov', ['2026-11-22'], rows)).toMatchObject({ rollingInDeliveryPct: 97.02, rollingInCastingPct: 95.12 });
+  // (97.015 × 360.10 + 98.621 × 465.60) ÷ 825.70
+  expect(summariseRms('w', '22–23 Nov', ['2026-11-22', '2026-11-23'], rows).rollingInDeliveryPct).toBe(97.92);
+  expect(summariseRms('d', '24 Nov', ['2026-11-24'], rows).rollingInDeliveryPct).toBeNull();
+});
+
+test('prime yield: prime ÷ billet input, over the entries with both (the user, 25 Nov 2026)', () => {
+  // 22 Nov 2026 as the ERP holds it: PRIME_MT1 328.12 of INPUT_MT1 360.10 → 91.12 % (mass yield on the actual: 92.57 %).
+  const e = (date: string, prime: number | null, input: number) => ({ date, vrno: `L5P-${date}`, productionMt: 333.34, productionPcs: 383, primeMt: prime, inputMt: input });
+  expect(summariseRms('d', '22 Nov', ['2026-11-22'], [e('2026-11-22', 328.12, 360.1)])).toMatchObject({ primeYieldPct: 91.12, massYieldPct: 92.57 });
+  // A day without prime filled is left out of both sums, not counted as billets with no prime.
+  expect(summariseRms('w', '22–23 Nov', ['2026-11-22', '2026-11-23'], [e('2026-11-22', 328.12, 360.1), e('2026-11-23', null, 465.6)]).primeYieldPct).toBe(91.12);
+});

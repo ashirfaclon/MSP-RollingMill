@@ -16,7 +16,7 @@
  * Power, specific energy: the RMS Daily Power Consumption Record (actual kWh, VCB-1) ÷ PRODUCTION_MT.
  * No mill mimic on RMS (the user, 16 Oct 2026), as on LSM.
  */
-import { useState, type KeyboardEvent } from 'react';
+import { Fragment, useState, type KeyboardEvent } from 'react';
 import { lastFigure } from '@/services/lastEntry';
 import { ofInput } from '@/components/production/ofInput';
 import { productionTermText } from '@/components/production/productionTerm';
@@ -57,6 +57,11 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
   const { dates } = useSelection();
   const prod = useRmsProduction(mill === 'rms' ? dates : null);
   const prodMt = prod.data?.totals.productionMt ?? null;
+  // RMS production (the user, 25 Nov 2026): the actual (PRODUCTION_MT) with its defective part under it, and prime as a
+  // card of its own beside it — actual = prime + defective reads across the two.
+  const primeMt = prod.data?.totals.primeMt ?? null;
+  const defectiveMt = prod.data?.totals.defectiveMt ?? null;
+  const prodTerm = prod.data ? productionTermText(prod.data.from, prod.data.to, prod.data.erp.lastDate) : null;
   // Billets in (pieces): INPUT_PCS of the same log sheet.
   const billetsPcs = prod.data?.totals.billetsPcs ?? null;
   const t = prod.data?.totals ?? null;
@@ -66,13 +71,15 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
   const lossSum = losses.reduce((a, l) => a + (l.value ?? 0), 0);
   const prodNote = prod.error ? 'ERP data unavailable' : prod.data?.erp.connection === 'down' ? prod.data.erp.message : '';
   const [prodOpen, setProdOpen] = useState(false);
+  const [rollOpen, setRollOpen] = useState(false);
   return (
     <div className="rm-viz">
-      <section className="rm-strip rm-strip--five" aria-label="Headline KPIs">
+      {/* RMS: nine cards — output, yields and stock five across, then the rolling % and energy four across (rm-strip--nine). */}
+      <section className={`rm-strip ${mill === 'rms' ? 'rm-strip--nine' : 'rm-strip--five'}`} aria-label="Headline KPIs">
         {CARDS.map((c) => c.label === 'Mass yield' && mill === 'rms'
           ? (
+            <Fragment key={c.label}>
             <KpiCard
-              key={c.label}
               label="Mass yield"
               value={t?.massYieldPct == null ? 'NA' : fixed(t.massYieldPct, 1)}
               noEntries={!!prod.data && prod.data.erp.connection === 'up' && t?.massYieldPct == null}
@@ -84,23 +91,75 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
               onOpen={() => setProdOpen(true)}
               openLabel="Mass yield per day, from the ERP log sheet"
             />
+            {/* Prime yield (the user, 25 Nov 2026): prime ÷ billet input. Mass yield is on the actual production. */}
+            <KpiCard
+              label="Prime yield"
+              value={t?.primeYieldPct == null ? 'NA' : fixed(t.primeYieldPct, 1)}
+              noEntries={!!prod.data && prod.data.erp.connection === 'up' && t?.primeYieldPct == null}
+              lastEntry={lastFigure(t?.primeYieldPct, prod.last, (d) => d.totals.primeYieldPct, (n) => fixed(n, 1))}
+              unit="%"
+              note={prodNote}
+              series="order"
+              loading={!prod.data && !prod.error}
+              onOpen={() => setProdOpen(true)}
+              openLabel="Prime yield per day, from the ERP log sheet"
+            />
+            {/* The total of Finished stock by size, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
+            <FinishedStockCard mill="rms" />
+            {/* On-line rolling % (Management Dash All.xlsx, RMS, rows 43–44 — the user, 25 Nov 2026): the ERP's own figures,
+                named as RMD's; every RMS entry is Online. */}
+            {([['Rolling in casting', 'rollingInCastingPct'], ['Rolling in delivery', 'rollingInDeliveryPct']] as const).map(([name, k]) => (
+              <KpiCard
+                key={k}
+                label={name}
+                term={prodTerm}
+                value={t?.[k] == null ? 'NA' : fixed(t[k]!, 2)}
+                noEntries={!!prod.data && prod.data.erp.connection === 'up' && t?.[k] == null}
+                lastEntry={lastFigure(t?.[k], prod.last, (d) => d.totals[k], (n) => fixed(n, 2))}
+                unit="%"
+                note={prodNote}
+                series="ok"
+                loading={!prod.data && !prod.error}
+                onOpen={() => setRollOpen(true)}
+                openLabel="Rolling in casting and delivery per day, from the ERP log sheet"
+              />
+            ))}
+            </Fragment>
           )
           : c.label === 'Production' && mill === 'rms'
           ? (
+            <Fragment key={c.label}>
             <KpiCard
-              key={c.label}
-              label="Production"
-              term={prod.data ? productionTermText(prod.data.from, prod.data.to, prod.data.erp.lastDate) : null}
+              label="Production · Actual"
+              term={prodTerm}
               value={prodMt === null ? 'NA' : fixed(prodMt, 1)}
               noEntries={!!prod.data && prod.data.erp.connection === 'up' && prodMt === null}
               lastEntry={lastFigure(prodMt, prod.last, (d) => d.totals.productionMt, (n) => fixed(n, 1))}
               unit="MT"
-              note={prodNote}
+              /* Actual = prime + defective (the user, 25 Nov 2026): the defective part and its share under the figure; prime is the card beside it. */
+              note={prodNote || (prodMt && defectiveMt !== null && !prod.last.data ? (
+                <span className="rm-card-defect">Defective <b className="num">{fixed(defectiveMt)} MT</b> <span>· {fixed((defectiveMt / prodMt) * 100)} %</span></span>
+              ) : '')}
               series="prod"
               loading={!prod.data && !prod.error}
               onOpen={() => setProdOpen(true)}
-              openLabel="Production per day, from the ERP log sheet"
+              openLabel="Actual, prime and defective production per day, from the ERP log sheet"
             />
+            {/* Prime as its own figure, like the actual (the user, 25 Nov 2026), with its share of the actual under it. */}
+            <KpiCard
+              label="Production · Prime"
+              term={prodTerm}
+              value={primeMt === null ? 'NA' : fixed(primeMt, 1)}
+              noEntries={!!prod.data && prod.data.erp.connection === 'up' && primeMt === null}
+              lastEntry={lastFigure(primeMt, prod.last, (d) => d.totals.primeMt, (n) => fixed(n, 1))}
+              unit="MT"
+              note={prodNote || (prodMt && primeMt !== null && !prod.last.data ? <><b className="num">{fixed((primeMt / prodMt) * 100)} %</b> of actual</> : '')}
+              series="order"
+              loading={!prod.data && !prod.error}
+              onOpen={() => setProdOpen(true)}
+              openLabel="Actual, prime and defective production per day, from the ERP log sheet"
+            />
+            </Fragment>
           )
           // The RMS Daily Power Consumption Record; specific energy = that power ÷ PRODUCTION_MT.
           : c.label === 'Power consumption' && mill === 'rms'
@@ -108,12 +167,10 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
           : c.label === 'Specific energy' && mill === 'rms'
           ? <SpecificEnergyCard key={c.label} mill="rms" />
           : <KpiCard key={c.label} label={c.label} value="NA" unit={c.unit} note="" series={c.series} />)}
-        {/* The total of Finished stock by size, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
-        {mill === 'rms'
-          ? <FinishedStockCard mill="rms" />
-          : <KpiCard label="Finished stock" value="NA" unit="MT" note="" series="free" />}
+        {mill !== 'rms' && <KpiCard label="Finished stock" value="NA" unit="MT" note="" series="free" />}
       </section>
       {mill === 'rms' && <RmsProductionDrawer open={prodOpen} onClose={() => setProdOpen(false)} />}
+      {mill === 'rms' && <RmsProductionDrawer view="rolling" open={rollOpen} onClose={() => setRollOpen(false)} />}
 
       <div className="rm-row">
         <RmdShiftProduction

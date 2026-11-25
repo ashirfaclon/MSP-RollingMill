@@ -557,3 +557,47 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   + a dot per bearing) was built and **turned down by the user — do not bring it back**. All view is long (24 Nov: 110
   bars, 2 940 px, scrolls inside the panel as before); Roughing / Route shorten it. Drill-down trend: per-part small
   charts as described above. rmd-bearings.e2e.spec.ts passes at 1366 / 1920, no console errors. Not committed.
+- **25 Nov 2026** — **RMS Production: actual, prime and defective** (the user: prime as its own figure, and see that
+  actual = prime + defective). The card was and is the ERP's PRODUCTION_MT — the ACTUAL production, not prime. Now two
+  cards (option 2 of three the user weighed — not one card with three sections, not three cards):
+  **Production · Actual** with "Defective x MT · y %" under the figure; **Production · Prime** (PRIME_MT1 + PRIME_MT2)
+  with "x % of actual" under it — actual = prime + defective reads across the two, prime shown once. Defective = DEFECTIVE_CUTMT1/2 +
+  ROLLING_DEFECT_MT1/2 (each entry fills the …1 or …2 set; now synced). Strip: six cards. Drill-down: Actual / Prime /
+  Defective columns, series and stats. ERP check, all 422 entries: prime + defective = actual on 401; 10 early entries
+  (30 Nov – Dec 2025) do not add up and 11 have no prime — shown as filed, so a long period's parts can fall short of
+  the actual (2026: 141,833 + 3,632 vs 148,659 MT). Card CSS: a five-card strip's period sits under the label; on
+  six-card strips (RMS, RMD, LSM, HSM Offline) the figure scales 16–30 px with the screen (22 px at 1366) so six-digit
+  year totals fit; the defective line's share wraps to a second line on a narrow card. rms-prime.e2e.spec.ts (1366 / 1920 × day, month, year: one
+  row, nothing cut off) and the RMS wiring test pass; 305 backend unit pass. Not committed.
+- **25 Nov 2026** — **RMS Finished stock by size: Prime and Defective** (the user, as HSM's prime / subprime). Each
+  section's bar: prime (amber) then defective (violet); tabs All / Prime / Defective; the drill-down marks each SKU's
+  grade and splits the section. Defective = the ERP's "… DEFECTIVE" items (item class FGD, 20 items); prime = the
+  rest. 24 Nov: 4,211.95 MT = 3,568.53 prime + 643.42 defective. RMD and LSM panels unchanged (no tabs).
+  **Repairable — asked for, NOT FOUND in the ERP:** no item, class, group, stock type / flag / attribute marks it.
+  Candidates put to the user: godown WPYRDP (RMS finished goods outside FGYRDP, ~288 MT) or the "Sp. Length" items
+  (class FSSL). Waiting for the plant to say how repairable is booked. rms-stock-grades.e2e.spec.ts passes
+  (1366 / 1920; grades add up to the total). Not committed.
+- **25 Nov 2026** — **RMS: Rolling in casting and Rolling in delivery** (Management Dash All.xlsx, sheet RMS, rows 43–44
+  "On Line Rolling % (Delivery / Casting)"). ERP log sheet fields ROLLING_PERCENTAGE_DELIVERY and
+  ROLLING_PERCENATGE_CASTING (the ERP's spelling; now synced), filled on 420 of 422 entries; every RMS entry is
+  TRAN_COLUMN_NAME1 = P11P (Online), so no Online / Offline split. They are billet input ÷ DELIVERY_QTY / TOTAL_CAST_QTY
+  × 100 (414 / 415 entries reproduce). One entry = the ERP's figure; a period = weighted by billet input, as RMD / LSM.
+  Named as RMD's. Cards after the two production cards; RMS strip now eight cards, two rows of four (Actual · Prime ·
+  Rolling in casting · Rolling in delivery / Mass yield · Power · Specific energy · Finished stock); a four-card
+  strip's period sits under the label (only RMS uses it). Own drill-down (both lines, table with billet input,
+  source). Checked: 22 Nov 95.12 / 97.02 = the ERP; 1–24 Nov 88.82 / 94.60. ERP slips shown as filed: 19 Jul 2026
+  delivery 47.85 / casting 44.89; a casting entry of 0.93 % (Feb 2026). rms-prime.e2e (1366 / 1920 × day / month /
+  year: two rows, nothing cut off) and the RMS wiring test pass; 306 backend unit pass. Not committed.
+- **25 Nov 2026** — **RMS: Prime yield card; Repairable searched for — not in the ERP.** Mass yield was and is on the
+  ACTUAL production (PRODUCTION_MT ÷ billet input = the ERP's PRODUCTION_PERCENTAGE: 22 Nov 92.57 %). New card **Prime
+  yield** = Σ prime ÷ Σ billet input over the entries with prime filled (22 Nov 91.12 %; 2026 so far 90.95 % against mass
+  yield 94.47 %); in the production drill-down too. The user wants it to become (prime + repairable) ÷ billet input —
+  **Repairable (Management Dash All.xlsx, RMS row 49, "attr_tran_data_head") is in no ERP field, item or yard**: searched
+  every RS log-sheet attribute (95 codes), every form's attributes, ATTR_MAST, item names / classes / groups, stock type /
+  flag / attribute, and the entry's item lines (billets from WPYRDP "WIP YARD"; prime and defective into FGYRDP "FG-YARD";
+  end cut, miss-roll, reject, burning loss into BPYRDP "BY PRODUCTS YARD"). Asked the user for the field name, item code
+  or a voucher where repairable was booked. RMS strip now nine cards (rm-strip--nine: a 20-column grid, five across —
+  Actual, Prime, Mass yield, Prime yield, Finished stock — then four wider: Rolling in casting / delivery, Power,
+  Specific energy; both rows full). The Actual card's defective line is violet, as defective stock. rms-prime.e2e
+  (1366 / 1920 × day / month / year: two full rows, nothing cut off) and the RMS wiring test pass; 307 backend unit
+  pass. Not committed.

@@ -40,13 +40,21 @@
 .rm-strip.rm-strip--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 /* Five: the four headline figures and Finished stock at the right end (the user, 31 Oct 2026). */
 .rm-strip.rm-strip--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* Nine (RMS, 25 Nov 2026): two full rows of unequal count — five across (output, yields, stock), then four wider
+   (rolling %, energy) — on a 20-column grid, so no row has a gap. */
+.rm-strip.rm-strip--nine { grid-template-columns: repeat(20, minmax(0, 1fr)); }
+.rm-strip--nine > :nth-child(-n + 5) { grid-column: span 4; }
+.rm-strip--nine > :nth-child(n + 6) { grid-column: span 5; }
 /* Six per row: LSM's twelve — the headline figures, then the plant's mill performance KPIs (the user, 23 Nov 2026). */
 .rm-strip.rm-strip--six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 /* Narrow cards: a card's date on its own line under the label, as RMD's. */
-.rm-strip--six .rm-card-term, .rm-strip--seven .rm-card-term { display: block; margin-top: 2px; }
-.rm-strip--six .rm-card-term::before, .rm-strip--seven .rm-card-term::before { content: none; }
+.rm-strip--four .rm-card-term, .rm-strip--nine .rm-card-term, .rm-strip--five .rm-card-term, .rm-strip--six .rm-card-term, .rm-strip--seven .rm-card-term { display: block; margin-top: 2px; }
+.rm-strip--four .rm-card-term::before, .rm-strip--nine .rm-card-term::before, .rm-strip--five .rm-card-term::before, .rm-strip--six .rm-card-term::before, .rm-strip--seven .rm-card-term::before { content: none; }
 /* Seven narrow cards (HSM Online): the figure scales with the screen so value + unit stay inside the card. */
 .rm-strip--seven .rm-card-value { font-size: clamp(16px, 1.4vw, 30px); }
+/* Six (RMS, LSM, HSM Offline, RMD): a five-digit year figure ("11,642.18 MT") is wider than a card at 1366 at 30 px —
+   22 px there, the full 30 px from about 1880 px wide (25 Nov 2026). */
+.rm-strip--six .rm-card-value, .rmd-strip .rm-card-value, .rm-strip--nine .rm-card-value { font-size: clamp(16px, 1.6vw, 30px); }
 
 /*
  * Each card spans four rows of the strip and adopts them as a subgrid, so label, value,
@@ -560,3 +568,12 @@
 
 /* A card showing its last entry from before the period: the date said plainly, in the warning tone. */
 .rm-card-last { color: var(--warn); font-weight: 700; }
+
+/* RMS Production · Actual: its defective part and share under the figure (the user, 25 Nov 2026). */
+/* Violet, as defective stock in Finished stock by size — one colour for defective on the screen (the user, 25 Nov 2026). */
+.rm-card-defect { color: color-mix(in srgb, var(--violet) 75%, var(--muted-2)); }
+.rm-card-defect b { font-weight: 800; color: var(--violet); }
+.rm-card-defect::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; background: var(--violet); vertical-align: 1px; }
+/* On a narrow card (1366, a year's six-digit figures) the share goes to a second line rather than being cut off. */
+.rm-card-note:has(> .rm-card-defect) { overflow: visible; white-space: normal; }
+.rm-card-defect > b, .rm-card-defect > span { white-space: nowrap; }

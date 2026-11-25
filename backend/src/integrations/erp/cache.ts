@@ -238,6 +238,14 @@ export interface RmsLogRow {
   missRollMt?: number | null;
   coldMt?: number | null;
   rejectMt?: number | null;
+  /** PRIME_MT1 + PRIME_MT2 (prime production, MT); productionMt is the actual production. Null when not filled. */
+  primeMt?: number | null;
+  /** Defective, MT: DEFECTIVE_CUTMT1/2 + ROLLING_DEFECT_MT1/2 — with prime it makes productionMt. Null when not filled. */
+  defectiveMt?: number | null;
+  /** The ERP's on-line rolling % of the entry: ROLLING_PERCENTAGE_DELIVERY (billet input ÷ DELIVERY_QTY) and
+   *  ROLLING_PERCENATGE_CASTING (billet input ÷ TOTAL_CAST_QTY), × 100. Null when not filled. */
+  rollingInDeliveryPct?: number | null;
+  rollingInCastingPct?: number | null;
   /** NET_RUNNING_HRS — ERP run hours; null when not filled. */
   runningHrs?: number | null;
 }
