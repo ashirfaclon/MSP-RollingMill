@@ -19,7 +19,7 @@ const test = base.extend<{ page: Page }>({
 
 test.describe.configure({ timeout: 120_000 });
 
-test('HSM: six cards per row; Both shows the five headline cards and both sets, Online or Offline only that rolling\'s row', async ({ page }) => {
+test('HSM: Both shows the headline cards and both sets, Online or Offline only that rolling\'s row', async ({ page }) => {
   await page.goto('/hsm/visualization');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
@@ -36,9 +36,10 @@ test('HSM: six cards per row; Both shows the five headline cards and both sets, 
   };
   const FIVE = [/^Production/, /^Mass yield/, /^Power consumption/, /^Specific energy/, /^Finished stock/];
 
-  // Both: Online + Offline added; rolling % from the Online entries, cold power from the Offline ones. Twelve cards.
+  // Both: Online + Offline added; rolling % from the Online entries, cold power from the Offline ones. Fourteen cards:
+  // Mill power and Hot billet (heater) beside Specific energy (the user, 25 Nov 2026).
   // Cold power: kWh | kWh/MT in one card; Breakdown its own card, as on LSM (the user, 25 Nov 2026).
-  await expect(labels).toHaveText([...FIVE, /^Cast qty/, /^Delivery/, /^Prime qty/, /^Rolling w\.r\.t\. casting/, /^Rolling w\.r\.t\. delivery/, /^Cold power/, /^Breakdown/]);
+  await expect(labels).toHaveText([...FIVE.slice(0, 4), /^Mill power/, /^Hot billet \(heater\)/, FIVE[4], /^Cast qty/, /^Delivery/, /^Prime qty/, /^Rolling w\.r\.t\. casting/, /^Rolling w\.r\.t\. delivery/, /^Cold power/, /^Breakdown/]);
   for (const [name, v] of [['Cast qty', '3,253.86'], ['Delivery', '3,123.06'], ['Prime qty', '2,884.18'], ['Rolling w.r.t. casting', '92.3'], ['Rolling w.r.t. delivery', '96.2'], ['Cold power', '10,097'], ['Cold power', '668.68']]) {
     await expect(value(name)).toContainText(v);
   }

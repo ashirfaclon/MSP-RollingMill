@@ -58,12 +58,19 @@ const DAILY = (rate: string): LimitDef[] => [
 
 export const LIMIT_DEFAULTS: Record<LimitMill, readonly LimitDef[]> = {
   hsm: [
-    { id: 'motor-bearing-temp', group: 'Temperatures', label: 'DC motor bearings (DE / NDE)', unit: '°C', reading: 'Electrical HSM → Mill Load Log Sheet',
+    { id: 'motor-bearing-temp', group: 'Temperatures', label: 'DC motor temperature (DE / NDE)', unit: '°C', reading: 'Electrical HSM → Mill Load Log Sheet',
       min: null, max: 80, approval: 'placeholder',
       basis: 'Standard placeholder: common practice for motor bearing housings in a hot plant.', range: [0, 200], dp: 0 },
     { id: 'motor-loading', group: 'Motors', label: 'Motor loading (load ÷ rated current)', unit: '%', reading: 'Electrical HSM → Mill Load Log Sheet',
       min: null, max: 100, approval: 'placeholder',
       basis: 'Standard placeholder: the motor\'s continuous rating; IEC 60034-1 allows 1.5 × rated current for about 60 s only.', range: [1, 300], dp: 0 },
+    // The plant's own range, printed on the form (HSM Bearing Temperature Details: T < 65 °C — the user, 25 Nov 2026).
+    { id: 'gearbox-bearing-temp', group: 'Temperatures', label: 'Reduction cum pinion gearbox bearings (D / ND side)', unit: '°C', reading: 'HSM Mechanical → Bearing Temperature Details',
+      min: null, max: 65, approval: 'plant',
+      basis: 'The plant\'s form, HSM Bearing Temperature Details: temperature range T < 65 °C.', range: [0, 200], dp: 0 },
+    { id: 'oil-temp', group: 'Oil', label: 'Lubrication tank oil temperature', unit: '°C', reading: 'HSM Mechanical → Bearing Temperature Details',
+      min: null, max: 65, approval: 'plant',
+      basis: 'The plant\'s form, HSM Bearing Temperature Details: oil temperature range T < 65 °C.', range: [0, 200], dp: 0 },
     VIBRATION('MID Logbook → Vibration Reading'),
     ...DAILY('ERP production ÷ historian running hours, per day'),
   ],

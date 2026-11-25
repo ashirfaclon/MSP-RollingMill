@@ -12,7 +12,6 @@ Note: some numbers in hsm-rolling, production, rolling-mill and wiring specs wer
 
 | Spec : line | Test | Why it fails | Expected | Shown |
 |---|---|---|---|---|
-| hsm-rolling.e2e.spec.ts:22 | HSM: six cards per row; Both shows the five headline cards and both sets, Online or Offline only that rolling' | Old 1-decimal text (2-decimal rule, 24 Nov) | "3,253.9" | "3,253.86MT" |
 | production.e2e.spec.ts:39 | the Production card shows ERP and Influx production for the Duration filter period | Old 1-decimal text (2-decimal rule, 24 Nov) | /\d[\d,]*\.\d\|NA/ | "Influx0" |
 | production.e2e.spec.ts:57 | clicking the card opens the ERP-vs-Influx drawer on the dashboard period — totals, two lines, one table | Number differs — likely 2-decimal rule or newer data | "202.40" | "22 Sep202.4217.9415.54" |
 | rolling-mill.spec.ts:16 | root redirects to HSM Visualization and shows every KPI from the comp | Unknown — check before trusting |  |  |
@@ -67,3 +66,5 @@ Note: some numbers in hsm-rolling, production, rolling-mill and wiring specs wer
 | wiring.e2e.spec.ts:1514 | RMD condition analytics: with the month's CA inputs saved, the costing cards and rows show the figures (the CA | Number differs — likely 2-decimal rule or newer data | /^500\.0\s*MT$/ | "500MT" |
 | wiring.e2e.spec.ts:1436 | HSM: production plan config — opens on the current plan, month total, shutdowns, Day / Night per day; Save pos | Unknown — check before trusting |  |  |
 | wiring.e2e.spec.ts:854 | RMD asset health: all drive groups by default; route: … | Expects a drive-group button row on the page (now the header picker) — default, run hours and limits checks fixed 25 Nov | ['Roughing', 'Route / diverter', 'Finishing', 'Auxiliary'] | 1 button |
+| settings.e2e.spec.ts:52 | RMD: the plant's own limits, chemistry and the tank sizes in one place | Live settings: RMD bearing minimum was cleared (default 45) — data, not code (25 Nov) | "45" | "" |
+| alerts.e2e.spec.ts:100 | Escalation matrix: the mill's contact list — levels, channels, how often; Cancel drops the draft | Test predates 903359d (dropdowns list each value once) | ['Warning', 'Critical', 'Warning'] | 2 options |

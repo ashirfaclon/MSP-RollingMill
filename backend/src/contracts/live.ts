@@ -1,5 +1,5 @@
 /** GET /api/hsm/live and /api/hsm/stands — the plant historian, now and as a trend. */
-import type { StandGroup } from './common';
+import type { Grain, StandGroup } from './common';
 
 export interface StandNow {
   id: string;
@@ -113,5 +113,90 @@ export interface HsmMillLoadReport {
    * The latest date up to `to` with a load or motor temperature reading (the form's Date); null when none in the last six
    * months. The card shows that day when the period has none (the user, 30 Oct 2026).
    */
+  lastDate: string | null;
+}
+
+/**
+ * GET /api/hsm/bearing-temp — the logbook's HSM Mechanical → Bearing Temperature Details (the user, 25 Nov 2026):
+ * one entry per round, every stand's reduction-cum-pinion gearbox bearings (D / ND side) and the four
+ * lubrication tanks' oil.
+ */
+export interface HsmGearBearing {
+  /** "RM 1" … "RM 5", "VE 1 · N-OS", "VE 1 · OS", "FM 1" … "FM 6". */
+  unit: string;
+  group: 'roughing' | 'finishing';
+  /** D side / ND side, °C. */
+  dC: number | null;
+  ndC: number | null;
+}
+export interface HsmOilTank {
+  /** 1–4. */
+  tank: number;
+  /** The stands it lubricates, as the form names them: "R1 & R2" … */
+  stands: string;
+  group: 'roughing' | 'finishing';
+  tempC: number | null;
+}
+export interface HsmBearingEntry {
+  /** The form's Date and time. */
+  date: string;
+  time: string | null;
+  shift: string;
+  /** The section rolling, as filled ("190 MM"); null when blank. */
+  section: string | null;
+  bearings: HsmGearBearing[];
+  tanks: HsmOilTank[];
+}
+/** A unit's or tank's latest reading of the period, with when it was taken. */
+export type HsmLatestBearing = HsmGearBearing & { date: string; time: string | null; shift: string; section: string | null };
+export type HsmLatestTank = HsmOilTank & { date: string; time: string | null; shift: string; section: string | null };
+export interface HsmBearingReport {
+  from: string;
+  to: string;
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  /** Each bearing unit's / tank's latest reading in the period (only those with one). */
+  latestBearings: HsmLatestBearing[];
+  latestTanks: HsmLatestTank[];
+  /** Every entry of the period, oldest first. */
+  entries: HsmBearingEntry[];
+  /** The latest date up to `to` with a reading; null when none in the last six months. */
+  lastDate: string | null;
+}
+
+/**
+ * GET /api/hsm/heater-power — the logbook's Electrical HSM → Billet Heater Performance & Mill Power (the user,
+ * 25 Nov 2026): one entry a day, three blocks of MT / kWh / kWh per MT.
+ */
+export interface HsmHeaterPowerPeriod {
+  key: string;
+  label: string;
+  fromDate: string;
+  toDate: string;
+  days: number;
+  /** Days with an entry. */
+  entryDays: number;
+  /** Hot billets — running with the billet heater. */
+  hotBilletMt: number | null;
+  hotBilletKwh: number | null;
+  hotBilletKwhPerMt: number | null;
+  /** Cold billets. */
+  coldBilletMt: number | null;
+  coldBilletKwh: number | null;
+  coldBilletKwhPerMt: number | null;
+  /** The mill. */
+  millPowerMt: number | null;
+  millPowerKwh: number | null;
+  millPowerKwhPerMt: number | null;
+}
+export interface HsmHeaterPowerReport {
+  from: string;
+  to: string;
+  grain: Grain;
+  form: string;
+  logbook: { connection: 'up' | 'down'; message: string };
+  rows: HsmHeaterPowerPeriod[];
+  totals: HsmHeaterPowerPeriod;
+  /** The latest date up to `to` with an entry; null when none in the last six months. */
   lastDate: string | null;
 }

@@ -14,6 +14,8 @@ import { PLANT_DAY_START_HOUR, PRODUCTION_WORKING_SPEC, counterComparison, isDat
 import { logSheetReport, ordersReport, sizeReport, stockReport } from './erp-kpis.service';
 import { electricalDelays } from './electrical-delays.service';
 import { hsmMillLoad } from './mill-load.service';
+import { hsmBearingTemp } from './bearing-temp.service';
+import { hsmHeaterPower } from './heater-power.service';
 import { STAND_METRICS, hsmLive, standTrend, type StandMetric } from './live.service';
 import { yieldComparison } from './yield.service';
 import { runningRate } from './running-rate.service';
@@ -107,6 +109,19 @@ export async function hsmRoutes(app: FastifyInstance) {
   app.get('/mill-load', { config: { errorCode: 'hsm_mill_load_failed' } }, async (req) => {
     const { from, to } = parseRange(searchParams(req));
     return hsmMillLoad(loadEnv(), from, to);
+  });
+
+  /** Visualization: Electrical HSM → Billet Heater Performance & Mill Power — hot billet (heater) MT, mill power kWh/MT. */
+  app.get('/heater-power', { config: { errorCode: 'hsm_heater_power_failed' } }, async (req) => {
+    const q = searchParams(req);
+    const { from, to } = parseRange(q);
+    return hsmHeaterPower(loadEnv(), from, to, parseGrain(q));
+  });
+
+  /** Asset Health: HSM Mechanical → Bearing Temperature Details — gearbox bearings (D / ND side) and lubrication-tank oil. */
+  app.get('/bearing-temp', { config: { errorCode: 'hsm_bearing_temp_failed' } }, async (req) => {
+    const { from, to } = parseRange(searchParams(req));
+    return hsmBearingTemp(loadEnv(), from, to);
   });
 
   /** Finished-strip stock in the FG yard at the end of plant date `to`. */

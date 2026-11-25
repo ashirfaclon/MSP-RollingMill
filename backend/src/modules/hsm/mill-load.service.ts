@@ -3,7 +3,7 @@
  * (electrical-hsm/mill-load-log-sheet), as the HSM source sheet names it (HSM source KPI.xlsx,
  * Asset Health): one entry per stand and reading —
  *   Motor current loading   load in amp (`load-in-amp`); as % once each motor's rated current is given;
- *   Bearing temperature     DC motor DE and NDE temperature (`dc-motor-de-temp`, `dc-motor-nde-temp`), °C.
+ *   Motor temperature       DC motor DE and NDE temperature (`dc-motor-de-temp`, `dc-motor-nde-temp`), °C.
  * The stand name places a reading in its group: RM n → roughing, FM n → finishing. An entry
  * remarked "test" is left out. Read fresh from the logbook; submissions from a month before the
  * period, placed by the form's Date.

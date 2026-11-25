@@ -4,10 +4,15 @@
  * HSM · Asset Health — the layout of the approved mock-up (HSM_Asset_Health_Dashboard.png), wired
  * only from the sources the HSM sheet names (HSM source KPI.xlsx, Asset Health; the user,
  * 21 Oct 2026). NA everywhere else, never a sample figure:
- *   Bearing temp       Mill Load Log Sheet: the hottest DC motor DE / NDE temperature at the
+ *   Motor temp         Mill Load Log Sheet: the hottest DC motor DE / NDE temperature at the
  *                      selected group's stands' latest readings, °C; opens every stand, and the
  *                      Condition trend is the hottest of each reading. (Deviation from a
- *                      comparable-load baseline once the form has history.)
+ *                      comparable-load baseline once the form has history.) Named Motor temp, not
+ *                      Bearing temp: they are the DC motors' own temperatures (the user, 25 Nov 2026).
+ *   Bearing temp       HSM Mechanical → Bearing Temperature Details (the user, 25 Nov 2026): the hottest
+ *                      reduction-cum-pinion gearbox bearing, D / ND side, at each stand's latest reading.
+ *   Oil temp           the same form: the hottest lubrication tank at its latest reading (tanks 1–2
+ *                      roughing, 3–4 finishing). Both in HsmGearTemps.tsx.
  *   Motor current      Mill Load Log Sheet: loading % = load ÷ the motor's rated current × 100
  *                      (Strip_Mill_DC_Motor_Details.xlsx, the plant, 26 Oct 2026), the mean of the
  *                      group's stands at their latest readings; the drill-down shows amps and %.
@@ -29,6 +34,7 @@ import { hsmHottest, midTop, whenText, withWhere } from './cardWhere';
 import HeaderSlot from '@/components/shell/HeaderSlot';
 import Picker from '@/components/shell/Picker';
 import BearingTrendAll, { hsmBearingPoints } from './BearingTrendAll';
+import { HsmBearingDrawer, HsmOilDrawer, useHsmGearTemps, whereOf } from './HsmGearTemps';
 import { lastFigure, useLastEntry } from '@/services/lastEntry';
 import Panel from '@/components/Panel';
 import KpiCard from '@/components/visualization/KpiCard';
@@ -98,7 +104,7 @@ export default function AssetHealth() {
     };
   };
   const { latest, bearingC, loadA, loadPct } = figures(load);
-  // The limits in use: DC motor bearings and motor loading, per stand; the card is the worst stand.
+  // The limits in use: DC motor temperature and motor loading, per stand; the card is the worst stand.
   const settings = useMillSettings('hsm');
   const bearingL = settings.limit('motor-bearing-temp'), loadingL = settings.limit('motor-loading');
   const bearingTone = worstTone(latest.flatMap((e) => [toneOf(e.deTempC, bearingL), toneOf(e.ndeTempC, bearingL)]));
@@ -108,6 +114,10 @@ export default function AssetHealth() {
   // Every DC motor bearing of the group's stands, each reading (the user, 31 Oct 2026).
   const trend = useMemo(() => (gid && load ? hsmBearingPoints(load.entries.filter((e) => inStands(gid, e))) : []), [gid, load]);
   const canOpen = !!gid && !!load;
+  // Gearbox bearings and lubrication oil, from HSM Mechanical → Bearing Temperature Details (the user, 25 Nov 2026).
+  const gear = useHsmGearTemps(gid, dates);
+  const [gearOpen, setGearOpen] = useState<'bearing' | 'oil' | null>(null);
+  const gearCanOpen = !!gid && !!gear.report;
 
   return (
     <div className="rm-viz ah">
@@ -116,15 +126,20 @@ export default function AssetHealth() {
       <HeaderSlot><Picker label="Group" title="Drive group" value={group} onChoose={setGroup} options={GROUP_OPTIONS} /></HeaderSlot>
 
       {/* No Gearbox oil card: HSM has no source for it (the user, 31 Oct 2026). */}
-      <section className="rm-strip ah-strip ah-strip--four" aria-label="Condition KPIs">
+      <section className="rm-strip ah-strip" aria-label="Condition KPIs">
         <KpiCard label="Vibration RMS" value={mid.maxMmS === null ? 'NA' : fixed(mid.maxMmS, 1)} unit="mm/s" series="hold" noEntries={!!mid.report && mid.maxMmS === null}
           tone={toneOf(mid.maxMmS, settings.limit('vibration'))}
           /* The machine with the highest reading, and the MID visit it is from (the user, 31 Oct 2026). */
           note="" where={(() => { const t = midTop(mid.machines, mid.date); return t ? { name: t.where, when: `MID · ${midDate(t.date)}` } : null; })()}
           {...(mid.machines.length ? { onOpen: () => setVibOpen(true), openLabel: 'Each machine at the last MID visit' } : {})} />
         <MidVibrationDrawer open={vibOpen} onClose={() => setVibOpen(false)} title={group === 'all' ? 'Whole mill' : `${drive} group`} mid={mid} />
+        <KpiCard label="Bearing temp" value={gear.bearing ? fixed(gear.bearing.c, 0) : 'NA'} unit="°C" note="" series="hold"
+          loading={!!gid && gear.loading} tone={gear.bearingTone}
+          noEntries={!!gid && !!gear.report && !gear.bearing} lastEntry={gear.bearingLast} where={whereOf(gear.bearing)}
+          {...(gearCanOpen ? { onOpen: () => setGearOpen('bearing'), openLabel: 'Each stand: gearbox bearings, D and ND side' } : {})} />
+        <HsmBearingDrawer open={gearOpen === 'bearing'} onClose={() => setGearOpen(null)} g={gear} title={drive} />
         <KpiCard
-          label="Bearing temp"
+          label="Motor temp"
           value={bearingC === null ? 'NA' : fixed(bearingC, 0)}
           noEntries={!!gid && !!load && bearingC === null}
           lastEntry={withWhere(lastFigure(bearingC, loadLast, (d) => figures(d).bearingC, (n) => fixed(n, 0)), loadLast.data ? hsmHottest(figures(loadLast.data).latest) : null)}
@@ -146,18 +161,29 @@ export default function AssetHealth() {
           tone={loadingTone}
           {...(canOpen ? { onOpen: () => setOpen(true), openLabel: 'Each stand: load and DC motor temperatures' } : {})}
         />
+        <KpiCard label="Oil temp" value={gear.oil ? fixed(gear.oil.c, 0) : 'NA'} unit="°C" note="" series="hold"
+          loading={!!gid && gear.loading} tone={gear.oilTone}
+          noEntries={!!gid && !!gear.report && !gear.oil} lastEntry={gear.oilLast} where={whereOf(gear.oil)}
+          {...(gearCanOpen ? { onOpen: () => setGearOpen('oil'), openLabel: 'Each lubrication tank' } : {})} />
+        <HsmOilDrawer open={gearOpen === 'oil'} onClose={() => setGearOpen(null)} g={gear} title={drive} groups={gid} />
         <KpiCard label="Run hours" value={runH == null ? 'NA' : fixed(runH, 1)} unit="h" note="" series="prod"
           noEntries={!!rateS.data && rateS.dataUrl === rateUrl && runH == null}
           lastEntry={lastFigure(runH, rateLast, (d) => d.totals.erpRunH, (n) => fixed(n, 1))} />
       </section>
 
       <div className="rm-row ah-row--one">
-        <Panel title="Condition trends" sub="Every machine and every bearing" className="rm-panel" bodyClass="rm-body ah-trends">
+        <Panel title="Condition trends" sub="Every machine, gearbox bearing and motor" className="rm-panel" bodyClass="rm-body ah-trends">
           <MidVibrationTrend mid={mid} />
+          {/* Every gearbox bearing of the group's stands, each round; the last entry's when the period has none. */}
           <BearingTrendAll
+            points={gear.trend}
+            last={gear.trendLast}
+            empty={!gid ? 'No bearing temperature source for this group' : gear.report && !gear.report.lastDate ? 'No entries recorded yet in the Bearing Temperature Details form' : 'No bearing readings in this period'} />
+          <BearingTrendAll
+            what="Motor"
             points={trend.length || !gid || !loadLast.data ? trend : hsmBearingPoints(loadLast.data.entries.filter((e) => inStands(gid, e)))}
             last={!trend.length && gid && loadLast.data ? loadLast.date : null}
-            empty={!gid ? 'No bearing temperature source for this group' : !load?.lastDate ? 'No entries recorded yet in the Mill Load Log Sheet' : 'No bearing readings in this period'} />
+            empty={!gid ? 'No motor temperature source for this group' : !load?.lastDate ? 'No entries recorded yet in the Mill Load Log Sheet' : 'No motor temperature readings in this period'} />
         </Panel>
       </div>
 
@@ -174,7 +200,7 @@ export default function AssetHealth() {
             <Stats items={[
               { label: 'Motor current loading', value: loadPct === null ? 'NA' : fixed(loadPct, 0), unit: '% · mean of stands', tone: loadPct === null ? 'v-na' : loadingTone },
               { label: 'Motor current', value: loadA === null ? 'NA' : fixed(loadA, 0), unit: 'A · mean of stands', tone: loadA === null ? 'v-na' : undefined },
-              { label: 'Hottest bearing', value: bearingC === null ? 'NA' : fixed(bearingC, 0), unit: '°C · DC motor', tone: bearingC === null ? 'v-na' : bearingTone },
+              { label: 'Hottest motor', value: bearingC === null ? 'NA' : fixed(bearingC, 0), unit: '°C · DC motor', tone: bearingC === null ? 'v-na' : bearingTone },
             ]} />
             <div className="pd-table-wrap">
               <table className="grid pd-table" aria-label="Mill load per stand">
@@ -217,7 +243,7 @@ export default function AssetHealth() {
                 'Each stand\'s latest reading of the period; RM stands = roughing, FM stands = finishing',
                 'Loading % = load ÷ rated current × 100 per stand (rated current: the table above — the plant\'s motor details, editable)',
                 'Motor current = the mean loading % of the group\'s stands',
-                'Bearing temp = the hottest DC motor DE / NDE temperature of the group\'s stands',
+                'Motor temp = the hottest DC motor DE / NDE temperature of the group\'s stands',
               ]}
             />
             {load.logbook.connection === 'down' && <p className="v-warn">{load.logbook.message}</p>}

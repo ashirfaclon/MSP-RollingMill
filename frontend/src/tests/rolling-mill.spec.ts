@@ -81,13 +81,12 @@ test('HSM asset health: the mock-up layout, only the HSM sheet\'s sources; the h
   const main = page.getByRole('main');
   await expect(main.getByRole('heading', { level: 2 })).toHaveText('HSM · Finishing drive group');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
-  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/]);   // no PM items on HSM
-  // As the HSM sheet: bearing temp and motor current from the Mill Load Log Sheet (NA until real
-  // entries), run hours from the ERP; the rest NA.
-  for (const i of [3]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^NA/);
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(1)).toHaveText(/^(NA|\d[\d,]*)°C$/);
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^(NA|\d[\d,]*)%$/);
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^(NA|\d[\d,]*(\.\d{1,2})?)h$/);
+  await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor temp/, /^Motor current/, /^Oil temp/, /^Run hours/]);   // no PM items on HSM
+  // Bearing temp and oil temp from HSM Mechanical → Bearing Temperature Details, motor temp and motor current from
+  // the Mill Load Log Sheet (NA until real entries), run hours from the ERP.
+  for (const i of [1, 2, 4]) await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(i)).toHaveText(/^(NA|\d[\d,]*)°C$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(3)).toHaveText(/^(NA|\d[\d,]*)%$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(5)).toHaveText(/^(NA|\d[\d,]*(\.\d{1,2})?)h$/);
   for (const t of ['Condition trends', 'Remarks']) {
     await expect(main.locator('section.panel', { hasText: t }).first()).toBeVisible();
   }

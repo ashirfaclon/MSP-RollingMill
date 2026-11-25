@@ -4,7 +4,8 @@
  * which limit, which asset and point, the value, its day and when it was filled. With each form's
  * last day with an entry, for the "not filled" checks.
  *
- *   HSM  Mill Load Log Sheet: DC motor DE / NDE temperature; loading = load ÷ the stand's rated current
+ *   HSM  Mill Load Log Sheet: DC motor DE / NDE temperature; loading = load ÷ the stand's rated current;
+ *        Bearing Temperature Details: gearbox bearings (D / ND side), lubrication-tank oil
  *   RMD  Mill Bearing Temperature, Oil Tank Temperature, Oil Tank Level (% of the tank's capacity);
  *        CCM Lolipop Sample: C, S, P, S + P
  *   LSM  Drive Temp: bearings, gearbox oil level and pressure; Mill Load Log Sheet: every pass's current
@@ -16,6 +17,7 @@
 import type { Env } from '../../config/env';
 import { LIMIT_DEFAULTS, type LimitMill } from '../../config/limits';
 import { hsmMillLoad } from '../hsm/mill-load.service';
+import { hsmBearingTemp } from '../hsm/bearing-temp.service';
 import { istDate } from '../hsm/production.service';
 import { hsmRatedCurrents } from '../forms-db/equipment.store';
 import { rmdAlertReadings } from '../rmd/asset.service';
@@ -61,6 +63,7 @@ export interface Source {
 export const SOURCES: Record<LimitMill, { key: string; label: string; expectDays: number }[]> = {
   hsm: [
     { key: 'mill-load', label: 'Electrical HSM → Mill Load Log Sheet', expectDays: 2 },
+    { key: 'bearing-temp', label: 'HSM Mechanical → Bearing Temperature Details', expectDays: 2 },
     { key: 'mid', label: 'MID Logbook → Vibration Reading', expectDays: 45 },
   ],
   rmd: [
@@ -114,7 +117,7 @@ async function mid(env: Env, mill: LimitMill, from: string, to: string): Promise
 }
 
 async function hsm(env: Env, from: string, to: string): Promise<Part> {
-  const [r, rated] = await Promise.all([hsmMillLoad(env, from, to), hsmRatedCurrents(env).catch(() => new Map<string, number>())]);
+  const [r, rated, bt] = await Promise.all([hsmMillLoad(env, from, to), hsmRatedCurrents(env).catch(() => new Map<string, number>()), hsmBearingTemp(env, from, to)]);
   const readings: Reading[] = [];
   for (const e of r.entries) {
     const at = orderKey(e.date, e.time);
@@ -124,7 +127,21 @@ async function hsm(env: Env, from: string, to: string): Promise<Part> {
     const a = rated.get(e.stand);
     if (e.loadA !== null && a) readings.push({ ...base, limitId: 'motor-loading', point: '', value: Math.round((e.loadA / a) * 1000) / 10 });
   }
-  return { readings, sources: [source('hsm', 'mill-load', r.logbook.connection === 'up', r.logbook.message, r.lastDate)] };
+  for (const e of bt.entries) {
+    const base = { day: e.date, at: orderKey(e.date, e.time), source: 'bearing-temp' };
+    for (const b of e.bearings) {
+      if (b.dC !== null) readings.push({ ...base, limitId: 'gearbox-bearing-temp', asset: b.unit, point: 'D side', value: b.dC });
+      if (b.ndC !== null) readings.push({ ...base, limitId: 'gearbox-bearing-temp', asset: b.unit, point: 'ND side', value: b.ndC });
+    }
+    for (const t of e.tanks) if (t.tempC !== null) readings.push({ ...base, limitId: 'oil-temp', asset: `Lubrication tank ${t.tank}`, point: t.stands, value: t.tempC });
+  }
+  return {
+    readings,
+    sources: [
+      source('hsm', 'mill-load', r.logbook.connection === 'up', r.logbook.message, r.lastDate),
+      source('hsm', 'bearing-temp', bt.logbook.connection === 'up', bt.logbook.message, bt.lastDate),
+    ],
+  };
 }
 
 async function rmd(env: Env, from: string, to: string): Promise<Part> {

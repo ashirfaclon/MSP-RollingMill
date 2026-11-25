@@ -140,6 +140,10 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
 - 44 Playwright tests fail (21 Nov) — old tests for UI that was since removed (audit T-01). Not rewritten yet; the RMD twin tests were brought up to date 21 Nov.
 - The live electricity-meter (EMS) test fails: IOsense returns an empty meter list (since 19 Nov).
 - `frontend/tools/mimic-render/render.cjs` has 4 lint errors (old helper script).
+- **Logbook forms appear only after their first entry** (the user, 25 Nov 2026): a new form has no tag and no
+  fields in the insight until someone submits an entry — there is nothing else to read its definition from. If a
+  named form cannot be found, ask the user to submit a test entry, then take the field names from it (test entries
+  are left out of the dashboard).
 - GitHub token is stored in plain text in the git remote URL — the user should replace it.
 - Branch `feature/hsm-condition-report` (local only, not on GitHub): an unmerged HSM monthly
   condition report (Excel download). The user said to leave it.
@@ -444,3 +448,48 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   erp-sync-state.test.ts (4), route tests (sign-in needed, state shape), topbar.e2e "Sync ERP" (mocked: failed run,
   refused press, one row); 288 backend unit tests pass, topbar e2e 3/3. A stray `backend/[object Object].tmp`
   (the old dev server ran a sync mid-edit) moved to the backup. Not committed.
+- **25 Nov 2026** — **HSM Asset Health: "Bearing temp" renamed "Motor temp"** (the user) — the readings are the DC
+  motors' own DE / NDE temperatures (Mill Load Log Sheet). HSM only: KPI card, drill-down stat "Hottest motor" and
+  formula, Condition trends title "Motor temp · °C" and its empty texts, panel sub "Every machine and every motor",
+  and the Settings / alert limit label "DC motor temperature (DE / NDE)" (limit id `motor-bearing-temp` kept, so
+  saved limits and alert history carry over). `BearingTrendAll` takes `what="Motor"`; RMD, LSM, RMS keep Bearing
+  temp (their readings are bearings). Checked 1366 / 1920, card, drill-down, RMD unchanged, no console errors;
+  288 backend unit tests pass; rolling-mill.spec HSM asset test updated (still stops earlier on its known heading
+  failure, KNOWN_FAILURES.md). Not committed.
+- **25 Nov 2026** — **HSM Asset Health: Bearing temp and Oil temp cards** (the user) from the new logbook form
+  **HSM → HSM Mechanical → Bearing Temperature Details** (`hsm-mechanical/bearing-temperature-details`; found only
+  after the user filed a test entry — see Known issues). One entry = one round of the whole mill: reduction-cum-pinion
+  gearbox bearings D / ND side of RM 1–5, VE 1 N-OS / OS, FM 1–6; lubrication tanks 1–4 (tank 1 R1 & R2, 2 R3–R5,
+  3 F1–F3, 4 F4–F6, from the plant's sheet); section rolling. Agreed with the user: tanks 1–2 roughing, 3–4
+  finishing; VE 1 = vertical edger, roughing; limits and alerts like the other mills. Cards (6 now, one row):
+  Vibration · **Bearing temp** · Motor temp · Motor current · **Oil temp** · Run hours — the hottest bearing side /
+  tank at each one's latest reading in the period for the drive group, with where and when; last-entry fallback;
+  each opens a drill-down (table per stand / tank with reading time and section, LimitsNote, source, formula; oil
+  also a trend). Condition trends gains a Bearing temp chart. Limits `gearbox-bearing-temp` and `oil-temp`, max 65 °C
+  (`plant`: the form prints T < 65 °C), editable in Settings; alert readings + a "not filled" check (2 days) for the
+  form. The form's own averages are not used. Backend `modules/hsm/bearing-temp.service.ts`, `GET /api/hsm/bearing-temp`;
+  frontend `asset/HsmGearTemps.tsx`. The form holds only the test entry (left out), so both cards read "No entries
+  recorded yet" until the plant files a real one — read live from the logbook, it shows within a minute, no sync.
+  Checked: 1366 / 1920 × Today / Yesterday / Current Month / Current Year, one row, no page scroll; filled state
+  tested with readings in the form's shape (test only, never on the dashboard): Finishing 68 °C FM 6 · D side amber,
+  Roughing 52 °C green, All, both drill-downs. Tests: unit hsm-bearing-temp.test.ts (4), 292 backend unit pass;
+  new hsm-gear-temps.e2e.spec.ts (2) pass; rolling-mill HSM asset test updated to six cards (still stops on its known
+  heading failure). Two unrelated failures added to KNOWN_FAILURES.md (RMD settings: the live bearing minimum was
+  cleared; escalation test predates the one-value dropdowns). Not committed.
+- **25 Nov 2026** — **HSM Visualization: Mill power and Hot billet (heater)** (the user) from the new logbook form
+  **HSM → Electrical HSM → Billet Heater Performance & Mill Power** (`electrical-hsm/billet-heater-performance-mill-power`,
+  found after the user's test entry). One entry a day: hot billet / cold billet / mill power, each MT, kWh, kWh/MT.
+  Agreed: on Visualization, under **Both** only, beside Specific energy (kept), no limits or alerts. "HOT BILLET PRD.
+  (Running with Heater) (MT)" is named **Hot billet (heater)** on the card (the full name in its drill-down).
+  Mill power = Σ mill-power kWh ÷ Σ mill-power MT over the period (one day = the form's own kWh/MT; without kWh and
+  MT, the mean of the form's kWh/MT); Hot billet = Σ hot-billet MT. Both now 14 cards, two rows of seven: Production ·
+  Mass yield · Power · Specific energy · Mill power · Hot billet (heater) · Finished stock / the seven rolling cards;
+  Online (7) and Offline (6) unchanged. Drill-downs per day / week / month: chart, table (mill: kWh/MT, kWh, MT;
+  hot: hot and cold billet MT and kWh/MT), source, formula. Backend `modules/hsm/heater-power.service.ts`,
+  `GET /api/hsm/heater-power?from&to&grain`; frontend `production/HsmHeaterPowerCards.tsx`. Only the test entry so
+  far (left out): both cards read "No entries recorded yet" until a real day is filed (read live). Checked 1366 /
+  1920 × Today / Yesterday / Current Month / Current Year: two rows, nothing spills, no page scroll, no console
+  errors; filled state tested with figures in the form's shape (test only): 53 000 kWh ÷ 500 MT = 106 kWh/MT,
+  400 MT. Caught and fixed a duplicate "Mill power" stat in the drill-down (now Mill energy, kWh). Tests: unit
+  hsm-heater-power.test.ts (3), 295 backend unit pass; new hsm-heater-power.e2e.spec.ts (2) pass; hsm-rolling test
+  updated and passes (off KNOWN_FAILURES.md). Not committed.
