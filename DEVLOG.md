@@ -406,3 +406,12 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   source). No Online/Offline split on LSM, so always shown. Checked day / month / year × 1366 / 1920: matches the ERP
   (21 Nov 7.44 / 20.76; 1–23 Nov 199.18 / 321.24), no overflow, no console errors. LSM browser test extended
   (1–8 Oct 56.16 / 50.23), passes. Not committed.
+- **26 Nov 2026** — **Foot of the Material & operating balance redone, all four mills** (the user: the two thin
+  left-hugging lines — Billets, then the bypasses — were bad UI). Now one strip of equal tiles across the panel,
+  label over figure like the KPI cards, hairline between tiles, each a button with a chevron to its drill-down:
+  HSM Billets in · Coils out · Defective · CCM bypass · HSM bypass (Offline: no bypasses), LSM Billets in · CCM
+  bypass · LSM bypass, RMD / RMS Billets in (a lone tile keeps a tile's width). Billets tiles open the balance
+  drill-down. Shared `production/BalanceStats.tsx`; old `.rm-mb-pieces`, `.rmd-mb-pieces`, `.rm-mb-ops` styles
+  removed. Checked 1 day / year × 4 mills × 1366 / 1920: no overflow, no console errors. Tests pointed at the new
+  strip: hsm-rolling, LSM and RMS production pass; three others touching it fail earlier on old known failures
+  (KNOWN_FAILURES.md). Not committed.

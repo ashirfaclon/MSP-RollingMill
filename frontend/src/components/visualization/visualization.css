@@ -345,7 +345,6 @@
 
 .rm-mb-bar { display: flex; gap: 2px; width: 100%; height: 22px; border-radius: 5px; overflow: hidden; background: var(--panel-3); }
 .rm-mb-bar--loss { height: 18px; }
-.rm-mb-bar--pieces { height: 5px; border-radius: 3px; }
 .rm-mb-seg { display: block; height: 100%; flex: none; background: var(--tone); }
 .rm-mb-seg--gap {
   background: repeating-linear-gradient(135deg, var(--tone) 0 3px, transparent 3px 6px);
@@ -368,37 +367,37 @@
 .rm-mb-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 2px; }
 .rm-mb-note { margin: 0; font-size: 10.5px; font-weight: 600; color: var(--muted-2); }
 
-.rm-mb-pieces {
-  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 12px;
-  margin: 6px -6px 0; padding: 10px 6px 4px; border: 0; border-top: 1px solid var(--border-soft); border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  background: transparent; font: inherit; color: inherit; text-align: left;
+/* The foot of the balance, every mill: one strip of equal tiles across the panel — label over figure, like the KPI
+   cards; a tile with a drill-down is a button with a chevron (the user, 26 Nov 2026). The grid is pulled left by a
+   tile's padding + rule, so the first tile of every row lines up with the panel's left edge and shows no rule. */
+.rm-mb-stats { margin-top: 12px; border-top: 1px solid var(--border-soft); overflow: hidden; }
+.rm-mb-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-left: -17px; row-gap: 4px; padding-top: 10px; }
+/* A lone tile (RMD, RMS: the billet count) keeps a tile's width — never one button stretched across the page. */
+.rm-mb-stats-grid:has(> .rm-mb-stat:only-child) { grid-template-columns: minmax(150px, 300px); }
+.rm-mb-stat {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0;
+  padding: 4px 28px 4px 16px; border: 0; border-left: 1px solid var(--border-soft); border-radius: 0;
+  background: none; font: inherit; color: inherit; text-align: left;
 }
-.rm-mb-pieces .rm-mb-bar { grid-column: 1 / -1; }
-/* HSM operating figures under the balance: one compact line like Billets above it — label then figure, each a
-   door to its own drill-down; reads the same with one figure (Offline) or three. */
-.rm-mb-ops { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 28px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
-.rm-mb-op {
-  display: inline-flex; align-items: baseline; gap: 10px; min-width: 0; margin: 0 -6px; padding: 4px 6px;
-  font: inherit; color: inherit; text-align: left; cursor: pointer; background: none; border: 0;
-  border-radius: var(--radius-sm); transition: background-color 130ms ease;
-}
-.rm-mb-op:hover { background: var(--panel-2); }
-.rm-mb-op:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.rm-mb-op-v { font-size: 13px; font-weight: 800; white-space: nowrap; }
-.rm-mb-op-v .rm-card-unit { font-size: 10.5px; margin-left: 4px; }
-.rm-mb-pieces-v { font-size: 11.5px; font-weight: 600; color: var(--text-2); justify-self: end; }
-.rm-mb-pieces-v b { font-weight: 800; color: var(--text); }
+.rm-mb-stat--open { cursor: pointer; transition: background-color 130ms ease; }
+.rm-mb-stat--open:hover { background: color-mix(in srgb, var(--panel-hi) 45%, transparent); }
+.rm-mb-stat--open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rm-mb-stat-v { font-size: 17px; font-weight: 800; line-height: 1.15; white-space: nowrap; color: var(--text); }
+.rm-mb-stat-v.v-na { color: var(--muted-3); }
+.rm-mb-stat-v .rm-card-unit { font-size: 10.5px; margin-left: 4px; }
+.rm-mb-stat-go { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 16px; line-height: 1; color: var(--muted-3); transition: color 130ms ease, transform 130ms ease; }
+.rm-mb-stat--open:hover .rm-mb-stat-go { color: var(--text-2); transform: translate(2px, -50%); }
 
 /*
  * The balance across the full width: two halves. Left, billet input split into finished and mass
  * difference; right, the mass difference by loss. The right half shares the left's rows (subgrid),
- * so the two bars sit on one line and the two legends level, with the billet count across the foot.
+ * so the two bars sit on one line and the two legends level.
  */
 @media (min-width: 1181px) {
   .rm-row--full .rm-mb {
     display: grid; align-content: center;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "head losses" "input losses" "labels losses" "note note" "pieces pieces";
+    grid-template-areas: "head losses" "input losses" "labels losses" "note note";
     column-gap: 0; row-gap: 8px;
   }
   .rm-row--full .rm-mb > * { min-width: 0; }
@@ -406,13 +405,6 @@
   .rm-row--full .rm-mb-bar--input { grid-area: input; width: auto; margin-right: 28px; }
   .rm-row--full .rm-mb-labels { grid-area: labels; padding-right: 28px; }
   .rm-row--full .rm-mb-note { grid-area: note; }
-  /* The billet count: one line, the figures beside the label; no hairline bar stretched across the page (the user, 31 Oct 2026). */
-  .rm-row--full .rm-mb-pieces, .rm-row--full .rmd-mb-pieces {
-    grid-area: pieces; display: flex; align-items: baseline; justify-content: flex-start; gap: 14px;
-    margin: 4px 0 0; padding: 10px 0 2px; border-top: 1px solid var(--border-soft); border-radius: 0;
-  }
-  .rm-row--full .rm-mb-pieces .rm-mb-bar { display: none; }
-  .rm-row--full .rm-mb-pieces-v { justify-self: auto; font-size: 12.5px; }
   .rm-row--full .rm-mb-losses {
     grid-area: losses; display: grid; grid-template-rows: subgrid; row-gap: 8px;
     margin-top: 0; padding-left: 28px; border-left: 1px solid var(--border-soft);

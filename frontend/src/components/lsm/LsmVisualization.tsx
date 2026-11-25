@@ -30,6 +30,7 @@ import { ofInput } from '@/components/production/ofInput';
 import { productionTermText } from '@/components/production/productionTerm';
 import FinishedStockCard from '@/components/production/FinishedStockCard';
 import Panel from '@/components/Panel';
+import BalanceStats from '@/components/production/BalanceStats';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
 import { FormRunningRateFoot } from '@/components/production/FormRunningRate';
@@ -210,26 +211,11 @@ function MaterialBalance() {
             ))}
           </div>
         </div>
-        <div className="rmd-mb-pieces">
-          <span className="rm-k">Billets</span>
-          {t?.billetsPcs == null
-            ? <span className="rm-mb-pieces-v num v-na">NA</span>
-            : <span className="rm-mb-pieces-v num"><b>{t.billetsPcs.toLocaleString('en-IN')}</b>{' '}in</span>}
-        </div>
       </div>
-      <div className="rm-mb-ops" role="group" aria-label="Operating figures">
-        {OPS.map((k) => {
-          const v = t?.[k] ?? null;
-          return (
-            <button key={k} type="button" className="rm-mb-op" aria-haspopup="dialog" onClick={() => setOp(k)} title={`${BYPASS[k].name} per day`}>
-              <span className="rm-k">{BYPASS[k].name}</span>
-              {!data && !error
-                ? <span className="skel skel--num" role="status" aria-label="Loading" />
-                : <span className={`rm-mb-op-v num ${v === null ? 'v-na' : ''}`}>{v === null ? 'NA' : <>{fixed(v)}<span className="rm-card-unit">MT</span></>}</span>}
-            </button>
-          );
-        })}
-      </div>
+      <BalanceStats items={[
+        { key: 'in', label: 'Billets in', value: t?.billetsPcs, unit: 'pcs', whole: true, loading: !data && !error, onOpen: () => setOpen(true), title: 'Material balance per day' },
+        ...OPS.map((k) => ({ key: k, label: BYPASS[k].name, value: t?.[k], unit: 'MT', loading: !data && !error, onOpen: () => setOp(k), title: `${BYPASS[k].name} per day` })),
+      ]} />
       <LsmProductionDrawer view="balance" open={open} onClose={() => setOpen(false)} />
       <LsmProductionDrawer view={op ?? 'ccmBypassMt'} open={op !== null} onClose={() => setOp(null)} />
     </Panel>

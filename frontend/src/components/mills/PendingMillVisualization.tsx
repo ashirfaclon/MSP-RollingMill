@@ -22,6 +22,7 @@ import { ofInput } from '@/components/production/ofInput';
 import { productionTermText } from '@/components/production/productionTerm';
 import FinishedStockCard from '@/components/production/FinishedStockCard';
 import Panel from '@/components/Panel';
+import BalanceStats from '@/components/production/BalanceStats';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
 import { FormRunningRateFoot } from '@/components/production/FormRunningRate';
@@ -167,13 +168,8 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
                 </div>
               </div>
             )}
-            <div className="rmd-mb-pieces">
-              <span className="rm-k">Billets</span>
-              {billetsPcs === null
-                ? <span className="rm-mb-pieces-v num v-na">NA</span>
-                : <span className="rm-mb-pieces-v num"><b>{billetsPcs.toLocaleString('en-IN')}</b>{' '}in</span>}
-            </div>
           </div>
+          <BalanceStats items={[{ key: 'in', label: 'Billets in', value: billetsPcs, unit: 'pcs', whole: true, ...(mill === 'rms' ? { onOpen: () => setProdOpen(true), title: 'Material balance per day' } : {}) }]} />
         </Panel>
       </div>
     </div>

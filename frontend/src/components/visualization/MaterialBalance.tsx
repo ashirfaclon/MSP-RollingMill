@@ -23,6 +23,7 @@ import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import Panel from '@/components/Panel';
 import { fixed } from '@/lib/num';
 import BalanceDrawer from '@/components/drill/BalanceDrawer';
+import BalanceStats from '@/components/production/BalanceStats';
 import LogMetricDrawer, { LOG_METRICS, type LogMetric } from '@/components/drill/LogMetricDrawer';
 import { RMD_MODE_LABELS, useGlobalSel } from '@/state/globalSel';
 import { useErpPeriod } from '@/components/production/useErpPeriod';
@@ -46,8 +47,6 @@ const MIN_MT = 0.05;
 const pct = (v: number | null | undefined, of: number | null | undefined) =>
   v === null || v === undefined || !of ? 0 : (v / of) * 100;
 const mt = (v: number | null | undefined) => `${fixed(v, 1)} MT`;
-/** Billets and coils are whole pieces — never decimals, whatever the number rule (the ERP's sums can carry a fraction). */
-const pcs = (v: number | null | undefined) => (v == null ? 'NA' : Math.round(v).toLocaleString('en-IN'));
 
 export default function MaterialBalance() {
   const { current, loading, note } = useErpPeriod();
@@ -136,34 +135,17 @@ export default function MaterialBalance() {
         </div>
         {!has && !loading && <p className="rm-mb-note">{note}</p>}
 
-        {/* Pieces: the same balance counted in billets and coils. */}
-        <div className="rm-mb-pieces">
-          <span className="rm-k">Billets</span>
-          {loading
-            ? <span className="skel skel--num" role="status" aria-label="Loading" />
-            : <span className="rm-mb-pieces-v num">{has ? <><b>{pcs(t!.inputPcs)}</b> in · <b className="rm-text--order">{pcs(t!.productionPcs)}</b> coils out</> : 'NA'}</span>}
-          <span className="rm-mb-bar rm-mb-bar--pieces" aria-hidden>
-            <i className="rm-mb-seg rm-tone--order" style={{ width: `${has ? pct(t!.productionPcs, t!.inputPcs) : 0}%` }} />
-            <i className="rm-mb-seg rm-tone--diff" style={{ width: `${has ? Math.max(0, 100 - pct(t!.productionPcs, t!.inputPcs)) : 0}%` }} />
-          </span>
-        </div>
       </div>
 
-      {/* Operating figures: each its own drill-down (performance.xlsx, the user, 25 Nov 2026). */}
-      <div className="rm-mb-ops" role="group" aria-label="Operating figures">
-        {OPS.filter((k) => mode !== 'offline' || k === 'rollingDefectMt').map((k) => {
-          const m = LOG_METRICS[k];
-          const v = has ? (t![k] as number | null) : null;
-          return (
-            <button key={k} type="button" className="rm-mb-op" aria-haspopup="dialog" onClick={() => setMetric(k)} title={`${m.name} per day`}>
-              <span className="rm-k">{m.name}</span>
-              {loading
-                ? <span className="skel skel--num" role="status" aria-label="Loading" />
-                : <span className={`rm-mb-op-v num ${v === null ? 'v-na' : ''}`}>{v === null ? 'NA' : <>{fixed(v)}<span className="rm-card-unit">{m.unit}</span></>}</span>}
-            </button>
-          );
-        })}
-      </div>
+      {/* Billets and coils, then the operating figures — each opens its drill-down (performance.xlsx, the user, 25 Nov 2026). */}
+      <BalanceStats items={[
+        { key: 'in', label: 'Billets in', value: has ? t!.inputPcs : null, unit: 'pcs', whole: true, loading, onOpen: () => setOpen(true), title: 'Material balance per day' },
+        { key: 'out', label: 'Coils out', value: has ? t!.productionPcs : null, unit: 'pcs', whole: true, loading, onOpen: () => setOpen(true), title: 'Material balance per day' },
+        ...OPS.filter((k) => mode !== 'offline' || k === 'rollingDefectMt').map((k) => ({
+          key: k, label: LOG_METRICS[k].name, value: has ? (t![k] as number | null) : null, unit: LOG_METRICS[k].unit, loading,
+          onOpen: () => setMetric(k), title: `${LOG_METRICS[k].name} per day`,
+        })),
+      ]} />
 
       <BalanceDrawer open={open} onClose={() => setOpen(false)} />
       <LogMetricDrawer metric={metric} onClose={() => setMetric(null)} />

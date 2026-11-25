@@ -44,13 +44,13 @@ test('HSM: six cards per row; Both shows the five headline cards and both sets, 
   }
   // The bypasses are Online's: in the balance under Both and Online, not under Offline.
   const ops = page.getByRole('group', { name: 'Operating figures' });
-  await expect(ops.getByRole('button')).toHaveText([/^Defective/, /^CCM bypass/, /^HSM bypass/]);
+  await expect(ops.getByRole('button')).toHaveText([/^Billets in/, /^Coils out/, /^Defective/, /^CCM bypass/, /^HSM bypass/]);
   await strip.screenshot({ path: `${SHOTS}/hsm-rolling-both.png` });
 
   // Online: its own row alone — production, cast, delivery, prime and the two rolling percentages (the user, 24 Nov 2026).
   await choose('Online');
   await expect(labels).toHaveText([/^Production/, /^Cast qty/, /^Delivery/, /^Prime qty/, /^Rolling w\.r\.t\. casting/, /^Rolling w\.r\.t\. delivery/, /^Breakdown/]);
-  await expect(ops.getByRole('button')).toHaveText([/^Defective/, /^CCM bypass/, /^HSM bypass/]);
+  await expect(ops.getByRole('button')).toHaveText([/^Billets in/, /^Coils out/, /^Defective/, /^CCM bypass/, /^HSM bypass/]);
   await expect(strip.locator('.rm-card-value').nth(0)).toContainText('2,870.29');
   await expect(value('Cast qty')).toContainText('3,237.6');
   await expect(value('Rolling w.r.t. casting')).toContainText('92.3');
@@ -59,7 +59,7 @@ test('HSM: six cards per row; Both shows the five headline cards and both sets, 
   // Offline: its own row alone — quantities and cold power; no rolling percentages (Offline's are never counted).
   await choose('Offline');
   await expect(labels).toHaveText([/^Production/, /^Cast qty/, /^Delivery/, /^Prime qty/, /^Cold power/, /^Breakdown/]);
-  await expect(ops.getByRole('button')).toHaveText([/^Defective/]);
+  await expect(ops.getByRole('button')).toHaveText([/^Billets in/, /^Coils out/, /^Defective/]);
   // Breakdown opens its own drill-down.
   await strip.getByRole('button', { name: 'Breakdown', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Breakdown · ERP log sheet' }).getByRole('table', { name: 'Breakdown by period' })).toBeVisible();

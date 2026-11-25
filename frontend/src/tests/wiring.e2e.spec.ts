@@ -71,7 +71,7 @@ test('mass yield card and the material balance show the ERP log sheet for the pe
   await expect(mb).toContainText('Yield96%');
   await expect(mb).toContainText('Finished 1,076.51 MT');
   await expect(mb).toContainText('Mass difference 44.83 MT · 4% of input');
-  await expect(mb).toContainText('1,496 in · 1,481 coils out');
+  await expect(panel.locator('.rm-mb-stat')).toContainText(['Billets in1,496pcs', 'Coils out1,481pcs']);
   const losses = panel.locator('.rm-mb-legend');
   for (const [k, v] of [['Burning loss', '14.84 MT 1.32%'], ['End cut', '19.07 MT 1.7%'], ['Miss-roll', '10.92 MT 0.97%']]) {
     await expect(losses.locator('.rm-mb-link', { hasText: new RegExp(`^${k}`) })).toContainText(v);
@@ -421,7 +421,7 @@ test('RMD: mass yield from the ERP log sheet (Prime + SL ÷ INPUT_MT); billets i
   await y.screenshot({ path: `${SHOTS}/rmd-drill-yield.png` });
   await page.keyboard.press('Escape');
   // BILLET_COUNT increases per RMD day: M1 3,173 + M2 3,021 = 6,194 over 1–8 Oct — the material balance's billets.
-  await expect(page.locator('section.panel', { hasText: 'Material & operating balance' }).locator('.rmd-mb-pieces')).toContainText('6,194 in');
+  await expect(page.locator('section.panel', { hasText: 'Material & operating balance' }).locator('.rm-mb-stat').first()).toContainText('Billets in6,194pcs');
 
   // Power: only the 16 Sep readings exist so far — VCB 1 18,022.3 + VCB 2 8,506.7 + VCB 3 4,441.6.
   await page.getByRole('button', { name: /Duration/ }).click();
@@ -635,13 +635,13 @@ test('LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant 
   await expect(balance).toContainText('Finished 2,106.12 MT');
   await expect(balance).toContainText('Mass difference 120.77 MT');
   // Billets in: Σ INPUT_PCS, 1–8 Oct = 8,429.
-  await expect(balance.locator('.rmd-mb-pieces')).toContainText('8,429 in');
+  await expect(balance.locator('.rm-mb-stat').first()).toContainText('Billets in8,429pcs');
   // The six losses add up to the mass difference: 24.63 + 68.46 + 9.14 + 5.3 + 13.24 = 120.77.
   await expect(balance.locator('.rm-mb-link')).toHaveText([/^Burning loss 24\.63 MT/, /^End cut 68\.46 MT/, /^Miss-roll 9\.14 MT/, /^Reject 5\.3 MT/, /^Short length 13\.24 MT/]);
   await balance.screenshot({ path: `${SHOTS}/lsm-material-balance.png` });
   // The two bypasses, as HSM's (no defective — LSM's log sheet has none): Σ CCM_BY_PASS_MT 56.16, Σ LSM_BY_PASS_MT 50.23.
   const ops = page.getByRole('group', { name: 'Operating figures' });
-  await expect(ops.locator('.rm-mb-op')).toHaveText(['CCM bypass56.16MT', 'LSM bypass50.23MT']);
+  await expect(ops.locator('.rm-mb-stat')).toHaveText(['Billets in8,429pcs›', 'CCM bypass56.16MT›', 'LSM bypass50.23MT›']);
   await ops.getByRole('button', { name: /LSM bypass/ }).click();
   const lb = page.getByRole('dialog', { name: 'LSM bypass · ERP log sheet' });
   await expect(lb.getByRole('table', { name: 'LSM bypass by period' }).locator('tfoot')).toContainText('50.23');
@@ -828,7 +828,7 @@ test('RMS: production from the ERP log sheet (division RS, series L5P) — a day
   await expect(card.locator('.rm-card-value')).toContainText('6,244.75');
   // Billets in: Σ INPUT_PCS (repeated entries once).
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
-  await expect(balance.locator('.rmd-mb-pieces')).toContainText(/[\d,]+ in/);
+  await expect(balance.locator('.rm-mb-stat').first()).toContainText(/Billets in[\d,]+pcs/);
   // Billet input Σ (INPUT_MT1 + INPUT_MT2) 6,648.09; mass yield 6,244.75 ÷ 6,648.09 = 93.93 %; mass difference 403.34.
   await expect(page.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-value')).toContainText('93.93');
   await expect(balance.locator('.rm-mb-figure-v')).toHaveText(['6,648.09 MT', '93.93%']);

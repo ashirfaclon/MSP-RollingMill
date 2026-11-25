@@ -311,7 +311,7 @@ test('RMD visualization: the HSM layout; wired where sourced, NA everywhere else
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
   await expect(balance.locator('.rm-mb-figure-v')).toHaveText(['NA', 'NA']);
   await expect(balance).toContainText('Mass difference NA');
-  await expect(balance.locator('.rmd-mb-pieces')).toContainText(/\d+ in|NA/);
+  await expect(balance.locator('.rm-mb-stat').first()).toContainText(/Billets in([\d,]+pcs|NA)/);
   // Finished stock by size: the ERP item ledger (FGYRDP), one row per bar size.
   await expect(page.locator('section.panel', { hasText: 'Finished stock by size' }).locator('.rm-size-name').first()).toHaveText(/^\d+ mm$/);   // highest stock first (the user, 30 Oct 2026)
   await page.screenshot({ path: `${SHOTS}/rmd-visualization.png`, fullPage: true });

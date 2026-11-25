@@ -15,6 +15,7 @@
  *
  */
 import Panel from '@/components/Panel';
+import BalanceStats from '@/components/production/BalanceStats';
 import { ofInput } from '@/components/production/ofInput';
 import type { Series } from '@/components/visualization/KpiCard';
 import { fixed } from '@/lib/num';
@@ -145,13 +146,8 @@ function MaterialBalance() {
           </div>
         </div>
 
-        <div className="rmd-mb-pieces">
-          <span className="rm-k">Billets</span>
-          {loading
-            ? <span className="skel skel--num" role="status" aria-label="Loading" />
-            : <span className="rm-mb-pieces-v num">{billets === null ? 'NA' : <><b>{billets.toLocaleString('en-IN')}</b>{' '}in</>}</span>}
-        </div>
       </div>
+      <BalanceStats items={[{ key: 'in', label: 'Billets in', value: billets, unit: 'pcs', whole: true, loading, onOpen: () => setOpen(true), title: 'Material balance per day' }]} />
       <RmdProductionDrawer view="balance" open={open} onClose={() => setOpen(false)} />
     </Panel>
   );

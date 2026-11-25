@@ -39,10 +39,6 @@
 .rmd-figure.rm-tone--ok .rm-k { color: var(--ok); }
 .rm-mb-caption { font-size: 10.5px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
 .rm-mb-caption b { color: var(--tone); font-weight: 800; font-size: 11.5px; }
-.rmd-mb-pieces {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border-soft);
-}
 
 @media (max-width: 1180px) {
   .rmd-mimic, .rmd-mimic.rmd-mimic--four { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
@@ -54,7 +50,7 @@
 }
 
 /* NA reads the same muted grey everywhere — never in a series colour. */
-.rmd-figure .rm-mb-figure-v.v-na, .rm-mb-caption b.v-na, .rm-mb-pieces-v.v-na { color: var(--muted-3); }
+.rmd-figure .rm-mb-figure-v.v-na, .rm-mb-caption b.v-na { color: var(--muted-3); }
 
 /* Every zone the same height, whether or not it carries a row of dots. */
 .rmd-mimic { align-items: stretch; }
