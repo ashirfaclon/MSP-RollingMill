@@ -205,6 +205,7 @@
 .brb-in { font-size: 10.5px; font-weight: 700; fill: #fff; paint-order: stroke; stroke: rgba(0, 0, 0, 0.25); stroke-width: 2px; }
 .brb-stand { font-size: 11.5px; font-weight: 700; fill: var(--text); }
 .brb-date { font-size: 10px; font-weight: 600; fill: var(--muted-2); }
+.brb-brg { font-size: 9.5px; font-weight: 800; letter-spacing: 0.2px; }
 .brb-limit { stroke: var(--risk); stroke-width: 2; }
 .brb-limit-text {
   position: absolute; right: 6px; padding: 1px 6px; border-radius: 4px; pointer-events: none;
@@ -221,10 +222,27 @@
 .ca-mbar-col { display: flex; flex-direction: column; align-items: center; min-height: 0; position: relative; }
 .ca-mbar-val { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
 .ca-mbar-track { flex: 1; width: 100%; max-width: 72px; display: flex; align-items: flex-end; }
-.ca-mbar-fill { width: 100%; border-radius: 4px 4px 0 0; transition: height 0.3s ease; }
+.ca-mbar-fill { width: 100%; border-radius: 4px 4px 0 0; }
 .ca-mbar-fill.is-matched { background: var(--cat-1); }
 .ca-mbar-fill.is-worse { background: var(--risk); }
 .ca-mbar-fill.is-better { background: var(--ok); }
 .ca-mbar-fill.is-neutral { background: var(--text-3); }
 .ca-mbar-label { position: absolute; bottom: -20px; font-size: 11px; font-weight: 700; color: var(--text-2); }
 .ca-mbar .ca-last { font-size: 10.5px; }
+
+/* A stand's parts side by side (RMD, several bearings per gearbox): one small chart each, one shared legend. */
+.ah-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px 18px; }
+.ah-part { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ah-part--wide { grid-column: 1 / -1; }
+.ah-part-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  padding: 3px 6px; margin: 0 -6px; border: none; border-radius: 6px; background: none; font: inherit; color: var(--muted-2); cursor: pointer; text-align: left;
+}
+.ah-part-head:hover { background: color-mix(in srgb, var(--panel-hi) 55%, transparent); color: var(--text); }
+.ah-part-head:focus-visible { outline: 2px solid var(--info); outline-offset: 1px; }
+.ah-part-head i { font-style: normal; font-size: 12px; }
+.ah-part-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 11px; font-weight: 600; color: var(--text-2); }
+.ah-part-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ah-part-legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.ah-part-legend .ah-part-solid { background: var(--text-3); }
+.ah-part-legend .ah-part-dash { background: repeating-linear-gradient(90deg, var(--text-3) 0 4px, transparent 4px 7px); }

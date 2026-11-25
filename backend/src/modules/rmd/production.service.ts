@@ -12,15 +12,16 @@
  *
  * Rolling in Casting % / Delivery % and Plant Efficiency % (the plant, 21 Nov 2026 — the Zoho TMT KPIs,
  * the ERP's figures): each entry's ROLLING_IN_TOTAL_PERCENTAGE / ROLLING_IN_DELIVERY_PRCNT, over a period
- * their average weighted by the entries' billet input; efficiency = Σ production ÷ Σ PRODUCTION_TARGET
- * over the entries that have both, which for one entry is the ERP's PLANT_EFFICIENCY.
+ * their average weighted by the entries' billet input; efficiency = each entry's PLANT_EFFICIENCY (the ERP's:
+ * performance × availability, so a breakdown counts — the user, 25 Nov 2026), over a period weighted by the
+ * entries' PRODUCTION_TARGET; one entry is the ERP's figure exactly.
  *
  * Online / Offline (`mode`, the user, 13 Nov 2026): only that rolling's entries (RMD_MODE_CODES);
  * all of them for Both. An entry synced before the split has no mode, so it counts under Both only.
  */
 import type { Env } from '../../config/env';
 import type { Grain, RmdMode, RmdProductionPeriod, RmdProductionReport } from '../../contracts';
-import { readErpRmdProduction, type RmdLogField, type RmdLogRow } from '../../integrations/erp/cache';
+import { RMD_BREAKDOWN_FIELDS, readErpRmdProduction, type RmdLogField, type RmdLogRow } from '../../integrations/erp/cache';
 import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, round2 } from '../hsm/production.service';
 import { sectionsRolled } from '../../shared/sections';
@@ -65,13 +66,25 @@ export function coal(rows: RmdLogRow[]): { coalMt: number | null; coalKgPerMt: n
   return { coalMt: round2(mt), coalKgPerMt: prod > 0 ? round2((mt * 1000) / prod) : null };
 }
 
-/** Σ production ÷ Σ target × 100 over the entries with both; null with none. */
+/**
+ * The ERP's PLANT_EFFICIENCY of each entry, weighted by its PRODUCTION_TARGET (equal weights where an entry has
+ * none); null with no figure. Was Σ production ÷ Σ target, which left out availability (the user, 25 Nov 2026).
+ */
 export function efficiencyPct(rows: RmdLogRow[]): number | null {
-  const both = rows.filter((r) => r.v.PRODUCT_PRIME_SLENGTH_MT !== null && (r.v.PRODUCTION_TARGET ?? 0) > 0);
-  if (!both.length) return null;
-  const prod = both.reduce((a, r) => a + r.v.PRODUCT_PRIME_SLENGTH_MT!, 0);
-  const target = both.reduce((a, r) => a + r.v.PRODUCTION_TARGET!, 0);
-  return round2((prod / target) * 100);
+  const v = rows.filter((r) => typeof r.v.PLANT_EFFICIENCY === 'number');
+  if (!v.length) return null;
+  const w = (r: RmdLogRow) => (v.every((x) => (x.v.PRODUCTION_TARGET ?? 0) > 0) ? r.v.PRODUCTION_TARGET! : 1);
+  return round2(v.reduce((a, r) => a + r.v.PLANT_EFFICIENCY! * w(r), 0) / v.reduce((a, r) => a + w(r), 0));
+}
+
+/** The sheet's seven breakdown items over the entries, hours each (negative minutes left out), and their total; null total with no entry. */
+export function breakdownOf(rows: RmdLogRow[]): { breakdownHrs: number | null; breakdown: RmdProductionPeriod['breakdown'] } {
+  const mins = RMD_BREAKDOWN_FIELDS.map(([code, label]) => ({ code, label, min: rows.reduce((a, r) => a + Math.max(0, r.v[code] ?? 0), 0) }));
+  // The total from the minutes, not from the rounded hours (115 min = 1.92 h, not 0.33 + 0.5 + 1.08).
+  return {
+    breakdownHrs: rows.length ? round2(mins.reduce((a, m) => a + m.min, 0) / 60) : null,
+    breakdown: mins.map(({ code, label, min }) => ({ code, label, hrs: round2(min / 60) })),
+  };
 }
 
 export function summarise(key: string, label: string, dates: string[], rows: RmdLogRow[]): RmdProductionPeriod {
@@ -96,6 +109,10 @@ export function summarise(key: string, label: string, dates: string[], rows: Rmd
     rollingInDeliveryPct: weightedPct(mine, 'ROLLING_IN_DELIVERY_PRCNT'),
     plantEfficiencyPct: efficiencyPct(mine),
     targetMt: sumOf(mine, 'PRODUCTION_TARGET'),
+    ...breakdownOf(mine),
+    ccmBypassMt: sumOf(mine, 'CCM_BYPASS_MT'),
+    millBypassMt: sumOf(mine, 'MILL_BYPASS_MT'),
+    shortLengthMt: sumOf(mine, 'FINISH_PRODUCT_SLENGTH_MT'),
   };
 }
 

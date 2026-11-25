@@ -6,6 +6,10 @@
  * gear, pinion gear; DE solid, NDE hatched) with its value, the alert limits as dashed lines with
  * the outside shaded, and a line saying whether any bearing is outside its limits. No stand buttons:
  * a dropdown picks All (default), Roughing or Route. The trend over time is in the drill-down.
+ * A gearbox with several bearings (the plant's sheet, 25 Nov 2026 — reduction gear 1–5, pinion gear 1–3, the
+ * intermill's second pinion set): its bars stay together in the part's colour, bearing by bearing, each DE / NDE
+ * pair numbered under the axis (B1, B2 …); a wider gap parts one gearbox from the next. (One bar per gearbox with
+ * a dot per bearing was tried and turned down by the user, 25 Nov 2026: every bearing keeps its own bar.)
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { dm } from '@/lib/plantDay';
@@ -22,6 +26,7 @@ const POSITIONS = [
   { name: 'Flywheel', color: 'var(--cat-2)' },
   { name: 'Reduction gear', color: 'var(--cat-3)' },
   { name: 'Pinion gear', color: 'var(--cat-4)' },
+  { name: 'Pinion gear set 2', color: 'var(--cat-5)' },
 ];
 const STAND_ORDER = ['20" R stand', '16" R stand', 'Intermill', 'NC stand', 'OC stand'];
 
@@ -31,14 +36,15 @@ const standKey = (s: string): [number, number] => {
   const i = STAND_ORDER.indexOf(m[1]);
   return [i < 0 ? STAND_ORDER.length : i, Number(m[2] ?? 0)];
 };
-/** "Reduction gear ND side" → position "Reduction gear", side NDE. */
+/** "Reduction gear B3 ND side" → position "Reduction gear", bearing 3, side NDE; no "B" is bearing 1. */
 const split = (point: string) => {
-  const m = /^(.*?)\s+(ND|D) side$/i.exec(point);
-  return { position: m ? m[1] : point, nde: !!m && m[2].toUpperCase() === 'ND' };
+  const m = /^(.*?)(?:\s+B(\d+))?\s+(ND|D) side$/i.exec(point);
+  return { position: m ? m[1] : point, bearing: m && m[2] ? Number(m[2]) : 1, nde: !!m && m[3].toUpperCase() === 'ND' };
 };
 
 // Geometry (px). Bars widen (to BAR_MAX) when a few stands leave the panel room; LABELS = the limit labels' room on the right.
-const BAR = 22, BAR_MAX = 64, GAP = 2, PAD = 16, TOP = 26, PLOT = 300, BOTTOM = 40, AXIS = 40, LABELS = 150;
+// BRG / PART: the extra room before the next bearing of a gearbox, and before the next gearbox.
+const BAR = 18, BAR_MAX = 64, GAP = 2, BRG = 4, PART = 10, PAD = 16, TOP = 26, PLOT = 300, BOTTOM = 40, AXIS = 40, LABELS = 150;
 
 /** The entry's time as HH:MM — the form holds a time or a full date-time. */
 const hhmm = (t: string | null) => (t ? /(\d{1,2}:\d{2})/.exec(t)?.[1] ?? null : null);
@@ -57,17 +63,21 @@ export default function RmdBearingBars({ readings, empty }: { readings: StandRea
   }, [readings.length]);
   const view = useMemo(() => {
     const rows = readings.filter((r) => set === 'all' || r.group === set).map((r) => {
-      const { position, nde } = split(r.point);
+      const { position, bearing, nde } = split(r.point);
       const p = POSITIONS.findIndex((x) => x.name === position);
-      return { ...r, time: hhmm(r.time), position, nde, p: p < 0 ? POSITIONS.length : p };
+      return { ...r, time: hhmm(r.time), position, bearing, nde, p: p < 0 ? POSITIONS.length : p };
     });
     const stands = [...new Set(rows.map((r) => r.equipment))].sort((a, b) => {
       const [ga, na] = standKey(a), [gb, nb] = standKey(b);
       return ga - gb || na - nb || a.localeCompare(b);
-    }).map((name) => ({
-      name,
-      bars: rows.filter((r) => r.equipment === name).sort((a, b) => a.p - b.p || Number(a.nde) - Number(b.nde)),
-    }));
+    }).map((name) => {
+      const bars = rows.filter((r) => r.equipment === name).sort((a, b) => a.p - b.p || a.bearing - b.bearing || Number(a.nde) - Number(b.nde));
+      // Where each bar starts beyond its plain slot: a little more before a new bearing, more before a new gearbox.
+      const extra = bars.reduce<number[]>((a, b, i) => [...a, i === 0 ? 0 : a[i - 1] + (b.p !== bars[i - 1].p ? PART : b.bearing !== bars[i - 1].bearing ? BRG : 0)], []);
+      // A part's bearings are numbered only where it has more than one.
+      const numbered = new Set(bars.filter((b) => b.bearing > 1).map((b) => b.p));
+      return { name, bars, extra, numbered };
+    });
     return { rows, stands };
   }, [readings, set]);
 
@@ -98,13 +108,17 @@ export default function RmdBearingBars({ readings, empty }: { readings: StandRea
   const ticks = Array.from({ length: Math.floor(top / 10) + 1 }, (_, i) => i * 10);
 
   const nBars = stands.reduce((n, s) => n + s.bars.length, 0);
-  const fixedW = stands.reduce((w, s) => w + PAD * 2 + (s.bars.length - 1) * GAP, 0) + LABELS;
+  const extraOf = (s: { extra: number[] }) => s.extra.at(-1) ?? 0;
+  const fixedW = stands.reduce((w, s) => w + PAD * 2 + (s.bars.length - 1) * GAP + extraOf(s), 0) + LABELS;
   const bar = nBars ? Math.min(BAR_MAX, Math.max(BAR, Math.floor((room - fixedW) / nBars))) : BAR;
-  const groupW = (n: number) => PAD * 2 + n * bar + (n - 1) * GAP;
-  const xs = stands.reduce<number[]>((a, s, i) => [...a, i === 0 ? 0 : a[i - 1] + groupW(stands[i - 1].bars.length)], []);
-  const plotW = stands.reduce((w, s) => w + groupW(s.bars.length), 0);
+  const groupW = (s: { bars: unknown[]; extra: number[] }) => PAD * 2 + s.bars.length * bar + (s.bars.length - 1) * GAP + extraOf(s);
+  const xs = stands.reduce<number[]>((a, s, i) => [...a, i === 0 ? 0 : a[i - 1] + groupW(stands[i - 1])], []);
+  const plotW = stands.reduce((w, s) => w + groupW(s), 0);
   const width = plotW + LABELS;
-  const height = TOP + PLOT + BOTTOM;
+  // Bearing numbers under the axis push the stand names down a line.
+  const multi = stands.some((s) => s.numbered.size > 0);
+  const nameY = TOP + PLOT + (multi ? 30 : 17);
+  const height = TOP + PLOT + BOTTOM + (multi ? 13 : 0);
   const positionsShown = POSITIONS.filter((p) => rows.some((r) => r.position === p.name));
 
   return (
@@ -123,7 +137,7 @@ export default function RmdBearingBars({ readings, empty }: { readings: StandRea
         <>
           <div className="brb-top">
             {outside.length
-              ? <span className="chip chip--risk" role="status">⚠ {outside.length} bearing{outside.length === 1 ? ' is' : 's are'} outside the alert limits: {outside.slice(0, 3).map((r) => `${r.equipment} ${r.position} ${r.nde ? 'NDE' : 'DE'} ${fixed(r.value, 0)} °C`).join(', ')}{outside.length > 3 ? ' …' : ''}</span>
+              ? <span className="chip chip--risk" role="status">⚠ {outside.length} bearing{outside.length === 1 ? ' is' : 's are'} outside the alert limits: {outside.slice(0, 3).map((r) => `${r.equipment} ${r.position}${r.bearing > 1 ? ` B${r.bearing}` : ''} ${r.nde ? 'NDE' : 'DE'} ${fixed(r.value, 0)} °C`).join(', ')}{outside.length > 3 ? ' …' : ''}</span>
               : <span className="chip chip--ok" role="status">✓ No bearing is outside the alert limits (highest {fixed(hi, 0)} °C, lowest {fixed(lo, 0)} °C)</span>}
             <span className="brb-legend" aria-label="Legend">
               {positionsShown.map((p) => <span key={p.name}><i style={{ background: p.color }} />{p.name}</span>)}
@@ -155,11 +169,12 @@ export default function RmdBearingBars({ readings, empty }: { readings: StandRea
                   <g key={s.name} transform={`translate(${xs[si]},0)`}>
                     {si > 0 && <line x1={0} x2={0} y1={TOP} y2={TOP + PLOT} className="brb-sep" />}
                     {s.bars.map((b, bi) => {
-                      const x = PAD + bi * (bar + GAP);
+                      const x = PAD + bi * (bar + GAP) + s.extra[bi];
+                      const numbered = s.numbered.has(b.p);
                       const by = y(b.value);
                       const h = TOP + PLOT - by;
                       const out = b.status === 'high' || b.status === 'low';
-                      const name = `${b.position} ${b.nde ? 'NDE' : 'DE'}`;
+                      const name = `${b.position}${numbered ? ` B${b.bearing}` : ''} ${b.nde ? 'NDE' : 'DE'}`;
                       const color = POSITIONS[b.p]?.color ?? 'var(--cat-6)';
                       return (
                         <g key={b.point}>
@@ -170,12 +185,16 @@ export default function RmdBearingBars({ readings, empty }: { readings: StandRea
                           {h > name.length * 6 + 14 && (
                             <text transform={`translate(${x + bar / 2 + 3.5},${TOP + PLOT - 8}) rotate(-90)`} className="brb-in">{name}</text>
                           )}
+                          {/* The bearing's number, once under its DE / NDE pair. */}
+                          {numbered && !b.nde && (
+                            <text x={x + bar + GAP / 2} y={TOP + PLOT + 13} textAnchor="middle" className="brb-brg" style={{ fill: color }}>B{b.bearing}</text>
+                          )}
                         </g>
                       );
                     })}
-                    <text x={groupW(s.bars.length) / 2} y={TOP + PLOT + 17} textAnchor="middle" className="brb-stand">{s.name}</text>
+                    <text x={groupW(s) / 2} y={nameY} textAnchor="middle" className="brb-stand">{s.name}</text>
                     {last && s.bars[0] && s.bars[0].at !== last.at && (
-                      <text x={groupW(s.bars.length) / 2} y={TOP + PLOT + 31} textAnchor="middle" className="brb-date">{dm(s.bars[0].at)}</text>
+                      <text x={groupW(s) / 2} y={nameY + 14} textAnchor="middle" className="brb-date">{dm(s.bars[0].at)}</text>
                     )}
                   </g>
                 ))}

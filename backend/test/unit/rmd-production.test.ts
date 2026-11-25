@@ -1,13 +1,16 @@
 /** RMD production and losses from the ERP log sheet (FA-SKJ codes as the plant gave them). */
 import { describe, expect, test } from 'vitest';
-import { efficiencyPct, massDifference, massYield, ofMode, summarise, weightedPct } from '../../src/modules/rmd/production.service';
+import { deliveryRate } from '../../src/modules/rmd/running-rate.service';
+import { breakdownOf, efficiencyPct, massDifference, massYield, ofMode, summarise, weightedPct } from '../../src/modules/rmd/production.service';
 import type { RmdLogRow } from '../../src/integrations/erp/cache';
 
 const entry = (date: string, vrno: string, input: number, prod: number, prime: number, bloss: number, endcut: number, misroll: number, chip: number): RmdLogRow => ({
   date, vrno, mode: vrno.endsWith('-0002') ? 'offline' : 'online',
   v: { INPUT_MT: input, ACTUAL_RUNNING_HRS: 5, PRODUCT_PRIME_SLENGTH_MT: prod, FINISH_PRODUCT_PRIME_MT: prime, BLOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, CHIP_OFF_MT: chip, TOTAL_POWER_CONSUMPTION: null, MILL_SINGLE_STAND: null,
     ROLLING_IN_TOTAL_PERCENTAGE: null, ROLLING_IN_DELIVERY_PRCNT: null, PLANT_EFFICIENCY: null, PRODUCTION_TARGET: null,
-    COAL_CONSUMPTION_KGMT: null, TOTAL_COAL_CONSUMPTION: null },
+    COAL_CONSUMPTION_KGMT: null, TOTAL_COAL_CONSUMPTION: null,
+    MILL_BKDN_IN_MIN_MECHANICAL: null, MILL_BKDN_IN_MIN_ELECTRICAL: null, MILL_BKDN_IN_MIN_PROCESS: null, MILL_BKDN_IN_MIN_RM: null, MILL_BKDN_IN_MIN_POWEROTHERS: null, MILL_1_12__STAND: null,
+    CCM_BYPASS_MT: null, MILL_BYPASS_MT: null, FINISH_PRODUCT_SLENGTH_MT: null, DELIVERY_RATE_MTHRS: null },
 });
 // 7 Oct 2026 as the ERP holds it: two entries.
 const ROWS = [
@@ -64,16 +67,66 @@ describe('the Zoho TMT KPIs from the ERP (the plant, 21 Nov 2026)', () => {
   const ON = zoho('L4P26J14-0001', 217.24, 207.78, 309, 93.008, 94.903, 67.243);
   const OFF = zoho('L4P26J14-0002', 100.93, 93.04, 52, 94.332, 94.332, 178.923);
 
-  test('one entry: exactly the ERP\'s figures; efficiency = production ÷ target', () => {
+  test('one entry: exactly the ERP\'s figures', () => {
     expect(summarise('d', '14 Jul', ['2026-07-14'], [ON])).toMatchObject({ rollingInCastingPct: 93.01, rollingInDeliveryPct: 94.9, plantEfficiencyPct: 67.24, targetMt: 309 });
   });
 
-  test('several entries: the percentages weighted by billet input; efficiency Σ production ÷ Σ target', () => {
+  test('several entries: the percentages weighted by billet input; efficiency the ERP\'s, weighted by target', () => {
     expect(weightedPct([ON, OFF], 'ROLLING_IN_TOTAL_PERCENTAGE')).toBe(93.43);
+    // (67.243 × 309 + 178.923 × 52) ÷ 361
     expect(efficiencyPct([ON, OFF])).toBe(83.33);
+  });
+
+  test('a breakdown counts: the ERP\'s performance × availability, not production ÷ target (the user, 25 Nov 2026)', () => {
+    // 19 Nov 2026 Online as the ERP holds it: 141.509 % performance × 87.118 % availability = 123.28 %.
+    const e = entry('2026-11-19', 'L4P26N19-0002', 300, 244.81, 244.81, 0, 0, 0, 0);
+    const n19 = { ...e, v: { ...e.v, PRODUCTION_TARGET: 173, PLANT_EFFICIENCY: 123.28 } };
+    expect(efficiencyPct([n19])).toBe(123.28);
+    expect(efficiencyPct([n19, ON])).toBe(87.36);   // (123.28 × 173 + 67.243 × 309) ÷ 482
   });
 
   test('entries synced before the fields were read: null, not 0', () => {
     expect(summarise('d', '7 Oct', ['2026-10-07'], ROWS)).toMatchObject({ rollingInCastingPct: null, rollingInDeliveryPct: null, plantEfficiencyPct: null, targetMt: null });
   });
+});
+
+describe('breakdown, the plant\'s sheet (the user, 25 Nov 2026)', () => {
+  const bd = (date: string, vrno: string, mins: Partial<Record<'MILL_BKDN_IN_MIN_PROCESS' | 'MILL_BKDN_IN_MIN_ELECTRICAL' | 'MILL_SINGLE_STAND' | 'MILL_1_12__STAND', number>>): RmdLogRow => {
+    const e = entry(date, vrno, 100, 95, 95, 0, 0, 0, 0);
+    return { ...e, v: { ...e.v, ...mins } };
+  };
+  test('all seven added, minutes to hours; each kept apart in the sheet\'s order', () => {
+    // 19 Nov 2026 Online as the ERP holds it: process 85 min; plus a single-stand and a mill 1½ entry.
+    const r = breakdownOf([bd('2026-11-19', 'L4P26N19-0002', { MILL_BKDN_IN_MIN_PROCESS: 85 }), bd('2026-11-04', 'L4P26N04-0002', { MILL_SINGLE_STAND: 15, MILL_1_12__STAND: 20 })]);
+    expect(r.breakdownHrs).toBe(2);   // (85 + 15 + 20) ÷ 60
+    expect(r.breakdown.map((b) => b.label)).toEqual(['Mechanical', 'Electrical', 'Process', 'Raw material', 'Power / other', 'Mill single stand', 'Mill 1½']);
+    expect(r.breakdown.find((b) => b.label === 'Process')!.hrs).toBe(1.42);
+  });
+  test('a negative entry (12 Apr 2026 Offline: mill 1½ −1) is left out; no entry is null, entries without any are 0', () => {
+    expect(breakdownOf([bd('2026-04-12', 'L4P26412-0002', { MILL_1_12__STAND: -1 })]).breakdownHrs).toBe(0);
+    expect(breakdownOf([]).breakdownHrs).toBeNull();
+  });
+});
+
+test('balance strip: CCM bypass, RMD bypass and short length summed (the user, 25 Nov 2026)', () => {
+  const e = (vrno: string, ccm: number, mill: number, sl: number): RmdLogRow => {
+    const x = entry('2026-11-24', vrno, 232.02, 223.3, 221.19, 0, 0, 0, 0);
+    return { ...x, v: { ...x.v, CCM_BYPASS_MT: ccm, MILL_BYPASS_MT: mill, FINISH_PRODUCT_SLENGTH_MT: sl } };
+  };
+  // 24 Nov 2026 as the ERP holds it: Online CCM 21.20 / RMD 0 / SL 2.11; Offline 0 / 0 / 2.67.
+  expect(summarise('d', '24 Nov', ['2026-11-24'], [e('L4P26N24-0002', 21.2, 0, 2.11), e('L4P26N24-0001', 0, 0, 2.67)]))
+    .toMatchObject({ ccmBypassMt: 21.2, millBypassMt: 0, shortLengthMt: 4.78 });
+});
+
+test('TPH is the ERP\'s delivery rate; several entries weighted by their hours, nothing left out (the user, 25 Nov 2026)', () => {
+  const e = (date: string, rate: number, hrs: number): RmdLogRow => {
+    const x = entry(date, 'L4P26N0-0002', 250, 240, 238, 0, 0, 0, 0);
+    return { ...x, v: { ...x.v, DELIVERY_RATE_MTHRS: rate, ACTUAL_RUNNING_HRS: hrs } };
+  };
+  // 6–8 Nov 2026 Online as the ERP holds them; 7 Nov is filed with 260 running hours.
+  const days = [e('2026-11-06', 25.077, 9.5), e('2026-11-07', 1.133, 260), e('2026-11-08', 24.521, 9.747)];
+  expect(deliveryRate(days.slice(0, 1))).toBe(25.08);   // one entry: the ERP's figure
+  expect(deliveryRate([days[0], days[2]])).toBe(24.8);   // (25.077 × 9.5 + 24.521 × 9.747) ÷ 19.247
+  expect(deliveryRate(days)).toBe(2.76);   // the wrong entry stays in and shows
+  expect(deliveryRate([])).toBeNull();
 });

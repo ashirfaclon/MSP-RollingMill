@@ -3,8 +3,8 @@
 /**
  * RMD · Condition Analytics — the layout of RMD_Condition_Analytics_Dashboard.png, sources as
  * RMD FACLON Persona - 2. Wired where a source exists; NA everywhere else, never a sample figure:
- *   Actual rate        ERP Prime + SL ÷ running hours from the billet counters — the
- *                      Visualization running rate (the user, 21 Oct 2026); opens its drill-down;
+ *   Actual rate        the ERP's delivery rate (DELIVERY_RATE_MTHRS) — the Visualization TPH (the user,
+ *                      25 Nov 2026); opens its drill-down;
  *   Specific energy    the VCB 1 / 2 / 3 power forms ÷ ERP Prime + SL;
  *   Mimic              as the sheet (the plant, 21 Oct 2026), no roughing group (the user,
  *                      27 Oct 2026): billet infeed = billets ÷ running hours; route / diverter =
@@ -78,7 +78,7 @@ export default function RmdConditionAnalytics() {
           series="prod"
           loading={!rateS.data && !rateS.error}
           onOpen={() => setOpen('rate')}
-          openLabel="Running rate per day"
+          openLabel="TPH (delivery rate) per day"
         />
         <CaCard id="opportunity" ca={ca} onOpen={openCa} />
         <SpecificEnergyCard mill="rmd" />

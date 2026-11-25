@@ -1,27 +1,25 @@
 /**
- * RMD running rate (TPH), per RMD day / week / month, all from the ERP log sheet (the plant,
- * 13 Nov 2026):
- *
- *   TPH = billet input (INPUT_MT) ÷ adjusted running hours
- *   adjusted running hours = double-stand hours + single-stand hours ÷ 2
- *
- * The mill rolls double-stand or single-stand; single-stand hours count half. MILL_SINGLE_STAND is
- * entered in minutes and is already inside ACTUAL_RUNNING_HRS, so adjusted = running hours −
- * single-stand hours ÷ 2. Online / Offline: that rolling's entries only (production.service.ts).
+ * RMD TPH, per RMD day / week / month: the ERP log sheet's DELIVERY_RATE_MTHRS (the plant's sheet, the user,
+ * 25 Nov 2026 — replaces billet input ÷ adjusted running hours). One entry: exactly the ERP's figure. Several:
+ * each entry's rate weighted by its ACTUAL_RUNNING_HRS (Σ rate × hours ÷ Σ hours) — every entry exactly as the
+ * ERP has it, nothing left out (the user: a wrong entry must show so the plant fixes it — e.g. 7 Nov 2026 Online,
+ * 260 running hours, 1.13 TPH). Entries without hours: their plain average. Online / Offline: that rolling's
+ * entries only (production.service.ts).
  */
 import type { Env } from '../../config/env';
 import type { Grain, RmdMode, RmdRunningRateReport, RmdTphPeriod } from '../../contracts';
-import { readErpRmdProduction } from '../../integrations/erp/cache';
+import { readErpRmdProduction, type RmdLogRow } from '../../integrations/erp/cache';
 import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, round2 } from '../hsm/production.service';
 import { ofMode, sumOf } from './production.service';
 
-/** Input ÷ hours; null without input or without running time. */
-export const rmdRate = (mt: number | null, h: number | null) => (mt === null || !h ? null : round2(mt / h));
-
-/** Running hours less half the single-stand time (minutes); null without running hours. */
-export const adjustedHours = (runH: number | null, singleMin: number | null) =>
-  (runH === null ? null : round2(runH - (singleMin ?? 0) / 120));
+/** The entries' delivery rates, weighted by their running hours; null with none. */
+export function deliveryRate(rows: RmdLogRow[]): number | null {
+  const v = rows.filter((r) => typeof r.v.DELIVERY_RATE_MTHRS === 'number');
+  if (!v.length) return null;
+  const w = (r: RmdLogRow) => (v.every((x) => (x.v.ACTUAL_RUNNING_HRS ?? 0) > 0) ? r.v.ACTUAL_RUNNING_HRS! : 1);
+  return round2(v.reduce((a, r) => a + r.v.DELIVERY_RATE_MTHRS! * w(r), 0) / v.reduce((a, r) => a + w(r), 0));
+}
 
 export function rmdRunningRate(env: Env, from: string, to: string, grain: Grain, mode: RmdMode = 'all'): RmdRunningRateReport {
   const cache = readErpRmdProduction(env);
@@ -31,13 +29,11 @@ export function rmdRunningRate(env: Env, from: string, to: string, grain: Grain,
   const period = (key: string, label: string, ds: string[]): RmdTphPeriod => {
     const set = new Set(ds);
     const mine = rows.filter((r) => set.has(r.date));
-    const runH = sumOf(mine, 'ACTUAL_RUNNING_HRS');
-    const singleMin = sumOf(mine, 'MILL_SINGLE_STAND');
-    const adjustedH = adjustedHours(runH, singleMin);
-    const inputMt = sumOf(mine, 'INPUT_MT');
     return {
       key, label, fromDate: ds[0], toDate: ds[ds.length - 1], days: ds.length,
-      inputMt, runH, singleStandH: runH === null ? null : round2((singleMin ?? 0) / 60), adjustedH, rateTph: rmdRate(inputMt, adjustedH),
+      inputMt: sumOf(mine, 'INPUT_MT'), runH: sumOf(mine, 'ACTUAL_RUNNING_HRS'),
+      entries: mine.filter((r) => typeof r.v.DELIVERY_RATE_MTHRS === 'number').length,
+      rateTph: deliveryRate(mine),
     };
   };
   const groups = new Map<string, { label: string; dates: string[] }>();

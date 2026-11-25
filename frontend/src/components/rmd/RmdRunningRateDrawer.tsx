@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * RMD running rate drill-down — billet input ÷ adjusted running hours for the dashboard's period,
- * per day / week / month, all from the ERP log sheet (the plant, 13 Nov 2026). Single-stand time
- * is inside the running hours and counts half. Online / Offline: that rolling's entries only.
+ * RMD TPH drill-down — the ERP log sheet's delivery rate (DELIVERY_RATE_MTHRS, the plant's sheet, the user, 25 Nov
+ * 2026), per day / week / month. A day: the ERP's figure. A week or month: its entries' rates weighted by their
+ * running hours, every entry as the ERP has it — a wrong one (7 Nov 2026 Online: 260 h) shows here, to be fixed in
+ * the ERP. Online / Offline: that rolling's entries only.
  */
 import { useMemo } from 'react';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
@@ -23,8 +24,8 @@ export default function RmdRunningRateDrawer({ open, onClose }: { open: boolean;
     <DrillDrawer
       open={open}
       onClose={onClose}
-      title="Running rate"
-      sub="RMD · TPH"
+      title="TPH · delivery rate"
+      sub="RMD · MT per hour"
       controls={r.controls}
       loading={loading}
       stale={!!data && dataUrl !== url}
@@ -41,29 +42,28 @@ function Content({ data }: { data: RmdRunningRateReport }) {
   const t = data.totals;
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const series = useMemo<DrillSeries[]>(() => [
-    { id: 'rate', name: 'Running rate', token: '--s-prod', type: 'line', data: rows.map((x) => x.rateTph), dp: 2 },
+    { id: 'rate', name: 'TPH', token: '--s-prod', type: 'line', data: rows.map((x) => x.rateTph), dp: 2 },
   ], [rows]);
   const axes = useMemo(() => [{ title: 'TPH', unit: 'TPH', min: 0 }], []);
   return (
     <>
       <Stats items={[
-        { label: 'Running rate', value: f(t.rateTph), unit: 'TPH' },
-        { label: 'Billet input', value: f(t.inputMt), unit: 'MT' },
-        { label: 'Adjusted hours', value: f(t.adjustedH, 1), unit: 'h' },
+        { label: 'TPH', value: f(t.rateTph), unit: 'MT/h' },
+        { label: 'Running hours', value: f(t.runH, 1), unit: 'h' },
+        { label: 'Entries', value: String(t.entries), unit: `in ${t.days} days` },
       ]} />
       <DrillChart series={series} categories={categories} axes={axes}
-        ariaLabel={`Running rate by period: ${rows.map((x) => `${x.label} ${f(x.rateTph)} TPH`).join('; ')}`} />
+        ariaLabel={`TPH by period: ${rows.map((x) => `${x.label} ${f(x.rateTph)} TPH`).join('; ')}`} />
       <div className="pd-table-wrap">
-        <table className="grid pd-table" aria-label="Running rate by period">
-          <thead><tr><th>Period</th><th className="r">Billet input (MT)</th><th className="r">Running hours</th><th className="r">Single stand (h)</th><th className="r">Adjusted hours</th><th className="r">Rate (TPH)</th></tr></thead>
+        <table className="grid pd-table" aria-label="TPH by period">
+          <thead><tr><th>Period</th><th className="r">Entries</th><th className="r">Running hours</th><th className="r">TPH</th></tr></thead>
           <tbody>{rows.map((x) => <Row key={x.key} r={x} />)}</tbody>
           <tfoot><Row r={t} /></tfoot>
         </table>
       </div>
       <SourceBox sources={sourcesOf(data.mode)} formula={[
-        'Running rate = INPUT_MT ÷ adjusted running hours, the same entries',
-        'Adjusted running hours = double-stand hours + single-stand hours ÷ 2',
-        'MILL_SINGLE_STAND is in minutes and inside ACTUAL_RUNNING_HRS, so adjusted = ACTUAL_RUNNING_HRS − MILL_SINGLE_STAND ÷ 120',
+        'TPH = DELIVERY_RATE_MTHRS of each entry, exactly as the ERP has it',
+        'A week or month: Σ (DELIVERY_RATE_MTHRS × ACTUAL_RUNNING_HRS) ÷ Σ ACTUAL_RUNNING_HRS over its entries — none left out, so a wrong entry shows',
       ]} />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
     </>
@@ -75,10 +75,8 @@ function Row({ r }: { r: RmdTphPeriod }) {
   return (
     <tr>
       <td><b>{r.label}</b>{range && <span className="pd-dim"> · {dm(r.fromDate)}–{dm(r.toDate)}</span>}</td>
-      <td className="num r">{f(r.inputMt)}</td>
-      <td className="num r">{f(r.runH, 1)}</td>
-      <td className="num r">{f(r.singleStandH, 2)}</td>
-      <td className="num r">{f(r.adjustedH, 2)}</td>
+      <td className="num r">{r.entries}</td>
+      <td className="num r">{f(r.runH, 2)}</td>
       <td className={`num r ${r.rateTph === null ? 'v-na' : 'v-val'}`}><b>{f(r.rateTph)}</b></td>
     </tr>
   );
@@ -90,6 +88,6 @@ const sourcesOf = (mode: RmdRunningRateReport['mode']): SourceSystem[] => [{
     ['Table', mode === 'all' ? 'ATTR_TRAN_DATA_BODY' : 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],
     ['Filter', mode === 'all' ? "USER_CODE = 'FA-SKJ'"
       : `USER_CODE = 'FA-SKJ', TRAN_COLUMN_NAME1 = '${mode === 'online' ? 'RO001' : 'RO002'}' (${mode === 'online' ? 'Online' : 'Offline'})`],
-    ['Field', "ATTR_CODE = 'INPUT_MT', 'ACTUAL_RUNNING_HRS', 'MILL_SINGLE_STAND' (value in ATTR_VALUE)"],
+    ['Field', "ATTR_CODE = 'DELIVERY_RATE_MTHRS', 'ACTUAL_RUNNING_HRS' (value in ATTR_VALUE)"],
   ],
 }];

@@ -11,14 +11,17 @@
  *   Mass yield          Prime + SL ÷ billet input (INPUT_MT), both from the ERP log sheet;
  *   Rolling in casting / Rolling in delivery / Plant efficiency  the Zoho TMT KPIs the plant asked for
  *                       (21 Nov 2026), as the ERP log sheet holds them: ROLLING_IN_TOTAL_PERCENTAGE,
- *                       ROLLING_IN_DELIVERY_PRCNT, production ÷ PRODUCTION_TARGET; all three open one drawer;
+ *                       ROLLING_IN_DELIVERY_PRCNT, the ERP's PLANT_EFFICIENCY; all three open one drawer;
+ *                       Rolling in casting not under Offline (the user, 25 Nov 2026);
  *   Power consumption   the logbook forms Power Reading VCB 1 / 2 / 3 (live, as filled);
  *   Specific energy     power ÷ ERP production (backend power report);
- *   Mill MPS            Influx CR Mill1/2 · General · MILL1_MPS / MILL2_MPS, m/s (RmdMillSpeedCard);
+ *   Mill MPS            Influx CR Mill1/2 · General · MILL1_MPS / MILL2_MPS, m/s, one card (RmdMillSpeedCard);
  *   Chemical composition  SMS → CCM Lolipop Sample, the RMD samples (RmdChemistryCard).
  *   Coal consumption    Offline only (the user, 24 Nov 2026): the ERP log sheet's coal, kg per MT of Prime + SL
  *                       (COAL_CONSUMPTION_KGMT; over several entries Σ TOTAL_COAL_CONSUMPTION ÷ Σ Prime + SL);
- *                       under Offline the two Mill MPS cards share one, so the strip stays two rows of six.
+ *                       it takes Rolling in casting's place, so Offline stays two rows of six.
+ *   Breakdown           the plant's sheet (the user, 25 Nov 2026): the ERP log sheet's seven breakdown items, hours;
+ *                       opens each item on its own, like Finished stock (RmdBreakdownCard).
  * A card with nothing behind it opens nothing.
  */
 import { useState } from 'react';
@@ -27,6 +30,7 @@ import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import RmdMillSpeedCard from './RmdMillSpeedCard';
 import RmdChemistryCard from './RmdChemistryCard';
+import RmdBreakdownCard from './RmdBreakdownCard';
 import FinishedStockCard from '@/components/production/FinishedStockCard';
 import { productionTermText } from '@/components/production/productionTerm';
 import { fixed } from '@/lib/num';
@@ -115,7 +119,7 @@ export default function RmdKpiStrip() {
         ['Rolling in casting', 'rollingInCastingPct'],
         ['Rolling in delivery', 'rollingInDeliveryPct'],
         ['Plant efficiency', 'plantEfficiencyPct'],
-      ] as const).map(([label, k]) => (
+      ] as const).filter(([, k]) => !(offline && k === 'rollingInCastingPct')).map(([label, k]) => (
         <KpiCard
           key={k}
           label={label}
@@ -152,8 +156,9 @@ export default function RmdKpiStrip() {
           <RmdProductionDrawer view="coal" open={coalOpen} onClose={() => setCoalOpen(false)} />
         </>
       )}
-      <RmdMillSpeedCard combined={offline} />
+      <RmdMillSpeedCard />
       <RmdChemistryCard />
+      <RmdBreakdownCard data={data} error={error} term={term} lastEntry={lastOf(t?.breakdownHrs, (lt) => lt.breakdownHrs, 2)} />
       {/* The ERP stock at the period's end, dated; replaces the Order allocation panel (the user, 31 Oct 2026). */}
       <FinishedStockCard mill="rmd" />
     </section>

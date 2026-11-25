@@ -44,19 +44,25 @@ const BEARING_FORMS: Record<string, { group: AssetGroup; equipment: string }> = 
   'old-continuous-stand': { group: 'route', equipment: 'OC stand' },
   'new-continuous-stand': { group: 'route', equipment: 'NC stand' },
 };
-const POINT: Record<string, string> = {
-  'flywheel-d-side': 'Flywheel D side', 'flywheel-nd-side': 'Flywheel ND side',
-  'reduction-gear-d-side': 'Reduction gear D side', 'reduction-gear-nd-side': 'Reduction gear ND side',
-  'pinion-gear-d-side': 'Pinion gear D side', 'pinion-gear-nd-side': 'Pinion gear ND side',
+/** The parts a form reads a bearing of, by the field's stem. */
+const PART: Record<string, string> = {
+  flywheel: 'Flywheel', 'reduction-gear': 'Reduction gear', 'pinion-gear': 'Pinion gear', 'pinion-gear-set-2': 'Pinion gear set 2',
 };
 
-/** One bearing field → { equipment, point }: "old-c-stand-3-pinion-gear-d-side-c" → OC stand 3 · Pinion gear D side. */
+/**
+ * One bearing field → { equipment, point }: "old-c-stand-3-pinion-gear-d-side-c" → OC stand 3 · Pinion gear D side.
+ * Since 25 Nov 2026 (the plant's Bearing_Temperature_ Forms sheet) a gearbox has several bearings — the field's
+ * "-b2" … "-b5" is the bearing number, and the intermill has a second pinion gear set:
+ * "reduction-gear-b4-nd-side-c" → Reduction gear B4 ND side; "pinion-gear-set-2-b2-d-side-c" → Pinion gear set 2 B2
+ * D side. Bearing 1 keeps the name it always had (no "B1"), so its alerts and history carry on.
+ */
 export function bearingOf(form: string, field: string): { equipment: string; point: string } | null {
   const def = BEARING_FORMS[form];
-  if (!def || !field.endsWith('-c')) return null;
-  const m = /^(?:(?:old|new)-c-stand-(\d+)-)?(.+)-c$/.exec(field);
-  if (!m || !POINT[m[2]]) return null;
-  return { equipment: m[1] ? `${def.equipment} ${m[1]}` : def.equipment, point: POINT[m[2]] };
+  if (!def) return null;
+  const m = /^(?:(?:old|new)-c-stand-(\d+)-)?(flywheel|reduction-gear|pinion-gear-set-2|pinion-gear)(?:-b(\d+))?-(d|nd)-side-c$/.exec(field);
+  if (!m) return null;
+  const bearing = m[3] && m[3] !== '1' ? ` B${m[3]}` : '';
+  return { equipment: m[1] ? `${def.equipment} ${m[1]}` : def.equipment, point: `${PART[m[2]]}${bearing} ${m[4].toUpperCase()} side` };
 }
 
 /** Oil tanks → group and label, by the field stem (level: "20-r-stand", temperature: "20-r-stand-c") — config/equipment.ts. */

@@ -90,8 +90,8 @@ export async function caActual(env: Env, mill: ConfigMill, from: string, to: str
   );
   const mt = prod.totals.productionMt;
   return {
-    // RMD: the hours its TPH is on (single-stand time at half).
-    mt, runH: 'adjustedH' in rate.totals ? rate.totals.adjustedH : rate.totals.runH, rateTph: rate.totals.rateTph,
+    // RMD: the ERP's running hours as they are (its TPH is the ERP's delivery rate since 25 Nov 2026).
+    mt, runH: rate.totals.runH, rateTph: rate.totals.rateTph,
     kwh: power.totals.kwh, kwhPerMt: power.totals.kwhPerMt,
     billetInputMt: prod.totals.billetInputMt, yieldPct: prod.totals.massYieldPct,
   };

@@ -115,9 +115,10 @@ export function readErpPm(env: Env, mill: PmMill): ErpPmCache | null {
  * The Zoho TMT KPIs the plant asked for (21 Nov 2026: "Rolling on Casting, Delivery and Efficiency"),
  * as the ERP log sheet holds them per entry — the ERP is the source of truth, Zoho's figures only a
  * reference (the plant). Rolling in Casting % = ROLLING_IN_TOTAL_PERCENTAGE, the only casting-related
- * percentage; PLANT_EFFICIENCY = PRODUCT_PRIME_SLENGTH_MT ÷ PRODUCTION_TARGET × 100 (checked on the
- * entries of 14–20 Jul 2026). PRODUCTION_TARGET is read for efficiency only — the plan is typed on
- * the dashboard (the plant).
+ * percentage; PLANT_EFFICIENCY = PLANT_PERFORMANCE (production ÷ PRODUCTION_TARGET × 100) × PLANT_AVAILABILITY
+ * ÷ 100 — on 620 of 621 entries (30 Nov 2025 – 24 Nov 2026); production ÷ target alone only where availability
+ * is 100 %, i.e. no breakdown. PRODUCTION_TARGET weights efficiency over a period — the plan is typed on the
+ * dashboard (the plant).
  */
 export const RMD_ROLLING_FIELDS = ['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DELIVERY_PRCNT', 'PLANT_EFFICIENCY', 'PRODUCTION_TARGET'] as const;
 /**
@@ -125,8 +126,30 @@ export const RMD_ROLLING_FIELDS = ['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DE
  * TOTAL_COAL_CONSUMPTION (MT) × 1000 ÷ PRODUCT_PRIME_SLENGTH_MT on every Offline entry checked (58, Sep–Nov 2026).
  */
 export const RMD_COAL_FIELDS = ['COAL_CONSUMPTION_KGMT', 'TOTAL_COAL_CONSUMPTION'] as const;
-export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT', 'TOTAL_POWER_CONSUMPTION', 'MILL_SINGLE_STAND',
-  ...RMD_ROLLING_FIELDS, ...RMD_COAL_FIELDS] as const;
+/**
+ * Breakdown, the plant's sheet (the user, 25 Nov 2026): the seven below added, every one in minutes. The ERP's own
+ * MILL_TOTAL_BREAKDOWN_HRS adds the first five only; the sheet also counts the single stand and mill 1½ — the user
+ * chose the sheet. In practice only Online entries have any (Nov 2025 – Nov 2026).
+ */
+export const RMD_BREAKDOWN_FIELDS = [
+  ['MILL_BKDN_IN_MIN_MECHANICAL', 'Mechanical'],
+  ['MILL_BKDN_IN_MIN_ELECTRICAL', 'Electrical'],
+  ['MILL_BKDN_IN_MIN_PROCESS', 'Process'],
+  ['MILL_BKDN_IN_MIN_RM', 'Raw material'],
+  ['MILL_BKDN_IN_MIN_POWEROTHERS', 'Power / other'],
+  ['MILL_SINGLE_STAND', 'Mill single stand'],
+  ['MILL_1_12__STAND', 'Mill 1½'],
+] as const;
+/**
+ * The balance strip's bypasses and short length (the user, 25 Nov 2026, the plant's sheet): CCM_BYPASS_MT (Online and
+ * Both), MILL_BYPASS_MT — the RMD bypass — and FINISH_PRODUCT_SLENGTH_MT (short length; Prime + SL = Prime + it on
+ * 578 of 621 entries). SHORTLENGTH_CUT is 0 on every entry and is not read.
+ */
+export const RMD_BALANCE_FIELDS = ['CCM_BYPASS_MT', 'MILL_BYPASS_MT', 'FINISH_PRODUCT_SLENGTH_MT'] as const;
+/** TPH, the plant's sheet (the user, 25 Nov 2026): the ERP's delivery rate, MT per hour, per entry. */
+export const RMD_RATE_FIELDS = ['DELIVERY_RATE_MTHRS'] as const;
+export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT', 'TOTAL_POWER_CONSUMPTION',
+  ...RMD_BALANCE_FIELDS, ...RMD_RATE_FIELDS, ...RMD_ROLLING_FIELDS, ...RMD_COAL_FIELDS, ...RMD_BREAKDOWN_FIELDS.map(([f]) => f)] as const;
 export type RmdLogField = (typeof RMD_LOG_FIELDS)[number];
 /**
  * Online / Offline: the log sheet head's TRAN_COLUMN_NAME1, RO001 = Online, RO002 = Offline (Management

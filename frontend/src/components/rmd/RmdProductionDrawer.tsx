@@ -20,7 +20,14 @@ import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdProductionPeriod, type RmdProductionReport } from '@/services/hsmApi';
 
-export type RmdProductionView = 'production' | 'yield' | 'balance' | 'performance' | 'coal';
+export type RmdProductionView = 'production' | 'yield' | 'balance' | 'performance' | 'coal' | BalanceKey;
+/** The balance strip's bypasses and short length (the user, 25 Nov 2026): each its own drill-down. */
+export type BalanceKey = 'ccmBypassMt' | 'millBypassMt' | 'shortLengthMt';
+export const BALANCE: Record<BalanceKey, { name: string; field: string; token: string }> = {
+  ccmBypassMt: { name: 'CCM bypass', field: 'CCM_BYPASS_MT', token: '--s-hold' },
+  millBypassMt: { name: 'RMD bypass', field: 'MILL_BYPASS_MT', token: '--s-alt' },
+  shortLengthMt: { name: 'Short length', field: 'FINISH_PRODUCT_SLENGTH_MT', token: '--s-order' },
+};
 
 const f = (v: number | null) => (v === null ? '—' : fmtNum(v, 2));
 
@@ -51,7 +58,8 @@ export default function RmdProductionDrawer({ open, onClose, view }: { open: boo
       hasData={!!data}
     >
       {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} />
-        : view === 'performance' ? <PerformanceContent data={data} /> : view === 'coal' ? <CoalContent data={data} /> : <BalanceContent data={data} />)}
+        : view === 'performance' ? <PerformanceContent data={data} /> : view === 'coal' ? <CoalContent data={data} />
+        : view in BALANCE ? <BalanceMetricContent data={data} k={view as BalanceKey} /> : <BalanceContent data={data} />)}
     </DrillDrawer>
   );
 }
@@ -62,6 +70,9 @@ const TITLE: Record<RmdProductionView, string> = {
   balance: 'Material balance · ERP log sheet',
   performance: 'Rolling in casting, delivery and plant efficiency · ERP log sheet',
   coal: 'Coal consumption · ERP log sheet',
+  ccmBypassMt: 'CCM bypass · ERP log sheet',
+  millBypassMt: 'RMD bypass · ERP log sheet',
+  shortLengthMt: 'Short length · ERP log sheet',
 };
 
 const label = (x: RmdProductionPeriod) => (
@@ -149,6 +160,48 @@ function YieldContent({ data }: { data: RmdProductionReport }) {
 }
 
 /** Coal, Offline entries only (the user, 24 Nov 2026): MT and kg per MT of Prime + SL, per day. */
+/** One balance figure per period, with the billet input beside it. */
+function BalanceMetricContent({ data, k }: { data: RmdProductionReport; k: BalanceKey }) {
+  const c = BALANCE[k];
+  const rows = data.rows;
+  const t = data.totals;
+  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
+  const series = useMemo<DrillSeries[]>(() => [
+    { id: k, name: c.name, token: c.token, type: 'column', data: rows.map((x) => x[k]), dp: 2 },
+  ], [rows, k, c]);
+  const axes = useMemo(() => [{ title: 'MT', unit: 'MT', min: 0 }], []);
+  return (
+    <>
+      <Stats items={[
+        { label: c.name, value: f(t[k]), unit: 'MT' },
+        { label: 'Billet input', value: f(t.billetInputMt), unit: 'MT' },
+        { label: 'Days entered', value: String(t.entryDays), unit: `of ${t.days}` },
+      ]} />
+      <DrillChart series={series} categories={categories} axes={axes}
+        ariaLabel={`${c.name} by period: ${rows.map((x) => `${x.label} ${f(x[k])} MT`).join('; ')}`} />
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label={`${c.name} by period`}>
+          <thead><tr><th>Period</th><th className="r">{c.name} (MT)</th><th className="r">Billet input (MT)</th></tr></thead>
+          <tbody>{rows.map((x) => <BalanceMetricRow key={x.key} x={x} k={k} />)}</tbody>
+          <tfoot><BalanceMetricRow x={t} k={k} /></tfoot>
+        </table>
+      </div>
+      <SourceBox sources={sources([c.field, 'INPUT_MT'])} formula={[`${c.name} = Σ ${c.field} of the period's entries, for the Rolling chosen`]} />
+      {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
+    </>
+  );
+}
+
+function BalanceMetricRow({ x, k }: { x: RmdProductionPeriod; k: BalanceKey }) {
+  return (
+    <tr>
+      {label(x)}
+      <td className="num r v-val"><b>{f(x[k])}</b></td>
+      <td className="num r">{f(x.billetInputMt)}</td>
+    </tr>
+  );
+}
+
 function CoalContent({ data }: { data: RmdProductionReport }) {
   const rows = data.rows;
   const t = data.totals;
@@ -237,12 +290,12 @@ function PerformanceContent({ data }: { data: RmdProductionReport }) {
         </table>
       </div>
       <SourceBox
-        sources={sources(['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DELIVERY_PRCNT', 'PRODUCT_PRIME_SLENGTH_MT', 'PRODUCTION_TARGET', 'INPUT_MT'])}
+        sources={sources(['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DELIVERY_PRCNT', 'PLANT_EFFICIENCY', 'PRODUCT_PRIME_SLENGTH_MT', 'PRODUCTION_TARGET', 'INPUT_MT'])}
         formula={[
           'Rolling in casting = ROLLING_IN_TOTAL_PERCENTAGE of each entry; over several entries, their average weighted by INPUT_MT',
           'Rolling in delivery = ROLLING_IN_DELIVERY_PRCNT of each entry; over several entries, their average weighted by INPUT_MT',
-          'Plant efficiency = Σ PRODUCT_PRIME_SLENGTH_MT ÷ Σ PRODUCTION_TARGET × 100 (one entry: the ERP\'s PLANT_EFFICIENCY)',
-          'Target is the ERP\'s, used for efficiency only — the production plan is the one filled on the dashboard',
+          'Plant efficiency = PLANT_EFFICIENCY of each entry (the ERP\'s: performance × availability — production ÷ target, less any breakdown time); over several entries, their average weighted by PRODUCTION_TARGET',
+          'Target is the ERP\'s, used to weight efficiency only — the production plan is the one filled on the dashboard',
         ]}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}

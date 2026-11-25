@@ -6,7 +6,8 @@
  * sample figure:
  *   Production by shift   targets from the plant's month-wise FY plan (Prime + SL), half per
  *                         shift; output per shift NA (not in the ERP); whole day = ERP Prime + SL
- *                         vs plan. Running rate = ERP billet input ÷ adjusted running hours.
+ *                         vs plan. TPH = the ERP's delivery rate (DELIVERY_RATE_MTHRS — the user, 25 Nov 2026;
+ *                         was billet input ÷ adjusted running hours).
  *   Finished stock card   the total of Finished stock by size (ERP item ledger, FGYRDP, at the period
  *                         end), dated; no Order allocation panel (the user, 31 Oct 2026).
  *   Material balance      billet input, finished and the four losses from the ERP log sheet
@@ -23,7 +24,8 @@ import { useState, type KeyboardEvent } from 'react';
 import { useSelection } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdBilletsReport, type RmdRunningRateReport } from '@/services/hsmApi';
 import RmdKpiStrip from './RmdKpiStrip';
-import RmdProductionDrawer, { useRmdProduction } from './RmdProductionDrawer';
+import RmdProductionDrawer, { BALANCE, useRmdProduction, type BalanceKey } from './RmdProductionDrawer';
+import { useGlobalSel } from '@/state/globalSel';
 import RmdMillMimic from './RmdMillMimic';
 import RmdShiftProduction from './RmdShiftProduction';
 import RmdRunningRateDrawer from './RmdRunningRateDrawer';
@@ -60,8 +62,8 @@ function RunningRateFoot() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="rm-foot-item rm-foot-btn" onClick={() => setOpen(true)} aria-haspopup="dialog" title="Running rate per day">
-        <span className="rm-k">Running rate</span>
+      <button type="button" className="rm-foot-item rm-foot-btn" onClick={() => setOpen(true)} aria-haspopup="dialog" title="TPH (delivery rate) per day, from the ERP log sheet">
+        <span className="rm-k">TPH · delivery rate</span>
         {!current && !error
           ? <span className="skel skel--num" role="status" aria-label="Loading" />
           : <span className={`rm-foot-v num ${rate === null ? 'v-na' : 'v-val'}`}>{rate === null ? 'NA' : `${fixed(rate, 2)} TPH`}</span>}
@@ -86,7 +88,9 @@ const mt = (v: number | null | undefined) => (v === null || v === undefined ? 'N
  * Drawn like the HSM panel: billet input split into finished | mass difference, to scale,
  * then the losses opened out, then the billet count. Billet input (INPUT_MT), finished
  * (Prime + SL) and the losses come from the ERP log sheet; mass difference and yield are
- * computed in the backend. The whole balance is one click: the drawer shows it per day.
+ * computed in the backend. The whole balance is one click: the drawer shows it per day. The strip under it
+ * (the user, 25 Nov 2026, the plant's sheet): Billets in, CCM bypass (Online and Both only), RMD bypass and Short
+ * length, each opening its own per-day drill-down.
  */
 function MaterialBalance() {
   const { dates } = useSelection();
@@ -94,8 +98,12 @@ function MaterialBalance() {
   const { data, dataUrl, error } = useApi<RmdBilletsReport>(url);
   const billets = data && dataUrl === url ? data.totals.totalPcs : null;
   const loading = !(data && dataUrl === url) && !error;
-  const t = useRmdProduction(dates).data?.totals ?? null;
+  const prod = useRmdProduction(dates);
+  const t = prod.data?.totals ?? null;
   const [open, setOpen] = useState(false);
+  const [metric, setMetric] = useState<BalanceKey | null>(null);
+  const offline = useGlobalSel().rmdMode === 'offline';
+  const keys: BalanceKey[] = offline ? ['millBypassMt', 'shortLengthMt'] : ['ccmBypassMt', 'millBypassMt', 'shortLengthMt'];
   const openOnKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } };
 
   // A loss that is 0 for the period isn't there: no segment, no legend entry. No data stays NA.
@@ -147,8 +155,15 @@ function MaterialBalance() {
         </div>
 
       </div>
-      <BalanceStats items={[{ key: 'in', label: 'Billets in', value: billets, unit: 'pcs', whole: true, loading, onOpen: () => setOpen(true), title: 'Material balance per day' }]} />
+      <BalanceStats items={[
+        { key: 'in', label: 'Billets in', value: billets, unit: 'pcs', whole: true, loading, onOpen: () => setOpen(true), title: 'Material balance per day' },
+        ...keys.map((k) => ({
+          key: k, label: BALANCE[k].name, value: t?.[k] ?? null, unit: 'MT', loading: !prod.data && !prod.error,
+          onOpen: () => setMetric(k), title: `${BALANCE[k].name} per day, from the ERP log sheet`,
+        })),
+      ]} />
       <RmdProductionDrawer view="balance" open={open} onClose={() => setOpen(false)} />
+      <RmdProductionDrawer view={metric ?? 'balance'} open={metric !== null} onClose={() => setMetric(null)} />
     </Panel>
   );
 }

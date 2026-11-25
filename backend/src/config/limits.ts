@@ -93,7 +93,7 @@ export const LIMIT_DEFAULTS: Record<LimitMill, readonly LimitDef[]> = {
       basis: 'Standard placeholder: IS 1786, Fe 500D.', range: [0.001, 1], dp: 3 },
     { id: 'chem-sp', group: 'Chemistry', label: 'Sulphur + phosphorus (S + P)', unit: '%', reading: 'SMS → CCM Lolipop Sample (RMD)', min: null, max: 0.075, approval: 'placeholder',
       basis: 'Standard placeholder: IS 1786, Fe 500D.', range: [0.001, 1], dp: 3 },
-    ...DAILY('Billet input ÷ adjusted running hours (ERP), per day'),
+    ...DAILY('ERP delivery rate (DELIVERY_RATE_MTHRS), per day'),
   ],
   lsm: [
     { id: 'gearbox-bearing-temp', group: 'Temperatures', label: 'Reduction and pinion gearbox bearings', unit: '°C', reading: 'LSM Mechanical → Drive Temp',

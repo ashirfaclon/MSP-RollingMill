@@ -143,6 +143,8 @@ export default function DrillChart(props: {
   ariaLabel: string;
   height?: number;
   horizontal?: boolean;
+  /** false: no legend of its own — several charts side by side share one (BearingTrendAll's parts). */
+  legend?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const chart = useRef<Chart | null>(null);
@@ -183,7 +185,7 @@ export default function DrillChart(props: {
     <div className="pd-chart-wrap">
       {/* A legend is for choosing between lines: with one there is nothing to choose — the
           axis title and the drawer's heading already say what it is. */}
-      {series.length > 1 && <div className="pd-legend" role="group" aria-label="Show or hide series">
+      {series.length > 1 && props.legend !== false && <div className="pd-legend" role="group" aria-label="Show or hide series">
         {series.map((s) => {
           const on = !hidden.has(s.id);
           return (

@@ -493,3 +493,67 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   400 MT. Caught and fixed a duplicate "Mill power" stat in the drill-down (now Mill energy, kWh). Tests: unit
   hsm-heater-power.test.ts (3), 295 backend unit pass; new hsm-heater-power.e2e.spec.ts (2) pass; hsm-rolling test
   updated and passes (off KNOWN_FAILURES.md). Not committed.
+- **25 Nov 2026** — **RMD Plant efficiency switched to the ERP's own figure** (the user, from the plant's sheet:
+  ATTR_TRAN_DATA_HEAD, TRAN_COLUMN_NAME1 RO001 Online / RO002 Offline, ATTR value PLANT_EFFICIENCY — the same
+  source and filter we already read). Checked all 621 RMD entries (30 Nov 2025 – 24 Nov 2026): the ERP's
+  PLANT_EFFICIENCY = PLANT_PERFORMANCE × PLANT_AVAILABILITY ÷ 100 on 620; performance = production ÷ target. We
+  had computed Σ production ÷ Σ target — right only with no breakdown (availability 100 %), so 69 Online entries
+  read high (19 Nov Online: ERP 123.28 %, ours 141.51 %). Now each entry's PLANT_EFFICIENCY, over a period weighted
+  by PRODUCTION_TARGET (one entry = the ERP's figure). 1–24 Nov: Online 142.47 → 141.27, Offline 107.21 (same),
+  Both 128.07 → 127.36. (LSM already used the ERP's figure, weighted by running + delay hours.) Drill-down formula
+  and source updated; unit test for the breakdown case; rmd-performance e2e pins 19 Nov Online = 123.28 %; 296
+  backend unit pass. **ERP data for the plant to check:** 40 entries above 180 % (to 456 %), mostly Offline with
+  a target far below production (Sep Offline target 32 MT vs 72–146 MT made); 2 Aug Offline L4P26802-0002 has
+  efficiency 0 and no availability. Shown as the ERP has them. Not committed.
+- **25 Nov 2026** — **RMD Offline: Rolling in casting removed** (the user). Online and Both keep it; Rolling in
+  delivery and Plant efficiency stay under Offline. Its slot goes back to Mill MPS: Offline shows Mill 1 MPS and
+  Mill 2 MPS as two cards again (the combined "Mill MPS" card, made only to fit Coal consumption, is removed from
+  RmdMillSpeedCard) — Offline stays twelve cards, two rows of six. Checked 1366 / 1920 × Today → Current Year: two
+  rows, nothing spills, no page scroll, no console errors; rmd-performance e2e asserts it (2 pass). Not committed.
+- **25 Nov 2026** — **RMD Breakdown card** (the user, from the plant's sheet; Online, Offline, Both). ERP log sheet
+  FA-SKJ, seven fields in minutes: MILL_BKDN_IN_MIN_MECHANICAL / _ELECTRICAL / _PROCESS / _RM / _POWEROTHERS,
+  MILL_SINGLE_STAND, MILL_1_12__STAND (now synced). The ERP's own MILL_TOTAL_BREAKDOWN_HRS adds only the first five;
+  **the user chose the sheet: all seven**. Card = Σ minutes ÷ 60 (total from minutes, not rounded parts); a negative
+  entry left out (12 Apr 2026 Offline mill 1½ = −1). Opens like Finished stock: total, then each cause, largest
+  first, hours / minutes / share, source, formula (`rmd/RmdBreakdownCard.tsx`). Only Online entries have breakdowns;
+  Offline reads 0 h. Checked against the ERP: Oct 1.92 h, 1–24 Nov 3.25 h, Apr–Nov 38.33 h (Online). To keep two
+  rows of six, Mill 1 / Mill 2 MPS are one card again under every rolling ("Mill MPS", Mill 1 | Mill 2, no
+  sparklines). Unit tests (298 pass); rmd-performance e2e has a Breakdown test (1.92 h, 7 rows, two rows at 1366 /
+  1920) and passes. Old wiring.e2e RMD failures not re-triaged (the user: skip); none name the merged MPS cards.
+  KNOWN_FAILURES.md line numbers are stale — match by test name. Not committed.
+- **25 Nov 2026** — **RMD balance strip: CCM bypass, RMD bypass, Short length** (the user, the plant's sheet). ERP log
+  sheet fields (now synced): CCM_BYPASS_MT (Online and Both — hidden under Offline as the sheet says; only 1 Offline
+  entry ever has any), MILL_BYPASS_MT = "Bypass RMD" (Online only in practice), FINISH_PRODUCT_SLENGTH_MT = short length
+  (both rollings; Prime + SL = Prime + it on 578 of 621; SHORTLENGTH_CUT is always 0, not used). Σ per period for the
+  Rolling chosen. Tiles after Billets in in the shared BalanceStats strip, each opening its own per-day drill-down
+  (chart, table with billet input, source) — RmdProductionDrawer views ccmBypassMt / millBypassMt / shortLengthMt.
+  Matches the ERP: 1–24 Nov Online 359.54 / 128.36 / 57.80 MT, Offline short length 71.09, Both 128.89. Checked
+  1366 / 1920 × Today → Current Year: one row, nothing spills, no page scroll, no console errors (rmd-performance e2e,
+  passes); unit test; 299 backend unit pass. Not committed.
+- **25 Nov 2026** — **RMD Running rate replaced by TPH = the ERP's delivery rate** (the user, the plant's sheet:
+  DELIVERY_RATE_MTHRS, Online / Offline / Both; now synced). Everywhere RMD shows it: Visualization footer ("TPH ·
+  delivery rate"), Condition Analytics "Actual rate", CA costing hours and the daily running-rate limit text. One
+  entry = the ERP's figure; a week / month = its entries' rates weighted by ACTUAL_RUNNING_HRS — **the user: show the
+  ERP exactly as it is, leave nothing out, so wrong entries show and get fixed.** Was billet input ÷ adjusted running
+  hours (single stand at half) — that logic and its tests removed. ERP slip to fix: **7 Nov 2026 Online L4P26N07-0001
+  has 260 running hours** (others 8–16 h) → ERP rate 1.13 TPH, pulls Nov Online to 12.85 TPH (≈25 without it).
+  Checked: API = ERP (7 Nov 1.13, 24 Nov 24.9, Nov Online 12.85, Offline 15.21); rmd-performance e2e (footer, drill,
+  Condition Analytics, 1366 / 1920); unit tests (298 pass). Not committed.
+- **25 Nov 2026** — **RMD bearing forms: several bearings per gearbox** (the plant's sheet `Bearing_Temperature_ Forms
+  And Issue log.xlsx`; forms 20" / 16" R stand, Intermill, OC, NC). "Done" = the bearing-1 fields we already read;
+  added: reduction gear and pinion gear bearings 2–3 (R stands), reduction gear 2–5, pinion gear 2–3 and a second
+  pinion set 1–3 (Intermill), bearing 2 (each OC / NC stand). `-b2` … `-b5` in a field is the BEARING NUMBER, not a
+  stand. `bearingOf` now reads all of them (points "Reduction gear B3 ND side", "Pinion gear set 2 B2 D side";
+  bearing 1 keeps its old name) — all 5 forms: 0 unread temperature fields; card, drill table, limits and alerts
+  follow. **In progress, not committed:** Condition trends bar chart (RmdBearingBars) shows every bearing as its own
+  bar, grouped by part and numbered B1… under the axis — correct but a long scroll (All: 110 bars, 2 940 px);
+  proposed to the user instead: one bar per gearbox at its hottest bearing with a tick per bearing — AWAITING THE
+  USER'S ANSWER. Drill-down trend (BearingTrendAll): a stand with more than 6 lines draws one small chart per part
+  on one °C scale, colour per bearing number, shared legend, a part opens full width. Seen working on real entries
+  at 1366; 1920 and the automated test still to do. 304 backend unit pass.
+- **25 Nov 2026** — **RMD bearing charts settled** (follows the entry above). Condition trends bar chart: **a bar per
+  bearing**, grouped by gearbox in the part's colour, DE solid / NDE hatched, each pair numbered B1 … B5 under the
+  axis, wider gap between gearboxes, 4th colour for Pinion gear set 2. A one-bar-per-gearbox version (hottest bearing
+  + a dot per bearing) was built and **turned down by the user — do not bring it back**. All view is long (24 Nov: 110
+  bars, 2 940 px, scrolls inside the panel as before); Roughing / Route shorten it. Drill-down trend: per-part small
+  charts as described above. rmd-bearings.e2e.spec.ts passes at 1366 / 1920, no console errors. Not committed.

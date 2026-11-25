@@ -123,13 +123,15 @@ export interface RmdTphPeriod {
   days: number;
   /** Billet input, MT (INPUT_MT); null with no entry. */
   inputMt: number | null;
-  /** Running hours (ACTUAL_RUNNING_HRS); null with no entry. */
+  /** Running hours (ACTUAL_RUNNING_HRS), as the ERP has them; null with no entry. */
   runH: number | null;
-  /** Single-stand running hours (MILL_SINGLE_STAND, entered in minutes); 0 when none entered. */
-  singleStandH: number | null;
-  /** runH − singleStandH ÷ 2. */
-  adjustedH: number | null;
-  /** inputMt ÷ adjustedH; null without both. */
+  /** Entries with a delivery rate. */
+  entries: number;
+  /**
+   * The ERP's DELIVERY_RATE_MTHRS (the user, 25 Nov 2026 — replaces input ÷ adjusted hours): one entry, its figure;
+   * several, Σ rate × ACTUAL_RUNNING_HRS ÷ Σ ACTUAL_RUNNING_HRS — every entry as the ERP has it, none left out, so a
+   * wrong one shows. Null with none.
+   */
   rateTph: number | null;
 }
 
@@ -196,14 +198,25 @@ export interface RmdProductionPeriod {
   /**
    * The Zoho TMT KPIs, from the ERP log sheet (the plant, 21 Nov 2026). Rolling in Casting % =
    * ROLLING_IN_TOTAL_PERCENTAGE, Rolling in Delivery % = ROLLING_IN_DELIVERY_PRCNT — each entry's
-   * figure, over a period the average weighted by billet input. Plant Efficiency % = Σ production ÷
-   * Σ PRODUCTION_TARGET (one entry: exactly the ERP's PLANT_EFFICIENCY). Null with no entry.
+   * figure, over a period the average weighted by billet input. Plant Efficiency % = each entry's PLANT_EFFICIENCY
+   * (performance × availability), over a period weighted by PRODUCTION_TARGET. Null with no entry.
    */
   rollingInCastingPct: number | null;
   rollingInDeliveryPct: number | null;
   plantEfficiencyPct: number | null;
-  /** Σ PRODUCTION_TARGET of the entries — what efficiency is measured against (not the plan). */
+  /** Σ PRODUCTION_TARGET of the entries — what efficiency weighs by (not the plan). */
   targetMt: number | null;
+  /**
+   * Breakdown, the plant's sheet (the user, 25 Nov 2026): Σ of the seven ERP fields (minutes) ÷ 60, hours — the five
+   * categories, the single stand and mill 1½; a negative entry (a typing slip) is left out. Null with no entry.
+   */
+  breakdownHrs: number | null;
+  /** The balance strip (the user, 25 Nov 2026): Σ CCM_BYPASS_MT, Σ MILL_BYPASS_MT (RMD bypass), Σ FINISH_PRODUCT_SLENGTH_MT, MT. */
+  ccmBypassMt: number | null;
+  millBypassMt: number | null;
+  shortLengthMt: number | null;
+  /** Each of the seven, hours, in the sheet's order. */
+  breakdown: { code: string; label: string; hrs: number }[];
 }
 
 export interface RmdProductionReport {

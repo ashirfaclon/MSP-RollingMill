@@ -8,6 +8,13 @@ describe('RMD bearing fields', () => {
     ['intermill', 'pinion-gear-nd-side-c', 'Intermill', 'Pinion gear ND side'],
     ['old-continuous-stand', 'old-c-stand-3-reduction-gear-d-side-c', 'OC stand 3', 'Reduction gear D side'],
     ['new-continuous-stand', 'new-c-stand-8-pinion-gear-nd-side-c', 'NC stand 8', 'Pinion gear ND side'],
+    // Several bearings per gearbox, and the intermill's second pinion set (the plant's sheet, 25 Nov 2026).
+    ['20-inch-r-stand', 'reduction-gear-b3-nd-side-c', '20" R stand', 'Reduction gear B3 ND side'],
+    ['intermill', 'reduction-gear-b5-d-side-c', 'Intermill', 'Reduction gear B5 D side'],
+    ['intermill', 'pinion-gear-set-2-d-side-c', 'Intermill', 'Pinion gear set 2 D side'],
+    ['intermill', 'pinion-gear-set-2-b3-nd-side-c', 'Intermill', 'Pinion gear set 2 B3 ND side'],
+    ['old-continuous-stand', 'old-c-stand-1-pinion-gear-b2-d-side-c', 'OC stand 1', 'Pinion gear B2 D side'],
+    ['new-continuous-stand', 'new-c-stand-8-reduction-gear-b2-nd-side-c', 'NC stand 8', 'Reduction gear B2 ND side'],
   ])('%s · %s → %s · %s', (form, field, equipment, point) => expect(bearingOf(form, field)).toEqual({ equipment, point }));
   test('not a bearing field', () => {
     expect(bearingOf('intermill', 'size-1-mm')).toBeNull();
