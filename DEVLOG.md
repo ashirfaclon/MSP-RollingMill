@@ -415,3 +415,12 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   removed. Checked 1 day / year × 4 mills × 1366 / 1920: no overflow, no console errors. Tests pointed at the new
   strip: hsm-rolling, LSM and RMS production pass; three others touching it fail earlier on old known failures
   (KNOWN_FAILURES.md). Not committed.
+- **25 Nov 2026** — **ERP auto-sync switched on, every 15 min** (the user: RMS 24 Nov was in the ERP but not on the
+  dashboard — nothing synced automatically; `ERP_SYNC_INTERVAL_MINUTES` was unset, default 0 = off, and no cron job
+  existed for this project). Interval chosen for the mill supervisors: log sheets are filled ~2× a day per mill, so
+  a shift entry shows within 15 min; a sync is ~22 s, read-only. Set `ERP_SYNC_INTERVAL_MINUTES=15` in
+  `backend/.env` (machine-local, not in git — **set it again on any other server**). Uses the existing in-service
+  scheduler (`backend/src/jobs/scheduler.ts`: child process, no overlap, 10-min kill, sync at boot then every
+  interval); caches are swapped in whole and re-read by mtime, so no restart and no half-written data; a failed
+  sync (ERP / VPN down) keeps the last good data. Tested at a 1-min interval (the user): syncs at 17:50:37, 17:51:37,
+  17:52:37 IST, all ok (~21–22 s each); then set back to 15 and restarted — boot sync ok.
