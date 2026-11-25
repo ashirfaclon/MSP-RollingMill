@@ -53,6 +53,9 @@ table.grid.set-table td, table.grid.set-table th { white-space: normal; }
 .al-in { width: 100%; min-width: 58px; max-width: 104px; text-align: left; font-weight: 600; }
 .al-in::placeholder { color: var(--muted-3); font-weight: 500; }
 select.al-in { padding-right: 2px; }
+/* A dropdown following the standard setting: grey, like a box's grey standard value; the list itself reads normally. */
+select.al-in.al-in--default { color: var(--muted-2); font-weight: 500; }
+select.al-in option { color: var(--text); font-weight: 600; }
 select.al-in:has(option[value=""]:checked) { color: var(--muted-2); font-weight: 500; }
 .al-in--edited { border-color: var(--info); }
 /* An alert with no limit can't raise: its settings wait, quietly. */

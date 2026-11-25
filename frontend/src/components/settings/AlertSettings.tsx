@@ -147,10 +147,16 @@ function AlertsBody({ data, focusId, valueOf, edit, reset, resets, changed }: {
     const cls = `pc-in al-in${edited ? ' al-in--edited' : ''}`;
     if (f === 'enabled' || f === 'severityOverride' || f === 'minSeverityToNotify') {
       const opts = f === 'enabled' ? [['on', 'On'], ['off', 'Off']] : (f === 'minSeverityToNotify' ? FLOORS : SEVERITIES).map((s) => [s, SEVERITY_LABEL[s]]);
+      // Each value once (no separate "use the default" entry repeating a value — "On, On, Off" — the user,
+      // 25 Nov 2026). The value the default gives stands for "follow the default" and, like the boxes' standard
+      // settings, is shown in grey while followed.
+      const def = opts.find(([, t]) => t === inherited)?.[0];
+      const shown = def !== undefined && v === def ? '' : v;
       return (
-        <select className={cls} value={v} onChange={(e) => edit(key, e.target.value)} aria-label={label}>
-          <option value="">{inherited}</option>
-          {opts.map(([o, t]) => <option key={o} value={o}>{t}</option>)}
+        <select className={`${cls}${shown === '' ? ' al-in--default' : ''}`} value={shown} onChange={(e) => edit(key, e.target.value)}
+          aria-label={label} title={`Standard setting: ${inherited}`}>
+          {def === undefined && <option value="">{inherited}</option>}
+          {opts.map(([o, t]) => <option key={o} value={o === def ? '' : o}>{t}</option>)}
         </select>
       );
     }
