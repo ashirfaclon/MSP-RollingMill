@@ -382,12 +382,11 @@ async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
  *   breakdowns  EQPT_PM_LOG, TNATURE = 'BKDN': FROM_DATE → TO_DATE, REMARKS, CLOSED_STATUS;
  *   work orders EQPT_PM_TRAN, TNATURE = 'WOPM', one per voucher: closed (PLAN_CLOSED_STATUS) or
  *               cancelled (CANCELLEDDATE).
- * Its own failure: the previous PM cache stays in place.
+ * Written as one file per mill, erp-pm-<mill>.json. Its own failure: the previous PM files stay in place.
  */
 async function pullPm(env: Env, p: Paths, log: (line: string) => void) {
   let conn: oracledb.Connection | null = null;
   const mills = Object.entries(PM_DIVISIONS) as [PmMill, string][];
-  const millOf = (div: unknown) => mills.find(([, d]) => d === div)![0];
   const divs = mills.map(([, d]) => `'${d}'`).join(', ');
   try {
     conn = await oracledb.getConnection({ user: env.erpUser!, password: env.erpPassword!, connectString: env.erpDsn! });
@@ -427,22 +426,26 @@ async function pullPm(env: Env, p: Paths, log: (line: string) => void) {
        WHERE t.ENTITY_CODE = 'MP' AND t.TNATURE = 'WOPM' AND m.DIV_CODE IN (${divs})
        GROUP BY m.DIV_CODE, t.VRNO, t.VRDATE, m.EQPT_ID_NAME
        ORDER BY 3`);
-    const cache: ErpPmCache = {
-      syncedAt: new Date().toISOString(),
-      source: 'MSPV7ERP1 · EQPT_ID_MAST, EQPT_PM_TRAN (PMREM, WOPM), EQPT_PM_LOG (BKDN) · entity MP',
-      equipment: Object.fromEntries(mills.map(([m, d]) => [m, Number(equipment.find((r) => r.DIV === d)?.N ?? 0)])) as Record<PmMill, number>,
-      days: days.map((r) => ({ mill: millOf(r.DIV), date: String(r.D), due: Number(r.N), done: Number(r.DONE), doneOnTime: Number(r.ON_TIME) })),
-      breakdowns: breakdowns.map((r) => ({
-        mill: millOf(r.DIV), vrno: String(r.VRNO), equipment: String(r.NAME ?? '').trim(), from: String(r.F), to: String(r.T),
+    // One file per mill (the user, 25 Nov 2026), written together from the same pull.
+    const syncedAt = new Date().toISOString();
+    const source = 'MSPV7ERP1 · EQPT_ID_MAST, EQPT_PM_TRAN (PMREM, WOPM), EQPT_PM_LOG (BKDN) · entity MP';
+    const caches = mills.map(([m, d]): ErpPmCache => ({
+      mill: m, syncedAt, source,
+      equipment: Number(equipment.find((r) => r.DIV === d)?.N ?? 0),
+      days: days.filter((r) => r.DIV === d)
+        .map((r) => ({ date: String(r.D), due: Number(r.N), done: Number(r.DONE), doneOnTime: Number(r.ON_TIME) })),
+      breakdowns: breakdowns.filter((r) => r.DIV === d).map((r) => ({
+        vrno: String(r.VRNO), equipment: String(r.NAME ?? '').trim(), from: String(r.F), to: String(r.T),
         hours: num(r.H), remark: r.R === null ? null : String(r.R).trim(), closed: r.CS !== null,
       })),
-      workOrders: orders.map((r) => ({
-        mill: millOf(r.DIV), vrno: String(r.VRNO), date: String(r.D), equipment: String(r.NAME ?? '').trim(),
+      workOrders: orders.filter((r) => r.DIV === d).map((r) => ({
+        vrno: String(r.VRNO), date: String(r.D), equipment: String(r.NAME ?? '').trim(),
         closed: Number(r.CLOSED) === 1, cancelled: Number(r.CANC) === 1,
       })),
-    };
-    writeAtomic(p.pm, cache);
-    log(`  ERP PM: equipment ${mills.map(([m]) => `${m} ${cache.equipment[m]}`).join(', ')} · ${cache.days.length} due dates · ${cache.breakdowns.length} breakdowns · ${cache.workOrders.length} work orders`);
+    }));
+    for (const c of caches) writeAtomic(p.pm[c.mill], c);
+    const total = (k: 'days' | 'breakdowns' | 'workOrders') => caches.reduce((a, c) => a + c[k].length, 0);
+    log(`  ERP PM: equipment ${caches.map((c) => `${c.mill} ${c.equipment}`).join(', ')} · ${total('days')} due dates · ${total('breakdowns')} breakdowns · ${total('workOrders')} work orders`);
   } catch (err) {
     log(`  ERP PM not synced: ${(err as Error).message}`);
   } finally {

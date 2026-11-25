@@ -23,10 +23,10 @@ const isTest = (b: ErpPmBreakdown) => (b.remark ?? '').trim().toLowerCase() === 
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 export function pmReport(env: Env, mill: PmMill, from: string, to: string, today = istToday()): PmReport {
-  const cache = readErpPm(env);
+  const cache = readErpPm(env, mill);
   // PM due today can still be done today: counted from tomorrow.
   const asOf = to < today ? to : addDays(today, -1);
-  const days = (cache?.days ?? []).filter((d) => d.mill === mill);
+  const days = cache?.days ?? [];
   const inPeriod = days.filter((d) => d.date >= from && d.date <= asOf);
   const sum = (k: 'due' | 'done' | 'doneOnTime') => inPeriod.reduce((a, d) => a + d[k], 0);
   const due = sum('due');
@@ -43,24 +43,23 @@ export function pmReport(env: Env, mill: PmMill, from: string, to: string, today
   }
   const next = days.find((d) => d.date >= today && d.due > d.done);
 
-  const all = (cache?.breakdowns ?? []).filter((b) => b.mill === mill && !isTest(b));
+  const all = (cache?.breakdowns ?? []).filter((b) => !isTest(b));
   const breakdowns: PmBreakdown[] = all
-    .filter((b) => b.from.slice(0, 10) >= from && b.from.slice(0, 10) <= to)
-    .map(({ mill: _, ...b }) => b);
+    .filter((b) => b.from.slice(0, 10) >= from && b.from.slice(0, 10) <= to);
   const hours = breakdowns.map((b) => b.hours).filter((h): h is number => h !== null);
   const breakdownHours = hours.length ? round2(hours.reduce((a, b) => a + b, 0)) : null;
 
   return {
     mill, from, to,
     erp: { connection: cache ? 'up' : 'down', message: cache ? MSG.ERP_UP : MSG.ERP_NOT_SYNCED, syncedAt: cache?.syncedAt ?? null },
-    equipment: cache?.equipment[mill] ?? 0,
+    equipment: cache?.equipment ?? 0,
     pm: { asOf, due, done: sum('done'), doneOnTime, onTimePct: due ? round2((100 * doneOnTime) / due) : null },
     months: [...months.values()],
     nextPm: next ? { date: next.date, count: next.due - next.done } : null,
     breakdowns,
     breakdownHours,
     mttrH: breakdowns.length && breakdownHours !== null ? round2(breakdownHours / breakdowns.length) : null,
-    openWorkOrders: (cache?.workOrders ?? []).filter((w) => w.mill === mill && w.date <= to && !w.closed && !w.cancelled).length,
+    openWorkOrders: (cache?.workOrders ?? []).filter((w) => w.date <= to && !w.closed && !w.cancelled).length,
     openActions: all.filter((b) => b.from.slice(0, 10) <= to && !b.closed).length,
   };
 }

@@ -136,9 +136,19 @@ describe('plant settings', () => {
 
 describe('access: only through an IOsense session', () => {
   test('data and status routes refuse a caller without a session', async () => {
-    for (const url of ['/api/hsm/live', '/api/hsm/production?from=2026-09-22&to=2026-09-28', '/api/config', '/api/sources', '/api/erp']) {
+    for (const url of ['/api/hsm/live', '/api/hsm/production?from=2026-09-22&to=2026-09-28', '/api/config', '/api/sources', '/api/erp', '/api/erp/sync']) {
       expect(await get(url, { authorization: '' })).toMatchObject({ status: 401, body: { error: 'unauthenticated' } });
     }
+    // Nobody starts an ERP sync without signing in.
+    const start = await app.inject({ method: 'POST', url: '/api/erp/sync', payload: {} });
+    expect([start.statusCode, start.json().error]).toEqual([401, 'unauthenticated']);
+  });
+
+  test('the ERP sync state: running or not, and each mill\'s last fetch', async () => {
+    const r = await get('/api/erp/sync');
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ running: false, intervalMinutes: 0 });
+    expect(Object.keys(r.body.mills)).toEqual(['hsm', 'rmd', 'lsm', 'rms']);
   });
 
   test('a forged, tampered or expired session is refused', async () => {

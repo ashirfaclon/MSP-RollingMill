@@ -38,6 +38,29 @@ export interface ErpStatus {
   divisions: ErpDivisionRow[];
 }
 
+export type ErpMill = 'hsm' | 'rmd' | 'lsm' | 'rms';
+
+/**
+ * GET / POST /api/erp/sync — the ERP sync the dashboard's Sync ERP button starts (the user, 25 Nov 2026):
+ * one run pulls all four mills; each mill's time is the oldest of its own files, so a part that did not
+ * sync shows as older.
+ */
+export interface ErpSyncState {
+  running: boolean;
+  /** The run in progress: when it started, and whether the schedule or a person started it. */
+  startedAt: string | null;
+  trigger: 'schedule' | 'manual' | null;
+  /** The last finished run, successful or not. */
+  lastAttempt: ErpSyncAttempt | null;
+  /** When each mill's ERP data was last fetched; null if never. */
+  mills: Record<ErpMill, string | null>;
+  /** The automatic sync's interval, minutes; 0 = off. */
+  intervalMinutes: number;
+  /** A new run can be started from this time (a short rest after each run, so the ERP is not hammered). */
+  nextAllowedAt: string | null;
+  configured: boolean;
+}
+
 export type SourceId = 'historian' | 'ems' | 'erp' | 'logbook';
 
 export interface HealthResponse { ok: true; time: string }

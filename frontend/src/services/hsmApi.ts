@@ -103,9 +103,14 @@ export async function postJson<T>(url: string, body: unknown): Promise<T> {
   if (!type.includes('application/json')) throw new Error('The data service is not reachable from this page');
   const out = await res.json();
   if (!res.ok) throw new Error(out?.message ?? 'The save could not be completed');
+  reloadAllData();
+  return out as T;
+}
+
+/** Empty the request cache and reload every open screen's data (after a save, or a fresh ERP sync). */
+export function reloadAllData() {
   inflight.clear();
   window.dispatchEvent(new Event(SAVED_EVENT));
-  return out as T;
 }
 
 export const rangeUrl = (path: string, p: { from: string; to: string; grain?: string } | null) =>

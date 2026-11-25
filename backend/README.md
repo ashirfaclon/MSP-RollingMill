@@ -76,6 +76,8 @@ Every response has `Cache-Control: no-store` and an `X-Request-Id` header. Error
 | GET | `/hsm/live` | Billets today, stand groups on/off |
 | GET | `/hsm/stands?group&metric&hours` | Stand trend (current / rpm / force / on-off) |
 | GET | `/erp` | ERP sync state |
+| GET | `/erp/sync` | The sync run (in progress?), last result, each mill's last ERP fetch |
+| POST | `/erp/sync` | Start a sync of all four mills now (the dashboard's Sync ERP button), or join the running one; 429 within a minute of the last run |
 | GET | `/historian/catalogue[?measurement]` | Historian discovery |
 | GET | `/ems/equipment` | Meter feeders seen in the last day |
 | GET | `/logbook[?days]` | Logbook session (and form counts once mapped) |
@@ -136,7 +138,7 @@ production, set them on the platform.
 | `CORS_ORIGINS` | *(none)* | The frontend origin(s), comma-separated. Required when the browser calls the API directly. `*` is refused in production. |
 | `TRUST_PROXY` | `false` | `true` behind a load balancer, so rate limits and logs see the real client IP |
 | `RATE_LIMIT_PER_MINUTE` | `600` | Per client IP; health and ready are exempt |
-| `ERP_SYNC_INTERVAL_MINUTES` | `0` | e.g. `180` to sync inside the service; `0` = run the job externally |
+| `ERP_SYNC_INTERVAL_MINUTES` | `0` | `15` recommended (set on this server 25 Nov 2026) to sync inside the service; `0` = run the job externally. The Sync ERP button works either way |
 | `ERP_CACHE_DIR` | `data` | Put this on a persistent volume |
 | `INFLUX_*`, `EMS_INFLUX_*`, `ERP_*`, `IOSENSE_*` | | Source connections; a missing one reads as "not configured", never as a crash |
 

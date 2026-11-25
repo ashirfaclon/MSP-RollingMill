@@ -424,3 +424,23 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   interval); caches are swapped in whole and re-read by mtime, so no restart and no half-written data; a failed
   sync (ERP / VPN down) keeps the last good data. Tested at a 1-min interval (the user): syncs at 17:50:37, 17:51:37,
   17:52:37 IST, all ok (~21–22 s each); then set back to 15 and restarted — boot sync ok.
+- **25 Nov 2026** — **Sync ERP button + each mill's last ERP fetch, top bar of every screen** (the user: fetch the
+  ERP on demand, and show when it was last fetched). Asked first: anyone signed in may press it; one press syncs
+  **all four mills**; **ERP PM split one file per mill** (`erp-pm-<mill>.json`) so a mill's data sits in its own
+  files, ready for per-mill access later. Backend: `jobs/erp-sync-runner.ts` — the one run, shared by the schedule
+  and the button (never two at once; a press while one runs joins it; a press within 60 s of the last run is
+  refused 429 so the ERP cannot be hammered; the schedule ignores that rest); `GET /api/erp/sync` (running?, last
+  attempt, each mill's last fetch = the OLDEST of its own files, so a part that failed shows the mill older, auto
+  interval) and `POST /api/erp/sync` (202; 503 when the ERP is not configured). PM: `readErpPm(env, mill)` reads
+  the mill's file, falling back to the old one-file `erp-pm.json` until the first per-mill sync (live, right
+  after deploy). Checked the split against the old file: equipment, due dates, breakdowns, work orders equal for
+  all four mills, no rows of another mill; the old file moved to the scratchpad backup. Frontend: `ErpSyncButton`
+  (before Settings) — "Sync ERP" over this mill's time (`18:17 · 25 Nov`, IST), spinner + "Syncing…" while it
+  runs, "Failed · <time>" in amber when the last run failed after this mill's fetch, a short refusal ("Wait a
+  minute") with the reason in the tooltip; when any mill's fetch time moves (button, schedule or someone else),
+  every open screen reloads (`reloadAllData`). Pinned to Reset's height so the row's centres stay level. Checked:
+  4 mills + Alerts × 1366 / 1920, both themes — one row (RMD Asset Health, the busiest bar, included), no page
+  scroll; a real press: Syncing… → 18:16 → 18:17, production reloaded, no console errors. Tests: unit
+  erp-sync-state.test.ts (4), route tests (sign-in needed, state shape), topbar.e2e "Sync ERP" (mocked: failed run,
+  refused press, one row); 288 backend unit tests pass, topbar e2e 3/3. A stray `backend/[object Object].tmp`
+  (the old dev server ran a sync mid-edit) moved to the backup. Not committed.

@@ -2,7 +2,7 @@
 
 /**
  * Top bar: which mill and which screen you are on, and the controls that apply to every
- * screen — mill switch, duration window, the mill's Settings (limits), theme, full screen. Brand block and
+ * screen — mill switch, duration window, Sync ERP, the mill's Settings (limits), theme, full screen. Brand block and
  * segment controls follow pellet-frontend's TopBar; the tabs moved to the sidebar.
  */
 import { useEffect, useState } from 'react';
@@ -12,6 +12,7 @@ import { OPEN_SETTINGS_EVENT, type OpenSettings } from '@/services/settings';
 import MillPicker from './MillPicker';
 import Picker from './Picker';
 import FullscreenButton from './FullscreenButton';
+import ErpSyncButton from './ErpSyncButton';
 import { millOf, screenOf, type MillId, type ScreenId } from '@/config/navigation';
 import { RMD_MODE_LABELS, isDefaultFilter, resetFilters, setGlobalSel, useGlobalSel, type RmdModeSel, type ThemeSel } from '@/state/globalSel';
 import { HEADER_SLOT_ID } from './HeaderSlot';
@@ -69,6 +70,9 @@ export default function TopBar({ mill, screen }: { mill: MillId; screen: ScreenI
             Reset
           </button>
         )}
+
+        {/* Fetch the ERP now, and when this mill's ERP data was last fetched (the user, 25 Nov 2026). */}
+        <ErpSyncButton mill={mill} />
 
         <button type="button" className="tb-reset tb-settings" onClick={() => setSettings({ tab: screen === 'alerts' ? 'alerts' : 'limits', focus: null })} title="The limits this mill's readings are judged by, and when its alerts notify">
           <GearGlyph />

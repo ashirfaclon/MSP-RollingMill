@@ -11,8 +11,8 @@ import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import type { Env } from '../../config/env';
 import { MSG } from '../../shared/messages';
-import type { ErpDivisionRow, ErpSyncAttempt, ErpStatus } from '../../contracts';
-export type { ErpDivisionRow, ErpSyncAttempt, ErpStatus };
+import type { ErpDivisionRow, ErpMill, ErpSyncAttempt, ErpStatus } from '../../contracts';
+export type { ErpDivisionRow, ErpMill, ErpSyncAttempt, ErpStatus };
 
 /**
  * Entities this app may read. MP = MSP Steel & Power, MS = MSP Sponge Iron (Raigarh).
@@ -42,7 +42,10 @@ export const cachePaths = (env: Env) => {
     lsmStock: path.join(dir, 'erp-lsm-stock.json'),
     rmsStock: path.join(dir, 'erp-rms-stock.json'),
     rmsProduction: path.join(dir, 'erp-rms-production.json'),
-    pm: path.join(dir, 'erp-pm.json'),
+    /** ERP PM, one file per mill (the user, 25 Nov 2026: a mill's data in its own files, ready for per-mill access). */
+    pm: Object.fromEntries(PM_MILLS.map((m) => [m, path.join(dir, `erp-pm-${m}.json`)])) as Record<PmMill, string>,
+    /** The one-file PM cache synced before 25 Nov 2026 — read only until the first per-mill sync. */
+    pmLegacy: path.join(dir, 'erp-pm.json'),
   };
 };
 
@@ -53,27 +56,50 @@ export const cachePaths = (env: Env) => {
  */
 export const PM_DIVISIONS = { hsm: 'S1', rmd: 'RM', lsm: 'LS', rms: 'RS' } as const;
 export type PmMill = keyof typeof PM_DIVISIONS;
-/** PM reminders of one mill falling due on one date: how many, done, and done by the due date. */
-export interface ErpPmDay { mill: PmMill; date: string; due: number; done: number; doneOnTime: number }
+const PM_MILLS = Object.keys(PM_DIVISIONS) as PmMill[];
+/** PM reminders falling due on one date: how many, done, and done by the due date. */
+export interface ErpPmDay { date: string; due: number; done: number; doneOnTime: number }
 /** One breakdown (EQPT_PM_LOG, TNATURE = 'BKDN'): plant-local times, hours down. */
 export interface ErpPmBreakdown {
-  mill: PmMill; vrno: string; equipment: string; from: string; to: string; hours: number | null;
+  vrno: string; equipment: string; from: string; to: string; hours: number | null;
   remark: string | null; closed: boolean;
 }
 /** One work order (EQPT_PM_TRAN, TNATURE = 'WOPM'). */
-export interface ErpPmWorkOrder { mill: PmMill; vrno: string; date: string; equipment: string; closed: boolean; cancelled: boolean }
+export interface ErpPmWorkOrder { vrno: string; date: string; equipment: string; closed: boolean; cancelled: boolean }
+/** One mill's ERP PM (erp-pm-<mill>.json). */
 export interface ErpPmCache {
+  mill: PmMill;
   syncedAt: string;
   source: string;
-  /** Equipment in EQPT_ID_MAST per mill (0: the mill is not in the ERP's PM module). */
-  equipment: Record<PmMill, number>;
+  /** Equipment in EQPT_ID_MAST (0: the mill is not in the ERP's PM module). */
+  equipment: number;
   days: ErpPmDay[];
   breakdowns: ErpPmBreakdown[];
   workOrders: ErpPmWorkOrder[];
 }
+/** The one-file shape synced before 25 Nov 2026: every mill's rows together, each row tagged. */
+interface ErpPmLegacyCache {
+  syncedAt: string;
+  source: string;
+  equipment: Record<PmMill, number>;
+  days: (ErpPmDay & { mill: PmMill })[];
+  breakdowns: (ErpPmBreakdown & { mill: PmMill })[];
+  workOrders: (ErpPmWorkOrder & { mill: PmMill })[];
+}
 
-export function readErpPm(env: Env): ErpPmCache | null {
-  return readJson<ErpPmCache>(cachePaths(env).pm);
+const untag = <T extends { mill: PmMill }>(rows: T[], mill: PmMill) =>
+  rows.filter((r) => r.mill === mill).map(({ mill: _, ...r }) => r);
+
+/** One mill's ERP PM; until the first per-mill sync, its rows of the old one-file cache. */
+export function readErpPm(env: Env, mill: PmMill): ErpPmCache | null {
+  const p = cachePaths(env);
+  const own = readJson<ErpPmCache>(p.pm[mill]);
+  if (own) return own;
+  const old = readJson<ErpPmLegacyCache>(p.pmLegacy);
+  return old && {
+    mill, syncedAt: old.syncedAt, source: old.source, equipment: old.equipment[mill] ?? 0,
+    days: untag(old.days, mill), breakdowns: untag(old.breakdowns, mill), workOrders: untag(old.workOrders, mill),
+  };
 }
 
 /**
@@ -330,6 +356,28 @@ function readJson<T>(file: string): T | null {
   } catch {
     return null;
   }
+}
+
+/** Each mill's ERP files (its PM file apart: read through readErpPm, so the legacy cache counts). */
+const MILL_FILES: Record<ErpMill, (p: ReturnType<typeof cachePaths>) => string[]> = {
+  hsm: (p) => [p.cache, p.production, p.commercial],
+  rmd: (p) => [p.rmdProduction, p.rmdStock],
+  lsm: (p) => [p.lsmProduction, p.lsmStock],
+  rms: (p) => [p.rmsProduction, p.rmsStock],
+};
+
+/**
+ * When each mill's ERP data was last fetched: the OLDEST of its files, so a part that failed to
+ * sync (each pull has its own failure) shows the mill as older, not as fresh. Null if any is missing.
+ */
+export function erpMillSyncedAt(env: Env): Record<ErpMill, string | null> {
+  const p = cachePaths(env);
+  const of = (m: ErpMill) => {
+    const times = [...MILL_FILES[m](p).map((f) => readJson<{ syncedAt?: string }>(f)?.syncedAt), readErpPm(env, m)?.syncedAt];
+    if (times.some((t) => !t)) return null;
+    return (times as string[]).reduce((a, b) => (Date.parse(b) < Date.parse(a) ? b : a));
+  };
+  return { hsm: of('hsm'), rmd: of('rmd'), lsm: of('lsm'), rms: of('rms') };
 }
 
 export function erpStatus(env: Env, nowMs = Date.now()): ErpStatus {

@@ -57,7 +57,7 @@ export async function buildApp({ config, lifecycle = { shuttingDown: false } }: 
   await app.register(async (api) => {
     await api.register(systemRoutes, { lifecycle });
     await api.register(authRoutes, { prefix: '/auth', config });
-    await api.register(sourcesRoutes);
+    await api.register(sourcesRoutes, { config });
     await api.register(hsmRoutes, { prefix: '/hsm' });
     await api.register(rmdRoutes, { prefix: '/rmd' });
     await api.register(lsmRoutes, { prefix: '/lsm' });

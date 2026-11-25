@@ -1,6 +1,6 @@
 /**
  * The top bar's controls (the user, 21 Nov 2026): Mill, Rolling and the drive group are dropdowns, all in
- * one row with Duration, Reset, Settings, theme and full screen — none on a line of their own.
+ * one row with Duration, Reset, Sync ERP, Settings, theme and full screen — none on a line of their own.
  */
 import { test, expect, type Page } from '@playwright/test';
 
@@ -48,4 +48,28 @@ test('HSM Asset Health: the Group dropdown in the same row', async ({ page }) =>
   await expect(page.locator('.topbar').getByRole('button', { name: /^Drive group: / })).toBeVisible();
   expect(new Set(await rowOf(page)).size).toBe(1);
   await page.locator('.topbar').screenshot({ path: `${SHOTS}/topbar-hsm-asset.png` });
+});
+
+test('Sync ERP: this mill\'s last fetch beside the button; a failed run and a refused press say so', async ({ page }) => {
+  const at = '2026-11-25T12:47:00.000Z';
+  const state = {
+    running: false, startedAt: null, trigger: null, intervalMinutes: 15, nextAllowedAt: null, configured: true,
+    mills: { hsm: at, rmd: '2026-11-25T12:40:00.000Z', lsm: at, rms: at },
+    lastAttempt: { attemptedAt: '2026-11-25T13:02:00.000Z', ok: false, message: 'ERP sync failed', durationMs: 1 },
+  };
+  // Answered here, so the test never starts a real ERP sync.
+  await page.route('**/api/erp/sync', (r) => r.request().method() === 'POST'
+    ? r.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'erp_sync_resting', message: 'The ERP was synced less than a minute ago — try again shortly' }) })
+    : r.fulfill({ contentType: 'application/json', body: JSON.stringify(state) }));
+  await page.goto('/rmd/visualization');
+  const btn = page.locator('.topbar').getByRole('button', { name: /^Sync ERP/ });
+  // RMD's own time (18:10 IST), not another mill's; the failed run after it is flagged.
+  await expect(btn).toContainText('Failed · 18:10 · 25 Nov');
+  await expect(btn).toHaveAttribute('title', /The last sync failed .* showing the data fetched before\. .*every 15 min/);
+  expect(new Set(await rowOf(page)).size).toBe(1);
+  await btn.click();
+  await expect(btn).toContainText('Wait a minute');
+  await expect(btn).toHaveAttribute('title', /^The ERP was synced less than a minute ago/);
+  expect(new Set(await rowOf(page)).size).toBe(1);
+  await page.locator('.topbar').screenshot({ path: `${SHOTS}/topbar-erp-sync.png` });
 });
