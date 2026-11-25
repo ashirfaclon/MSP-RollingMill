@@ -11,6 +11,7 @@ import DrillDrawer, { Stats } from './DrillDrawer';
 import SourceBox, { type SourceSystem } from './SourceBox';
 import DrillChart, { fmtNum, type DrillSeries } from './DrillChart';
 import { useDrillRange } from './useDrillRange';
+import SectionsCell from './SectionsCell';
 import { dm, useProduction, type PeriodRow, type ProductionComparison } from '@/services/hsmProduction';
 import { rangeUrl, useApi } from '@/services/hsmApi';
 
@@ -114,6 +115,7 @@ function Content({ data, config }: { data: ProductionComparison; config: Counter
               <th className="r">ERP ({u})</th>
               <th className="r">{config.working ? `Influx · working hours (${u})` : `Influx (${u})`}</th>
               <th className="r">Delta ({u})</th>
+              {config.working && <th>Size rolled</th>}
               {config.working && data.grain === 'day' && <th>Working hours</th>}
             </tr>
           </thead>
@@ -147,6 +149,7 @@ function Row({ r, f, config, hours }: { r: PeriodRow; f: (v: number | null) => s
       <td className="num r v-val">{f(r.erpMt)}</td>
       <td className="num r v-val">{f(influxOf(r, config))}</td>
       <td className={`num r ${varClass(deltaOf(r, config))}`}>{f(deltaOf(r, config))}</td>
+      {config.working && <SectionsCell sections={r.sections} />}
       {hours !== undefined && <td className="pd-dim">{hours}</td>}
     </tr>
   );
@@ -187,7 +190,11 @@ export const PRODUCTION_COUNTER: CounterConfig = {
   sources: [erpLogSheet('PRODUCTION_MT'), influxCounter('Total_Production_Ton'), {
     name: 'Logbook',
     rows: [['Form', 'HSM Checklists → Shift Setup Checklist'], ['Field', 'Date, Shift, Shift start time, Shift end time (HH:MM IST)']],
-  }],
+  }, { name: 'ERP', rows: [
+          ['Table', 'PROD_TRAN (production receipts), ITEM_MAST (item name)'],
+          ['Filter', "DIV_CODE = 'S1', finished items (ITEM_CODE 'F…'), not cancelled"],
+          ['Size', 'read from the item name, as in Finished stock by size'],
+        ] }],
   working: true,
 };
 

@@ -51,6 +51,18 @@ describe('LSM production from the log sheet', () => {
     const r = summariseLsm('d', '11 Oct', ['2026-10-11'], [{ ...ROWS[0], v: old as typeof ROWS[0]['v'] }]);
     expect(r).toMatchObject({ productionMt: 269.79, availabilityPct: null, efficiencyPct: null, nonPrimeYieldPct: null, delayHrs: null });
   });
+  test('the section(s) rolled: finished receipts by section, named as Finished stock by size; defective left out', () => {
+    // 11 Nov 2026 as the ERP holds it.
+    const receipts = [
+      { date: '2026-11-11', item: 'F01011500003', name: 'MS ANGLE 65X6 6 mtr', mt: 195.38 },
+      { date: '2026-11-11', item: 'F01011600002', name: 'MS ANGLE 65X8 6 mtr', mt: 106.77 },
+      { date: '2026-11-11', item: 'F01070100011', name: 'MS ANGLE 65X6  DEFECTIVE', mt: 1.9 },
+      { date: '2026-11-12', item: 'F01011300004', name: 'MS ANGLE 50 X 6 6 mtr', mt: 297.08 },
+    ];
+    expect(summariseLsm('d', '11 Nov', ['2026-11-11'], ROWS, receipts).sections)
+      .toEqual([{ label: 'A 65×65×6', mt: 195.38 }, { label: 'A 65×65×8', mt: 106.77 }]);
+    expect(summariseLsm('d', '10 Oct', ['2026-10-10'], ROWS, receipts).sections).toEqual([]);
+  });
   test('a date with no entry is null, not 0', () => {
     expect(summariseLsm('d', '10 Oct', ['2026-10-10'], ROWS)).toMatchObject({ entryDays: 0, productionMt: null, lossesMt: null });
   });

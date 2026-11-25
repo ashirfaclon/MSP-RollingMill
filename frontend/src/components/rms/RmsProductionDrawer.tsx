@@ -11,6 +11,7 @@ import { useLastEntry } from '@/services/lastEntry';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { fmtNum, type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox from '@/components/drill/SourceBox';
+import SectionsCell from '@/components/drill/SectionsCell';
 import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmsProductionPeriod, type RmsProductionReport } from '@/services/hsmApi';
@@ -77,6 +78,14 @@ function Content({ data }: { data: RmsProductionReport }) {
           <tfoot><tr>{label(t)}<td className="num r">{pcs(t.billetsPcs)}</td><td className="num r">{f(t.billetInputMt)}</td><td className="num r">{f(t.productionMt)}</td><td className="num r">{pct(t.massYieldPct)}</td><td className="num r">{f(t.massDiffMt)}</td></tr></tfoot>
         </table>
       </div>
+      {/* What was rolled — its own table, so the one above keeps its width (the user, 25 Nov 2026). */}
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label="Section rolled by period">
+          <thead><tr><th>Period</th><th className="r">Production (MT)</th><th>Section rolled</th></tr></thead>
+          <tbody>{rows.map((x) => <tr key={x.key}>{label(x)}<td className="num r v-val">{f(x.productionMt)}</td><SectionsCell sections={x.sections} /></tr>)}</tbody>
+          <tfoot><tr>{label(t)}<td className="num r">{f(t.productionMt)}</td><SectionsCell sections={t.sections} /></tr></tfoot>
+        </table>
+      </div>
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Losses by period">
           <thead><tr><th>Period</th>{LOSSES.map(([, l]) => <th key={l} className="r">{l}</th>)}<th className="r">Losses (MT)</th></tr></thead>
@@ -91,6 +100,10 @@ function Content({ data }: { data: RmsProductionReport }) {
           ['Table', 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],
           ['Filter', "ENTITY_CODE = 'MP', DIV_CODE = 'RS', TNATURE = 'PRLOG', SERIES = 'L5P'"],
           ['Field', "ATTR_CODE = 'PRODUCTION_MT', 'INPUT_MT1', 'INPUT_MT2', 'INPUT_PCS', 'BURNING_LOSS_MT1/2', 'ENDCUT_MT1/2', 'MISROLL_MT1/2', 'COLD_MT', 'REJECT_MT1/2' (value in ATTR_VALUE), by VRDATE"],
+        ] }, { name: 'ERP', rows: [
+          ['Table', 'PROD_TRAN (production receipts), ITEM_MAST (item name)'],
+          ['Filter', "DIV_CODE = 'RS', finished items (ITEM_CODE 'F…'), not cancelled; defective counted in its section"],
+          ['Size', 'read from the item name, as in Finished stock by size'],
         ] }]}
         formula={[
           "Production = Σ PRODUCTION_MT of the date's entries",

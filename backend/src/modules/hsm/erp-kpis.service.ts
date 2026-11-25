@@ -163,6 +163,13 @@ export function parseStripSpec(name: string): StripSpec | null {
   return { width: `${m[1]}–${m[2]}`, thickness: t !== null && Number.isFinite(t) ? t : null, defective: /defective/i.test(name) };
 }
 
+/** A strip item's name as Finished stock by size shows it: "234–236 × 2.50", "… · defective"; null if not a strip. */
+export function stripLabelOf(name: string): string | null {
+  const spec = parseStripSpec(name);
+  if (!spec) return null;
+  return `${spec.width}${spec.thickness === null ? '' : ` × ${spec.thickness.toFixed(2)}`}${spec.defective ? ' · defective' : ''}`;
+}
+
 export function sizeReport(env: Env, from: string, to: string): SizeReport {
   const com = readErpCommercial(env);
   const names = com?.items ?? {};

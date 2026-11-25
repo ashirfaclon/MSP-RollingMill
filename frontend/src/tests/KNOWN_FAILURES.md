@@ -31,12 +31,9 @@ Note: some numbers in hsm-rolling, production, rolling-mill and wiring specs wer
 | wiring.e2e.spec.ts:470 | RMD: production and losses from the ERP log sheet (FA-SKJ), and what they feed | Old 1-decimal text (2-decimal rule, 24 Nov) | "1,689.9" | "1,689.86MT" |
 | wiring.e2e.spec.ts:525 | RMD: finished stock by size from the ERP item ledger (FGYRDP), and a size opens its SKUs | Number differs — likely 2-decimal rule or newer data | "793.0 MT" | "794.95 MT" |
 | wiring.e2e.spec.ts:580 | RMD: production by shift — the FY plan (Prime + SL) per day and shift, against ERP Prime + SL | Number differs — likely 2-decimal rule or newer data | "Plan 2,121 MT" | "Plan 2,139.48 MT" |
-| wiring.e2e.spec.ts:616 | LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant gave the codes | Old 1-decimal text (2-decimal rule, 24 Nov) | "94.6" | "94.58%" |
 | wiring.e2e.spec.ts:702 | RMD: running rate opens its drill-down — Prime + SL ÷ running hours from the billet counters | Unknown — check before trusting |  |  |
 | wiring.e2e.spec.ts:747 | LSM: finished stock by section, as the ERP Stock Sheet Engine for division LS | Stock size list changed (live ERP stock) | "A 50×50×6" | "MC 75×40" |
 | wiring.e2e.spec.ts:780 | RMS: finished stock by section, by the ERP stock rule for division RS | Stock size list changed (live ERP stock) | /^A 130×130×/ | "MC 175" |
-| wiring.e2e.spec.ts:796 | RMS: production from the ERP log sheet (division RS, series L5P) — a day entered twice counts once | Old 1-decimal text (2-decimal rule, 24 Nov) | "6,244.8" | "6,244.75MT" |
-| wiring.e2e.spec.ts:838 | RMD asset health: route drive group by default; motor current live, run hours from ACTUAL_RUNNING_HRS, bearing | Header / drive-group control moved | "RMD · Route drive group" |  |
 | wiring.e2e.spec.ts:941 | RMD asset health: motor current — live with a Live chip while drives run, else the period mean while running w | Unknown — check before trusting | /^\d[\d,]*\s*A$/ | "157.22A" |
 | wiring.e2e.spec.ts:960 | LSM: production vs plan — the October plan (8,750 MT), whole day only, against ERP PRODUTION_MT | Number differs — likely 2-decimal rule or newer data | "Plan 2,258 MT" | "Plan 2,258.08 MT" |
 | wiring.e2e.spec.ts:994 | RMS: production vs plan — the monthly plan (Oct 13,499 MT), whole day only, against ERP PRODUCTION_MT | Number differs — likely 2-decimal rule or newer data | "Plan 5,226 MT" | "Plan 5,225.52 MT" |
@@ -69,3 +66,4 @@ Note: some numbers in hsm-rolling, production, rolling-mill and wiring specs wer
 | wiring.e2e.spec.ts:1404 | RMS asset health: ERP PM — PM on time, next PM, open work orders, MTBF / MTTR, open action | Number differs — likely 2-decimal rule or newer data | /^28\.6\s*%$/ | "2.04%" |
 | wiring.e2e.spec.ts:1514 | RMD condition analytics: with the month's CA inputs saved, the costing cards and rows show the figures (the CA | Number differs — likely 2-decimal rule or newer data | /^500\.0\s*MT$/ | "500MT" |
 | wiring.e2e.spec.ts:1436 | HSM: production plan config — opens on the current plan, month total, shutdowns, Day / Night per day; Save pos | Unknown — check before trusting |  |  |
+| wiring.e2e.spec.ts:854 | RMD asset health: all drive groups by default; route: … | Expects a drive-group button row on the page (now the header picker) — default, run hours and limits checks fixed 25 Nov | ['Roughing', 'Route / diverter', 'Finishing', 'Auxiliary'] | 1 button |

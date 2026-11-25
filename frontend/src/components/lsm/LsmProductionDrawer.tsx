@@ -9,7 +9,9 @@
  *   balance     billet input, production and the six losses (Material balance);
  *   availabilityPct … rollingInDeliveryPct  each of the plant's management KPIs on its own (the user, 23 /
  *               25 Nov 2026): its line against 100 %, beside the figures it is worked out from;
- *   breakdown   breakdown hours = DELAY_HRS, its own chart (the user, 25 Nov 2026).
+ *   breakdown   breakdown hours = DELAY_HRS, its own chart (the user, 25 Nov 2026);
+ *   ccmBypassMt, lsmBypassMt  the two bypasses on their own, as HSM's (CCM_BY_PASS_MT, LSM_BY_PASS_MT; the user,
+ *               25 Nov 2026 — LSM's log sheet has no defective figure, so that one is left out).
  * Codes exactly as the plant gave them; production is PRODUTION_MT, as the table spells it.
  */
 import { useMemo } from 'react';
@@ -17,17 +19,20 @@ import { useLastEntry } from '@/services/lastEntry';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { fmtNum, type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox, { type SourceSystem } from '@/components/drill/SourceBox';
+import SectionsCell from '@/components/drill/SectionsCell';
 import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type LsmProductionPeriod, type LsmProductionReport } from '@/services/hsmApi';
 
-export type LsmProductionView = 'production' | 'yield' | 'balance' | 'breakdown' | PerfKey;
+export type LsmProductionView = 'production' | 'yield' | 'balance' | 'breakdown' | BypassKey | PerfKey;
 
 const TITLES: Record<LsmProductionView, string> = {
   production: 'Production · ERP log sheet',
   yield: 'Yield · ERP log sheet',
   balance: 'Material balance · ERP log sheet',
   breakdown: 'Breakdown · ERP log sheet',
+  ccmBypassMt: 'CCM bypass · ERP log sheet',
+  lsmBypassMt: 'LSM bypass · ERP log sheet',
   availabilityPct: 'Availability · ERP log sheet',
   performancePct: 'Performance · ERP log sheet',
   efficiencyPct: 'Efficiency · ERP log sheet',
@@ -64,7 +69,8 @@ export default function LsmProductionDrawer({ open, onClose, view }: { open: boo
       hasData={!!data}
     >
       {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} />
-        : view in PERF ? <KpiContent data={data} k={view as PerfKey} /> : view === 'breakdown' ? <BreakdownContent data={data} /> : <BalanceContent data={data} />)}
+        : view in PERF ? <KpiContent data={data} k={view as PerfKey} /> : view in BYPASS ? <BypassContent data={data} k={view as BypassKey} />
+        : view === 'breakdown' ? <BreakdownContent data={data} /> : <BalanceContent data={data} />)}
     </DrillDrawer>
   );
 }
@@ -91,12 +97,19 @@ function ProductionContent({ data }: { data: LsmProductionReport }) {
         ariaLabel={`Production by period: ${rows.map((x) => `${x.label} ${f(x.productionMt)} MT`).join('; ')}`} />
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Production by period">
-          <thead><tr><th>Period</th><th className="r">Production (MT)</th></tr></thead>
-          <tbody>{rows.map((x) => <tr key={x.key}>{label(x)}<td className="num r v-val">{f(x.productionMt)}</td></tr>)}</tbody>
-          <tfoot><tr>{label(t)}<td className="num r">{f(t.productionMt)}</td></tr></tfoot>
+          <thead><tr><th>Period</th><th className="r">Production (MT)</th><th>Section rolled</th></tr></thead>
+          <tbody>{rows.map((x) => <tr key={x.key}>{label(x)}<td className="num r v-val">{f(x.productionMt)}</td><SectionsCell sections={x.sections} /></tr>)}</tbody>
+          <tfoot><tr>{label(t)}<td className="num r">{f(t.productionMt)}</td><SectionsCell sections={t.sections} /></tr></tfoot>
         </table>
       </div>
-      <SourceBox sources={sources(['PRODUTION_MT'])} formula={["Production = Σ PRODUTION_MT of the date's entries"]} />
+      <SourceBox
+        sources={[...sources(['PRODUTION_MT']), { name: 'ERP', rows: [
+          ['Table', 'PROD_TRAN (production receipts), ITEM_MAST (item name)'],
+          ['Filter', "DIV_CODE = 'LS', finished items (ITEM_CODE 'F…'), not cancelled, defective items left out"],
+          ['Section', 'read from the item name, as in Finished stock by size (MS ANGLE 65X6 → A 65×65×6)'],
+        ] }]}
+        formula={["Production = Σ PRODUTION_MT of the date's entries", 'Section rolled = the finished items received that day, by section (MT each when more than one)']}
+      />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
     </>
   );
@@ -186,6 +199,55 @@ function BreakdownRow({ x }: { x: LsmProductionPeriod }) {
       {label(x)}
       <td className="num r v-val"><b>{f(x.delayHrs)}</b></td>
       <td className="num r">{f(x.runningHrs)}</td>
+    </tr>
+  );
+}
+
+export type BypassKey = 'ccmBypassMt' | 'lsmBypassMt';
+
+/** The two bypasses, as HSM's (the user, 25 Nov 2026): each read against the billet input, as the ERP's own % is. */
+export const BYPASS: Record<BypassKey, { name: string; field: string; token: string }> = {
+  ccmBypassMt: { name: 'CCM bypass', field: 'CCM_BY_PASS_MT', token: '--s-alt' },
+  lsmBypassMt: { name: 'LSM bypass', field: 'LSM_BY_PASS_MT', token: '--violet' },
+};
+
+function BypassContent({ data, k }: { data: LsmProductionReport; k: BypassKey }) {
+  const c = BYPASS[k];
+  const rows = data.rows;
+  const t = data.totals;
+  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
+  const series = useMemo<DrillSeries[]>(() => [
+    { id: k, name: c.name, token: c.token, type: 'column', data: rows.map((x) => x[k]), dp: 2 },
+  ], [rows, k, c]);
+  const axes = useMemo(() => [{ title: 'MT', unit: 'MT', min: 0 }], []);
+  return (
+    <>
+      <Stats items={[
+        { label: c.name, value: f(t[k]), unit: 'MT' },
+        { label: 'Billet input', value: f(t.billetInputMt), unit: 'MT' },
+        { label: 'Days entered', value: String(t.entryDays), unit: `of ${t.days}` },
+      ]} />
+      <DrillChart series={series} categories={categories} axes={axes}
+        ariaLabel={`${c.name} by period: ${rows.map((x) => `${x.label} ${f(x[k])} MT`).join('; ')}`} />
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label={`${c.name} by period`}>
+          <thead><tr><th>Period</th><th className="r">{c.name} (MT)</th><th className="r">Billet input (MT)</th></tr></thead>
+          <tbody>{rows.map((x) => <BypassRow key={x.key} x={x} k={k} />)}</tbody>
+          <tfoot><BypassRow x={t} k={k} /></tfoot>
+        </table>
+      </div>
+      <SourceBox sources={sources([c.field, 'INPUT_MT'])} formula={[`${c.name} = Σ ${c.field} of the period's entries`]} />
+      {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
+    </>
+  );
+}
+
+function BypassRow({ x, k }: { x: LsmProductionPeriod; k: BypassKey }) {
+  return (
+    <tr>
+      {label(x)}
+      <td className="num r v-val"><b>{f(x[k])}</b></td>
+      <td className="num r">{f(x.billetInputMt)}</td>
     </tr>
   );
 }

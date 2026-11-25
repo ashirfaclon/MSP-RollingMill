@@ -358,3 +358,51 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   Plan-panel foot figures scale on narrow screens. Checked 1 day / year × 3 modes × 1920 / 1366: full rows, no
   figure outside its card, no overflow. hsm-rolling test updated, passes. A stray `}` in visualization.css gave a
   500 for a minute during this — fixed. Rule saved: memory kpi-consistency-ui. Committed and pushed 25 Nov.
+- **25 Nov 2026** — **Shift Setup Checklist, end-to-end check** (the user): three test entries saved through the
+  dashboard (2 Feb Day 07:15–15:45; 10 Nov Day 09:30–14:00 and Night 23:30–05:45, in-charge "TEST ENTRY - delete"),
+  read back from the IOsense logbook with both shift times as typed. Working-hours Influx for 10 Nov: the dashboard
+  showed both windows and 61.94 MT on the Production card; an independent Influx sum of Total_Production_Ton
+  increases over 09:30–14:00 (0) and 23:30–05:45 across midnight (61.94) matched exactly. The three test entries
+  were then deleted by ID; the logbook is back to its 4 real entries (1 Nov Night, 7 Nov Night, 18 Nov Day, 24 Nov
+  Day) and 10 Nov is NA again. No code change.
+- **25 Nov 2026** — **RMD Asset Health opens on drive group "All"** (the user; was Route). `RmdAssetHealth.tsx`.
+  Checked day / month / year × 1920 / 1366: six cards, no overflow. Its browser test updated for the default, run hours
+  87.75 h and the limits wording; still fails further on (an old drive-group button row) — kept in KNOWN_FAILURES.md.
+- **25 Nov 2026** — **Settings → Alerts dropdowns showed a value twice** ("On, On, Off", "Warning, Critical, Warning"):
+  the "follow the default" entry was labelled with the default's value. Now each value once; the default's value
+  stands for "follow the default" and shows in grey while followed (like the grey standard values in the boxes),
+  "Standard setting: …" on hover (`AlertSettings.tsx`, settings.css). "(default)" as text was tried and dropped — it
+  was cut off in the narrow boxes. All 198 dropdowns on every screen, settings tab, Edit plan and checklist of all four
+  mills scanned: no repeated entries. Not committed.
+- **25 Nov 2026** — **LSM: the section rolled each day** (the user). The ERP's production receipts (PROD_TRAN, DIV 'LS',
+  finished items 'F…', not cancelled) name the section of every item; Σ of the non-defective items = the log sheet's
+  PRODUTION_MT on 229 of 234 days (Apr–Nov). Synced as `receipts` in erp-lsm-production.json; `sections` per period
+  (by section, named as Finished stock by size via `sectionLabelOf`, largest first, defective left out). LSM
+  Production drill-down: column "Section rolled" — one section: its name; several: each with its MT; more than 3
+  (a week, a month): the 3 largest and "+N more", all on hover. Production stays exactly as the ERP has it (the user:
+  "follow ERP as it is" — the 5 mismatching days are left as they are: 27 Apr, 16 May, 14 Oct saved twice; 8 Jun,
+  21 Jun two different entries — for the plant to correct). Checked 1 day / 10 days / month / year × 1366 / 1920:
+  nothing scrolls sideways. Test in lsm-production.test.ts. Not committed.
+- **25 Nov 2026** — **HSM, RMD and RMS: the size / section rolled** (the user, after LSM). Same ERP source (PROD_TRAN
+  finished receipts, `pullReceipts` in sync.ts); each receipt's voucher is the REF_VRNO of one log-sheet entry, which
+  gives its rolling (HSM ST001 / ST002, RMD RO001 / RO002), so HSM and RMD follow the Rolling switch. Checked against
+  the log sheet: HSM receipts = PRODUCTION_MT on every entry (166 Online, 109 Offline); RMD receipts (miss roll left
+  out) = Prime on 226 of 281 entries — never Prime + SL, so RMD shows "Size rolled (of Prime)"; RMS = PRODUCTION_MT on
+  231 of 233 days. Names as each mill's Finished stock by size (`stripLabelOf`, `barLabelOf`, sections). Shared cell
+  `drill/SectionsCell.tsx`, shared sum `shared/sections.ts`. Where: HSM Both — Production card drill-down, column
+  "Size rolled"; HSM Online / Offline — own table "Size rolled by period" (the main table is already wide); RMD —
+  Production drill-down column; RMS — own table "Section rolled by period". Checked 1 day → year × 1366 / 1920: RMS and
+  the new HSM table don't scroll sideways; HSM Online main table unchanged (its old 168 px). Unit test
+  sections-rolled.test.ts; 247 backend tests pass. The LSM and RMS production browser tests had old 1-decimal figures —
+  updated (RMS also loses the removed Order allocation line, gains a section check); both pass, taken off
+  KNOWN_FAILURES.md. Not committed.
+- **25 Nov 2026** — **LSM: CCM bypass and LSM bypass** (the user: "same as HSM"). ERP log sheet FA-LP-P fields
+  `CCM_BY_PASS_MT`, `LSM_BY_PASS_MT` (already synced, not shown until now); filled on every entry since Apr; the ERP's
+  own bypass % is of INPUT_MT on all 240 entries; TOTAL_CAST_QTY = INPUT_MT + CCM + LSM + END_CRACK_BY_PASS_CCM_MT
+  bypass on every entry (end-crack left out, as on HSM). **Defective left out** (the user): LSM's log sheet has no
+  defective field — every ERP form searched; only HSM (S1) and RMS (RS) have one. (Defective items received into
+  stores exist in PROD_TRAN, ~0.5–0.9 % of rolled — offered, not wanted.) Shown as HSM's: a line under the Material
+  balance (CCM bypass · LSM bypass), each opening its own drill-down (column chart, bypass beside billet input,
+  source). No Online/Offline split on LSM, so always shown. Checked day / month / year × 1366 / 1920: matches the ERP
+  (21 Nov 7.44 / 20.76; 1–23 Nov 199.18 / 321.24), no overflow, no console errors. LSM browser test extended
+  (1–8 Oct 56.16 / 50.23), passes. Not committed.

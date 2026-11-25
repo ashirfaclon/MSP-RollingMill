@@ -10,6 +10,7 @@ import DrillDrawer, { Stats } from './DrillDrawer';
 import DrillChart, { fmtNum, type DrillSeries } from './DrillChart';
 import SourceBox from './SourceBox';
 import { useDrillRange } from './useDrillRange';
+import SectionsCell from './SectionsCell';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type HsmRollingPeriod, type HsmRollingReport } from '@/services/hsmApi';
 import { RMD_MODE_LABELS, useGlobalSel } from '@/state/globalSel';
@@ -72,6 +73,14 @@ function Content({ data }: { data: HsmRollingReport }) {
           <tfoot><Row x={t} showRolling={showRolling} showCold={showCold} /></tfoot>
         </table>
       </div>
+      {/* What was rolled — its own table: the one above is already wide (the user, 25 Nov 2026). */}
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label="Size rolled by period">
+          <thead><tr><th>Period</th><th className="r">Production (MT)</th><th>Size rolled</th></tr></thead>
+          <tbody>{rows.map((x) => <tr key={x.key}>{periodCell(x)}<td className="num r v-val">{f(x.productionMt)}</td><SectionsCell sections={x.sections} /></tr>)}</tbody>
+          <tfoot><tr>{periodCell(t)}<td className="num r">{f(t.productionMt)}</td><SectionsCell sections={t.sections} /></tr></tfoot>
+        </table>
+      </div>
       <SourceBox
         sources={[{ name: 'ERP', rows: [
           ['Table', 'ATTR_TRAN_DATA_HEAD ⋈ ATTR_TRAN_DATA_BODY'],
@@ -79,6 +88,10 @@ function Content({ data }: { data: HsmRollingReport }) {
           ['Rolling', 'TRAN_COLUMN_NAME1: ST001 = Online, ST002 = Offline (cold rolling)'],
           ['Field', "ATTR_CODE = 'TOTAL_CAST_QTY', 'DELIVERY_QTY', 'INPUT_MT', 'PRODUCTION_MT', 'PRIME_MT', 'POWER_CONSUMPTION_IN_KWH' (value in ATTR_VALUE)"],
           ['Date', 'VRDATE — a date with several entries adds them'],
+        ] }, { name: 'ERP', rows: [
+          ['Table', 'PROD_TRAN (production receipts), ITEM_MAST (item name)'],
+          ['Filter', "DIV_CODE = 'S1', finished items (ITEM_CODE 'F…'), not cancelled; each tied to its log-sheet entry (REF_VRNO) for its rolling"],
+          ['Size', 'read from the item name, as in Finished stock by size'],
         ] }]}
         formula={[
           'Cast, delivery, input, production, prime = Σ over the chosen rolling\'s entries (Both adds Online and Offline)',
@@ -91,6 +104,10 @@ function Content({ data }: { data: HsmRollingReport }) {
     </>
   );
 }
+
+const periodCell = (x: HsmRollingPeriod) => (
+  <td><b>{x.label}</b>{x.days > 1 && x.key !== 'total' && <span className="pd-dim"> · {dm(x.fromDate)}–{dm(x.toDate)}</span>}</td>
+);
 
 function Row({ x, showRolling, showCold }: { x: HsmRollingPeriod; showRolling: boolean; showCold: boolean }) {
   return (

@@ -23,7 +23,8 @@
  */
 import type { Env } from '../../config/env';
 import type { Grain, LsmProductionPeriod, LsmProductionReport } from '../../contracts';
-import { readErpLsmProduction, type LsmLogField, type LsmLogRow } from '../../integrations/erp/cache';
+import { readErpLsmProduction, type LsmLogField, type LsmLogRow, type LsmReceipt } from '../../integrations/erp/cache';
+import { sectionLabelOf } from './stock.service';
 import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, round2 } from '../hsm/production.service';
 import { massDifference, massYield } from '../rmd/production.service';
@@ -54,7 +55,21 @@ const runAndDelayHrs = (r: LsmLogRow) => {
 };
 const inputMt = (r: LsmLogRow) => valueOf(r, 'INPUT_MT');
 
-export function summariseLsm(key: string, label: string, dates: string[], rows: LsmLogRow[]): LsmProductionPeriod {
+/** The sections rolled over the dates: the non-defective finished receipts, by section, largest first. */
+export function sectionsOf(dates: string[], receipts: LsmReceipt[]): LsmProductionPeriod['sections'] {
+  const by = new Map<string, { mt: number; sort: number }>();
+  for (const r of receipts) {
+    if (r.date < dates[0] || r.date > dates[dates.length - 1] || /DEFECTIVE/i.test(r.name)) continue;
+    const s = sectionLabelOf(r.name);
+    if (!s) continue;
+    const g = by.get(s.label) ?? { mt: 0, sort: s.sort };
+    g.mt += r.mt;
+    by.set(s.label, g);
+  }
+  return [...by].map(([label, g]) => ({ label, mt: round2(g.mt) })).sort((a, b) => b.mt - a.mt || a.label.localeCompare(b.label));
+}
+
+export function summariseLsm(key: string, label: string, dates: string[], rows: LsmLogRow[], receipts: LsmReceipt[] = []): LsmProductionPeriod {
   const mine = rows.filter((r) => r.date >= dates[0] && r.date <= dates[dates.length - 1]);
   const losses = (['B_LOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'COLD_MT', 'REJECT_MT', 'SHORTLENGTH_MT'] as const).map((f) => sumOf(mine, f));
   const productionMt = sumOf(mine, 'PRODUTION_MT');
@@ -82,6 +97,7 @@ export function summariseLsm(key: string, label: string, dates: string[], rows: 
     efficiencyPct: weightedPct(mine, 'PLANT_EFFICIENCY', runAndDelayHrs),
     rollingInCastingPct: weightedPct(mine, 'ROLLING_PERCENTAGE_CASTING', inputMt),
     rollingInDeliveryPct: weightedPct(mine, 'ROLLING_PERCENTAGE_DELIVERY', inputMt),
+    sections: sectionsOf(dates, receipts),
   };
 }
 
@@ -104,8 +120,8 @@ export function lsmProduction(env: Env, from: string, to: string, grain: Grain):
       syncedAt: cache?.syncedAt ?? null,
       lastDate: rows.at(-1)?.date ?? null,
     },
-    rows: [...groups].map(([key, g]) => summariseLsm(key, g.label, g.dates, rows)),
-    totals: summariseLsm('total', 'Total', dates, rows),
+    rows: [...groups].map(([key, g]) => summariseLsm(key, g.label, g.dates, rows, cache?.receipts ?? [])),
+    totals: summariseLsm('total', 'Total', dates, rows, cache?.receipts ?? []),
   };
 }
 

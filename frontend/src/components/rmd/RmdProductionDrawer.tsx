@@ -15,6 +15,7 @@ import { useLastEntry } from '@/services/lastEntry';
 import DrillDrawer, { Stats } from '@/components/drill/DrillDrawer';
 import DrillChart, { fmtNum, type DrillSeries } from '@/components/drill/DrillChart';
 import SourceBox, { type SourceSystem } from '@/components/drill/SourceBox';
+import SectionsCell from '@/components/drill/SectionsCell';
 import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdProductionPeriod, type RmdProductionReport } from '@/services/hsmApi';
@@ -88,16 +89,21 @@ function ProductionContent({ data }: { data: RmdProductionReport }) {
         ariaLabel={`Production by period: ${rows.map((x) => `${x.label} prime + SL ${f(x.productionMt)} MT, prime ${f(x.primeMt)} MT`).join('; ')}`} />
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Production by period">
-          <thead><tr><th>Period</th><th className="r">Prime + SL (MT)</th><th className="r">Prime (MT)</th></tr></thead>
-          <tbody>{rows.map((x) => <tr key={x.key}>{label(x)}<td className="num r v-val">{f(x.productionMt)}</td><td className="num r v-val">{f(x.primeMt)}</td></tr>)}</tbody>
-          <tfoot><tr>{label(t)}<td className="num r">{f(t.productionMt)}</td><td className="num r">{f(t.primeMt)}</td></tr></tfoot>
+          <thead><tr><th>Period</th><th className="r">Prime + SL (MT)</th><th className="r">Prime (MT)</th><th>Size rolled (of Prime)</th></tr></thead>
+          <tbody>{rows.map((x) => <tr key={x.key}>{label(x)}<td className="num r v-val">{f(x.productionMt)}</td><td className="num r v-val">{f(x.primeMt)}</td><SectionsCell sections={x.sections} /></tr>)}</tbody>
+          <tfoot><tr>{label(t)}<td className="num r">{f(t.productionMt)}</td><td className="num r">{f(t.primeMt)}</td><SectionsCell sections={t.sections} /></tr></tfoot>
         </table>
       </div>
       <SourceBox
-        sources={sources(['PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT'])}
+        sources={[...sources(['PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT']), { name: 'ERP', rows: [
+          ['Table', 'PROD_TRAN (production receipts), ITEM_MAST (item name)'],
+          ['Filter', "DIV_CODE = 'RM', finished items (ITEM_CODE 'F…'), not cancelled, miss roll left out; each tied to its log-sheet entry (REF_VRNO) for its rolling"],
+          ['Size', 'read from the item name, as in Finished stock by size'],
+        ] }]}
         formula={[
           "Prime + SL = Σ PRODUCT_PRIME_SLENGTH_MT of the date's entries",
           "Prime = Σ FINISH_PRODUCT_PRIME_MT of the date's entries",
+          'Size rolled = the finished bars received for the entries, by size — they add up to Prime on most entries, not to Prime + SL',
         ]}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}

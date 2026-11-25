@@ -23,6 +23,8 @@ import type { Grain, RmdMode, RmdProductionPeriod, RmdProductionReport } from '.
 import { readErpRmdProduction, type RmdLogField, type RmdLogRow } from '../../integrations/erp/cache';
 import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, round2 } from '../hsm/production.service';
+import { sectionsRolled } from '../../shared/sections';
+import { barLabelOf } from './stock.service';
 
 /** Production ÷ billet input × 100; null without both (or with no input). */
 export const massYield = (productionMt: number | null, inputMt: number | null) =>
@@ -122,8 +124,9 @@ export function rmdProduction(env: Env, from: string, to: string, grain: Grain, 
       syncedAt: cache?.syncedAt ?? null,
       lastDate: rows.at(-1)?.date ?? null,
     },
-    rows: [...groups].map(([key, g]) => summarise(key, g.label, g.dates, rows)),
-    totals: summarise('total', 'Total', dates, rows),
+    // The bar size(s) the chosen rolling rolled, miss roll left out — they add up to Prime (the user, 25 Nov 2026).
+    rows: [...groups].map(([key, g]) => ({ ...summarise(key, g.label, g.dates, rows), sections: sectionsRolled(g.dates, cache?.receipts ?? [], barLabelOf, mode) })),
+    totals: { ...summarise('total', 'Total', dates, rows), sections: sectionsRolled(dates, cache?.receipts ?? [], barLabelOf, mode) },
   };
 }
 

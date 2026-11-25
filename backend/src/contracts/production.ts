@@ -60,6 +60,8 @@ export interface PeriodRow {
   workingVarianceMt?: number | null;
   /** Days with both checklist times and an ERP entry. */
   workingComparedDays?: number;
+  /** Production only: the strip size(s) rolled, from the finished receipts (Finished stock by size names), largest first. */
+  sections?: { label: string; mt: number }[];
 }
 
 export interface ProductionComparison {

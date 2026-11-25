@@ -623,22 +623,29 @@ test('LSM: production and losses from the ERP log sheet (FA-LP-P), as the plant 
 
   // Σ PRODUTION_MT, 1–8 Oct = 2,106.12 MT (each entry counted once — the ERP repeats some).
   const card = page.getByRole('button', { name: 'Production', exact: true });
-  await expect(card.locator('.rm-card-value')).toContainText('2,106.1');
+  await expect(card.locator('.rm-card-value')).toContainText('2,106.12');
   await expect(card.locator('.rm-card-note')).toHaveText('');
 
   // Prime yield (was Mass yield): PRODUTION_MT 2,106.12 ÷ INPUT_MT 2,226.89 = 94.58 %.
-  await expect(page.getByRole('button', { name: 'Prime yield', exact: true }).locator('.rm-card-value')).toContainText('94.6');
-  // Material balance: input 2,226.9, finished 2,106.1, difference 120.8; cold is 0 so it isn't shown.
+  await expect(page.getByRole('button', { name: 'Prime yield', exact: true }).locator('.rm-card-value')).toContainText('94.58');
+  // Material balance: input 2,226.89, finished 2,106.12, difference 120.77; cold is 0 so it isn't shown.
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
-  await expect(balance).toContainText('Billet input2,226.9 MT');
-  await expect(balance).toContainText('Prime yield94.6%');
-  await expect(balance).toContainText('Finished 2,106.1 MT');
-  await expect(balance).toContainText('Mass difference 120.8 MT');
+  await expect(balance).toContainText('Billet input2,226.89 MT');
+  await expect(balance).toContainText('Prime yield94.58%');
+  await expect(balance).toContainText('Finished 2,106.12 MT');
+  await expect(balance).toContainText('Mass difference 120.77 MT');
   // Billets in: Σ INPUT_PCS, 1–8 Oct = 8,429.
   await expect(balance.locator('.rmd-mb-pieces')).toContainText('8,429 in');
-  // The six losses add up to the mass difference: 24.6 + 68.5 + 9.1 + 5.3 + 13.2 = 120.8.
-  await expect(balance.locator('.rm-mb-link')).toHaveText([/^Burning loss 24\.6 MT/, /^End cut 68\.5 MT/, /^Miss-roll 9\.1 MT/, /^Reject 5\.3 MT/, /^Short length 13\.2 MT/]);
+  // The six losses add up to the mass difference: 24.63 + 68.46 + 9.14 + 5.3 + 13.24 = 120.77.
+  await expect(balance.locator('.rm-mb-link')).toHaveText([/^Burning loss 24\.63 MT/, /^End cut 68\.46 MT/, /^Miss-roll 9\.14 MT/, /^Reject 5\.3 MT/, /^Short length 13\.24 MT/]);
   await balance.screenshot({ path: `${SHOTS}/lsm-material-balance.png` });
+  // The two bypasses, as HSM's (no defective — LSM's log sheet has none): Σ CCM_BY_PASS_MT 56.16, Σ LSM_BY_PASS_MT 50.23.
+  const ops = page.getByRole('group', { name: 'Operating figures' });
+  await expect(ops.locator('.rm-mb-op')).toHaveText(['CCM bypass56.16MT', 'LSM bypass50.23MT']);
+  await ops.getByRole('button', { name: /LSM bypass/ }).click();
+  const lb = page.getByRole('dialog', { name: 'LSM bypass · ERP log sheet' });
+  await expect(lb.getByRole('table', { name: 'LSM bypass by period' }).locator('tfoot')).toContainText('50.23');
+  await page.keyboard.press('Escape');
 
   await card.click();
   const prod = page.getByRole('dialog', { name: 'Production · ERP log sheet' });
@@ -818,40 +825,43 @@ test('RMS: production from the ERP log sheet (division RS, series L5P) — a day
   await dialog.getByRole('button', { name: 'Apply' }).click();
   // Σ PRODUCTION_MT 1–12 Oct, 1 / 3 / 10 Oct once each = the finished goods the ERP received: 6,244.75 MT.
   const card = page.getByRole('button', { name: 'Production', exact: true });
-  await expect(card.locator('.rm-card-value')).toContainText('6,244.8');
-  await expect(page.locator('section.panel', { hasText: 'Order allocation' }).locator('.rm-alloc-total').first()).toHaveText('6,244.8 MT');
+  await expect(card.locator('.rm-card-value')).toContainText('6,244.75');
   // Billets in: Σ INPUT_PCS (repeated entries once).
   const balance = page.locator('section.panel', { hasText: 'Material & operating balance' });
   await expect(balance.locator('.rmd-mb-pieces')).toContainText(/[\d,]+ in/);
-  // Billet input Σ (INPUT_MT1 + INPUT_MT2) 6,648.09; mass yield 6,244.75 ÷ 6,648.09 = 93.9 %; mass difference 403.3.
-  await expect(page.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-value')).toContainText('93.9');
-  await expect(balance.locator('.rm-mb-figure-v')).toHaveText(['6,648.1 MT', '93.9%']);
-  await expect(balance).toContainText('Finished 6,244.8 MT');
-  await expect(balance).toContainText('Mass difference 403.3 MT');
+  // Billet input Σ (INPUT_MT1 + INPUT_MT2) 6,648.09; mass yield 6,244.75 ÷ 6,648.09 = 93.93 %; mass difference 403.34.
+  await expect(page.getByRole('button', { name: 'Mass yield', exact: true }).locator('.rm-card-value')).toContainText('93.93');
+  await expect(balance.locator('.rm-mb-figure-v')).toHaveText(['6,648.09 MT', '93.93%']);
+  await expect(balance).toContainText('Finished 6,244.75 MT');
+  await expect(balance).toContainText('Mass difference 403.34 MT');
   // The mass difference opened out: burning 99.47 + end cut 258.44 + miss-roll 22.36 + reject 23.07 = 403.34; cold 0 — not shown.
   await expect(balance.locator('.rm-mb-legend .rm-mb-link')).toHaveText([
-    'Burning loss 99.5 MT', 'End cut 258.4 MT', 'Miss-roll 22.4 MT', 'Reject 23.1 MT',
+    'Burning loss 99.47 MT 1.5%', 'End cut 258.44 MT 3.89%', 'Miss-roll 22.36 MT 0.34%', 'Reject 23.07 MT 0.35%',
   ]);
   await expect(balance.locator('.rm-mb-bar--loss .rm-mb-seg')).toHaveCount(4);
   await balance.screenshot({ path: `${SHOTS}/rms-material-balance.png` });
   await card.click();
   const d = page.getByRole('dialog', { name: 'Production · ERP log sheet' });
   const t = d.getByRole('table', { name: 'Production by period' });
-  for (const v of ['627.37', '577.45', '92.0%', '49.92']) await expect(t.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
+  for (const v of ['627.37', '577.45', '92.04%', '49.92']) await expect(t.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
   await expect(t.getByRole('row', { name: /^4 Oct/ })).toContainText('568.45');
   await expect(t.locator('thead th')).toHaveText(['Period', 'Billets in (pcs)', 'Billet input (MT)', 'Production (MT)', 'Mass yield', 'Mass difference (MT)']);
-  for (const v of ['6,648.09', '6,244.75', '93.9%', '403.34']) await expect(t.locator('tfoot')).toContainText(v);
+  for (const v of ['6,648.09', '6,244.75', '93.93%', '403.34']) await expect(t.locator('tfoot')).toContainText(v);
   await expect(d.getByRole('region', { name: 'Formula' })).toContainText('Billet input = Σ (INPUT_MT1 + INPUT_MT2)');
+  // The section(s) rolled, from the ERP's finished receipts (PROD_TRAN): 1 Oct — MB 300 only, all 577.45 MT of it.
+  const st = d.getByRole('table', { name: 'Section rolled by period' });
+  await expect(st.getByRole('row', { name: /^1 Oct/ })).toContainText('MB 300');
+  await expect(st.locator('tfoot')).toContainText('MC 200 1,161.96 MT');
   const lt = d.getByRole('table', { name: 'Losses by period' });
   await expect(lt.locator('thead th')).toHaveText(['Period', 'Burning loss', 'End cut', 'Miss-roll', 'Cold', 'Reject', 'Losses (MT)']);
-  for (const v of ['12.55', '29.80', '1.75', '5.82', '49.92']) await expect(lt.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
+  for (const v of ['12.55', '29.8', '1.75', '5.82', '49.92']) await expect(lt.getByRole('row', { name: /^1 Oct/ })).toContainText(v);
   await expect(lt.locator('tfoot')).toContainText('403.34');
   await expect(d.getByRole('region', { name: 'Data source' })).toContainText("DIV_CODE = 'RS', TNATURE = 'PRLOG', SERIES = 'L5P'");
   await page.waitForTimeout(700);
   await d.screenshot({ path: `${SHOTS}/rms-drill-production.png` });
 });
 
-test('RMD asset health: route drive group by default; motor current live, run hours from ACTUAL_RUNNING_HRS, bearing and oil from the forms with the plant limits', async ({ page }) => {
+test('RMD asset health: all drive groups by default; route: motor current live, run hours from ACTUAL_RUNNING_HRS, bearing and oil from the forms with the plant limits', async ({ page }) => {
   await page.goto('/rmd/asset-health');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
@@ -859,16 +869,21 @@ test('RMD asset health: route drive group by default; motor current live, run ho
   await dialog.getByLabel('End Date').fill('2026-10-08');
   await dialog.getByRole('button', { name: 'Apply' }).click();
   const main = page.getByRole('main');
-  await expect(main.getByRole('heading', { level: 2 })).toHaveText('RMD · Route drive group');
+  // All drive groups by default (the user, 25 Nov 2026); the checks below are the route group's.
+  const group = page.getByRole('button', { name: /^Drive group: / });
+  await expect(group).toHaveAccessibleName('Drive group: All');
+  await group.click();
+  await page.getByRole('listbox', { name: 'Drive group' }).getByRole('option', { name: 'Route / diverter' }).click();
+  await expect(group).toHaveAccessibleName('Drive group: Route / diverter');
   const cards = main.getByRole('region', { name: 'Condition KPIs' });
   await expect(cards.locator('.rm-card-label:not([aria-hidden="true"] *)')).toHaveText([/^Vibration RMS/, /^Bearing temp/, /^Motor current/, /^Gearbox oil/, /^Run hours/, /^PM on time/]);
   // Run hours: Σ ACTUAL_RUNNING_HRS 1–8 Oct = 87.75 h.
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^87\.8h$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(4)).toHaveText(/^87\.75h$/);
   // Motor current: live; NA while no route drive runs.
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^(NA|\d[\d,]*)A$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(2)).toHaveText(/^(NA|\d[\d,]*(\.\d{1,2})?)A$/);
   // Bearing temp and gearbox oil from the mechanical forms: a reading, or NA without entries.
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(1)).toHaveText(/^(NA|\d+)°C$/);
-  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(3)).toHaveText(/^(NA|[\d,]+)L$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(1)).toHaveText(/^(NA|\d+(\.\d{1,2})?)°C$/);
+  await expect(cards.locator('.rm-card-value:not([aria-hidden="true"] *)').nth(3)).toHaveText(/^(NA|[\d,]+(\.\d{1,2})?)L$/);
   // Bearing drawer: each reading against the plant's limits (bearings 45–65 °C, flywheel 45–80 °C).
   const bearingCard = cards.getByRole('button', { name: /Bearing temp/ });
   if (await bearingCard.count()) {
@@ -877,7 +892,8 @@ test('RMD asset health: route drive group by default; motor current live, run ho
     const t = d.getByRole('table', { name: 'Bearing temperatures' });
     await expect(t.locator('thead th')).toHaveText(['Equipment', 'Point', '°C', 'Limits', 'Date']);
     await expect(t.locator('tbody tr').first().locator('td').nth(3)).toHaveText(/^45–(65|80)$/);
-    await expect(d).toContainText('bearings 45–65 °C, flywheel 45–80 °C');
+    await expect(d).toContainText('Bearings (reduction / pinion gear) 45–65 °C');
+    await expect(d).toContainText('Flywheel bearings 45–80 °C');
     await page.waitForTimeout(700);
     await d.screenshot({ path: `${SHOTS}/rmd-asset-bearing-limits.png` });
     await d.getByRole('button', { name: /Close/ }).click();

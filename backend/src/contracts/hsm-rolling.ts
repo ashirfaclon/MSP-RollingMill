@@ -24,6 +24,8 @@ export interface HsmRollingPeriod {
   coldPowerKwh: number | null;
   /** Offline entries only: Σ POWER_CONSUMPTION_IN_KWH ÷ Σ PRODUCTION_MT. */
   coldPowerKwhPerMt: number | null;
+  /** The strip size(s) rolled by the chosen rolling, from the finished receipts tied to its entries, largest first. */
+  sections?: { label: string; mt: number }[];
 }
 
 export interface HsmRollingReport {

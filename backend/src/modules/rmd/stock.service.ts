@@ -17,6 +17,15 @@ export function barSizeOf(name: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/** A received item as Finished stock by size names it ("12 mm"); null for a miss roll or an unsized item. */
+export function barLabelOf(name: string): string | null {
+  if (/^MISS ROLL/i.test(name.trim())) return null;
+  const mm = barSizeOf(name);
+  if (mm !== null) return `${mm} mm`;
+  const round = /ROUND BAR\s*(\d+(?:\.\d+)?)\s*MM/i.exec(name);
+  return round ? `Round ${round[1]} mm` : null;
+}
+
 /** The items shown: a sized TMT bar that is not a miss roll. */
 function shownItems(items: { code: string; name: string }[]) {
   return items.map((i) => ({ ...i, sizeMm: barSizeOf(i.name) })).filter((i) => i.sizeMm !== null && !/^MISS ROLL/i.test(i.name));

@@ -28,6 +28,7 @@ export interface LsmProductionPeriod {
   massDiffMt: number | null;
   /** productionMt ÷ billetInputMt × 100; null without both. */
   massYieldPct: number | null;
+  /** LSM_BY_PASS_MT / CCM_BY_PASS_MT — billets bypassing the mill, Σ over the period's entries (the ERP's % is of INPUT_MT). */
   lsmBypassMt: number | null;
   ccmBypassMt: number | null;
   endCrackBypassMt: number | null;
@@ -35,6 +36,11 @@ export interface LsmProductionPeriod {
   runningHrs: number | null;
   /** DELAY_HRS, Σ over the period's entries. */
   delayHrs: number | null;
+  /**
+   * The section(s) rolled in the period, from the finished items received from LSM's production (ERP PROD_TRAN),
+   * named as in Finished stock by size, largest first; defective items left out. Empty when none was received.
+   */
+  sections: { label: string; mt: number }[];
   /** TOTAL_PRODUCTION — production + short length, Σ over the period's entries. */
   totalProductionMt: number | null;
   /** Yield with non-prime: totalProductionMt ÷ billetInputMt × 100 (massYieldPct is the prime yield). */
@@ -104,6 +110,8 @@ export interface RmsProductionPeriod {
   runningHrs: number | null;
   /** Σ of the five; null when none is filled. */
   lossesMt: number | null;
+  /** The section(s) rolled, from the finished receipts (Finished stock by size names, defective in its section), largest first. */
+  sections?: { label: string; mt: number }[];
 }
 
 export interface RmsProductionReport {

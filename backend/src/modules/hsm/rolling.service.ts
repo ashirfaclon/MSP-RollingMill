@@ -16,6 +16,8 @@ import type { Grain, HsmRollingPeriod, HsmRollingReport, RmdMode } from '../../c
 import { readErpProduction, type ErpProductionRow, type LogField } from '../../integrations/erp/cache';
 import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, round2 } from './production.service';
+import { sectionsRolled } from '../../shared/sections';
+import { stripLabelOf } from './erp-kpis.service';
 
 const sumOf = (rows: ErpProductionRow[], f: LogField) => {
   const v = rows.map((r) => r.v?.[f]).filter((x): x is number => typeof x === 'number');
@@ -68,7 +70,8 @@ export function hsmRolling(env: Env, from: string, to: string, grain: Grain, mod
       syncedAt: cache?.syncedAt ?? null,
       lastDate: rows.at(-1)?.date ?? null,
     },
-    rows: [...groups].map(([key, g]) => summariseRolling(key, g.label, g.dates, rows, mode)),
-    totals: summariseRolling('total', 'Total', dates, rows, mode),
+    // The strip size(s) the chosen rolling rolled, from the receipts tied to its entries (the user, 25 Nov 2026).
+    rows: [...groups].map(([key, g]) => ({ ...summariseRolling(key, g.label, g.dates, rows, mode), sections: sectionsRolled(g.dates, cache?.receipts ?? [], stripLabelOf, mode) })),
+    totals: { ...summariseRolling('total', 'Total', dates, rows, mode), sections: sectionsRolled(dates, cache?.receipts ?? [], stripLabelOf, mode) },
   };
 }

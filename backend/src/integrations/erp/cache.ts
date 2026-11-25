@@ -111,7 +111,7 @@ export const RMD_MODE_CODES = { RO001: 'online', RO002: 'offline' } as const;
 export type RmdLogMode = (typeof RMD_MODE_CODES)[keyof typeof RMD_MODE_CODES];
 /** `mode` is missing on a cache synced before the Online / Offline split; a value absent there reads as null. */
 export interface RmdLogRow { date: string; vrno: string; mode?: RmdLogMode | null; v: Record<RmdLogField, number | null> }
-export interface RmdProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmdLogRow[] }
+export interface RmdProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmdLogRow[]; receipts?: MillReceipt[] }
 
 export function readErpRmdProduction(env: Env): RmdProductionCache | null {
   return readJson<RmdProductionCache>(cachePaths(env).rmdProduction);
@@ -152,7 +152,20 @@ export const LSM_LOG_FIELDS = [
 ] as const;
 export type LsmLogField = (typeof LSM_LOG_FIELDS)[number];
 export interface LsmLogRow { date: string; vrno: string; v: Record<LsmLogField, number | null> }
-export interface LsmProductionCache { syncedAt: string; source: string; fromDate: string; rows: LsmLogRow[] }
+/**
+ * A finished item received into stores from LSM's production (PROD_TRAN, division LS, items "F…"), per date — what
+ * section was rolled that day (the user, 25 Nov 2026). Σ of the non-defective items = the log sheet's PRODUTION_MT
+ * on 229 of 234 days (Apr–Nov 2026; the rest are log-sheet entries saved twice or on another date).
+ */
+export interface LsmReceipt { date: string; item: string; name: string; mt: number }
+/**
+ * The same for HSM, RMD and RMS (the user, 25 Nov 2026): each receipt's voucher is the REF_VRNO of exactly one
+ * log-sheet entry, which gives its rolling (HSM ST001 / ST002, RMD RO001 / RO002). HSM: an entry's receipts = its
+ * PRODUCTION_MT on every entry Jun–Nov (166 Online, 109 Offline); RMD: without miss roll = its FINISH_PRODUCT_PRIME_MT
+ * on 226 of 281 (never Prime + SL); RMS: = PRODUCTION_MT on 231 of 233 days.
+ */
+export interface MillReceipt extends LsmReceipt { mode?: 'online' | 'offline' | null }
+export interface LsmProductionCache { syncedAt: string; source: string; fromDate: string; rows: LsmLogRow[]; receipts?: LsmReceipt[] }
 
 export function readErpLsmProduction(env: Env): LsmProductionCache | null {
   return readJson<LsmProductionCache>(cachePaths(env).lsmProduction);
@@ -179,7 +192,7 @@ export interface RmsLogRow {
   /** NET_RUNNING_HRS — ERP run hours; null when not filled. */
   runningHrs?: number | null;
 }
-export interface RmsProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmsLogRow[] }
+export interface RmsProductionCache { syncedAt: string; source: string; fromDate: string; rows: RmsLogRow[]; receipts?: MillReceipt[] }
 
 export function readErpRmsProduction(env: Env): RmsProductionCache | null {
   return readJson<RmsProductionCache>(cachePaths(env).rmsProduction);
@@ -261,7 +274,7 @@ export interface ErpProductionRow {
   /** Online / Offline; missing on a cache synced before the split. */
   mode?: HsmLogMode | null;
 }
-export interface ErpProductionCache { syncedAt: string; source: string; fromDate: string; rows: ErpProductionRow[] }
+export interface ErpProductionCache { syncedAt: string; source: string; fromDate: string; rows: ErpProductionRow[]; receipts?: MillReceipt[] }
 
 export function readErpProduction(env: Env): ErpProductionCache | null {
   return readJson<ErpProductionCache>(cachePaths(env).production);

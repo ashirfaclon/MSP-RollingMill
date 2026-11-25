@@ -36,7 +36,7 @@ import { FormRunningRateFoot } from '@/components/production/FormRunningRate';
 import '@/components/visualization/visualization.css';
 import { fixed } from '@/lib/num';
 import { useSelection } from '@/services/hsmProduction';
-import LsmProductionDrawer, { useLsmProduction } from './LsmProductionDrawer';
+import LsmProductionDrawer, { BYPASS, useLsmProduction, type BypassKey } from './LsmProductionDrawer';
 import RmdStockBySize from '@/components/rmd/RmdStockBySize';
 import PowerKpiCard from '@/components/production/PowerKpiCard';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
@@ -151,11 +151,19 @@ const LOSSES: { key: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'r
   { key: 'shortLengthMt', label: 'Short length', series: 'inline' },
 ];
 
-/** Drawn like RMD's: billet input split into finished | mass difference, then the losses opened out. One click: the drawer per day. */
+/** The panel's operating figures, as HSM's (CCM bypass · HSM bypass); LSM's log sheet has no defective figure. */
+const OPS: BypassKey[] = ['ccmBypassMt', 'lsmBypassMt'];
+
+/**
+ * Drawn like RMD's: billet input split into finished | mass difference, then the losses opened out. One click: the
+ * drawer per day. Under it the two bypasses, each opening its own drill-down (the user, 25 Nov 2026).
+ */
 function MaterialBalance() {
   const { dates } = useSelection();
-  const t = useLsmProduction(dates).data?.totals ?? null;
+  const { data, error } = useLsmProduction(dates);
+  const t = data?.totals ?? null;
   const [open, setOpen] = useState(false);
+  const [op, setOp] = useState<BypassKey | null>(null);
   const openOnKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } };
   // A loss that is 0 for the period isn't there: no segment, no legend entry. No data stays NA.
   const losses = LOSSES.map((l) => ({ ...l, value: t?.[l.key] ?? null })).filter((l) => l.value === null || l.value >= 0.05);
@@ -209,7 +217,21 @@ function MaterialBalance() {
             : <span className="rm-mb-pieces-v num"><b>{t.billetsPcs.toLocaleString('en-IN')}</b>{' '}in</span>}
         </div>
       </div>
+      <div className="rm-mb-ops" role="group" aria-label="Operating figures">
+        {OPS.map((k) => {
+          const v = t?.[k] ?? null;
+          return (
+            <button key={k} type="button" className="rm-mb-op" aria-haspopup="dialog" onClick={() => setOp(k)} title={`${BYPASS[k].name} per day`}>
+              <span className="rm-k">{BYPASS[k].name}</span>
+              {!data && !error
+                ? <span className="skel skel--num" role="status" aria-label="Loading" />
+                : <span className={`rm-mb-op-v num ${v === null ? 'v-na' : ''}`}>{v === null ? 'NA' : <>{fixed(v)}<span className="rm-card-unit">MT</span></>}</span>}
+            </button>
+          );
+        })}
+      </div>
       <LsmProductionDrawer view="balance" open={open} onClose={() => setOpen(false)} />
+      <LsmProductionDrawer view={op ?? 'ccmBypassMt'} open={op !== null} onClose={() => setOp(null)} />
     </Panel>
   );
 }

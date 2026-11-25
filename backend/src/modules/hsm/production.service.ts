@@ -25,6 +25,8 @@ import {
 } from './counter-events';
 import type { ByProductKey, ByProducts, DayValue, Grain, PeriodRow, ProductionComparison } from '../../contracts';
 import { productionIn, readShiftWindows } from './working-hours';
+import { sectionsRolled } from '../../shared/sections';
+import { stripLabelOf } from './erp-kpis.service';
 export type { ByProductKey, ByProducts, DayValue, Grain, PeriodRow, ProductionComparison };
 
 /** The plant day, as used for the Influx side of the comparison. */
@@ -357,7 +359,8 @@ async function compute(env: Env, spec: CounterSpec, from: string, to: string, gr
       startedBy: e.startedBy, endedBy: e.endedBy,
     })),
     days,
-    rows: aggregate(days, grain),
-    totals: summarise('total', 'Total', days),
+    // Production: the strip size(s) rolled, from the finished receipts (the user, 25 Nov 2026).
+    rows: aggregate(days, grain).map((r) => (spec.workingHours ? { ...r, sections: sectionsRolled(dateRange(r.fromDate, r.toDate), cache?.receipts ?? [], stripLabelOf) } : r)),
+    totals: spec.workingHours ? { ...summarise('total', 'Total', days), sections: sectionsRolled(dates, cache?.receipts ?? [], stripLabelOf) } : summarise('total', 'Total', days),
   };
 }

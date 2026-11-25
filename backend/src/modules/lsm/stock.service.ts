@@ -67,6 +67,15 @@ export function sectionOf(name: string): { label: string; type: string; a: numbe
   return { label: `${type} ${a}${b ? `×${b}` : ''}`, type, a, b };
 }
 
+/**
+ * An item's section as Finished stock by size names it — "MS ANGLE 65X6 6 mtr" → A 65×65×6 (the plant's names for
+ * LSM's list, the same style for the rest); null when the name gives no section.
+ */
+export function sectionLabelOf(name: string, plantList = true): { label: string; sort: number } | null {
+  const s = sectionOf(name);
+  return s ? { label: (plantList ? LABEL.get(s.label) : undefined) ?? labelOf(s), sort: sortOf(s, plantList) } : null;
+}
+
 export function stockBySection(cache: Pick<LsmStockCache, 'moves' | 'items'>, asOf: string, plantList = true): LsmStockReport['sizes'] {
   const byItem = new Map<string, number>();
   for (const m of cache.moves) {

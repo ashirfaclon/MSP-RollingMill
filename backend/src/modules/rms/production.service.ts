@@ -20,6 +20,10 @@ import { readErpRmsProduction, type RmsLogRow } from '../../integrations/erp/cac
 import { MSG } from '../../shared/messages';
 import { dateRange, periodOf, round2 } from '../hsm/production.service';
 import { massDifference, massYield } from '../rmd/production.service';
+import { sectionsRolled } from '../../shared/sections';
+import { sectionLabelOf } from '../lsm/stock.service';
+
+const rmsLabel = (name: string) => sectionLabelOf(name, false)?.label ?? null;
 
 /** Entries of one date that repeat another (same production MT and pieces) are dropped. */
 export function distinctEntries(rows: RmsLogRow[]): RmsLogRow[] {
@@ -88,7 +92,8 @@ export function rmsProduction(env: Env, from: string, to: string, grain: Grain):
       syncedAt: cache?.syncedAt ?? null,
       lastDate: rows.at(-1)?.date ?? null,
     },
-    rows: [...groups].map(([key, g]) => summariseRms(key, g.label, g.dates, rows)),
-    totals: summariseRms('total', 'Total', dates, rows),
+    // The section(s) rolled, from the finished receipts; defective in its section, as Finished stock by size (the user, 25 Nov 2026).
+    rows: [...groups].map(([key, g]) => ({ ...summariseRms(key, g.label, g.dates, rows), sections: sectionsRolled(g.dates, cache?.receipts ?? [], rmsLabel) })),
+    totals: { ...summariseRms('total', 'Total', dates, rows), sections: sectionsRolled(dates, cache?.receipts ?? [], rmsLabel) },
   };
 }

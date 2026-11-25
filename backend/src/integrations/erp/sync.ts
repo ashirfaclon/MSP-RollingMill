@@ -24,6 +24,7 @@ import oracledb from 'oracledb';
 import { loadEnv, type Env } from '../../config/env';
 import {
   HSM_MODE_CODES,
+  type MillReceipt,
   ERP_ENTITIES, LOG_FIELDS, LSM_LOG_FIELDS, PM_DIVISIONS, RMD_LOG_FIELDS, RMD_MODE_CODES, RMD_STOCK_RULE, STOCK_DIVISIONS, STOCK_EXCLUDED_TCODES, cachePaths,
   type ErpPmCache, type PmMill,
   type LsmLogField, type LsmProductionCache, type LsmStockCache, type RmsProductionCache, type RmdLogField, type RmdProductionCache, type RmdStockCache,
@@ -111,7 +112,8 @@ async function pull(env: Env, p: Paths, t0: number, log: (line: string) => void)
       const v = Object.fromEntries(LOG_FIELDS.map((f) => [f, num(r[f])])) as Record<LogField, number | null>;
       return { date: String(r.D), vrno: String(r.VRNO), mt: v.PRODUCTION_MT, v, mode: HSM_MODE_CODES[String(r.MODE) as keyof typeof HSM_MODE_CODES] ?? null };
     });
-    production = { syncedAt, source: 'ATTR_TRAN_DATA_HEAD/BODY · MP/S1 · PRLOG/L6P', fromDate: FROM, rows };
+    production = { syncedAt, source: 'ATTR_TRAN_DATA_HEAD/BODY · MP/S1 · PRLOG/L6P', fromDate: FROM, rows,
+      receipts: await pullReceipts(conn, 'S1', 'L6P', HSM_MODE_CODES) };
 
     /* ---- production by item (PROD_TRAN receipts) ---- */
     const lines = await q<{ D: string; ITEM: string; MT: number }>(`
@@ -224,6 +226,29 @@ async function pull(env: Env, p: Paths, t0: number, log: (line: string) => void)
 }
 
 /**
+ * A division's finished items received from its production, per date and item, with the rolling of the log-sheet
+ * entry whose REF_VRNO is the receipt's voucher (`modes`; none for a mill without one) — what was rolled each day
+ * (the user, 25 Nov 2026). Read only.
+ */
+async function pullReceipts(
+  conn: oracledb.Connection, div: string, series: string, modes: Record<string, 'online' | 'offline'> | null,
+): Promise<MillReceipt[]> {
+  const rows = ((await conn.execute<Record<string, unknown>>(`
+    SELECT TO_CHAR(TRUNC(p.VRDATE), 'YYYY-MM-DD') AS "D", p.ITEM_CODE AS "ITEM", MAX(i.ITEM_NAME) AS "NAME",
+           ROUND(SUM(p.QTYRECD), 3) AS "MT", MAX(h.TRAN_COLUMN_NAME1) AS "MODE"
+      FROM MSPV7ERP1.PROD_TRAN p
+      LEFT JOIN MSPV7ERP1.ITEM_MAST i ON i.ITEM_CODE = p.ITEM_CODE
+      LEFT JOIN MSPV7ERP1.ATTR_TRAN_DATA_HEAD h ON h.REF_VRNO = p.VRNO AND h.ENTITY_CODE = 'MP' AND h.TNATURE = 'PRLOG' AND h.SERIES = :series
+     WHERE p.ENTITY_CODE = 'MP' AND p.DIV_CODE = :div AND NVL(p.CANCELLED_FLAG, 'N') <> 'Y'
+       AND p.ITEM_CODE LIKE 'F%' AND NVL(p.QTYRECD, 0) > 0 AND p.VRDATE >= TO_DATE(:fromDate, 'YYYY-MM-DD')
+     GROUP BY TRUNC(p.VRDATE), p.VRNO, p.ITEM_CODE ORDER BY 1, 2`, { div, series, fromDate: FROM }, { maxRows: 0 })).rows ?? []) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    date: String(r.D), item: String(r.ITEM), name: String(r.NAME ?? r.ITEM), mt: Number(r.MT),
+    ...(modes ? { mode: modes[String(r.MODE)] ?? null } : {}),
+  }));
+}
+
+/**
  * RMD Production Log Sheet, as the plant specified: ATTR_TRAN_DATA_BODY where USER_CODE =
  * 'FA-SKJ', one row per entry (VRDATE, VRNO) with its RMD_LOG_FIELDS values (ATTR_VALUE), and
  * Online / Offline from its head's TRAN_COLUMN_NAME1 (RMD_MODE_CODES).
@@ -260,6 +285,7 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
         v: Object.fromEntries(RMD_LOG_FIELDS.map((f) => [f, num(r[f])])) as Record<RmdLogField, number | null>,
       })),
     };
+    cache.receipts = await pullReceipts(conn, 'RM', 'L4P', RMD_MODE_CODES);
     writeAtomic(p.rmdProduction, cache);
     const online = cache.rows.filter((r) => r.mode === 'online').length;
     const offline = cache.rows.filter((r) => r.mode === 'offline').length;
@@ -335,6 +361,7 @@ async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
         };
       }),
     };
+    cache.receipts = await pullReceipts(conn, 'RS', 'L5P', null);
     writeAtomic(p.rmsProduction, cache);
     log(`  RMS log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);
   } catch (err) {
@@ -491,8 +518,16 @@ async function pullLsm(env: Env, p: Paths, log: (line: string) => void) {
         v: Object.fromEntries(LSM_LOG_FIELDS.map((f) => [f, num(r[f])])) as Record<LsmLogField, number | null>,
       })),
     };
+    /* ---- the section(s) rolled each day: finished items received from LSM's production ---- */
+    const receipts = ((await conn.execute<Record<string, unknown>>(`
+      SELECT TO_CHAR(TRUNC(p.VRDATE), 'YYYY-MM-DD') AS "D", p.ITEM_CODE AS "ITEM", MAX(i.ITEM_NAME) AS "NAME", ROUND(SUM(p.QTYRECD), 3) AS "MT"
+        FROM MSPV7ERP1.PROD_TRAN p LEFT JOIN MSPV7ERP1.ITEM_MAST i ON i.ITEM_CODE = p.ITEM_CODE
+       WHERE p.ENTITY_CODE = 'MP' AND p.DIV_CODE = 'LS' AND NVL(p.CANCELLED_FLAG, 'N') <> 'Y'
+         AND p.ITEM_CODE LIKE 'F%' AND NVL(p.QTYRECD, 0) > 0 AND p.VRDATE >= TO_DATE(:fromDate, 'YYYY-MM-DD')
+       GROUP BY TRUNC(p.VRDATE), p.ITEM_CODE ORDER BY 1, 2`, { fromDate: FROM }, { maxRows: 0 })).rows ?? []) as Record<string, unknown>[];
+    cache.receipts = receipts.map((r) => ({ date: String(r.D), item: String(r.ITEM), name: String(r.NAME ?? r.ITEM), mt: Number(r.MT) }));
     writeAtomic(p.lsmProduction, cache);
-    log(`  LSM log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}`);
+    log(`  LSM log sheet: ${cache.rows.length} entries, ${FROM} → ${cache.rows.at(-1)?.date ?? 'none'}; ${cache.receipts?.length ?? 0} finished receipts`);
   } catch (err) {
     log(`  LSM log sheet not synced: ${(err as Error).message}`);
   } finally {

@@ -189,6 +189,11 @@ export interface RmdProductionPeriod {
   /** coalMt × 1000 ÷ Σ Prime + SL of those entries, kg/MT — one entry: the ERP's COAL_CONSUMPTION_KGMT. */
   coalKgPerMt: number | null;
   /**
+   * The bar size(s) rolled by the chosen rolling: finished receipts tied to its entries, miss roll left out — they add
+   * up to Prime (FINISH_PRODUCT_PRIME_MT) on most entries, never to Prime + SL. Largest first.
+   */
+  sections?: { label: string; mt: number }[];
+  /**
    * The Zoho TMT KPIs, from the ERP log sheet (the plant, 21 Nov 2026). Rolling in Casting % =
    * ROLLING_IN_TOTAL_PERCENTAGE, Rolling in Delivery % = ROLLING_IN_DELIVERY_PRCNT — each entry's
    * figure, over a period the average weighted by billet input. Plant Efficiency % = Σ production ÷
