@@ -117,7 +117,8 @@ const CARDS: Record<Group, { bearing: boolean; current: boolean; oil: boolean }>
 const STRIP: Record<number, string> = { 6: '', 5: ' ah-strip--five', 4: ' ah-strip--four', 3: ' ah-strip--three' };
 
 export default function RmdAssetHealth() {
-  const [group, setGroup] = useState<Group>('route');
+  // All drive groups by default (the user, 25 Nov 2026).
+  const [group, setGroup] = useState<Group>('all');
   const show = CARDS[group];
   const [open, setOpen] = useState<'bearing' | 'oil' | 'current' | 'run' | null>(null);
   const zones = LIVE[group] ?? null;
