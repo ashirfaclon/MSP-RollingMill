@@ -11,7 +11,9 @@
  *   Mass yield          Prime + SL ÷ billet input (INPUT_MT), both from the ERP log sheet;
  *   Rolling in casting / Rolling in delivery / Plant efficiency  the Zoho TMT KPIs the plant asked for
  *                       (21 Nov 2026), as the ERP log sheet holds them: ROLLING_IN_TOTAL_PERCENTAGE,
- *                       ROLLING_IN_DELIVERY_PRCNT, the ERP's PLANT_EFFICIENCY; all three open one drawer;
+ *                       ROLLING_IN_DELIVERY_PRCNT (one drawer); Plant efficiency, the plant's formula worked out here
+ *                       (the user, 26 Nov 2026): performance (actual ÷ the dashboard's plan) × availability ((running −
+ *                       breakdown) ÷ running), Prime + SL and Prime in one card, its own drawer;
  *                       Rolling in casting not under Offline (the user, 25 Nov 2026);
  *   Power consumption   the logbook forms Power Reading VCB 1 / 2 / 3 (live, as filled);
  *   Specific energy     power ÷ ERP production (backend power report);
@@ -44,6 +46,7 @@ export default function RmdKpiStrip() {
   const [yieldOpen, setYieldOpen] = useState(false);
   const [prodOpen, setProdOpen] = useState(false);
   const [perfOpen, setPerfOpen] = useState(false);
+  const [effOpen, setEffOpen] = useState(false);
   const [coalOpen, setCoalOpen] = useState(false);
   const offline = useGlobalSel().rmdMode === 'offline';
   const { dates } = useSelection();
@@ -118,7 +121,6 @@ export default function RmdKpiStrip() {
       {([
         ['Rolling in casting', 'rollingInCastingPct'],
         ['Rolling in delivery', 'rollingInDeliveryPct'],
-        ['Plant efficiency', 'plantEfficiencyPct'],
       ] as const).filter(([, k]) => !(offline && k === 'rollingInCastingPct')).map(([label, k]) => (
         <KpiCard
           key={k}
@@ -132,10 +134,33 @@ export default function RmdKpiStrip() {
           series="ok"
           loading={!data && !error}
           onOpen={() => setPerfOpen(true)}
-          openLabel="Rolling in casting, rolling in delivery and plant efficiency per day, from the ERP log sheet"
+          openLabel="Rolling in casting and rolling in delivery per day, from the ERP log sheet"
         />
       ))}
       <RmdProductionDrawer view="performance" open={perfOpen} onClose={() => setPerfOpen(false)} />
+      {/* Plant efficiency, the plant's formula (the user, 26 Nov 2026): Prime + SL and Prime, as Mass yield's two. */}
+      <KpiCard
+        label="Plant efficiency"
+        term={term}
+        value={t?.plantEfficiencyPct == null ? 'NA' : fixed(t.plantEfficiencyPct)}
+        pair={t ? [
+          { source: 'Prime + SL', value: t.plantEfficiencyPct == null ? 'NA' : fixed(t.plantEfficiencyPct) },
+          { source: 'Prime', value: t.primeEfficiencyPct == null ? 'NA' : fixed(t.primeEfficiencyPct) },
+        ] : undefined}
+        noEntries={up && t?.plantEfficiencyPct == null ? (t && t.entryDays > 0 && !t.effDays ? 'No production plan for these days' : true) : false}
+        lastEntry={(() => {
+          const l = lastOf(t?.plantEfficiencyPct, (lt) => lt.plantEfficiencyPct, 2);
+          const lp = last.data?.totals.primeEfficiencyPct;
+          return l ? { ...l, pair: [{ source: 'Prime + SL', value: l.value }, { source: 'Prime', value: lp == null ? 'NA' : fixed(lp) }] } : null;
+        })()}
+        unit="%"
+        note={note}
+        series="ok"
+        loading={!data && !error}
+        onOpen={() => setEffOpen(true)}
+        openLabel="Plant efficiency per day — performance against the plan and availability"
+      />
+      <RmdProductionDrawer view="efficiency" open={effOpen} onClose={() => setEffOpen(false)} />
       <PowerKpiCard mill="rmd" />
       <SpecificEnergyCard mill="rmd" />
       {offline && (

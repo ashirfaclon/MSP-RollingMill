@@ -198,12 +198,23 @@ export interface RmdProductionPeriod {
   /**
    * The Zoho TMT KPIs, from the ERP log sheet (the plant, 21 Nov 2026). Rolling in Casting % =
    * ROLLING_IN_TOTAL_PERCENTAGE, Rolling in Delivery % = ROLLING_IN_DELIVERY_PRCNT — each entry's
-   * figure, over a period the average weighted by billet input. Plant Efficiency % = each entry's PLANT_EFFICIENCY
-   * (performance × availability), over a period weighted by PRODUCTION_TARGET. Null with no entry.
+   * figure, over a period the average weighted by billet input. Null with no entry.
    */
   rollingInCastingPct: number | null;
   rollingInDeliveryPct: number | null;
+  /**
+   * Plant efficiency, the plant's formula (the user, 26 Nov 2026), over the dates with both a plan and an ERP entry:
+   * performance = actual ÷ the dashboard's plan × 100; availability = (running − breakdown) ÷ running × 100;
+   * efficiency = performance × availability ÷ 100. Prime + SL and Prime each; null without a plan.
+   */
   plantEfficiencyPct: number | null;
+  primeEfficiencyPct: number | null;
+  performancePct: number | null;
+  primePerformancePct: number | null;
+  availabilityPct: number | null;
+  /** Σ plan over those dates, MT, and how many dates. */
+  planMt: number | null;
+  effDays: number;
   /** Σ PRODUCTION_TARGET of the entries — what efficiency weighs by (not the plan). */
   targetMt: number | null;
   /**

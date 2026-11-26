@@ -1,6 +1,6 @@
 /**
  * RMD: the Zoho TMT KPIs the plant asked for (21 Nov 2026) — Rolling in casting, Rolling in delivery and
- * Plant efficiency — from the ERP log sheet, per rolling, each card opening the day-by-day drill-down.
+ * Plant efficiency — the plant's formula (26 Nov 2026), per rolling, each card opening the day-by-day drill-down.
  */
 import { test as base, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
@@ -28,7 +28,7 @@ test('RMD: rolling in casting, rolling in delivery and plant efficiency, per rol
   const cards = ['Rolling in casting', 'Rolling in delivery', 'Plant efficiency'];
   for (const c of cards) {
     await expect(strip.getByRole('button', { name: new RegExp(`^${c}`) })).not.toContainText('Loading', { timeout: 60_000 });
-    await expect(strip.getByRole('button', { name: new RegExp(`^${c}`) })).toContainText(/\d+(\.\d)?%|NA/);
+    await expect(strip.getByRole('button', { name: new RegExp(`^${c}`) })).toContainText(/\d+(\.\d+)?\s*%|NA/);
   }
   await page.screenshot({ path: `${SHOTS}/rmd-performance-cards.png` });
 
@@ -55,14 +55,14 @@ test('RMD: rolling in casting, rolling in delivery and plant efficiency, per rol
   await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Both' }).click();
 
   await strip.getByRole('button', { name: /^Rolling in casting/ }).click();
-  const drill = page.getByRole('dialog', { name: /Rolling in casting, delivery and plant efficiency/ });
+  const drill = page.getByRole('dialog', { name: /Rolling in casting and delivery/ });
   await expect(drill.getByRole('table', { name: 'Rolling performance by period' })).toBeVisible();
   await expect(drill.getByText('ROLLING_IN_TOTAL_PERCENTAGE', { exact: false }).first()).toBeVisible();
   await page.waitForTimeout(1500);   // the bars grow in
   await drill.screenshot({ path: `${SHOTS}/rmd-performance-drill.png` });
 });
 
-test('RMD plant efficiency is the ERP\'s own figure — a breakdown counts (the user, 25 Nov 2026)', async ({ page }) => {
+test('RMD plant efficiency: performance against the dashboard plan × availability, Prime + SL and Prime (the user, 26 Nov 2026)', async ({ page }) => {
   await page.goto('/rmd/visualization');
   await page.getByRole('button', { name: /Duration/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Select period' });
@@ -71,9 +71,16 @@ test('RMD plant efficiency is the ERP\'s own figure — a breakdown counts (the 
   await dialog.getByRole('button', { name: 'Apply' }).click();
   await page.getByRole('button', { name: /^Rolling:/ }).click();
   await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Online' }).click();
-  // 19 Nov Online: performance 141.51 % × availability 87.12 % = the ERP's 123.28 % (production ÷ target alone: 141.51 %).
+  // 19 Nov Online: performance 101.69 % (Prime + SL ÷ the 240.74 MT plan) × availability 85.18 % ((9.58 − 1.42) ÷ 9.58)
+  // = 86.62 %; Prime 85.78 %.
   const card = page.getByRole('region', { name: 'Headline KPIs' }).getByRole('button', { name: /^Plant efficiency/ });
-  await expect(card.locator('.rm-card-value')).toHaveText(/^123\.28?\s*%$/, { timeout: 60_000 });
+  await expect(card.locator('.rm-card-pair')).toHaveText(/Prime \+ SL\s*86\.62\s*Prime\s*85\.78/, { timeout: 60_000 });
+  await card.click();
+  const d = page.getByRole('dialog', { name: /Plant efficiency/ });
+  await expect(d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot')).toContainText('86.62');
+  await expect(d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot')).toContainText('85.18');
+  await page.waitForTimeout(1200);
+  await d.screenshot({ path: `${SHOTS}/rmd-efficiency-drill.png` });
 });
 
 test('RMD Breakdown: the sheet\'s seven items added, hours; opens each on its own like Finished stock (the user, 25 Nov 2026)', async ({ page }) => {
@@ -170,9 +177,9 @@ test('RMD TPH is the ERP\'s delivery rate, exactly as filed — Visualization an
   await period('2026-11-07', '2026-11-07');
   await expect(foot).toContainText('1.13 TPH', { timeout: 60_000 });
   await period('2026-11-24', '2026-11-24');
-  await expect(foot).toContainText('24.9 TPH');
+  await expect(foot).toContainText('24.9 TPH', { timeout: 30_000 });
   await period('2026-11-01', '2026-11-24');
-  await expect(foot).toContainText('12.85 TPH');
+  await expect(foot).toContainText('12.85 TPH', { timeout: 30_000 });
   await foot.click();
   const d = page.getByRole('dialog', { name: /TPH · delivery rate/ });
   await expect(d.getByRole('table', { name: 'TPH by period' }).locator('tfoot')).toContainText('12.85');

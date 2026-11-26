@@ -16,6 +16,7 @@ import { rmdRunningRate } from './running-rate.service';
 import { rmdProduction } from './production.service';
 import { rmdStock } from './stock.service';
 import { rmdPlan } from './plan.service';
+import { savedPlanDays, type SavedPlanDay } from '../forms-db/plan.store';
 import { rmdAssetForms } from './asset.service';
 import { isDate } from '../hsm/production.service';
 import { HttpError } from '../../shared/http-error';
@@ -113,6 +114,11 @@ export async function rmdRoutes(app: FastifyInstance) {
   app.get('/production', { config: { errorCode: 'rmd_production_failed' } }, async (req) => {
     const q = searchParams(req);
     const { from, to } = parseRange(q);
-    return rmdProduction(loadEnv(), from, to, parseGrain(q), parseRmdMode(q));
+    const env = loadEnv();
+    const mode = parseRmdMode(q);
+    // The plan the plant efficiency is measured against (the user, 26 Nov 2026): the dashboard's Production Plan, per date.
+    const saved = await savedPlanDays(env, 'rmd', from, to, mode).catch(() => new Map<string, SavedPlanDay>());
+    const plan = new Map([...saved].map(([d, s]) => [d, s.dayMt + s.nightMt]));
+    return rmdProduction(env, from, to, parseGrain(q), mode, plan);
   });
 }

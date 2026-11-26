@@ -57,7 +57,7 @@ function RollingContent({ data }: { data: RmsProductionReport }) {
   const t = data.totals;
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const series = useMemo<DrillSeries[]>(() => [
-    { id: 'casting', name: 'Rolling in casting', token: '--s-ok', type: 'line', data: rows.map((x) => x.rollingInCastingPct), dp: 2 },
+    { id: 'casting', name: 'Rolling in casting', token: '--s-prod', type: 'line', data: rows.map((x) => x.rollingInCastingPct), dp: 2 },
     { id: 'delivery', name: 'Rolling in delivery', token: '--s-order', type: 'line', data: rows.map((x) => x.rollingInDeliveryPct), dp: 2 },
   ], [rows]);
   const axes = useMemo(() => [{ title: '%', unit: '%' }], []);
@@ -104,8 +104,8 @@ function Content({ data }: { data: RmsProductionReport }) {
     { id: 'input', name: 'Billet input', token: '--s-free', type: 'column', data: rows.map((x) => x.billetInputMt), dp: 2 },
     { id: 'prod', name: 'Actual', token: '--s-prod', type: 'column', data: rows.map((x) => x.productionMt), dp: 2 },
     { id: 'prime', name: 'Prime', token: '--s-order', type: 'column', data: rows.map((x) => x.primeMt), dp: 2 },
-    { id: 'defective', name: 'Defective', token: '--s-reject', type: 'column', data: rows.map((x) => x.defectiveMt), dp: 2 },
-    { id: 'yield', name: 'Mass yield', token: '--s-order', type: 'line', axis: 1, data: rows.map((x) => x.massYieldPct), dp: 1 },
+    { id: 'defective', name: 'Defective', token: '--violet', type: 'column', data: rows.map((x) => x.defectiveMt), dp: 2 },
+    { id: 'yield', name: 'Mass yield', token: '--cat-5', type: 'line', axis: 1, data: rows.map((x) => x.massYieldPct), dp: 1 },
   ], [rows]);
   const axes = useMemo(() => [{ title: 'MT', unit: 'MT' }, { title: '%', unit: '%' }], []);
   return (

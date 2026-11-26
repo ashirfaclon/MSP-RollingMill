@@ -1,7 +1,7 @@
 /** RMD production and losses from the ERP log sheet (FA-SKJ codes as the plant gave them). */
 import { describe, expect, test } from 'vitest';
 import { deliveryRate } from '../../src/modules/rmd/running-rate.service';
-import { breakdownOf, efficiencyPct, massDifference, massYield, ofMode, summarise, weightedPct } from '../../src/modules/rmd/production.service';
+import { breakdownOf, plantEfficiency, massDifference, massYield, ofMode, summarise, weightedPct } from '../../src/modules/rmd/production.service';
 import type { RmdLogRow } from '../../src/integrations/erp/cache';
 
 const entry = (date: string, vrno: string, input: number, prod: number, prime: number, bloss: number, endcut: number, misroll: number, chip: number): RmdLogRow => ({
@@ -68,25 +68,15 @@ describe('the Zoho TMT KPIs from the ERP (the plant, 21 Nov 2026)', () => {
   const OFF = zoho('L4P26J14-0002', 100.93, 93.04, 52, 94.332, 94.332, 178.923);
 
   test('one entry: exactly the ERP\'s figures', () => {
-    expect(summarise('d', '14 Jul', ['2026-07-14'], [ON])).toMatchObject({ rollingInCastingPct: 93.01, rollingInDeliveryPct: 94.9, plantEfficiencyPct: 67.24, targetMt: 309 });
+    expect(summarise('d', '14 Jul', ['2026-07-14'], [ON])).toMatchObject({ rollingInCastingPct: 93.01, rollingInDeliveryPct: 94.9, targetMt: 309 });
   });
 
-  test('several entries: the percentages weighted by billet input; efficiency the ERP\'s, weighted by target', () => {
+  test('several entries: the percentages weighted by billet input', () => {
     expect(weightedPct([ON, OFF], 'ROLLING_IN_TOTAL_PERCENTAGE')).toBe(93.43);
-    // (67.243 × 309 + 178.923 × 52) ÷ 361
-    expect(efficiencyPct([ON, OFF])).toBe(83.33);
-  });
-
-  test('a breakdown counts: the ERP\'s performance × availability, not production ÷ target (the user, 25 Nov 2026)', () => {
-    // 19 Nov 2026 Online as the ERP holds it: 141.509 % performance × 87.118 % availability = 123.28 %.
-    const e = entry('2026-11-19', 'L4P26N19-0002', 300, 244.81, 244.81, 0, 0, 0, 0);
-    const n19 = { ...e, v: { ...e.v, PRODUCTION_TARGET: 173, PLANT_EFFICIENCY: 123.28 } };
-    expect(efficiencyPct([n19])).toBe(123.28);
-    expect(efficiencyPct([n19, ON])).toBe(87.36);   // (123.28 × 173 + 67.243 × 309) ÷ 482
   });
 
   test('entries synced before the fields were read: null, not 0', () => {
-    expect(summarise('d', '7 Oct', ['2026-10-07'], ROWS)).toMatchObject({ rollingInCastingPct: null, rollingInDeliveryPct: null, plantEfficiencyPct: null, targetMt: null });
+    expect(summarise('d', '7 Oct', ['2026-10-07'], ROWS)).toMatchObject({ rollingInCastingPct: null, rollingInDeliveryPct: null, targetMt: null });
   });
 });
 
@@ -129,4 +119,34 @@ test('TPH is the ERP\'s delivery rate; several entries weighted by their hours, 
   expect(deliveryRate([days[0], days[2]])).toBe(24.8);   // (25.077 × 9.5 + 24.521 × 9.747) ÷ 19.247
   expect(deliveryRate(days)).toBe(2.76);   // the wrong entry stays in and shows
   expect(deliveryRate([])).toBeNull();
+});
+
+describe('plant efficiency, the plant\'s formula (the user, 26 Nov 2026)', () => {
+  // 19 Nov 2026 Online as the ERP holds it: Prime + SL 244.81, 9.583 h running, 85 min process breakdown; a 250 MT plan.
+  const day = (date: string, sl: number, prime: number, runH: number, processMin: number): RmdLogRow => {
+    const e = entry(date, `L4P-${date}`, 260, sl, prime, 0, 0, 0, 0);
+    return { ...e, v: { ...e.v, ACTUAL_RUNNING_HRS: runH, MILL_BKDN_IN_MIN_PROCESS: processMin } };
+  };
+  const n19 = day('2026-11-19', 244.81, 240, 9.583, 85);
+  const n20 = day('2026-11-20', 120, 118, 8.17, 0);
+
+  test('performance = actual ÷ plan; availability = (running − breakdown) ÷ running; efficiency = their product ÷ 100', () => {
+    expect(plantEfficiency([n19], new Map([['2026-11-19', 250]]))).toEqual({
+      planMt: 250, effDays: 1,
+      performancePct: 97.92, primePerformancePct: 96, availabilityPct: 85.18,
+      plantEfficiencyPct: 83.41, primeEfficiencyPct: 81.77,
+    });
+  });
+
+  test('several days: MT and hours summed first, then the formula once', () => {
+    const r = plantEfficiency([n19, n20], new Map([['2026-11-19', 250], ['2026-11-20', 120]]));
+    expect(r).toMatchObject({ planMt: 370, effDays: 2, performancePct: 98.6, availabilityPct: 92, plantEfficiencyPct: 90.71 });
+  });
+
+  test('only the days with both a plan and an ERP entry; no plan, no efficiency', () => {
+    expect(plantEfficiency([n19, n20], new Map([['2026-11-19', 250]]))).toMatchObject({ effDays: 1, plantEfficiencyPct: 83.41 });
+    expect(plantEfficiency([n19], new Map())).toMatchObject({ effDays: 0, plantEfficiencyPct: null, primeEfficiencyPct: null });
+    expect(plantEfficiency([n19], undefined).plantEfficiencyPct).toBeNull();
+    expect(summarise('d', '19 Nov', ['2026-11-19'], [n19], new Map([['2026-11-19', 250]]))).toMatchObject({ plantEfficiencyPct: 83.41, primeEfficiencyPct: 81.77 });
+  });
 });

@@ -601,3 +601,25 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   Specific energy; both rows full). The Actual card's defective line is violet, as defective stock. rms-prime.e2e
   (1366 / 1920 × day / month / year: two full rows, nothing cut off) and the RMS wiring test pass; 307 backend unit
   pass. Not committed.
+- **26 Nov 2026** — **RMD Plant efficiency: the plant's own formula, worked out here** (the user; replaces the ERP's
+  PLANT_EFFICIENCY of 25 Nov). Performance = actual ÷ the DASHBOARD's production plan × 100 (Production Plan form, per
+  date and rolling — a Prime + SL plan, used for both); availability = (ACTUAL_RUNNING_HRS − breakdown) ÷
+  ACTUAL_RUNNING_HRS × 100, breakdown = the Breakdown card's seven items; efficiency = performance × availability ÷ 100.
+  Two efficiencies — Prime + SL (PRODUCT_PRIME_SLENGTH_MT) and Prime (FINISH_PRODUCT_PRIME_MT) — in one card as Mass
+  yield's pair. Only dates with both a plan and an ERP entry; over several dates MT and hours summed first, formula once.
+  The user asked for Target ÷ Actual; confirmed Actual ÷ Target (and ÷ 100 on the product). RMD only for now (LSM, RMS,
+  HSM still show the ERP's efficiency). The production route now reads the saved plan (savedPlanDays) and passes it to
+  rmdProduction; plantEfficiency() in production.service. Own drill-down: plan, Prime + SL, Prime, running, breakdown,
+  performance, availability, both efficiencies; the rolling drill-down no longer carries efficiency. Checked: 19 Nov
+  Online 101.69 % × 85.18 % = 86.62 % (Prime 85.78 %). Note: Nov Online availability 99.35 % includes the 7 Nov entry's
+  260 running hours (ERP slip). Also fixed a chart colour that did not exist (--s-ok → --s-prod) here and on RMS's
+  Rolling in casting line (grey since 25 Nov). Tests: unit (3 new; 309 pass), rmd-performance e2e (5 pass — the TPH
+  test needed 30 s on its later waits). Not committed.
+- **26 Nov 2026** — **Chart colours that did not exist** (the user spotted RMS Defective with no legend swatch). Two
+  series named undefined theme colours and drew grey: RMS production Defective (`--s-reject` → `--violet`, defective's
+  colour on the card and in the stock panel) and RMD CCM bypass (`--s-hold` → `--s-pred`). RMS's Mass yield line shared
+  Prime's teal → `--cat-5` (pink). New guard: frontend `src/lib/chart-tokens.unit.test.ts` fails when any component's
+  `token: '--…'` is not defined in styles/theme.css. Not committed.
+- **26 Nov 2026** — Known, not from today's work: frontend unit tests `src/components/twin/twin.unit.test.ts` → 2 fail
+  (route: "the 01:38 case …", "trace: selecting PRI …") with today's changes stashed too — the RMD mimic tests predate the
+  line-2 PR1 / PR2 mimic change. Not looked into.

@@ -20,11 +20,11 @@ import { useDrillRange } from '@/components/drill/useDrillRange';
 import { dm } from '@/services/hsmProduction';
 import { rangeUrl, useApi, type RmdProductionPeriod, type RmdProductionReport } from '@/services/hsmApi';
 
-export type RmdProductionView = 'production' | 'yield' | 'balance' | 'performance' | 'coal' | BalanceKey;
+export type RmdProductionView = 'production' | 'yield' | 'balance' | 'performance' | 'efficiency' | 'coal' | BalanceKey;
 /** The balance strip's bypasses and short length (the user, 25 Nov 2026): each its own drill-down. */
 export type BalanceKey = 'ccmBypassMt' | 'millBypassMt' | 'shortLengthMt';
 export const BALANCE: Record<BalanceKey, { name: string; field: string; token: string }> = {
-  ccmBypassMt: { name: 'CCM bypass', field: 'CCM_BYPASS_MT', token: '--s-hold' },
+  ccmBypassMt: { name: 'CCM bypass', field: 'CCM_BYPASS_MT', token: '--s-pred' },
   millBypassMt: { name: 'RMD bypass', field: 'MILL_BYPASS_MT', token: '--s-alt' },
   shortLengthMt: { name: 'Short length', field: 'FINISH_PRODUCT_SLENGTH_MT', token: '--s-order' },
 };
@@ -50,7 +50,7 @@ export default function RmdProductionDrawer({ open, onClose, view }: { open: boo
       open={open}
       onClose={onClose}
       title={TITLE[view]}
-      sub={view === 'yield' || view === 'performance' ? 'RMD · %' : 'RMD · MT'}
+      sub={view === 'yield' || view === 'performance' || view === 'efficiency' ? 'RMD · %' : 'RMD · MT'}
       controls={r.controls}
       loading={loading}
       stale={!!data && dataUrl !== url}
@@ -58,7 +58,7 @@ export default function RmdProductionDrawer({ open, onClose, view }: { open: boo
       hasData={!!data}
     >
       {data && (view === 'production' ? <ProductionContent data={data} /> : view === 'yield' ? <YieldContent data={data} />
-        : view === 'performance' ? <PerformanceContent data={data} /> : view === 'coal' ? <CoalContent data={data} />
+        : view === 'performance' ? <PerformanceContent data={data} /> : view === 'efficiency' ? <EfficiencyContent data={data} /> : view === 'coal' ? <CoalContent data={data} />
         : view in BALANCE ? <BalanceMetricContent data={data} k={view as BalanceKey} /> : <BalanceContent data={data} />)}
     </DrillDrawer>
   );
@@ -68,7 +68,8 @@ const TITLE: Record<RmdProductionView, string> = {
   production: 'Production · ERP log sheet',
   yield: 'Yield · ERP log sheet',
   balance: 'Material balance · ERP log sheet',
-  performance: 'Rolling in casting, delivery and plant efficiency · ERP log sheet',
+  performance: 'Rolling in casting and delivery · ERP log sheet',
+  efficiency: 'Plant efficiency · plan, ERP log sheet',
   coal: 'Coal consumption · ERP log sheet',
   ccmBypassMt: 'CCM bypass · ERP log sheet',
   millBypassMt: 'RMD bypass · ERP log sheet',
@@ -269,7 +270,6 @@ function PerformanceContent({ data }: { data: RmdProductionReport }) {
   const series = useMemo<DrillSeries[]>(() => [
     { id: 'casting', name: 'Rolling in casting', token: '--s-prod', type: 'column', data: rows.map((x) => x.rollingInCastingPct), dp: 2 },
     { id: 'delivery', name: 'Rolling in delivery', token: '--s-order', type: 'column', data: rows.map((x) => x.rollingInDeliveryPct), dp: 2 },
-    { id: 'efficiency', name: 'Plant efficiency', token: '--s-pred', type: 'column', data: rows.map((x) => x.plantEfficiencyPct), dp: 2 },
   ], [rows]);
   const axes = useMemo(() => [{ title: '%', unit: '%' }], []);
 
@@ -278,24 +278,21 @@ function PerformanceContent({ data }: { data: RmdProductionReport }) {
       <Stats items={[
         { label: 'Rolling in casting', value: f(t.rollingInCastingPct), unit: '%' },
         { label: 'Rolling in delivery', value: f(t.rollingInDeliveryPct), unit: '%' },
-        { label: 'Plant efficiency', value: f(t.plantEfficiencyPct), unit: '%' },
       ]} />
       <DrillChart series={series} categories={categories} axes={axes}
-        ariaLabel={`Rolling performance by period: ${rows.map((x) => `${x.label} casting ${f(x.rollingInCastingPct)}%, delivery ${f(x.rollingInDeliveryPct)}%, efficiency ${f(x.plantEfficiencyPct)}%`).join('; ')}`} />
+        ariaLabel={`Rolling performance by period: ${rows.map((x) => `${x.label} casting ${f(x.rollingInCastingPct)}%, delivery ${f(x.rollingInDeliveryPct)}%`).join('; ')}`} />
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Rolling performance by period">
-          <thead><tr><th>Period</th><th className="r">Rolling in casting (%)</th><th className="r">Rolling in delivery (%)</th><th className="r">Plant efficiency (%)</th><th className="r">Prime + SL (MT)</th><th className="r">Target (MT)</th></tr></thead>
+          <thead><tr><th>Period</th><th className="r">Rolling in casting (%)</th><th className="r">Rolling in delivery (%)</th><th className="r">Billet input (MT)</th></tr></thead>
           <tbody>{rows.map((x) => <PerformanceRow key={x.key} x={x} />)}</tbody>
           <tfoot><PerformanceRow x={t} /></tfoot>
         </table>
       </div>
       <SourceBox
-        sources={sources(['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DELIVERY_PRCNT', 'PLANT_EFFICIENCY', 'PRODUCT_PRIME_SLENGTH_MT', 'PRODUCTION_TARGET', 'INPUT_MT'])}
+        sources={sources(['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DELIVERY_PRCNT', 'INPUT_MT'])}
         formula={[
           'Rolling in casting = ROLLING_IN_TOTAL_PERCENTAGE of each entry; over several entries, their average weighted by INPUT_MT',
           'Rolling in delivery = ROLLING_IN_DELIVERY_PRCNT of each entry; over several entries, their average weighted by INPUT_MT',
-          'Plant efficiency = PLANT_EFFICIENCY of each entry (the ERP\'s: performance × availability — production ÷ target, less any breakdown time); over several entries, their average weighted by PRODUCTION_TARGET',
-          'Target is the ERP\'s, used to weight efficiency only — the production plan is the one filled on the dashboard',
         ]}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
@@ -309,9 +306,76 @@ function PerformanceRow({ x }: { x: RmdProductionPeriod }) {
       {label(x)}
       <td className="num r v-val">{f(x.rollingInCastingPct)}</td>
       <td className="num r v-val">{f(x.rollingInDeliveryPct)}</td>
-      <td className="num r v-val">{f(x.plantEfficiencyPct)}</td>
+      <td className="num r">{f(x.billetInputMt)}</td>
+    </tr>
+  );
+}
+
+/**
+ * Plant efficiency, the plant's formula (the user, 26 Nov 2026), per period: performance (actual ÷ the dashboard's plan),
+ * availability ((running − breakdown) ÷ running) and the two efficiencies, with every figure they come from.
+ */
+function EfficiencyContent({ data }: { data: RmdProductionReport }) {
+  const rows = data.rows;
+  const t = data.totals;
+  const categories = useMemo(() => rows.map((x) => x.label), [rows]);
+  const series = useMemo<DrillSeries[]>(() => [
+    { id: 'sl', name: 'Efficiency · Prime + SL', token: '--s-prod', type: 'column', data: rows.map((x) => x.plantEfficiencyPct), dp: 2 },
+    { id: 'prime', name: 'Efficiency · Prime', token: '--s-order', type: 'column', data: rows.map((x) => x.primeEfficiencyPct), dp: 2 },
+    { id: 'avail', name: 'Availability', token: '--s-pred', type: 'line', data: rows.map((x) => x.availabilityPct), dp: 2 },
+  ], [rows]);
+  const axes = useMemo(() => [{ title: '%', unit: '%', min: 0 }], []);
+  return (
+    <>
+      <Stats items={[
+        { label: 'Efficiency · Prime + SL', value: f(t.plantEfficiencyPct), unit: '%' },
+        { label: 'Efficiency · Prime', value: f(t.primeEfficiencyPct), unit: '%' },
+        { label: 'Performance · Prime + SL', value: f(t.performancePct), unit: '%' },
+        { label: 'Availability', value: f(t.availabilityPct), unit: '%' },
+        { label: 'Days with a plan', value: String(t.effDays), unit: `of ${t.entryDays} entered` },
+      ]} />
+      <DrillChart series={series} categories={categories} axes={axes}
+        ariaLabel={`Plant efficiency by period: ${rows.map((x) => `${x.label} ${f(x.plantEfficiencyPct)}% (prime ${f(x.primeEfficiencyPct)}%)`).join('; ')}`} />
+      <div className="pd-table-wrap">
+        <table className="grid pd-table" aria-label="Plant efficiency by period">
+          <thead><tr>
+            <th>Period</th><th className="r">Plan (MT)</th><th className="r">Prime + SL (MT)</th><th className="r">Prime (MT)</th>
+            <th className="r">Running (h)</th><th className="r">Breakdown (h)</th>
+            <th className="r">Performance (%)</th><th className="r">Availability (%)</th><th className="r">Efficiency · Prime + SL (%)</th><th className="r">Efficiency · Prime (%)</th>
+          </tr></thead>
+          <tbody>{rows.map((x) => <EfficiencyRow key={x.key} x={x} />)}</tbody>
+          <tfoot><EfficiencyRow x={t} /></tfoot>
+        </table>
+      </div>
+      <SourceBox
+        sources={[
+          ...sources(['PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'ACTUAL_RUNNING_HRS', 'MILL_BKDN_IN_MIN_MECHANICAL / _ELECTRICAL / _PROCESS / _RM / _POWEROTHERS', 'MILL_SINGLE_STAND', 'MILL_1_12__STAND']),
+          { name: 'Logbook', rows: [['Form', 'Production Plan (RMD ROLLING PLAN), saved on the dashboard'], ['Field', 'Day + Night plan, MT (Prime + SL)']] },
+        ]}
+        formula={[
+          'Plant efficiency = Performance × Availability ÷ 100',
+          'Performance = Actual production ÷ Plan × 100',
+          'Availability = (Running hours − Breakdown hours) ÷ Running hours × 100',
+        ]}
+      />
+      {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
+    </>
+  );
+}
+
+function EfficiencyRow({ x }: { x: RmdProductionPeriod }) {
+  return (
+    <tr>
+      {label(x)}
+      <td className="num r">{f(x.planMt)}</td>
       <td className="num r">{f(x.productionMt)}</td>
-      <td className="num r">{f(x.targetMt)}</td>
+      <td className="num r">{f(x.primeMt)}</td>
+      <td className="num r">{f(x.runningHrs)}</td>
+      <td className="num r">{f(x.breakdownHrs)}</td>
+      <td className="num r">{f(x.performancePct)}</td>
+      <td className="num r">{f(x.availabilityPct)}</td>
+      <td className="num r v-val"><b>{f(x.plantEfficiencyPct)}</b></td>
+      <td className="num r v-val">{f(x.primeEfficiencyPct)}</td>
     </tr>
   );
 }

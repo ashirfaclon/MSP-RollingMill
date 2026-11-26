@@ -10,11 +10,9 @@
  *
  * Mass yield = production ÷ billet input × 100; mass difference = billet input − production.
  *
- * Rolling in Casting % / Delivery % and Plant Efficiency % (the plant, 21 Nov 2026 — the Zoho TMT KPIs,
- * the ERP's figures): each entry's ROLLING_IN_TOTAL_PERCENTAGE / ROLLING_IN_DELIVERY_PRCNT, over a period
- * their average weighted by the entries' billet input; efficiency = each entry's PLANT_EFFICIENCY (the ERP's:
- * performance × availability, so a breakdown counts — the user, 25 Nov 2026), over a period weighted by the
- * entries' PRODUCTION_TARGET; one entry is the ERP's figure exactly.
+ * Rolling in Casting % / Delivery % (the plant, 21 Nov 2026 — the Zoho TMT KPIs, the ERP's figures): each entry's
+ * ROLLING_IN_TOTAL_PERCENTAGE / ROLLING_IN_DELIVERY_PRCNT, over a period their average weighted by billet input.
+ * Plant efficiency is worked out here (the user, 26 Nov 2026 — no longer the ERP's PLANT_EFFICIENCY), see plantEfficiency.
  *
  * Online / Offline (`mode`, the user, 13 Nov 2026): only that rolling's entries (RMD_MODE_CODES);
  * all of them for Both. An entry synced before the split has no mode, so it counts under Both only.
@@ -66,15 +64,37 @@ export function coal(rows: RmdLogRow[]): { coalMt: number | null; coalKgPerMt: n
   return { coalMt: round2(mt), coalKgPerMt: prod > 0 ? round2((mt * 1000) / prod) : null };
 }
 
+/** The dashboard's production plan per date, MT (Prime + SL; the Production Plan form, saved on the dashboard). */
+export type PlanByDate = Map<string, number>;
+
 /**
- * The ERP's PLANT_EFFICIENCY of each entry, weighted by its PRODUCTION_TARGET (equal weights where an entry has
- * none); null with no figure. Was Σ production ÷ Σ target, which left out availability (the user, 25 Nov 2026).
+ * Plant efficiency, the plant's formula (the user, 26 Nov 2026), over the dates with both a plan and an ERP entry:
+ *   performance  = actual ÷ plan × 100 — two of them: Prime + SL (PRODUCT_PRIME_SLENGTH_MT) and Prime (FINISH_PRODUCT_PRIME_MT),
+ *                  both against the one plan (a Prime + SL plan);
+ *   availability = (ACTUAL_RUNNING_HRS − breakdown) ÷ ACTUAL_RUNNING_HRS × 100 — breakdown = the Breakdown card's seven items;
+ *   efficiency   = performance × availability ÷ 100.
+ * Over several dates the MT and hours are summed first, then the formula is applied once. Null without a plan.
  */
-export function efficiencyPct(rows: RmdLogRow[]): number | null {
-  const v = rows.filter((r) => typeof r.v.PLANT_EFFICIENCY === 'number');
-  if (!v.length) return null;
-  const w = (r: RmdLogRow) => (v.every((x) => (x.v.PRODUCTION_TARGET ?? 0) > 0) ? r.v.PRODUCTION_TARGET! : 1);
-  return round2(v.reduce((a, r) => a + r.v.PLANT_EFFICIENCY! * w(r), 0) / v.reduce((a, r) => a + w(r), 0));
+export function plantEfficiency(rows: RmdLogRow[], plan: PlanByDate | undefined) {
+  const none = { planMt: null, effDays: 0, performancePct: null, primePerformancePct: null, availabilityPct: null, plantEfficiencyPct: null, primeEfficiencyPct: null };
+  if (!plan) return none;
+  const dates = [...new Set(rows.map((r) => r.date))].filter((d) => (plan.get(d) ?? 0) > 0);
+  if (!dates.length) return none;
+  const mine = rows.filter((r) => dates.includes(r.date));
+  const planMt = round2(dates.reduce((a, d) => a + plan.get(d)!, 0));
+  const sl = sumOf(mine, 'PRODUCT_PRIME_SLENGTH_MT');
+  const prime = sumOf(mine, 'FINISH_PRODUCT_PRIME_MT');
+  const runH = sumOf(mine, 'ACTUAL_RUNNING_HRS');
+  const bdH = breakdownOf(mine).breakdownHrs ?? 0;
+  const pct = (a: number | null, b: number) => (a === null ? null : round2((a / b) * 100));
+  const availabilityPct = runH ? round2(((runH - bdH) / runH) * 100) : null;
+  const performancePct = pct(sl, planMt);
+  const primePerformancePct = pct(prime, planMt);
+  const eff = (p: number | null) => (p === null || availabilityPct === null ? null : round2((p * availabilityPct) / 100));
+  return {
+    planMt, effDays: dates.length, performancePct, primePerformancePct, availabilityPct,
+    plantEfficiencyPct: eff(performancePct), primeEfficiencyPct: eff(primePerformancePct),
+  };
 }
 
 /** The sheet's seven breakdown items over the entries, hours each (negative minutes left out), and their total; null total with no entry. */
@@ -87,7 +107,7 @@ export function breakdownOf(rows: RmdLogRow[]): { breakdownHrs: number | null; b
   };
 }
 
-export function summarise(key: string, label: string, dates: string[], rows: RmdLogRow[]): RmdProductionPeriod {
+export function summarise(key: string, label: string, dates: string[], rows: RmdLogRow[], plan?: PlanByDate): RmdProductionPeriod {
   const mine = rows.filter((r) => r.date >= dates[0] && r.date <= dates[dates.length - 1]);
   const losses = [sumOf(mine, 'BLOSS_MT'), sumOf(mine, 'ENDCUT_MT'), sumOf(mine, 'MISROLL_MT'), sumOf(mine, 'CHIP_OFF_MT')];
   const productionMt = sumOf(mine, 'PRODUCT_PRIME_SLENGTH_MT');
@@ -107,7 +127,7 @@ export function summarise(key: string, label: string, dates: string[], rows: Rmd
     ...coal(mine),
     rollingInCastingPct: weightedPct(mine, 'ROLLING_IN_TOTAL_PERCENTAGE'),
     rollingInDeliveryPct: weightedPct(mine, 'ROLLING_IN_DELIVERY_PRCNT'),
-    plantEfficiencyPct: efficiencyPct(mine),
+    ...plantEfficiency(mine, plan),
     targetMt: sumOf(mine, 'PRODUCTION_TARGET'),
     ...breakdownOf(mine),
     ccmBypassMt: sumOf(mine, 'CCM_BYPASS_MT'),
@@ -122,7 +142,7 @@ export const ofMode = (rows: RmdLogRow[], mode: RmdMode) => (mode === 'all' ? ro
 /** The cached log sheet entries of `mode`. */
 export const rmdLogRows = (env: Env, mode: RmdMode) => ofMode(readErpRmdProduction(env)?.rows ?? [], mode);
 
-export function rmdProduction(env: Env, from: string, to: string, grain: Grain, mode: RmdMode = 'all'): RmdProductionReport {
+export function rmdProduction(env: Env, from: string, to: string, grain: Grain, mode: RmdMode = 'all', plan?: PlanByDate): RmdProductionReport {
   const cache = readErpRmdProduction(env);
   const rows = ofMode(cache?.rows ?? [], mode);
   const dates = dateRange(from, to);
@@ -142,8 +162,8 @@ export function rmdProduction(env: Env, from: string, to: string, grain: Grain, 
       lastDate: rows.at(-1)?.date ?? null,
     },
     // The bar size(s) the chosen rolling rolled, miss roll left out — they add up to Prime (the user, 25 Nov 2026).
-    rows: [...groups].map(([key, g]) => ({ ...summarise(key, g.label, g.dates, rows), sections: sectionsRolled(g.dates, cache?.receipts ?? [], barLabelOf, mode) })),
-    totals: { ...summarise('total', 'Total', dates, rows), sections: sectionsRolled(dates, cache?.receipts ?? [], barLabelOf, mode) },
+    rows: [...groups].map(([key, g]) => ({ ...summarise(key, g.label, g.dates, rows, plan), sections: sectionsRolled(g.dates, cache?.receipts ?? [], barLabelOf, mode) })),
+    totals: { ...summarise('total', 'Total', dates, rows, plan), sections: sectionsRolled(dates, cache?.receipts ?? [], barLabelOf, mode) },
   };
 }
 
