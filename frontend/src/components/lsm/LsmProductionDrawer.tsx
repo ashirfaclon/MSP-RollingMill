@@ -284,13 +284,13 @@ const PERF: Record<PerfKey, { name: string; token: string; cols: Col[]; codes: s
     name: 'Rolling in casting', token: '--s-alt',
     cols: [{ key: 'billetInputMt', name: 'Billet input', unit: 'MT' }],
     codes: ['ROLLING_PERCENTAGE_CASTING', 'INPUT_MT'],
-    formula: ['Rolling in casting = the ERP\'s ROLLING_PERCENTAGE_CASTING of each entry', 'Several entries: weighted by INPUT_MT'],
+    formula: ['Rolling in casting = Σ INPUT_MT ÷ Σ (INPUT_MT ÷ ROLLING_PERCENTAGE_CASTING) × 100'],
   },
   rollingInDeliveryPct: {
     name: 'Rolling in delivery', token: '--violet',
     cols: [{ key: 'billetInputMt', name: 'Billet input', unit: 'MT' }],
     codes: ['ROLLING_PERCENTAGE_DELIVERY', 'INPUT_MT'],
-    formula: ['Rolling in delivery = the ERP\'s ROLLING_PERCENTAGE_DELIVERY of each entry', 'Several entries: weighted by INPUT_MT'],
+    formula: ['Rolling in delivery = Σ INPUT_MT ÷ Σ (INPUT_MT ÷ ROLLING_PERCENTAGE_DELIVERY) × 100'],
   },
 };
 

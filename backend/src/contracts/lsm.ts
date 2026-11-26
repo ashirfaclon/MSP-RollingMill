@@ -51,9 +51,9 @@ export interface LsmProductionPeriod {
   performancePct: number | null;
   /** PLANT_EFFICIENCY (availability × performance); over several entries weighted by running + delay hours. */
   efficiencyPct: number | null;
-  /** ROLLING_PERCENTAGE_CASTING; over several entries weighted by billet input. */
+  /** ROLLING_PERCENTAGE_CASTING; over several entries tonnes first: Σ input ÷ Σ (input ÷ %). */
   rollingInCastingPct: number | null;
-  /** ROLLING_PERCENTAGE_DELIVERY; over several entries weighted by billet input. */
+  /** ROLLING_PERCENTAGE_DELIVERY; over several entries tonnes first: Σ input ÷ Σ (input ÷ %). */
   rollingInDeliveryPct: number | null;
 }
 
@@ -97,11 +97,14 @@ export interface RmsProductionPeriod {
   /** Defective, MT (defective cut + rolling defect, as the ERP books them); prime + defective = productionMt. */
   defectiveMt: number | null;
   /**
-   * On-line rolling % (the user, 25 Nov 2026; every RMS entry is Online, P11P): the ERP's ROLLING_PERCENTAGE_DELIVERY /
-   * ROLLING_PERCENATGE_CASTING, over a period weighted by billet input. Null with no entry.
+   * On-line rolling % (every RMS entry is Online, P11P), as the plant's casting sheet (the user, 26 Nov 2026):
+   * Σ billet input ÷ Σ DELIVERY_QTY / Σ TOTAL_CAST_QTY × 100 over the period's entries. Null with no entry.
    */
   rollingInDeliveryPct: number | null;
   rollingInCastingPct: number | null;
+  /** Σ TOTAL_CAST_QTY and Σ DELIVERY_QTY, MT; null with none filled. */
+  castMt: number | null;
+  deliveryMt: number | null;
   /** Σ INPUT_PCS — billets in, pieces; null with no entry. */
   billetsPcs: number | null;
   /** Σ (INPUT_MT1 + INPUT_MT2) — billet input, MT; null with none filled. */

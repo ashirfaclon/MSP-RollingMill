@@ -30,11 +30,11 @@ test('RMS: actual production with its prime and defective parts, from the ERP lo
   await expect(card.locator('.rm-card-note')).toHaveText(/^Defective 38\.99 MT · 14\.46 %$/);   // 38.99 ÷ 269.59
   await expect(prime.locator('.rm-card-value')).toContainText('230.6');
   await expect(prime.locator('.rm-card-note')).toHaveText(/^85\.54 % of actual$/);
-  // 22 Nov 2026 as the ERP holds it: ROLLING_PERCENATGE_CASTING 95.116, ROLLING_PERCENTAGE_DELIVERY 97.015.
+  // 22 Nov 2026, as the casting sheet (row 24, AE / AD): 360.104 ÷ 378.594 = 95.12 %, 360.104 ÷ 371.184 = 97.01 %.
   await period(page, '2026-11-22', '2026-11-22');
   await expect(strip.getByRole('button', { name: 'Rolling in casting', exact: true }).locator('.rm-card-value')).toContainText('95.12', { timeout: 60_000 });
-  await expect(strip.getByRole('button', { name: 'Rolling in delivery', exact: true }).locator('.rm-card-value')).toContainText('97.02');
-  await expect(strip.locator('.rm-card-label-text')).toHaveText([/^Production · Actual/, /^Production · Prime/, /^Mass yield/, /^Prime yield/, /^Finished stock/, /^Rolling in casting/, /^Rolling in delivery/, /^Power consumption/, /^Specific energy/]);
+  await expect(strip.getByRole('button', { name: 'Rolling in delivery', exact: true }).locator('.rm-card-value')).toContainText('97.01');
+  await expect(strip.locator('.rm-card-label-text')).toHaveText([/^Production · Actual/, /^Production · Prime/, /^Mass yield/, /^Prime yield/, /^Finished stock/, /^Rolling in casting/, /^Rolling in delivery/, /^Power consumption/, /^Specific energy/, /^Power factor/]);
   // Prime yield 22 Nov: 328.12 ÷ 360.10 = 91.12 % (mass yield on the actual, 92.57 %).
   await expect(strip.getByRole('button', { name: 'Prime yield', exact: true }).locator('.rm-card-value')).toContainText('91.1');
   for (const w of [1366, 1920]) {
@@ -42,12 +42,12 @@ test('RMS: actual production with its prime and defective parts, from the ERP lo
     for (const [from, to] of [['2026-11-24', '2026-11-24'], ['2026-11-01', '2026-11-24'], ['2026-01-01', '2026-11-24']]) {
       await period(page, from, to);
       await expect(strip.locator('.rm-card-value', { hasText: 'Loading' })).toHaveCount(0, { timeout: 60_000 });
-      await expect(strip.locator('.rm-card')).toHaveCount(9);
+      await expect(strip.locator('.rm-card')).toHaveCount(10);
       const rows = new Set(await strip.locator('.rm-card').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top / 10)))).size;
       expect(rows, `${w} ${from}: two rows`).toBe(2);
-      // Both rows full: the first five end where the last four end.
+      // Both rows full: the first five end where the last five end.
       const rights = await strip.locator('.rm-card').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
-      expect(Math.abs(rights[4] - rights[8]), `${w} ${from}: rows end together`).toBeLessThan(2);
+      expect(Math.abs(rights[4] - rights[9]), `${w} ${from}: rows end together`).toBeLessThan(2);
       // Nothing wider than its card: the figure, and the prime · defective line under it.
       const spill = await strip.locator('.rm-card, .rm-card-note').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent?.slice(0, 40)));
       expect(spill, `${w} ${from}`).toEqual([]);

@@ -43,7 +43,8 @@ describe('LSM production from the log sheet', () => {
       availabilityPct: 92.06, performancePct: 95.49,
       // efficiency = availability × performance over the two days, as on one.
       efficiencyPct: 87.9,
-      rollingInCastingPct: 95.06, rollingInDeliveryPct: 88.34, nonPrimeYieldPct: 95.33,
+      // rolling %: tonnes first — Σ input ÷ Σ (input ÷ %) (26 Nov 2026).
+      rollingInCastingPct: 94.95, rollingInDeliveryPct: 88.25, nonPrimeYieldPct: 95.33,
     });
   });
   test('a cache synced before the KPIs were added reads them as not entered', () => {

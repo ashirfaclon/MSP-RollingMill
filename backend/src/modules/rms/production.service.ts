@@ -37,14 +37,17 @@ export function distinctEntries(rows: RmsLogRow[]): RmsLogRow[] {
 }
 
 /**
- * The ERP's % of each entry, over several: weighted by the entry's billet input (equal weights where an entry has
- * none) — as RMD's and LSM's rolling % (the user, 25 Nov 2026). One entry: exactly the ERP's figure.
+ * On-line rolling %, as the plant's casting sheet works it (the user, 26 Nov 2026 — "Casting Sheet November 26.xls",
+ * Production_Report AD / AE and its Total row): Σ billet input ÷ Σ DELIVERY_QTY (delivery) or Σ TOTAL_CAST_QTY (casting)
+ * × 100 — the tonnes of every entry in the period added up first, then divided once; never an average of the daily %.
+ * Over the entries that have both figures, so an entry with no input doesn't count its delivery against nothing.
+ * The ERP's own ROLLING_PERCENTAGE_* fields are not used: they are the same division per entry, but a typing slip
+ * there (15 Nov 2026: casting 0.931 for 93.10) would show.
  */
-export function weightedRmsPct(rows: RmsLogRow[], k: 'rollingInDeliveryPct' | 'rollingInCastingPct'): number | null {
-  const v = rows.filter((r) => typeof r[k] === 'number');
-  if (!v.length) return null;
-  const w = (r: RmsLogRow) => (v.every((x) => (x.inputMt ?? 0) > 0) ? r.inputMt! : 1);
-  return round2(v.reduce((a, r) => a + r[k]! * w(r), 0) / v.reduce((a, r) => a + w(r), 0));
+export function rollingPct(rows: RmsLogRow[], by: 'deliveryMt' | 'castMt'): number | null {
+  const both = rows.filter((r) => (r.inputMt ?? 0) > 0 && (r[by] ?? 0) > 0);
+  if (!both.length) return null;
+  return round2((both.reduce((a, r) => a + r.inputMt!, 0) / both.reduce((a, r) => a + r[by]!, 0)) * 100);
 }
 
 /**
@@ -65,7 +68,7 @@ export function summariseRms(key: string, label: string, dates: string[], rows: 
   const input = mine.map((r) => r.inputMt ?? null).filter((x): x is number => x !== null);
   const productionMt = v.length ? round2(v.reduce((a, b) => a + b, 0)) : null;
   const billetInputMt = input.length ? round2(input.reduce((a, b) => a + b, 0)) : null;
-  const lossOf = (k: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'rejectMt' | 'runningHrs' | 'primeMt' | 'defectiveMt') => {
+  const lossOf = (k: 'burningLossMt' | 'endCutMt' | 'missRollMt' | 'coldMt' | 'rejectMt' | 'runningHrs' | 'primeMt' | 'defectiveMt' | 'castMt' | 'deliveryMt') => {
     const xs = mine.map((r) => r[k] ?? null).filter((x): x is number => x !== null);
     return xs.length ? round2(xs.reduce((a, b) => a + b, 0)) : null;
   };
@@ -78,8 +81,10 @@ export function summariseRms(key: string, label: string, dates: string[], rows: 
     productionMt,
     primeMt: lossOf('primeMt'),
     defectiveMt: lossOf('defectiveMt'),
-    rollingInDeliveryPct: weightedRmsPct(mine, 'rollingInDeliveryPct'),
-    rollingInCastingPct: weightedRmsPct(mine, 'rollingInCastingPct'),
+    rollingInDeliveryPct: rollingPct(mine, 'deliveryMt'),
+    rollingInCastingPct: rollingPct(mine, 'castMt'),
+    castMt: lossOf('castMt'),
+    deliveryMt: lossOf('deliveryMt'),
     billetsPcs: pcs.length ? pcs.reduce((a, b) => a + b, 0) : null,
     billetInputMt,
     massDiffMt: massDifference(billetInputMt, productionMt),
@@ -96,6 +101,15 @@ export function rmsProductionByDay(env: Env, dates: string[]): Map<string, numbe
   const rows = distinctEntries(readErpRmsProduction(env)?.rows ?? []);
   return new Map(dates.map((d) => {
     const v = rows.filter((r) => r.date === d && r.productionMt !== null).map((r) => r.productionMt!);
+    return [d, v.length ? round2(v.reduce((a, b) => a + b, 0)) : null];
+  }));
+}
+
+/** Prime production (PRIME_MT1 + PRIME_MT2) per date; null for a date with no prime entered — what specific energy divides by. */
+export function rmsPrimeByDay(env: Env, dates: string[]): Map<string, number | null> {
+  const rows = distinctEntries(readErpRmsProduction(env)?.rows ?? []);
+  return new Map(dates.map((d) => {
+    const v = rows.filter((r) => r.date === d && typeof r.primeMt === 'number').map((r) => r.primeMt!);
     return [d, v.length ? round2(v.reduce((a, b) => a + b, 0)) : null];
   }));
 }

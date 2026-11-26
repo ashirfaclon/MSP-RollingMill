@@ -319,7 +319,10 @@ async function pullRmd(env: Env, p: Paths, log: (line: string) => void) {
 const RMS_LOSS_CODES = ['BURNING_LOSS_MT1', 'BURNING_LOSS_MT2', 'ENDCUT_MT1', 'ENDCUT_MT2', 'MISROLL_MT1', 'MISROLL_MT2', 'COLD_MT', 'REJECT_MT1', 'REJECT_MT2', 'PRIME_MT1', 'PRIME_MT2',
   'DEFECTIVE_CUTMT1', 'DEFECTIVE_CUTMT2', 'ROLLING_DEFECT_MT1', 'ROLLING_DEFECT_MT2',
   // On-line rolling % (Management Dash All.xlsx, RMS, rows 43–44 — the user, 25 Nov 2026); the ERP spells casting PERCENATGE.
-  'ROLLING_PERCENTAGE_DELIVERY', 'ROLLING_PERCENATGE_CASTING'] as const;
+  'ROLLING_PERCENTAGE_DELIVERY', 'ROLLING_PERCENATGE_CASTING',
+  // What the plant's casting sheet works the rolling % from (the user, 26 Nov 2026): cast and delivery quantities; and
+  // INPUT_MT, where 4 of 423 entries put the billet input instead of INPUT_MT1 / INPUT_MT2 (never both).
+  'TOTAL_CAST_QTY', 'DELIVERY_QTY', 'INPUT_MT'] as const;
 type RmsLossCode = (typeof RMS_LOSS_CODES)[number];
 
 /** Σ of the codes filled (to the gram); null when none is. */
@@ -357,7 +360,9 @@ async function pullRmsLog(env: Env, p: Paths, log: (line: string) => void) {
       rows: rows.map((r) => {
         return {
           date: String(r.D), vrno: String(r.VRNO), productionMt: num(r.MT), productionPcs: num(r.PCS), inputPcs: num(r.IN_PCS),
-          inputMt: sumOfCodes(r, ['INPUT_MT1', 'INPUT_MT2']),
+          inputMt: sumOfCodes(r, ['INPUT_MT1', 'INPUT_MT2']) ?? sumOfCodes(r, ['INPUT_MT']),
+          castMt: num(r.TOTAL_CAST_QTY),
+          deliveryMt: num(r.DELIVERY_QTY),
           burningLossMt: sumOfCodes(r, ['BURNING_LOSS_MT1', 'BURNING_LOSS_MT2']),
           endCutMt: sumOfCodes(r, ['ENDCUT_MT1', 'ENDCUT_MT2']),
           missRollMt: sumOfCodes(r, ['MISROLL_MT1', 'MISROLL_MT2']),

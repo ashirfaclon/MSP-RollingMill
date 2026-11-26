@@ -1,7 +1,7 @@
 /** RMD production and losses from the ERP log sheet (FA-SKJ codes as the plant gave them). */
 import { describe, expect, test } from 'vitest';
 import { deliveryRate } from '../../src/modules/rmd/running-rate.service';
-import { breakdownOf, plantEfficiency, massDifference, massYield, ofMode, summarise, weightedPct } from '../../src/modules/rmd/production.service';
+import { breakdownOf, plantEfficiency, massDifference, massYield, ofMode, summarise, rollingPct } from '../../src/modules/rmd/production.service';
 import type { RmdLogRow } from '../../src/integrations/erp/cache';
 
 const entry = (date: string, vrno: string, input: number, prod: number, prime: number, bloss: number, endcut: number, misroll: number, chip: number): RmdLogRow => ({
@@ -71,8 +71,12 @@ describe('the Zoho TMT KPIs from the ERP (the plant, 21 Nov 2026)', () => {
     expect(summarise('d', '14 Jul', ['2026-07-14'], [ON])).toMatchObject({ rollingInCastingPct: 93.01, rollingInDeliveryPct: 94.9, targetMt: 309 });
   });
 
-  test('several entries: the percentages weighted by billet input', () => {
-    expect(weightedPct([ON, OFF], 'ROLLING_IN_TOTAL_PERCENTAGE')).toBe(93.43);
+  test('several entries: tonnes first — Σ input ÷ Σ (input ÷ %), as HSM / RMS and the plant\'s casting sheet (26 Nov 2026)', () => {
+    // (217.24 + 100.93) ÷ (217.24 ÷ 0.93008 + 100.93 ÷ 0.94332); delivery the same with 94.903 / 94.332.
+    expect(rollingPct([ON, OFF], 'ROLLING_IN_TOTAL_PERCENTAGE')).toBe(93.42);
+    expect(summarise('d', '14 Jul', ['2026-07-14'], [ON, OFF])).toMatchObject({ rollingInCastingPct: 93.42, rollingInDeliveryPct: 94.72 });
+    // A blank (0) % or no input: left out of both sides.
+    expect(rollingPct([ON, { ...OFF, v: { ...OFF.v, ROLLING_IN_TOTAL_PERCENTAGE: 0 } }], 'ROLLING_IN_TOTAL_PERCENTAGE')).toBe(93.01);
   });
 
   test('entries synced before the fields were read: null, not 0', () => {

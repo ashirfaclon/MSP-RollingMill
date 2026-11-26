@@ -37,13 +37,18 @@ export const sumOf = (rows: RmdLogRow[], f: RmdLogField) => {
   return v.length ? round2(v.reduce((a, b) => a + b, 0)) : null;
 };
 
-/** A percentage of each entry, over several: weighted by the entry's billet input (equal weights where none is entered). */
-export function weightedPct(rows: RmdLogRow[], f: RmdLogField): number | null {
-  const v = rows.filter((r) => typeof r.v[f] === 'number');
+/**
+ * On-line rolling % over several entries, tonnes first, as the plant's casting sheet and HSM / RMS (the user, 26 Nov 2026):
+ * Σ billet input ÷ Σ the tonnes each entry's % divides by × 100 — never an average of the %. This log sheet has no
+ * cast / delivery tonnes, so each entry's are read back from its own figures: input ÷ (% ÷ 100). One entry gives exactly
+ * the ERP's %. An entry with no input, or its % blank or 0, is left out of both sides. A typing slip in a % counts as
+ * filed (RMD 30 Nov 2025: 5,089 % / 1,448 %) — for the plant to correct.
+ */
+export function rollingPct(rows: RmdLogRow[], f: 'ROLLING_IN_TOTAL_PERCENTAGE' | 'ROLLING_IN_DELIVERY_PRCNT'): number | null {
+  const v = rows.filter((r) => (r.v.INPUT_MT ?? 0) > 0 && (r.v[f] ?? 0) > 0);
   if (!v.length) return null;
-  const w = (r: RmdLogRow) => (v.every((x) => (x.v.INPUT_MT ?? 0) > 0) ? r.v.INPUT_MT! : 1);
-  const total = v.reduce((a, r) => a + w(r), 0);
-  return round2(v.reduce((a, r) => a + r.v[f]! * w(r), 0) / total);
+  const input = v.reduce((a, r) => a + r.v.INPUT_MT!, 0);
+  return round2((input / v.reduce((a, r) => a + r.v.INPUT_MT! / (r.v[f]! / 100), 0)) * 100);
 }
 
 /** Coal of one entry, MT: TOTAL_COAL_CONSUMPTION, else COAL_CONSUMPTION_KGMT × Prime + SL ÷ 1000; null with none. */
@@ -131,8 +136,8 @@ export function summarise(key: string, label: string, dates: string[], rows: Rmd
     massYieldPct: massYield(productionMt, billetInputMt),
     primeYieldPct: massYield(sumOf(mine, 'FINISH_PRODUCT_PRIME_MT'), billetInputMt),
     ...coal(mine),
-    rollingInCastingPct: weightedPct(mine, 'ROLLING_IN_TOTAL_PERCENTAGE'),
-    rollingInDeliveryPct: weightedPct(mine, 'ROLLING_IN_DELIVERY_PRCNT'),
+    rollingInCastingPct: rollingPct(mine, 'ROLLING_IN_TOTAL_PERCENTAGE'),
+    rollingInDeliveryPct: rollingPct(mine, 'ROLLING_IN_DELIVERY_PRCNT'),
     ...plantEfficiency(mine, plan),
     targetMt: sumOf(mine, 'PRODUCTION_TARGET'),
     ...breakdownOf(mine),

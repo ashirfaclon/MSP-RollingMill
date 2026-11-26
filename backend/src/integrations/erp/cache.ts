@@ -236,8 +236,11 @@ export function readErpLsmStock(env: Env): LsmStockCache | null {
 /** RMS Production Log Sheet: one row per entry (division RS, series L5P). */
 export interface RmsLogRow {
   date: string; vrno: string; productionMt: number | null; productionPcs: number | null; inputPcs?: number | null;
-  /** INPUT_MT1 + INPUT_MT2 (billet input, MT); null when neither is filled. */
+  /** INPUT_MT1 + INPUT_MT2 (billet input, MT); INPUT_MT when neither is filled (4 of 423 entries); null when none is. */
   inputMt?: number | null;
+  /** TOTAL_CAST_QTY and DELIVERY_QTY (= cast − CCM bypass − end crack bypass), MT — what the rolling % divide by. */
+  castMt?: number | null;
+  deliveryMt?: number | null;
   /** Losses, MT (…_MT1 + …_MT2 where split); null when not filled. */
   burningLossMt?: number | null;
   endCutMt?: number | null;

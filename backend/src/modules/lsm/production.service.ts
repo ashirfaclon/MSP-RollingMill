@@ -48,6 +48,23 @@ function weightedPct(rows: LsmLogRow[], f: LsmLogField, weight: (r: LsmLogRow) =
   return total > 0 ? round2(v.reduce((a, x) => a + x.pct * x.w, 0) / total) : null;
 }
 
+/**
+ * On-line rolling % over several entries, tonnes first, as the plant's casting sheet and HSM / RMS (the user, 26 Nov 2026):
+ * Σ billet input ÷ Σ the tonnes each entry's % divides by × 100 — never an average of the %. This log sheet has no
+ * cast / delivery tonnes, so each entry's are read back from its own figures: input ÷ (% ÷ 100). One entry gives exactly
+ * the ERP's %. An entry with no input, or its % blank or 0, is left out of both sides. A typing slip in a % counts as
+ * filed (RMD 30 Nov 2025: 5,089 % / 1,448 %) — for the plant to correct.
+ */
+function rollingPct(rows: LsmLogRow[], f: 'ROLLING_PERCENTAGE_CASTING' | 'ROLLING_PERCENTAGE_DELIVERY'): number | null {
+  const v = rows.flatMap((r) => {
+    const input = valueOf(r, 'INPUT_MT');
+    const pct = valueOf(r, f);
+    return input !== null && input > 0 && pct !== null && pct > 0 ? [{ input, of: input / (pct / 100) }] : [];
+  });
+  if (!v.length) return null;
+  return round2((v.reduce((a, x) => a + x.input, 0) / v.reduce((a, x) => a + x.of, 0)) * 100);
+}
+
 const runHrs = (r: LsmLogRow) => valueOf(r, 'NET_RUNNING_HRS');
 const runAndDelayHrs = (r: LsmLogRow) => {
   const run = valueOf(r, 'NET_RUNNING_HRS');
@@ -95,8 +112,8 @@ export function summariseLsm(key: string, label: string, dates: string[], rows: 
     availabilityPct: weightedPct(mine, 'PLANT_AVAILABILITY', runAndDelayHrs),
     performancePct: weightedPct(mine, 'PLANT_PERFORMANCE', runHrs),
     efficiencyPct: weightedPct(mine, 'PLANT_EFFICIENCY', runAndDelayHrs),
-    rollingInCastingPct: weightedPct(mine, 'ROLLING_PERCENTAGE_CASTING', inputMt),
-    rollingInDeliveryPct: weightedPct(mine, 'ROLLING_PERCENTAGE_DELIVERY', inputMt),
+    rollingInCastingPct: rollingPct(mine, 'ROLLING_PERCENTAGE_CASTING'),
+    rollingInDeliveryPct: rollingPct(mine, 'ROLLING_PERCENTAGE_DELIVERY'),
     sections: sectionsOf(dates, receipts),
   };
 }

@@ -291,8 +291,8 @@ function PerformanceContent({ data }: { data: RmdProductionReport }) {
       <SourceBox
         sources={sources(['ROLLING_IN_TOTAL_PERCENTAGE', 'ROLLING_IN_DELIVERY_PRCNT', 'INPUT_MT'])}
         formula={[
-          'Rolling in casting = ROLLING_IN_TOTAL_PERCENTAGE of each entry; over several entries, their average weighted by INPUT_MT',
-          'Rolling in delivery = ROLLING_IN_DELIVERY_PRCNT of each entry; over several entries, their average weighted by INPUT_MT',
+          'Rolling in casting = Σ INPUT_MT ÷ Σ (INPUT_MT ÷ ROLLING_IN_TOTAL_PERCENTAGE) × 100',
+          'Rolling in delivery = Σ INPUT_MT ÷ Σ (INPUT_MT ÷ ROLLING_IN_DELIVERY_PRCNT) × 100',
         ]}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}

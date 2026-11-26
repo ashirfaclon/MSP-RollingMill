@@ -44,13 +44,25 @@ test('actual and prime production apart (the user, 25 Nov 2026): PRODUCTION_MT i
   expect(summariseRms('d', '24 Nov', ['2026-11-24'], [{ ...row, primeMt: null }]).primeMt).toBeNull();
 });
 
-test('on-line rolling %: the ERP\'s per entry, weighted by billet input (the user, 25 Nov 2026)', () => {
-  // 22–23 Nov 2026 as the ERP holds them: delivery 97.015 % on 360.10 MT input, 98.621 % on 465.60 MT.
-  const e = (date: string, input: number, del: number, cast: number) => ({ date, vrno: `L5P-${date}`, productionMt: 300, productionPcs: 300, inputMt: input, rollingInDeliveryPct: del, rollingInCastingPct: cast });
-  const rows = [e('2026-11-22', 360.1, 97.015, 95.116), e('2026-11-23', 465.6, 98.621, 93.301)];
-  expect(summariseRms('d', '22 Nov', ['2026-11-22'], rows)).toMatchObject({ rollingInDeliveryPct: 97.02, rollingInCastingPct: 95.12 });
-  // (97.015 × 360.10 + 98.621 × 465.60) ÷ 825.70
-  expect(summariseRms('w', '22–23 Nov', ['2026-11-22', '2026-11-23'], rows).rollingInDeliveryPct).toBe(97.92);
+test('on-line rolling %: Σ billet input ÷ Σ delivery / Σ cast, as the plant\'s casting sheet (the user, 26 Nov 2026)', () => {
+  // "Casting Sheet November 26.xls" against the ERP: 11 Nov has two entries, 15 Nov's input is in INPUT_MT (synced as inputMt).
+  const e = (date: string, vrno: string, input: number | null, del: number, cast: number, pctTypo: number | null = null) => ({
+    date, vrno, productionMt: 300, productionPcs: 300, inputMt: input, deliveryMt: del, castMt: cast,
+    rollingInDeliveryPct: null, rollingInCastingPct: pctTypo,
+  });
+  const rows = [
+    e('2026-11-11', 'L5P26N11-0001', 93.9, 96.07, 97.84),
+    e('2026-11-11', 'L5P26N11-0002', 439.06, 470.52, 480.38),
+    e('2026-11-15', 'L5P26N15-0001', 309.36, 316.84, 332.3, 0.931),
+  ];
+  // A day with two entries: the sheet's own figure (row 13, AD / AE), not the average of the two.
+  expect(summariseRms('d', '11 Nov', ['2026-11-11'], rows)).toMatchObject({ rollingInDeliveryPct: 94.06, rollingInCastingPct: 92.17, castMt: 578.22, deliveryMt: 566.59 });
+  // 15 Nov: worked from the tonnes — the ERP's typed casting % (0.931) does not show.
+  expect(summariseRms('d', '15 Nov', ['2026-11-15'], rows)).toMatchObject({ rollingInDeliveryPct: 97.64, rollingInCastingPct: 93.1 });
+  // A period: tonnes added up first — (93.9 + 439.06 + 309.36) ÷ (96.07 + 470.52 + 316.84).
+  expect(summariseRms('p', '11–15 Nov', ['2026-11-11', '2026-11-15'], rows)).toMatchObject({ rollingInDeliveryPct: 95.35, rollingInCastingPct: 92.51 });
+  // An entry without input counts neither its input nor its delivery; no entry, no figure.
+  expect(summariseRms('d', '11 Nov', ['2026-11-11'], [...rows, e('2026-11-11', 'L5P26N11-0003', null, 50, 50)]).rollingInDeliveryPct).toBe(94.06);
   expect(summariseRms('d', '24 Nov', ['2026-11-24'], rows).rollingInDeliveryPct).toBeNull();
 });
 

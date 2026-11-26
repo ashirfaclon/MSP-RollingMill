@@ -655,3 +655,37 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   100 % — raw ERP rows, plan form, API and screen agree. Flag for the plant: Oct Offline efficiency 247 % — only a few
   Oct days have an Offline plan and it is small (964 MT). Also fixed the stale card check in rmd-performance e2e (the
   pair card has no "%"). Unit 17 / 17 (rmd-production), rmd-performance e2e 7 / 7. Not committed.
+- **26 Nov 2026** — **All our services stopped on the user's request, until they ask to start again**: pm2 93 (deployed backend, PORT 9020) and 94 (alert sender) `pm2 stop`ped — restart with `pm2 start 93 94`; dev backend (8521) and dev dashboard (8520) stopped. No public URL for this app found in nginx. Port 9692 (MSP Steel Logbook, another project) was stopped by mistake for ~3 min and restarted with the same command.
+- **26 Nov 2026** — **Services started again** (the user): pm2 94 alerts, dev 8520 / 8521 at once; pm2 93 (deployed backend) could not — while ours was stopped, AI Studio Manager deployed "Sumitomo Analytics App" (b9c2fcd4) at 10:56 on the same port 9020 (its database.json lists both on 9020). After the user undeployed Sumitomo, 9020 was free and pm2 93 started; the user confirmed data on 8520 and the deployed URL. Watch: a Sumitomo redeploy may take 9020 again — one of the two needs another port in AI Studio Manager.
+- **26 Nov 2026** — **RMS power from the updated form; specific energy on prime; Power factor card** (the user). The
+  RMS Daily Power Consumption Record now has, once a day: VCB-1 and VCB-2 actual kWh / kVAh, `total-actual-kwh`
+  (the form's sum), `total-hsm-share-kwh`, `total-crusher-kwh`, `total-colony-kwh`, and `total-rms-actual-power-kwh`
+  (= total − the three, the form's own figure). Built: Power consumption = RMS's own power, note "x % of total drawn";
+  Specific energy = RMS power ÷ PRIME production (PRIME_MT1 + 2), summed over the days with both (was actual
+  production over all days), note "per MT of prime" — RMS only, the other mills still divide by actual; new Power factor
+  card (kWh ÷ kVAh, both meters; each meter under it) → RMS strip is ten cards, two rows of five (`rm-strip--ten`).
+  One drill-down, three views switched at the top (`RmsPowerDrawer`): Power sharing (stacked RMS / HSM share /
+  Crusher / Colony), VCB-1 vs VCB-2, Power factor. Old-form entries (to 22 Nov: VCB-1 only, no sharing) count as the
+  meter reading they are — own colour "VCB-1 reading · not shared out", never called RMS power; their power factor
+  is kWh ÷ kVAh (matches the form's own box). The "test entry" rule now reads every remarks box, so the user's 26 Nov
+  test entry (17 kWh) is left out as before; a blank old-style 26 Nov entry (0 kWh) is still in the logbook. Backend
+  `power.service.ts` (`rmsRead`, `rmsSplitOf`, `paired`), contract `RmsPowerSplit`. Real data 1–22 Nov: 200,212 kWh,
+  PF 0.92, specific energy 39.87 kWh/MT prime. Sanity flags: power is filed on only 13 of 22 days; 21 Nov PF 0.745.
+  The new form's screens were checked with a stubbed API reply in the e2e only (no real new-form entry exists yet).
+  Tests: power unit 12 / 12, rms-power e2e 2 / 2, rms-prime e2e passes. CA page's RMS specific energy follows (same
+  report). Not committed.
+- **26 Nov 2026** — **LSM Finished stock by size: MC 150 and MC 300 removed** (the user) — `LSM_NOT_SHOWN` in
+  `lsm/stock.service.ts`; out of the list and the total (7,073.41 → 7,015.13 MT at 26 Nov). RMS keeps its own. Unit
+  test added. Wiring e2e has ~15 old failures in LSM / RMS tests (plan, asset health, order allocation, counts) —
+  not from this change; KNOWN_FAILURES.md line numbers are stale.
+- **26 Nov 2026** — **RMS rolling % now matches the plant's casting sheet** (the user gave "Casting Sheet November 26.xls", Production_Report: AD = U ÷ P, AE = U ÷ K, Total row = ΣU ÷ ΣP, ΣU ÷ ΣK). Was: the ERP's per-entry % averaged weighted by input → 1–25 Nov showed 94.65 / 89.01 against the sheet's 95.68 / 93.07. Now `rollingPct`: Σ billet input ÷ Σ DELIVERY_QTY / Σ TOTAL_CAST_QTY × 100 over the entries with both (newly synced); a day with two entries is the same sum (11 Nov 94.06 / 92.17 as the sheet). Billet input = INPUT_MT1 + INPUT_MT2, else INPUT_MT (4 of 423 entries put it there: 20 Feb, 4–5 Jul, 15 Nov — they read 0 input before, so mass yield / billet input for those days change too). ERP typing slip flagged: 15 Nov ROLLING_PERCENATGE_CASTING 0.931 (should be 93.10) — no longer used. Result: all 25 days and the total match the sheet; 15 and 24 Nov differ by 0.01 only because the ERP stores tonnes to 2 dp, the sheet to 3. Drill-down shows Cast / Delivery / Billet input per period. RMD and LSM rolling % still average the ERP's % (not asked). Unit + e2e (rms-rolling-sheet, rms-prime, rms-power) pass. Not committed.
+- **26 Nov 2026** — **RMD and LSM rolling % over several entries: tonnes first too** (the user: "make its logic the same"
+  as RMS / HSM). Their log sheets have no cast / delivery tonnes (LSM has TOTAL_CAST_QTY, but its stored casting % equals
+  input ÷ cast on only 36 of 57 entries), so each entry's tonnes are read back from its own figures:
+  Σ INPUT_MT ÷ Σ (INPUT_MT ÷ %) × 100. One entry = the ERP's % exactly; a blank / 0 % or no input is left out of both
+  sides (LSM: 6 delivery % left at 0). Typing slip counted as filed, for the plant: RMD 30 Nov 2025 delivery 5,089 % /
+  casting 1,448 %. 1–25 Nov: RMD 95.50 → 95.37 / 92.37 → 92.02; LSM 96.28 → 96.11 / 94.49 → 94.20. `rollingPct` in
+  rmd / lsm production.service; drill-down formulas updated. LSM availability / performance / efficiency are still
+  weighted averages (availability = run ÷ (run + delay) and efficiency = A × P hold on 57 / 57 entries; performance
+  matches no formula — ask the plant). Unit 315 / 315. The plant's "Casting Sheet November 26.xls" is kept out of git
+  (plant data) — local only.

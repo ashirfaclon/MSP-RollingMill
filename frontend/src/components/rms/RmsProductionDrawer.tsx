@@ -66,29 +66,30 @@ function RollingContent({ data }: { data: RmsProductionReport }) {
       <Stats items={[
         { label: 'Rolling in casting', value: pct2(t.rollingInCastingPct), unit: '' },
         { label: 'Rolling in delivery', value: pct2(t.rollingInDeliveryPct), unit: '' },
+        { label: 'Cast', value: f(t.castMt), unit: 'MT' },
+        { label: 'Delivery', value: f(t.deliveryMt), unit: 'MT' },
         { label: 'Billet input', value: f(t.billetInputMt), unit: 'MT' },
-        { label: 'Days entered', value: String(t.entryDays), unit: `of ${t.days}` },
       ]} />
       <DrillChart series={series} categories={categories} axes={axes}
         ariaLabel={`Rolling in casting and delivery by period: ${rows.map((x) => `${x.label} ${pct2(x.rollingInCastingPct)} / ${pct2(x.rollingInDeliveryPct)}`).join('; ')}`} />
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Rolling in casting and delivery by period">
-          <thead><tr><th>Period</th><th className="r">Rolling in casting</th><th className="r">Rolling in delivery</th><th className="r">Billet input (MT)</th></tr></thead>
+          <thead><tr><th>Period</th><th className="r">Cast (MT)</th><th className="r">Delivery (MT)</th><th className="r">Billet input (MT)</th><th className="r">Rolling in casting</th><th className="r">Rolling in delivery</th></tr></thead>
           <tbody>{rows.map((x) => (
-            <tr key={x.key}>{label(x)}<td className="num r v-val">{pct2(x.rollingInCastingPct)}</td><td className="num r v-val">{pct2(x.rollingInDeliveryPct)}</td><td className="num r">{f(x.billetInputMt)}</td></tr>
+            <tr key={x.key}>{label(x)}<td className="num r">{f(x.castMt)}</td><td className="num r">{f(x.deliveryMt)}</td><td className="num r">{f(x.billetInputMt)}</td><td className="num r v-val">{pct2(x.rollingInCastingPct)}</td><td className="num r v-val">{pct2(x.rollingInDeliveryPct)}</td></tr>
           ))}</tbody>
-          <tfoot><tr>{label(t)}<td className="num r">{pct2(t.rollingInCastingPct)}</td><td className="num r">{pct2(t.rollingInDeliveryPct)}</td><td className="num r">{f(t.billetInputMt)}</td></tr></tfoot>
+          <tfoot><tr>{label(t)}<td className="num r">{f(t.castMt)}</td><td className="num r">{f(t.deliveryMt)}</td><td className="num r">{f(t.billetInputMt)}</td><td className="num r">{pct2(t.rollingInCastingPct)}</td><td className="num r">{pct2(t.rollingInDeliveryPct)}</td></tr></tfoot>
         </table>
       </div>
       <SourceBox
         sources={[{ name: 'ERP', rows: [
           ['Table', 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],
           ['Filter', "TNATURE = 'PRLOG', DIV_CODE = 'RS', SERIES = 'L5P' — every entry TRAN_COLUMN_NAME1 = P11P (Online)"],
-          ['Field', "ATTR_CODE = 'ROLLING_PERCENATGE_CASTING' (the ERP's spelling), 'ROLLING_PERCENTAGE_DELIVERY', 'INPUT_MT1', 'INPUT_MT2'"],
+          ['Field', "ATTR_CODE = 'TOTAL_CAST_QTY', 'DELIVERY_QTY', 'INPUT_MT1' + 'INPUT_MT2' (else 'INPUT_MT')"],
         ] }]}
         formula={[
-          'Each entry: the ERP\'s figure — billet input ÷ TOTAL_CAST_QTY (casting), ÷ DELIVERY_QTY (delivery), × 100',
-          'Several entries: their average weighted by billet input (INPUT_MT1 + INPUT_MT2)',
+          'Rolling in casting = Σ Billet input ÷ Σ Cast × 100',
+          'Rolling in delivery = Σ Billet input ÷ Σ Delivery × 100',
         ]}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
