@@ -45,16 +45,18 @@
 .rm-strip.rm-strip--nine { grid-template-columns: repeat(20, minmax(0, 1fr)); }
 .rm-strip--nine > :nth-child(-n + 5) { grid-column: span 4; }
 .rm-strip--nine > :nth-child(n + 6) { grid-column: span 5; }
+/* Ten cards (RMS): two rows of five. */
+.rm-strip.rm-strip--ten { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 /* Six per row: LSM's twelve — the headline figures, then the plant's mill performance KPIs (the user, 23 Nov 2026). */
 .rm-strip.rm-strip--six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 /* Narrow cards: a card's date on its own line under the label, as RMD's. */
-.rm-strip--four .rm-card-term, .rm-strip--nine .rm-card-term, .rm-strip--five .rm-card-term, .rm-strip--six .rm-card-term, .rm-strip--seven .rm-card-term { display: block; margin-top: 2px; }
-.rm-strip--four .rm-card-term::before, .rm-strip--nine .rm-card-term::before, .rm-strip--five .rm-card-term::before, .rm-strip--six .rm-card-term::before, .rm-strip--seven .rm-card-term::before { content: none; }
+.rm-strip--four .rm-card-term, .rm-strip--nine .rm-card-term, .rm-strip--ten .rm-card-term, .rm-strip--five .rm-card-term, .rm-strip--six .rm-card-term, .rm-strip--seven .rm-card-term { display: block; margin-top: 2px; }
+.rm-strip--four .rm-card-term::before, .rm-strip--nine .rm-card-term::before, .rm-strip--ten .rm-card-term::before, .rm-strip--five .rm-card-term::before, .rm-strip--six .rm-card-term::before, .rm-strip--seven .rm-card-term::before { content: none; }
 /* Seven narrow cards (HSM Online): the figure scales with the screen so value + unit stay inside the card. */
 .rm-strip--seven .rm-card-value { font-size: clamp(16px, 1.4vw, 30px); }
 /* Six (RMS, LSM, HSM Offline, RMD): a five-digit year figure ("11,642.18 MT") is wider than a card at 1366 at 30 px —
    22 px there, the full 30 px from about 1880 px wide (25 Nov 2026). */
-.rm-strip--six .rm-card-value, .rmd-strip .rm-card-value, .rm-strip--nine .rm-card-value { font-size: clamp(16px, 1.6vw, 30px); }
+.rm-strip--six .rm-card-value, .rmd-strip .rm-card-value, .rm-strip--nine .rm-card-value, .rm-strip--ten .rm-card-value { font-size: clamp(16px, 1.6vw, 30px); }
 
 /*
  * Each card spans four rows of the strip and adopts them as a subgrid, so label, value,

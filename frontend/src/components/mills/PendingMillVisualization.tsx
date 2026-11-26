@@ -13,7 +13,8 @@
  * Never a sample number. The KPI list follows the plant's Visualisation sheet for the mill
  * (LSM.xlsx / R.M.S.xlsx); each card and panel is wired once its source is confirmed.
  * Finished stock: a card at the end of the strip, dated; no Order allocation panel (the user, 31 Oct 2026).
- * Power, specific energy: the RMS Daily Power Consumption Record (actual kWh, VCB-1) ÷ PRODUCTION_MT.
+ * Power, specific energy, power factor: the RMS Daily Power Consumption Record as updated 26 Nov 2026 — RMS's own power
+ * (total drawn − HSM share − crusher − colony) ÷ prime production; power factor = kWh ÷ kVAh.
  * No mill mimic on RMS (the user, 16 Oct 2026), as on LSM.
  */
 import { Fragment, useState, type KeyboardEvent } from 'react';
@@ -26,7 +27,7 @@ import BalanceStats from '@/components/production/BalanceStats';
 import KpiCard, { type Series } from '@/components/visualization/KpiCard';
 import RmdShiftProduction from '@/components/rmd/RmdShiftProduction';
 import { FormRunningRateFoot } from '@/components/production/FormRunningRate';
-import PowerKpiCard from '@/components/production/PowerKpiCard';
+import { RmsPowerCard, RmsPowerFactorCard } from '@/components/rms/RmsPowerCards';
 import SpecificEnergyCard from '@/components/production/SpecificEnergyCard';
 import '@/components/visualization/visualization.css';
 import '@/components/rmd/rmd.css';
@@ -74,8 +75,8 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
   const [rollOpen, setRollOpen] = useState(false);
   return (
     <div className="rm-viz">
-      {/* RMS: nine cards — output, yields and stock five across, then the rolling % and energy four across (rm-strip--nine). */}
-      <section className={`rm-strip ${mill === 'rms' ? 'rm-strip--nine' : 'rm-strip--five'}`} aria-label="Headline KPIs">
+      {/* RMS: ten cards, two rows of five — output, yields and stock; then the rolling %, power, specific energy and power factor (rm-strip--ten). */}
+      <section className={`rm-strip ${mill === 'rms' ? 'rm-strip--ten' : 'rm-strip--five'}`} aria-label="Headline KPIs">
         {CARDS.map((c) => c.label === 'Mass yield' && mill === 'rms'
           ? (
             <Fragment key={c.label}>
@@ -161,11 +162,11 @@ export default function PendingMillVisualization({ mill }: { mill: 'lsm' | 'rms'
             />
             </Fragment>
           )
-          // The RMS Daily Power Consumption Record; specific energy = that power ÷ PRODUCTION_MT.
+          // The RMS Daily Power Consumption Record: RMS's own power; specific energy = that ÷ prime production; power factor.
           : c.label === 'Power consumption' && mill === 'rms'
-          ? <PowerKpiCard key={c.label} mill="rms" />
+          ? <RmsPowerCard key={c.label} />
           : c.label === 'Specific energy' && mill === 'rms'
-          ? <SpecificEnergyCard key={c.label} mill="rms" />
+          ? <Fragment key={c.label}><SpecificEnergyCard mill="rms" /><RmsPowerFactorCard /></Fragment>
           : <KpiCard key={c.label} label={c.label} value="NA" unit={c.unit} note="" series={c.series} />)}
         {mill !== 'rms' && <KpiCard label="Finished stock" value="NA" unit="MT" note="" series="free" />}
       </section>

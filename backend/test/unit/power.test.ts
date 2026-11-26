@@ -156,3 +156,54 @@ describe('RMS power from its Daily Power Consumption Record', () => {
     expect((await powerReport(env(), '2026-10-07', '2026-10-07', Date.parse('2026-10-09T08:00:00Z'))).equipment).not.toContain('VCB-1 (1250 A)');
   });
 });
+
+describe('RMS power, the form as updated 26 Nov 2026: two meters, the shares given away, RMS\'s own power', () => {
+  const FORM = 'rms-electrical-logbook/daily-power-consumption-record';
+  const now = Date.parse('2026-11-23T08:00:00Z');
+  const neu = (id: string, date: string, v: Record<string, unknown>) => ({
+    _id: id, tags: [FORM], resultName: FORM, createdAt: `${date}T12:00:00Z`, invocationTime: `${date}T12:00:00Z`,
+    result: { date, time: '', 'vcb-1-remarks': 'Ok', 'vcb-2-remarks': '', 'total-remarks': '', ...v },
+  });
+  const day1 = neu('n1', '2026-11-20', {
+    'vcb-1-actual-kwh': 12000, 'vcb-1-actual-kvah': 13000, 'vcb-2-actual-kwh': 8000, 'vcb-2-actual-kvah': 8500,
+    'total-actual-kwh': 20000, 'total-hsm-share-kwh': 3000, 'total-crusher-kwh': 500, 'total-colony-kwh': 200, 'total-rms-actual-power-kwh': 16300,
+  });
+  // The user's test entry, exactly as filed: "Test entry" sits in the new remarks boxes.
+  const testEntry = neu('n2', '2026-11-20', {
+    'vcb-1-actual-kwh': 10, 'vcb-1-actual-kvah': 10, 'vcb-1-remarks': 'Test entry', 'vcb-2-actual-kwh': 10, 'vcb-2-actual-kvah': 10, 'vcb-2-remarks': 'Test entry',
+    'total-actual-kwh': 20, 'total-hsm-share-kwh': 1, 'total-crusher-kwh': 1, 'total-colony-kwh': 1, 'total-rms-actual-power-kwh': 17, 'total-remarks': 'test entry',
+  });
+  // An entry of the old form: VCB-1 only, kWh and kVAh, no sharing.
+  const old = {
+    _id: 'o1', tags: [FORM], resultName: FORM, createdAt: '2026-11-19T12:00:00Z', invocationTime: '2026-11-19T12:00:00Z',
+    result: { date: '2026-11-19', shift: 'NIGHT', 'actual-kwh-vcb-1-1250amp': 12162, 'actual-kvah-vcb-1-1250amp': 13350, 'power-factor-vcb-1-1250amp': 0.91, remarks: 'Ok' },
+  };
+
+  test('the card\'s figure is RMS\'s own power; the split and power factors come with it; a test entry is left out', async () => {
+    ROWS = [day1, testEntry] as unknown as typeof ROWS;
+    const r = await rmsPowerReport(env(), '2026-11-20', '2026-11-20', now);
+    expect(r.totals).toMatchObject({ kwh: 16300, entries: 1 });
+    expect(r.totals.rms).toEqual({
+      vcb1Kwh: 12000, vcb2Kwh: 8000, vcb1Kvah: 13000, vcb2Kvah: 8500, totalKwh: 20000,
+      hsmShareKwh: 3000, crusherKwh: 500, colonyKwh: 200, rmsKwh: 16300, meterOnlyKwh: null,
+      pf1: 0.923, pf2: 0.941, pf: 0.93,
+    });
+    expect(r.days[0].rms).toEqual(r.totals.rms);
+    expect(r.basis).toBe('prime');
+  });
+
+  test('a blank form total is worked out: VCB-1 + VCB-2, less the shares', async () => {
+    ROWS = [neu('n3', '2026-11-21', { 'vcb-1-actual-kwh': 100, 'vcb-2-actual-kwh': 50, 'total-hsm-share-kwh': 20, 'total-crusher-kwh': null, 'total-colony-kwh': 5 })] as unknown as typeof ROWS;
+    const r = await rmsPowerReport(env(), '2026-11-21', '2026-11-21', now);
+    expect(r.totals.rms).toMatchObject({ totalKwh: 150, rmsKwh: 125, crusherKwh: null, pf: null });
+    expect(r.totals.kwh).toBe(125);
+  });
+
+  test('an old-form entry is the VCB-1 reading it is — counted, never called RMS power, its power factor from kWh ÷ kVAh', async () => {
+    ROWS = [old, day1] as unknown as typeof ROWS;
+    const r = await rmsPowerReport(env(), '2026-11-19', '2026-11-20', now);
+    expect(r.days[0].rms).toMatchObject({ vcb1Kwh: 12162, vcb2Kwh: null, totalKwh: 12162, rmsKwh: null, meterOnlyKwh: 12162, hsmShareKwh: null, pf1: 0.911, pf: 0.911 });
+    expect(r.totals).toMatchObject({ kwh: 28462 });
+    expect(r.totals.rms).toMatchObject({ totalKwh: 32162, rmsKwh: 16300, meterOnlyKwh: 12162, vcb1Kwh: 24162, pf1: 0.917 });
+  });
+});

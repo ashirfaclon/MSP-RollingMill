@@ -76,6 +76,9 @@ export function sectionLabelOf(name: string, plantList = true): { label: string;
   return s ? { label: (plantList ? LABEL.get(s.label) : undefined) ?? labelOf(s), sort: sortOf(s, plantList) } : null;
 }
 
+/** LSM sections left out of Finished stock by size and its total (the user, 26 Nov 2026). */
+const LSM_NOT_SHOWN = new Set(['MC 150', 'MC 300']);
+
 export function stockBySection(cache: Pick<LsmStockCache, 'moves' | 'items'>, asOf: string, plantList = true): LsmStockReport['sizes'] {
   const byItem = new Map<string, number>();
   for (const m of cache.moves) {
@@ -89,6 +92,7 @@ export function stockBySection(cache: Pick<LsmStockCache, 'moves' | 'items'>, as
     // Not rolled steel (paver blocks …): not finished stock.
     if (!s && !STEEL.test(name)) continue;
     const key = s ? (plantList ? LABEL.get(s.label) : undefined) ?? labelOf(s) : 'Other';
+    if (plantList && LSM_NOT_SHOWN.has(key)) continue;
     const g = groups.get(key) ?? { sort: sortOf(s, plantList), items: [] };
     g.items.push({ code, name, kg: kgs });
     groups.set(key, g);

@@ -12,10 +12,14 @@
  *        (electrical-logbook/daily-power-consumption-record): `actual-kwh-vcb-1-1250amp`
  *        (kWh) = present − previous reading, as the plant gave it (13 Oct 2026).
  *   RMS  "Rolling Mill Structure (RMS) → RMS Electrical Logbook → Daily Power Consumption
- *        Record" (rms-electrical-logbook/daily-power-consumption-record): the same fields as
- *        LSM's, `actual-kwh-vcb-1-1250amp` (kWh) (the user, 17 Oct 2026).
+ *        Record" (rms-electrical-logbook/daily-power-consumption-record). The form as updated
+ *        (the user, 26 Nov 2026), one entry a day: VCB-1 and VCB-2 actual kWh / kVAh, their total,
+ *        the HSM share, crusher and colony, and `total-rms-actual-power-kwh` = total − the three —
+ *        RMS's own power, the figure shown. An entry of the old form (to 22 Nov 2026) has
+ *        `actual-kwh-vcb-1-1250amp` only: shown as it is, marked as a meter reading with no sharing.
+ *        Specific energy is over PRIME production (PRIME_MT1 + PRIME_MT2), the days with both.
  *
- * An entry whose remark says "test entry" is left out.
+ * An entry whose remark (any of the form's remarks boxes) says "test entry" is left out.
  *
  * Specific energy = that power ÷ the mill's ERP production for the same period, kWh/MT (the
  * user, 30 Oct 2026: ERP, never the Influx counter) — HSM's ERP log sheet (PRODUCTION_MT, L6P);
@@ -29,21 +33,48 @@
  * submitted from a month before the period.
  */
 import type { Env } from '../../config/env';
-import type { PowerDay, PowerEntry, PowerReport, RmdMode } from '../../contracts';
+import type { PowerDay, PowerEntry, PowerReport, RmdMode, RmsPowerSplit } from '../../contracts';
 import { fetchFormsEntries, num, type InsightEntry } from '../../integrations/logbook/client';
 import { MSG } from '../../shared/messages';
 import { dateRange, plantDayStart, productionComparison, round2 } from '../hsm/production.service';
 import { rmdLogRows, rmdProductionByDay, sumOf } from '../rmd/production.service';
 import { readErpRmdProduction } from '../../integrations/erp/cache';
 import { lsmProductionByDay } from '../lsm/production.service';
-import { rmsProductionByDay } from '../rms/production.service';
+import { rmsPrimeByDay } from '../rms/production.service';
 
 export type PowerMill = 'hsm' | 'rmd' | 'lsm' | 'rms';
 
 /** How one logbook form becomes power entries: its mill, and the meter and kWh of a result. */
 interface PowerForm {
   mill: PowerMill;
-  read: (res: Record<string, unknown>) => Pick<PowerEntry, 'equipment' | 'previousReading' | 'presentReading' | 'kwh'>;
+  read: (res: Record<string, unknown>) => Pick<PowerEntry, 'equipment' | 'previousReading' | 'presentReading' | 'kwh'> & { split?: SplitSums };
+}
+
+/** One RMS entry's figures, before the power factors are worked out. */
+type SplitSums = Omit<RmsPowerSplit, 'pf1' | 'pf2' | 'pf'>;
+const SPLIT_KEYS = ['vcb1Kwh', 'vcb2Kwh', 'vcb1Kvah', 'vcb2Kvah', 'totalKwh', 'hsmShareKwh', 'crusherKwh', 'colonyKwh', 'rmsKwh', 'meterOnlyKwh'] as const;
+const addOrNull = (...xs: (number | null)[]) => {
+  const v = xs.filter((x): x is number => x !== null);
+  return v.length ? round2(v.reduce((a, b) => a + b, 0)) : null;
+};
+/** kWh ÷ kVAh, 3 dp; null without both. */
+const pfOf = (kwh: number | null, kvah: number | null) => (kwh === null || !kvah ? null : Math.round((kwh / kvah) * 1000) / 1000);
+
+/**
+ * The RMS split of several entries (or days): every figure summed; a power factor = Σ kWh ÷ Σ kVAh over the entries
+ * that have both for that meter, so an entry with kWh but no kVAh doesn't lift it.
+ */
+export function rmsSplitOf(parts: SplitSums[]): RmsPowerSplit {
+  const sum = (k: (typeof SPLIT_KEYS)[number]) => addOrNull(...parts.map((p) => p[k]));
+  const pair = (kwh: 'vcb1Kwh' | 'vcb2Kwh', kvah: 'vcb1Kvah' | 'vcb2Kvah') => parts.filter((p) => p[kwh] !== null && p[kvah]).map((p) => [p[kwh]!, p[kvah]!]);
+  const one = pair('vcb1Kwh', 'vcb1Kvah');
+  const two = pair('vcb2Kwh', 'vcb2Kvah');
+  const tot = (ps: number[][], i: number) => (ps.length ? ps.reduce((a, p) => a + p[i], 0) : null);
+  return {
+    ...(Object.fromEntries(SPLIT_KEYS.map((k) => [k, sum(k)])) as SplitSums),
+    pf1: pfOf(tot(one, 0), tot(one, 1)), pf2: pfOf(tot(two, 0), tot(two, 1)),
+    pf: pfOf(tot([...one, ...two], 0), tot([...one, ...two], 1)),
+  };
 }
 
 export const POWER_FORM = 'electrical-hsm/power-consumption';
@@ -63,6 +94,37 @@ const vcb1250: PowerForm['read'] = (res) => ({
   presentReading: num(res['present-kwh-vcb-1-1250amp']),
   kwh: num(res['actual-kwh-vcb-1-1250amp']),
 });
+/**
+ * RMS's Daily Power Consumption Record. The updated form (26 Nov 2026): two meters, the shares given away and RMS's
+ * own power — the form's own totals are used as filed, worked out here only if left blank. The old form: VCB-1 only.
+ */
+const rmsRead: PowerForm['read'] = (res) => {
+  if (!('vcb-1-actual-kwh' in res) && !('total-rms-actual-power-kwh' in res) && !('total-actual-kwh' in res)) {
+    const old = vcb1250(res);
+    return {
+      ...old,
+      split: {
+        vcb1Kwh: old.kwh, vcb2Kwh: null, vcb1Kvah: num(res['actual-kvah-vcb-1-1250amp']), vcb2Kvah: null, totalKwh: old.kwh,
+        hsmShareKwh: null, crusherKwh: null, colonyKwh: null, rmsKwh: null, meterOnlyKwh: old.kwh,
+      },
+    };
+  }
+  const vcb1Kwh = num(res['vcb-1-actual-kwh']);
+  const vcb2Kwh = num(res['vcb-2-actual-kwh']);
+  const totalKwh = num(res['total-actual-kwh']) ?? addOrNull(vcb1Kwh, vcb2Kwh);
+  const hsmShareKwh = num(res['total-hsm-share-kwh']);
+  const crusherKwh = num(res['total-crusher-kwh']);
+  const colonyKwh = num(res['total-colony-kwh']);
+  const rmsKwh = num(res['total-rms-actual-power-kwh'])
+    ?? (totalKwh === null ? null : round2(totalKwh - (hsmShareKwh ?? 0) - (crusherKwh ?? 0) - (colonyKwh ?? 0)));
+  return {
+    equipment: 'RMS (VCB-1 + VCB-2 − shares)', previousReading: null, presentReading: null, kwh: rmsKwh,
+    split: {
+      vcb1Kwh, vcb2Kwh, vcb1Kvah: num(res['vcb-1-actual-kvah']), vcb2Kvah: num(res['vcb-2-actual-kvah']), totalKwh,
+      hsmShareKwh, crusherKwh, colonyKwh, rmsKwh, meterOnlyKwh: null,
+    },
+  };
+};
 /** Every power form, by its logbook tag. */
 const FORMS = new Map<string, PowerForm>([
   [POWER_FORM, {
@@ -76,7 +138,7 @@ const FORMS = new Map<string, PowerForm>([
   }],
   vcb(1), vcb(2), vcb(3),
   ['electrical-logbook/daily-power-consumption-record', { mill: 'lsm', read: vcb1250 }],
-  ['rms-electrical-logbook/daily-power-consumption-record', { mill: 'rms', read: vcb1250 }],
+  ['rms-electrical-logbook/daily-power-consumption-record', { mill: 'rms', read: rmsRead }],
 ]);
 const formsOf = (mill: PowerMill) => [...FORMS].filter(([, f]) => f.mill === mill).map(([tag]) => tag);
 
@@ -89,7 +151,7 @@ const LOOK_BACK_MS = 31 * DAY_MS;
 /** How far back to look for the last entry when the period and its month before have none. */
 const LAST_ENTRY_LOOK_BACK_MS = 183 * DAY_MS;
 
-type Row = PowerEntry & { createdMs: number };
+type Row = PowerEntry & { createdMs: number; split?: SplitSums };
 
 function toRow(r: InsightEntry): Row | null {
   const tag = String((r.tags ?? [])[0] ?? r.resultName ?? '');
@@ -97,7 +159,7 @@ function toRow(r: InsightEntry): Row | null {
   if (!form) return null;
   const res = r.result ?? {};
   // A test entry is not a reading.
-  if (/test\s*entry/i.test(String(res['remarks'] ?? ''))) return null;
+  if (Object.entries(res).some(([k, v]) => /remarks$/.test(k) && /test\s*entry/i.test(String(v ?? '')))) return null;
   const createdMs = Date.parse(r.createdAt ?? r.invocationTime ?? '');
   return {
     date: String(res['date'] ?? '').slice(0, 10),
@@ -111,7 +173,7 @@ function toRow(r: InsightEntry): Row | null {
 /** Production per plant date and in total, MT — what specific energy divides by. */
 interface Production { byDay: Map<string, number | null>; total: number | null }
 
-async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs: number, production: Promise<Production | null>): Promise<PowerReport> {
+async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs: number, production: Promise<Production | null>, paired = false): Promise<PowerReport> {
   const dates = dateRange(from, to);
   const base = { from, to, form: formsOf(mill).join(', ') };
   if (!env.logbookInsightId) {
@@ -135,7 +197,8 @@ async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs
     const vals = es.map((e) => e.kwh).filter((v): v is number => v !== null);
     const kwh = vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null;
     const productionMt = prod?.byDay.get(date) ?? null;
-    return { date, kwh, entries: es.length, byEquipment, productionMt, kwhPerMt: specificEnergy(kwh, productionMt) };
+    const splits = es.map((e) => e.split).filter((x): x is SplitSums => !!x);
+    return { date, kwh, entries: es.length, byEquipment, productionMt, kwhPerMt: specificEnergy(kwh, productionMt), ...(mill === 'rms' ? { rms: rmsSplitOf(splits) } : {}) };
   });
   const byEquipment: Record<string, number> = {};
   for (const d of days) for (const [k, v] of Object.entries(d.byEquipment)) byEquipment[k] = round2((byEquipment[k] ?? 0) + v);
@@ -157,12 +220,20 @@ async function report(env: Env, mill: PowerMill, from: string, to: string, nowMs
     days,
     totals: (() => {
       const kwh = withKwh.length ? round2(withKwh.reduce((a, d) => a + d.kwh!, 0)) : null;
+      const rms = mill === 'rms' ? { rms: rmsSplitOf(inRange.map((e) => e.split).filter((x): x is SplitSums => !!x)) } : {};
+      if (paired) {
+        // Σ power ÷ Σ production over the days that have both, so a day without one of them doesn't bend the figure.
+        const both = days.filter((d) => d.kwh !== null && d.productionMt);
+        const pairedKwh = both.length ? round2(both.reduce((a, d) => a + d.kwh!, 0)) : null;
+        const productionMt = both.length ? round2(both.reduce((a, d) => a + d.productionMt!, 0)) : null;
+        return { kwh, entries: inRange.length, byEquipment, productionMt, kwhPerMt: specificEnergy(pairedKwh, productionMt), pairedKwh, ...rms };
+      }
       const productionMt = prod?.total ?? null;
-      return { kwh, entries: inRange.length, byEquipment, productionMt, kwhPerMt: specificEnergy(kwh, productionMt) };
+      return { kwh, entries: inRange.length, byEquipment, productionMt, kwhPerMt: specificEnergy(kwh, productionMt), ...rms };
     })(),
     entries: inRange
       .sort((a, b) => (a.date === b.date ? b.createdMs - a.createdMs : b.date.localeCompare(a.date)))
-      .map(({ createdMs: _c, ...e }) => e),
+      .map(({ createdMs: _c, split: _s, ...e }) => e),
     lastDate,
   };
 }
@@ -231,10 +302,13 @@ export function lsmPowerReport(env: Env, from: string, to: string, nowMs = Date.
   return report(env, 'lsm', from, to, nowMs, production);
 }
 
-/** RMS: the RMS Daily Power Consumption Record, over the ERP log sheet's production (PRODUCTION_MT). */
-export function rmsPowerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
-  const byDay = rmsProductionByDay(env, dateRange(from, to));
+/**
+ * RMS: the RMS Daily Power Consumption Record — RMS's own power — over the ERP log sheet's PRIME production
+ * (PRIME_MT1 + PRIME_MT2), the days with both (the user, 26 Nov 2026).
+ */
+export async function rmsPowerReport(env: Env, from: string, to: string, nowMs = Date.now()): Promise<PowerReport> {
+  const byDay = rmsPrimeByDay(env, dateRange(from, to));
   const vals = [...byDay.values()].filter((v): v is number => v !== null);
   const production = Promise.resolve({ byDay, total: vals.length ? round2(vals.reduce((a, b) => a + b, 0)) : null });
-  return report(env, 'rms', from, to, nowMs, production);
+  return { ...(await report(env, 'rms', from, to, nowMs, production, true)), basis: 'prime' };
 }

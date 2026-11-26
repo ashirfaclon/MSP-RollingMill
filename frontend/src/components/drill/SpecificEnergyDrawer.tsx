@@ -41,7 +41,10 @@ export default function SpecificEnergyDrawer(props: {
 
 function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill: PowerMill }) {
   const t = data.totals;
-  const rows = useMemo(() => powerPeriods(data.days, grain), [data.days, grain]);
+  // RMS: over prime production, the days with both figures (the user, 26 Nov 2026).
+  const prime = data.basis === 'prime';
+  const rows = useMemo(() => powerPeriods(data.days, grain, prime), [data.days, grain, prime]);
+  const prodName = prime ? 'Prime production' : 'Production';
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const series = useMemo<DrillSeries[]>(() => [
     { id: 'se', name: 'Specific energy', token: '--s-prod', type: 'line', data: rows.map((x) => x.kwhPerMt), dp: 1 },
@@ -53,8 +56,8 @@ function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill:
     <>
       <Stats items={[
         { label: 'Specific energy', value: n(t.kwhPerMt), unit: 'kWh/MT' },
-        { label: 'Power', value: n(t.kwh), unit: 'kWh' },
-        { label: 'Production (ERP)', value: n(t.productionMt), unit: 'MT' },
+        { label: 'Power', value: n(prime ? t.pairedKwh : t.kwh), unit: 'kWh', title: prime ? 'The days with both power and prime production' : undefined },
+        { label: `${prodName} (ERP)`, value: n(t.productionMt), unit: 'MT', title: prime ? 'The days with both power and prime production' : undefined },
       ]} />
 
       {t.entries > 0 ? (
@@ -70,18 +73,18 @@ function Content({ data, grain, mill }: { data: PowerReport; grain: Grain; mill:
 
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label="Specific energy by period">
-          <thead><tr><th>Period</th><th className="r">Power (kWh)</th><th className="r">Production (MT)</th><th className="r">Specific energy (kWh/MT)</th></tr></thead>
+          <thead><tr><th>Period</th><th className="r">Power (kWh)</th><th className="r">{prodName} (MT)</th><th className="r">Specific energy (kWh/MT)</th></tr></thead>
           <tbody>
             {rows.map((x) => (
               <tr key={x.key}>
                 <td><b>{x.label}</b>{x.fromDate !== x.toDate && <span className="pd-dim"> · {dm(x.fromDate)}–{dm(x.toDate)}</span>}</td>
-                <td className="num r">{n(x.kwh)}</td>
+                <td className="num r">{n(prime ? x.pairedKwh : x.kwh)}</td>
                 <td className="num r">{n(x.productionMt)}</td>
                 <td className="num r v-val"><b>{n(x.kwhPerMt)}</b></td>
               </tr>
             ))}
           </tbody>
-          <tfoot><tr><td>Total</td><td className="num r">{n(t.kwh)}</td><td className="num r">{n(t.productionMt)}</td><td className="num r">{n(t.kwhPerMt)}</td></tr></tfoot>
+          <tfoot><tr><td>Total</td><td className="num r">{n(prime ? t.pairedKwh : t.kwh)}</td><td className="num r">{n(t.productionMt)}</td><td className="num r">{n(t.kwhPerMt)}</td></tr></tfoot>
         </table>
       </div>
 
@@ -148,7 +151,7 @@ const SOURCES: Record<PowerMill, SourceSystem[]> = {
       name: 'Logbook',
       rows: [
         ['Form', 'RMS Electrical Logbook → Daily Power Consumption Record'],
-        ['Field', 'ACTUAL_KWH_VCB_1_1250AMP (kWh), by the form\'s date'],
+        ['Field', 'TOTAL RMS ACTUAL POWER KWH, by the form\'s date'],
       ],
     },
     {
@@ -156,7 +159,7 @@ const SOURCES: Record<PowerMill, SourceSystem[]> = {
       rows: [
         ['Table', 'ATTR_TRAN_DATA_HEAD + ATTR_TRAN_DATA_BODY'],
         ['Filter', "ENTITY_CODE = 'MP', DIV_CODE = 'RS', TNATURE = 'PRLOG', SERIES = 'L5P'"],
-        ['Field', "ATTR_CODE = 'PRODUCTION_MT' (value in ATTR_VALUE), by VRDATE"],
+        ['Field', "ATTR_CODE = 'PRIME_MT1' + 'PRIME_MT2' (value in ATTR_VALUE), by VRDATE"],
       ],
     },
   ],
@@ -166,5 +169,5 @@ const FORMULA: Record<PowerMill, string[]> = {
   hsm: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
   rmd: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
   lsm: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
-  rms: ['Specific energy = Power (kWh) ÷ ERP production (MT)'],
+  rms: ['Specific energy = RMS power (kWh) ÷ Prime production (MT)'],
 };

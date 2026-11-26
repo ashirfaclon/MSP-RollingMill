@@ -56,3 +56,14 @@ describe('LSM stock by section', () => {
       .toEqual([['A 130×130×10', 83.8], ['MC 200', 512.6], ['MB 200', 233.95], ['H Beam 152', 1.61]]);
   });
 });
+
+describe('LSM: MC 150 and MC 300 are not shown (the user, 26 Nov 2026)', () => {
+  const cache = {
+    items: { A: 'MS CHANNEL 150 MM 12 mtr', B: 'MS CHANNEL 300 MM DEFECTIVE', C: 'MS Channel 75X40 6 mtr' },
+    moves: [{ date: '2026-11-01', item: 'A', netMt: 40 }, { date: '2026-11-01', item: 'B', netMt: 18 }, { date: '2026-11-01', item: 'C', netMt: 10 }],
+  } as unknown as Parameters<typeof stockBySection>[0];
+  test('left out of LSM\'s sections; RMS (no plant list) keeps them', () => {
+    expect(stockBySection(cache, '2026-11-30').map((s) => s.label)).toEqual(['MC 75×40']);
+    expect(stockBySection(cache, '2026-11-30', false).map((s) => s.label)).toEqual(['MC 75×40', 'MC 150', 'MC 300']);
+  });
+});

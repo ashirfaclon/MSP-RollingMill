@@ -33,20 +33,22 @@ export const bothLast = (a: string | null | undefined, b: string | null | undefi
 
 export default function SpecificEnergyCard({ mill = 'hsm' }: { mill?: PowerMill }) {
   const { data, loading, error } = usePower(mill);
+  const t = data?.totals;
   const { dates } = useSelection();
   /* No figure in the period (no power, or no ERP production yet): the last day that has both (the user, 30 Oct 2026). */
   const erpLast = useErpLastDate(mill);
   const last = useLastEntry<PowerReport>(`/api/${mill}/power`, !!data && data.totals.kwhPerMt === null, bothLast(data?.lastDate, erpLast), dates?.from);
   const lastSe = last.data?.totals.kwhPerMt ?? null;
   const [open, setOpen] = useState(false);
-  const t = data?.totals;
   const note = error ? 'Logbook unavailable'
     : data?.logbook.connection === 'down' ? data.logbook.message
+    // RMS: over prime production (the user, 26 Nov 2026) — said under the figure, the other mills divide by actual.
+    : data?.basis === 'prime' && t?.kwhPerMt != null ? 'per MT of prime'
     : '';
   // Wired, nothing recorded: no power entries, or no production entered for the period.
   const empty = !t || error || data?.logbook.connection === 'down' ? false
     : t.kwh === null ? 'No power entries recorded yet'
-    : !t.productionMt ? 'No production entries recorded yet'
+    : !t.productionMt ? (data?.basis === 'prime' ? 'No day with both power and prime production' : 'No production entries recorded yet')
     : false;
   return (
     <>

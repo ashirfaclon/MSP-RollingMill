@@ -102,6 +102,31 @@ export interface PowerEntry {
   enteredAt: string | null;
 }
 
+/**
+ * RMS only (the form as updated, 26 Nov 2026): what came in through the two meters, what was given to HSM, the
+ * crusher and the colony, and what RMS itself used. kWh / kVAh, null where nothing was entered. An entry of the old
+ * form (to 22 Nov 2026) has VCB-1 only and no sharing: its reading is in `meterOnlyKwh`, not `rmsKwh`.
+ */
+export interface RmsPowerSplit {
+  vcb1Kwh: number | null;
+  vcb2Kwh: number | null;
+  vcb1Kvah: number | null;
+  vcb2Kvah: number | null;
+  /** TOTAL ACTUAL KWH = VCB-1 + VCB-2 (the form's own sum). */
+  totalKwh: number | null;
+  hsmShareKwh: number | null;
+  crusherKwh: number | null;
+  colonyKwh: number | null;
+  /** TOTAL RMS ACTUAL POWER KWH = total − HSM share − crusher − colony (the form's own figure). */
+  rmsKwh: number | null;
+  /** Old-form entries: the VCB-1 reading, sharing not recorded. */
+  meterOnlyKwh: number | null;
+  /** Power factor = kWh ÷ kVAh, over the entries with both: each meter and the two together. */
+  pf1: number | null;
+  pf2: number | null;
+  pf: number | null;
+}
+
 export interface PowerDay {
   date: string;
   /** Σ power-consumed of the day's entries; null when the day has none. */
@@ -113,6 +138,8 @@ export interface PowerDay {
   productionMt: number | null;
   /** kwh ÷ productionMt. */
   kwhPerMt: number | null;
+  /** RMS only. */
+  rms?: RmsPowerSplit;
 }
 
 export interface PowerReport {
@@ -122,7 +149,15 @@ export interface PowerReport {
   logbook: { connection: 'up' | 'down'; message: string; readSince: string | null };
   equipment: string[];
   days: PowerDay[];
-  totals: { kwh: number | null; entries: number; byEquipment: Record<string, number>; productionMt: number | null; kwhPerMt: number | null };
+  totals: {
+    kwh: number | null; entries: number; byEquipment: Record<string, number>; productionMt: number | null; kwhPerMt: number | null;
+    /** RMS only: the split over the period. */
+    rms?: RmsPowerSplit;
+    /** RMS only: Σ kWh over the days that have both power and prime production — what kwhPerMt divides (productionMt is those days' too). */
+    pairedKwh?: number | null;
+  };
+  /** RMS: specific energy is over PRIME production, summed over the days with both figures (the user, 26 Nov 2026). */
+  basis?: 'prime';
   /** Every entry in the range, newest date first. */
   entries: PowerEntry[];
   /**
