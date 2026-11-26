@@ -49,6 +49,9 @@ function Content({ data }: { data: RmdBilletsReport }) {
 
   return (
     <>
+      {data.influx.connection === 'down' && (
+        <p className="v-warn pd-influx-down" role="status">Influx (the plant counters) is not answering, so billet counts can't be read right now. ERP figures are not affected.</p>
+      )}
       <Stats items={[
         { label: 'Billets in', value: n(t.totalPcs), unit: 'pcs' },
         { label: 'Line 1 (M1)', value: n(t.m1), unit: 'pcs' },
@@ -71,7 +74,6 @@ function Content({ data }: { data: RmdBilletsReport }) {
       </div>
 
       <SourceBox sources={SOURCES} formula={FORMULA} />
-      {data.influx.connection === 'down' && <p className="v-warn">{data.influx.message}</p>}
     </>
   );
 }

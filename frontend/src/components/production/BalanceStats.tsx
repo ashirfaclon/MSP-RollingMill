@@ -19,6 +19,8 @@ export interface BalanceStat {
   /** Opens the figure's drill-down. */
   onOpen?: () => void;
   title?: string;
+  /** A short warning under the figure, e.g. why it is NA. */
+  note?: string;
 }
 
 export default function BalanceStats({ items }: { items: BalanceStat[] }) {
@@ -35,6 +37,7 @@ export default function BalanceStats({ items }: { items: BalanceStat[] }) {
                 : <span className={`rm-mb-stat-v num ${na ? 'v-na' : ''}`}>
                     {na ? 'NA' : <>{s.whole ? Math.round(s.value!).toLocaleString('en-IN') : fixed(s.value)}<span className="rm-card-unit">{s.unit}</span></>}
                   </span>}
+              {s.note && !s.loading && <span className="rm-mb-stat-note v-warn">{s.note}</span>}
             </>
           );
           return s.onOpen

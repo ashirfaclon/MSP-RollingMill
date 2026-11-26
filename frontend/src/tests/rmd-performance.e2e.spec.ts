@@ -28,7 +28,7 @@ test('RMD: rolling in casting, rolling in delivery and plant efficiency, per rol
   const cards = ['Rolling in casting', 'Rolling in delivery', 'Plant efficiency'];
   for (const c of cards) {
     await expect(strip.getByRole('button', { name: new RegExp(`^${c}`) })).not.toContainText('Loading', { timeout: 60_000 });
-    await expect(strip.getByRole('button', { name: new RegExp(`^${c}`) })).toContainText(/\d+(\.\d+)?\s*%|NA/);
+    await expect(strip.getByRole('button', { name: new RegExp(`^${c}`) })).toContainText(/\d+(\.\d+)?\s*%|NA|Prime \+ SL\s*\d/);
   }
   await page.screenshot({ path: `${SHOTS}/rmd-performance-cards.png` });
 
@@ -193,4 +193,53 @@ test('RMD TPH is the ERP\'s delivery rate, exactly as filed — Visualization an
   await page.goto('/rmd/condition-analytics');
   await expect(page.getByRole('button', { name: /^Actual rate/ }).locator('.rm-card-value')).toHaveText(/^12\.85/, { timeout: 60_000 });
   expect(errors).toEqual([]);
+});
+
+test('RMD Billets in says it is from Influx (the plant counters), not the ERP — and when Influx is not answering (the user, 26 Nov 2026)', async ({ page }) => {
+  await page.goto('/rmd/visualization');
+  const tile = page.getByRole('group', { name: 'Billets and operating figures' }).locator('.rm-mb-stat').first();
+  await expect(tile).toContainText(/Billets in([\d,]+pcs|NA)/, { timeout: 60_000 });
+  await expect(tile).toHaveAttribute('title', /Influx/);
+  const api = await page.request.get('http://localhost:8521/api/rmd/billets?from=2026-11-25&to=2026-11-25&grain=day');
+  const down = (await api.json()).influx.connection === 'down';
+  if (down) await expect(tile).toContainText('Influx not answering');
+  else await expect(tile).not.toContainText('Influx not answering');
+  await tile.screenshot({ path: `${SHOTS}/rmd-billets-tile.png` });
+
+  // Opens the Influx billet infeed — its Data source names Influx and the tag, not the ERP log sheet.
+  await tile.click();
+  const d = page.getByRole('dialog', { name: /Billet infeed · Influx/ });
+  await expect(d.getByRole('table', { name: 'Billets in by period' })).toBeVisible({ timeout: 60_000 });
+  const src = d.getByRole('region', { name: 'Data source' }).or(d.locator('section[aria-label="Data source"]'));
+  await expect(src).toContainText('Influx');
+  await expect(src).toContainText('BILLET_COUNT');
+  await expect(src).not.toContainText('ERP');
+  if (down) await expect(d.getByRole('status').filter({ hasText: 'not answering' })).toContainText('ERP figures are not affected');
+  await d.screenshot({ path: `${SHOTS}/rmd-billets-drill.png` });
+});
+
+test('RMD Offline plant efficiency: breakdown hours never count, so it is what was made against the plan (the user, 26 Nov 2026)', async ({ page }) => {
+  for (const w of [1366, 1920]) {
+    await page.setViewportSize({ width: w, height: 1000 });
+    await page.goto('/rmd/visualization');
+    await page.getByRole('button', { name: /Duration/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Select period' });
+    await dialog.getByLabel('Start Date').fill('2026-11-23');
+    await dialog.getByLabel('End Date').fill('2026-11-26');
+    await dialog.getByRole('button', { name: 'Apply' }).click();
+    await page.getByRole('button', { name: /^Rolling:/ }).click();
+    await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Offline' }).click();
+    // 23–25 Nov Offline (26 Nov not filed yet): Prime + SL 461.2, Prime 450.81 MT against 3 × 178.32 = 534.96 MT of plan;
+    // no stops counted, availability 100 % → 86.21 % and 84.27 %.
+    const card = page.getByRole('region', { name: 'Headline KPIs' }).getByRole('button', { name: /^Plant efficiency/ });
+    await expect(card.locator('.rm-card-pair')).toHaveText(/Prime \+ SL\s*86\.21\s*Prime\s*84\.27/, { timeout: 60_000 });
+    expect(await card.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), `${w}: no overflow`).toBe(true);
+    await card.click();
+    const d = page.getByRole('dialog', { name: /Plant efficiency/ });
+    const foot = d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot td');
+    // Plan, Prime + SL, Prime, Running, Breakdown, CCM breakdown, Performance, Availability, Efficiency ×2.
+    await expect(foot).toHaveText(['Total', '534.96', '461.2', '450.81', '31.84', '0', '0', '86.21', '100', '86.21', '84.27']);
+    await page.waitForTimeout(1200);
+    await d.screenshot({ path: `${SHOTS}/rmd-efficiency-offline-${w}.png` });
+  }
 });

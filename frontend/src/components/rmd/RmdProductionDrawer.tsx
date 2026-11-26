@@ -371,7 +371,7 @@ function EfficiencyRow({ x }: { x: RmdProductionPeriod }) {
       <td className="num r">{f(x.productionMt)}</td>
       <td className="num r">{f(x.primeMt)}</td>
       <td className="num r">{f(x.runningHrs)}</td>
-      <td className="num r">{f(x.breakdownHrs)}</td>
+      <td className="num r">{f(x.effBreakdownHrs)}</td>
       <td className="num r">{f(x.ccmBreakdownHrs)}</td>
       <td className="num r">{f(x.performancePct)}</td>
       <td className="num r">{f(x.availabilityPct)}</td>

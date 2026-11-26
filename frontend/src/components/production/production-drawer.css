@@ -151,6 +151,8 @@ p.pd-dim { margin: -6px 0 0; }
 table.grid.pd-source td { white-space: normal; vertical-align: top; }
 table.grid.pd-source td:last-child { min-width: 180px; }
 
+/* Influx not answering (RMD billet infeed): said at the top of the drill-down, before the empty table. */
+.pd-influx-down { margin: 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--warn) 10%, transparent); font-size: 12.5px; font-weight: 600; }
 /* Source / formula boxes at a drawer's foot: a small caption over a quiet code-style box. */
 .pd-src { display: grid; gap: 12px; }
 .pd-src section { display: grid; gap: 6px; }

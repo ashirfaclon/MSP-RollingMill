@@ -27,6 +27,7 @@ import RmdKpiStrip from './RmdKpiStrip';
 import RmdProductionDrawer, { BALANCE, useRmdProduction, type BalanceKey } from './RmdProductionDrawer';
 import { useGlobalSel } from '@/state/globalSel';
 import RmdMillMimic from './RmdMillMimic';
+import RmdBilletsDrawer from './RmdBilletsDrawer';
 import RmdShiftProduction from './RmdShiftProduction';
 import RmdRunningRateDrawer from './RmdRunningRateDrawer';
 import RmdStockBySize from './RmdStockBySize';
@@ -98,6 +99,10 @@ function MaterialBalance() {
   const { data, dataUrl, error } = useApi<RmdBilletsReport>(url);
   const billets = data && dataUrl === url ? data.totals.totalPcs : null;
   const loading = !(data && dataUrl === url) && !error;
+  // Billets in is the one figure here read from Influx (the plant counters), not the ERP (the user, 26 Nov 2026):
+  // it opens the Influx drill-down, and says so on the tile when Influx is not answering.
+  const influxDown = !!data && dataUrl === url && data.influx.connection === 'down';
+  const [billetsOpen, setBilletsOpen] = useState(false);
   const prod = useRmdProduction(dates);
   const t = prod.data?.totals ?? null;
   const [open, setOpen] = useState(false);
@@ -156,13 +161,15 @@ function MaterialBalance() {
 
       </div>
       <BalanceStats items={[
-        { key: 'in', label: 'Billets in', value: billets, unit: 'pcs', whole: true, loading, onOpen: () => setOpen(true), title: 'Material balance per day' },
+        { key: 'in', label: 'Billets in', value: billets, unit: 'pcs', whole: true, loading, onOpen: () => setBilletsOpen(true),
+          title: 'Billets in per day, from the Influx plant counters (not the ERP)', note: influxDown ? 'Influx not answering' : undefined },
         ...keys.map((k) => ({
           key: k, label: BALANCE[k].name, value: t?.[k] ?? null, unit: 'MT', loading: !prod.data && !prod.error,
           onOpen: () => setMetric(k), title: `${BALANCE[k].name} per day, from the ERP log sheet`,
         })),
       ]} />
       <RmdProductionDrawer view="balance" open={open} onClose={() => setOpen(false)} />
+      <RmdBilletsDrawer open={billetsOpen} onClose={() => setBilletsOpen(false)} />
       <RmdProductionDrawer view={metric ?? 'balance'} open={metric !== null} onClose={() => setMetric(null)} />
     </Panel>
   );

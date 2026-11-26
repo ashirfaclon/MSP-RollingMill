@@ -634,3 +634,24 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   For HSM / LSM / RMS (when asked): HSM and RMS have prime, LSM does not; breakdown is one DELAY_HRS / DELAY_HOURS total;
   HSM's plan is whole-mill (no Online / Offline split); RMS has no November plan. 310 backend unit pass; rmd-performance
   e2e passes. Not committed.
+- **26 Nov 2026** — **RMD Billets in now says it is from Influx** (the user: Influx was down, Billets in showed NA, and
+  nothing told the user it isn't an ERP figure — it looks like a dashboard bug). Billets in is the only figure in the
+  RMD balance strip read from Influx (BILLET_COUNT); it used to open the ERP Material balance drill-down. Now the tile
+  opens the Influx billet infeed drill-down (`RmdBilletsDrawer`: Data source = Influx, tag BILLET_COUNT), its tooltip
+  says "from the Influx plant counters (not the ERP)", and when Influx is not answering the tile shows "Influx not
+  answering" under NA (`BalanceStats` `note`) and the drill-down opens with a warning box: "Influx (the plant counters)
+  is not answering … ERP figures are not affected." HSM / LSM / RMS Billets in are ERP (INPUT_PCS) — unchanged.
+  Why Influx was down (26 Nov): 10.135.80.145:8086 accepted connections but answered nothing; ~290 open connections
+  from this machine — 198 from another project's backend (repos/bda1f68a…), 62 + 32 from two others; ours held 6
+  (the 25 Nov guard). Not touched — not ours. e2e: rmd-performance "Billets in says it is from Influx" + balance strip
+  pass. Not committed.
+- **26 Nov 2026** — **RMD Offline plant efficiency: breakdown hours never count** (the user). `plantEfficiency` adds back
+  only the Online entries' stops (the seven Breakdown items + TOTAL_CCM_BD_IN_HRS); an Offline entry's are ignored, so
+  Offline availability = 100 % and Offline efficiency = performance (made ÷ plan) — not stuck at 100 %. Under Both the
+  Offline entries' stops don't count either. New `effBreakdownHrs` (the breakdown the efficiency used) feeds the
+  drill-down's Breakdown column. Today's figures don't move: every Offline entry this year has all breakdown fields 0.
+  Verified Current Week Offline (23–25 Nov; 26 Nov not filed): Prime + SL 148.46 + 118.02 + 194.72 = 461.2, Prime
+  450.81 MT against 3 × 178.32 = 534.96 MT (Nov Offline plan 5,350 MT ÷ 30, form) → 86.21 % / 84.27 %, availability
+  100 % — raw ERP rows, plan form, API and screen agree. Flag for the plant: Oct Offline efficiency 247 % — only a few
+  Oct days have an Offline plan and it is small (964 MT). Also fixed the stale card check in rmd-performance e2e (the
+  pair card has no "%"). Unit 17 / 17 (rmd-production), rmd-performance e2e 7 / 7. Not committed.

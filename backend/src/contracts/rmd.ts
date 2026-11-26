@@ -212,6 +212,8 @@ export interface RmdProductionPeriod {
   performancePct: number | null;
   primePerformancePct: number | null;
   availabilityPct: number | null;
+  /** The Breakdown card's seven items over those dates, Online entries only (Offline stops never count), hours; null without a plan. */
+  effBreakdownHrs: number | null;
   /** Σ TOTAL_CCM_BD_IN_HRS over those dates (Online only), hours; null without a plan. */
   ccmBreakdownHrs: number | null;
   /** Σ plan over those dates, MT, and how many dates. */

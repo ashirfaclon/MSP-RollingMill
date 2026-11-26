@@ -393,6 +393,7 @@
 .rm-mb-stat-v { font-size: 17px; font-weight: 800; line-height: 1.15; white-space: nowrap; color: var(--text); }
 .rm-mb-stat-v.v-na { color: var(--muted-3); }
 .rm-mb-stat-v .rm-card-unit { font-size: 10.5px; margin-left: 4px; }
+.rm-mb-stat-note { font-size: 11px; font-weight: 600; line-height: 1.2; }
 .rm-mb-stat-go { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 16px; line-height: 1; color: var(--muted-3); transition: color 130ms ease, transform 130ms ease; }
 .rm-mb-stat--open:hover .rm-mb-stat-go { color: var(--text-2); transform: translate(2px, -50%); }
 
