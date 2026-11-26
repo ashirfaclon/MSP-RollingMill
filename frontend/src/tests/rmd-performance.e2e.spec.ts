@@ -71,14 +71,14 @@ test('RMD plant efficiency: performance against the dashboard plan × availabili
   await dialog.getByRole('button', { name: 'Apply' }).click();
   await page.getByRole('button', { name: /^Rolling:/ }).click();
   await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Online' }).click();
-  // 19 Nov Online: performance 101.69 % (Prime + SL ÷ the 240.74 MT plan) × availability 85.18 % ((9.58 − 1.42) ÷ 9.58)
-  // = 86.62 %; Prime 85.78 %.
+  // 19 Nov Online: performance 101.69 % (Prime + SL ÷ the 240.74 MT plan) × availability 87.09 % (9.58 ÷ (9.58 + 1.42 + 0 CCM))
+  // = 88.56 %; Prime 87.71 %.
   const card = page.getByRole('region', { name: 'Headline KPIs' }).getByRole('button', { name: /^Plant efficiency/ });
-  await expect(card.locator('.rm-card-pair')).toHaveText(/Prime \+ SL\s*86\.62\s*Prime\s*85\.78/, { timeout: 60_000 });
+  await expect(card.locator('.rm-card-pair')).toHaveText(/Prime \+ SL\s*88\.56\s*Prime\s*87\.71/, { timeout: 60_000 });
   await card.click();
   const d = page.getByRole('dialog', { name: /Plant efficiency/ });
-  await expect(d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot')).toContainText('86.62');
-  await expect(d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot')).toContainText('85.18');
+  await expect(d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot')).toContainText('88.56');
+  await expect(d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot')).toContainText('87.09');
   await page.waitForTimeout(1200);
   await d.screenshot({ path: `${SHOTS}/rmd-efficiency-drill.png` });
 });

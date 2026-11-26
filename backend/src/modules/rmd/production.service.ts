@@ -71,12 +71,14 @@ export type PlanByDate = Map<string, number>;
  * Plant efficiency, the plant's formula (the user, 26 Nov 2026), over the dates with both a plan and an ERP entry:
  *   performance  = actual ÷ plan × 100 — two of them: Prime + SL (PRODUCT_PRIME_SLENGTH_MT) and Prime (FINISH_PRODUCT_PRIME_MT),
  *                  both against the one plan (a Prime + SL plan);
- *   availability = (ACTUAL_RUNNING_HRS − breakdown) ÷ ACTUAL_RUNNING_HRS × 100 — breakdown = the Breakdown card's seven items;
+ *   availability = ACTUAL_RUNNING_HRS ÷ (ACTUAL_RUNNING_HRS + breakdown + CCM breakdown) × 100 — running hours already
+ *                  exclude the stops, so they are added back below the line (the user, 26 Nov 2026); breakdown = the
+ *                  Breakdown card's seven items, CCM breakdown = TOTAL_CCM_BD_IN_HRS (Online only);
  *   efficiency   = performance × availability ÷ 100.
  * Over several dates the MT and hours are summed first, then the formula is applied once. Null without a plan.
  */
 export function plantEfficiency(rows: RmdLogRow[], plan: PlanByDate | undefined) {
-  const none = { planMt: null, effDays: 0, performancePct: null, primePerformancePct: null, availabilityPct: null, plantEfficiencyPct: null, primeEfficiencyPct: null };
+  const none = { planMt: null, effDays: 0, ccmBreakdownHrs: null, performancePct: null, primePerformancePct: null, availabilityPct: null, plantEfficiencyPct: null, primeEfficiencyPct: null };
   if (!plan) return none;
   const dates = [...new Set(rows.map((r) => r.date))].filter((d) => (plan.get(d) ?? 0) > 0);
   if (!dates.length) return none;
@@ -86,13 +88,14 @@ export function plantEfficiency(rows: RmdLogRow[], plan: PlanByDate | undefined)
   const prime = sumOf(mine, 'FINISH_PRODUCT_PRIME_MT');
   const runH = sumOf(mine, 'ACTUAL_RUNNING_HRS');
   const bdH = breakdownOf(mine).breakdownHrs ?? 0;
+  const ccmH = round2(mine.reduce((a, r) => a + Math.max(0, r.v.TOTAL_CCM_BD_IN_HRS ?? 0), 0));
   const pct = (a: number | null, b: number) => (a === null ? null : round2((a / b) * 100));
-  const availabilityPct = runH ? round2(((runH - bdH) / runH) * 100) : null;
+  const availabilityPct = runH ? round2((runH / (runH + bdH + ccmH)) * 100) : null;
   const performancePct = pct(sl, planMt);
   const primePerformancePct = pct(prime, planMt);
   const eff = (p: number | null) => (p === null || availabilityPct === null ? null : round2((p * availabilityPct) / 100));
   return {
-    planMt, effDays: dates.length, performancePct, primePerformancePct, availabilityPct,
+    planMt, effDays: dates.length, ccmBreakdownHrs: ccmH, performancePct, primePerformancePct, availabilityPct,
     plantEfficiencyPct: eff(performancePct), primeEfficiencyPct: eff(primePerformancePct),
   };
 }

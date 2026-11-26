@@ -204,7 +204,7 @@ export interface RmdProductionPeriod {
   rollingInDeliveryPct: number | null;
   /**
    * Plant efficiency, the plant's formula (the user, 26 Nov 2026), over the dates with both a plan and an ERP entry:
-   * performance = actual ÷ the dashboard's plan × 100; availability = (running − breakdown) ÷ running × 100;
+   * performance = actual ÷ the dashboard's plan × 100; availability = running ÷ (running + breakdown + CCM breakdown) × 100;
    * efficiency = performance × availability ÷ 100. Prime + SL and Prime each; null without a plan.
    */
   plantEfficiencyPct: number | null;
@@ -212,6 +212,8 @@ export interface RmdProductionPeriod {
   performancePct: number | null;
   primePerformancePct: number | null;
   availabilityPct: number | null;
+  /** Σ TOTAL_CCM_BD_IN_HRS over those dates (Online only), hours; null without a plan. */
+  ccmBreakdownHrs: number | null;
   /** Σ plan over those dates, MT, and how many dates. */
   planMt: number | null;
   effDays: number;

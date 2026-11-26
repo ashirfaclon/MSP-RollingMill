@@ -623,3 +623,14 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
 - **26 Nov 2026** — Known, not from today's work: frontend unit tests `src/components/twin/twin.unit.test.ts` → 2 fail
   (route: "the 01:38 case …", "trace: selecting PRI …") with today's changes stashed too — the RMD mimic tests predate the
   line-2 PR1 / PR2 mimic change. Not looked into.
+- **26 Nov 2026** — **RMD availability corrected: running hours already exclude the stops** (the user). In the log
+  sheet SCHEDULE_HRS − TOTAL_CCM_BD_IN_HRS = AVAILABLE_HOURS (301 / 301) and AVAILABLE_HOURS − the five mill categories =
+  ACTUAL_RUNNING_HRS (155 / 164), so "(running − breakdown) ÷ running" took the breakdown off twice. Now **availability =
+  running ÷ (running + breakdown + CCM breakdown) × 100** — breakdown = the Breakdown card's SEVEN items (the user chose
+  seven over five, knowing single stand / mill 1½ time is also inside running hours), CCM breakdown = TOTAL_CCM_BD_IN_HRS
+  (now synced; Online only, 301 entries). RMD only — the other mills are not touched (the user). Drill-down gains a CCM
+  breakdown column; its formula line reads the same. 19 Nov Online: 9.58 ÷ (9.58 + 1.42) = 87.09 % → efficiency 88.56 %
+  (Prime 87.71 %); 23 Nov Online, a caster stop: 7.75 ÷ (7.75 + 0 + 3.17) = 70.97 % → 58.10 %; Nov Both 82.40 % / 81.24 %.
+  For HSM / LSM / RMS (when asked): HSM and RMS have prime, LSM does not; breakdown is one DELAY_HRS / DELAY_HOURS total;
+  HSM's plan is whole-mill (no Online / Offline split); RMS has no November plan. 310 backend unit pass; rmd-performance
+  e2e passes. Not committed.
