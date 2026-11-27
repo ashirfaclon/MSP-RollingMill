@@ -12,9 +12,10 @@
  *   Rolling in casting / Rolling in delivery / Plant efficiency  the Zoho TMT KPIs the plant asked for
  *                       (21 Nov 2026), as the ERP log sheet holds them: ROLLING_IN_TOTAL_PERCENTAGE,
  *                       ROLLING_IN_DELIVERY_PRCNT (one drawer); Plant efficiency, the plant's formula worked out here
- *                       (the user, 26 Nov 2026): performance (actual ÷ the dashboard's plan) × availability ((running −
- *                       breakdown) ÷ running), Prime + SL and Prime in one card, its own drawer;
- *                       Rolling in casting not under Offline (the user, 25 Nov 2026);
+ *                       (the user, 26 Nov 2026): performance (actual ÷ the dashboard's plan) × availability (actual
+ *                       hours ÷ available hours, 27 Nov 2026), Prime + SL and Prime in one card, its own drawer;
+ *                       Rolling in casting not under Offline (the user, 25 Nov 2026); neither rolling % under Both
+ *                       (the user, 27 Nov 2026) — Both is ten cards, two rows of five;
  *   Power consumption   the logbook forms Power Reading VCB 1 / 2 / 3 (live, as filled);
  *   Specific energy     power ÷ ERP production (backend power report);
  *   Mill MPS            Influx CR Mill1/2 · General · MILL1_MPS / MILL2_MPS, m/s, one card (RmdMillSpeedCard);
@@ -48,7 +49,10 @@ export default function RmdKpiStrip() {
   const [perfOpen, setPerfOpen] = useState(false);
   const [effOpen, setEffOpen] = useState(false);
   const [coalOpen, setCoalOpen] = useState(false);
-  const offline = useGlobalSel().rmdMode === 'offline';
+  const rolling = useGlobalSel().rmdMode;
+  const offline = rolling === 'offline';
+  // Both: no rolling in casting / delivery (the user, 27 Nov 2026).
+  const both = rolling === 'all';
   const { dates } = useSelection();
   const { data, error, last } = useRmdProduction(dates);
   const t = data?.totals;
@@ -66,7 +70,7 @@ export default function RmdKpiStrip() {
   const term = data ? productionTermText(data.from, data.to, data.erp.lastDate) : null;
 
   return (
-    <section className="rm-strip rmd-strip" aria-label="Headline KPIs">
+    <section className={`rm-strip rmd-strip${both ? ' rmd-strip--ten' : ''}`} aria-label="Headline KPIs">
       <KpiCard
         label="Production · Prime + SL"
         term={term}
@@ -121,7 +125,7 @@ export default function RmdKpiStrip() {
       {([
         ['Rolling in casting', 'rollingInCastingPct'],
         ['Rolling in delivery', 'rollingInDeliveryPct'],
-      ] as const).filter(([, k]) => !(offline && k === 'rollingInCastingPct')).map(([label, k]) => (
+      ] as const).filter(([, k]) => !both && !(offline && k === 'rollingInCastingPct')).map(([label, k]) => (
         <KpiCard
           key={k}
           label={label}

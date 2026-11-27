@@ -331,7 +331,9 @@ for (const mill of ['lsm', 'rms'] as const) {
     await expect(strip.locator('.rm-card-label')).toHaveText(mill === 'lsm'
       ? [/^Production/, 'Prime yield', 'Yield with non-prime', 'Power consumption', 'Specific energy', /^Finished stock/,
         'Availability', 'Performance', 'Efficiency', 'Rolling in casting', 'Rolling in delivery', 'Breakdown']
-      : [/^Production/, 'Mass yield', 'Power consumption', 'Specific energy', /^Finished stock/]);
+      // RMS: actual and prime, both yields, stock, the rolling %, power, energy, power factor (25–26 Nov 2026).
+      : [/^Production · Actual/, /^Production · Prime/, 'Mass yield', 'Prime yield', /^Finished stock/,
+        /^Rolling in casting/, /^Rolling in delivery/, 'Power consumption', 'Specific energy', 'Power factor']);
     // Every card is wired now (ERP log sheets, power forms, stock): a figure, or NA when its source has nothing.
     const values = strip.locator('.rm-card-value');
     await expect(values.first()).toBeVisible();

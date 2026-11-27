@@ -724,3 +724,22 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   totals a bypass % as Σ bypass ÷ Σ cast (O34 / S34 = 2.73 / 4.20 %) = daily % weighted by cast; a plain average gives
   2.67 / 4.22. Rolling split checked on all three tabs (Feb 2026): Online defective 1.04 %, CCM 7.28 %, HSM 10.03 %;
   Offline defective 23.97 % (bypasses not shown — Online figures); Both 1.64 / 7.11 / 9.8. e2e covers Offline too.
+- **27 Nov 2026** — **All our services stopped on the user's request, until they ask to start again**: pm2 143 (deployed backend, PORT 9020, …-894fcffa) and 144 (alert sender, PORT 9028, …-212bd7a9) `pm2 stop`ped; dev dashboard 8520 and dev backend 8521 stopped. Restart: `pm2 start 143 144` (check 9020 is still free first — on 26 Nov another deployment took it while ours was stopped), dev: `npm run dev` in backend/, `npx next dev -p 8520` in frontend/.
+- **27 Nov 2026** — Deployed backend (pm2 143, 9020) and alert sender (144, 9028) started again on the user's request; both healthy. They run 46c08a0 — the HSM bypass % commit e50939a is pushed but needs a redeploy (backend + frontend) in AI Studio Manager. Dev servers 8520 / 8521 still off.
+- **27 Nov 2026** — **RMD: availability = actual hours ÷ available hours; no rolling % or TPH under Both** (the user).
+  (1) Plant efficiency's availability = Σ ACTUAL_RUNNING_HRS ÷ Σ AVAILABLE_HOURS × 100 (fields confirmed by the user), the
+  same rule on Online, Offline and Both (was running ÷ (running + 7 breakdown items + CCM breakdown), Offline fixed at
+  100); hours added first over several days, exact hours divided, only the result rounded; entries without available
+  hours left out. AVAILABLE_HOURS now synced (`RMD_AVAILABILITY_FIELDS`). Period fields `effRunningHrs` / `availableHrs`
+  replace `effBreakdownHrs` / `ccmBreakdownHrs`. Drill-down: Actual hours / Available hours columns on every tab, the
+  availability line on every tab, formula "Availability = Actual hours ÷ Available hours × 100", source ACTUAL_RUNNING_HRS
+  + AVAILABLE_HOURS. Real data: 25 Nov availability 100 on all tabs (actual = available); Nov Online 519.25 / 521.5 h =
+  99.57 %, Offline 100 %, Both 99.71 % — efficiency ≈ performance now; CCM breakdown no longer lowers it (25 Nov Online
+  was 86.64 % with 1.58 h CCM). (2) Under Both: no Rolling in casting / delivery cards (strip = ten cards, two rows of five,
+  `rmd-strip--ten`) and no TPH · delivery rate in the Production vs plan panel (three equal figures). Online and
+  Offline unchanged. (3) % for CCM bypass / RMD bypass / Short length: dropped by the user for now (RMD has no CCM
+  bypass % in the ERP — all 56 FA-SKJ fields checked; RMD bypass % = MILL_BYPASS_PERCENTAGE, short length % =
+  FINISH_PRODUCT_SLENGTHPERCENT, both ÷ INPUT_MT, for when it comes back). Flag: the saved RMD plan for 25 Nov changed
+  since 26 Nov (Online 240.72 → 166.66, Offline 178.32 → 113.32 MT), so performance now reads ~148 % — someone re-saved
+  the November plan. Unit 323 / 323; e2e (rmd-performance: Both cards, efficiency on all three tabs against the API,
+  TPH under Both) pass 6 / 6 (dev servers run briefly, then off again); rolling-mill RMS card list updated to its 10 cards. Committed.

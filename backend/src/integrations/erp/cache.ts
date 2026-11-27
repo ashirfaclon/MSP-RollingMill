@@ -154,8 +154,10 @@ export const RMD_RATE_FIELDS = ['DELIVERY_RATE_MTHRS'] as const;
  * ACTUAL_RUNNING_HRS (155 of 164): running hours already exclude both.
  */
 export const RMD_CCM_FIELDS = ['TOTAL_CCM_BD_IN_HRS'] as const;
+/** Available hours (the user, 27 Nov 2026): availability = ACTUAL_RUNNING_HRS ÷ AVAILABLE_HOURS × 100, every rolling. */
+export const RMD_AVAILABILITY_FIELDS = ['AVAILABLE_HOURS'] as const;
 export const RMD_LOG_FIELDS = ['INPUT_MT', 'ACTUAL_RUNNING_HRS', 'PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'BLOSS_MT', 'ENDCUT_MT', 'MISROLL_MT', 'CHIP_OFF_MT', 'TOTAL_POWER_CONSUMPTION',
-  ...RMD_BALANCE_FIELDS, ...RMD_RATE_FIELDS, ...RMD_CCM_FIELDS, ...RMD_ROLLING_FIELDS, ...RMD_COAL_FIELDS, ...RMD_BREAKDOWN_FIELDS.map(([f]) => f)] as const;
+  ...RMD_BALANCE_FIELDS, ...RMD_RATE_FIELDS, ...RMD_CCM_FIELDS, ...RMD_AVAILABILITY_FIELDS, ...RMD_ROLLING_FIELDS, ...RMD_COAL_FIELDS, ...RMD_BREAKDOWN_FIELDS.map(([f]) => f)] as const;
 export type RmdLogField = (typeof RMD_LOG_FIELDS)[number];
 /**
  * Online / Offline: the log sheet head's TRAN_COLUMN_NAME1, RO001 = Online, RO002 = Offline (Management

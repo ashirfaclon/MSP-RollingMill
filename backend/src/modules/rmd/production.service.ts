@@ -76,16 +76,14 @@ export type PlanByDate = Map<string, number>;
  * Plant efficiency, the plant's formula (the user, 26 Nov 2026), over the dates with both a plan and an ERP entry:
  *   performance  = actual ÷ plan × 100 — two of them: Prime + SL (PRODUCT_PRIME_SLENGTH_MT) and Prime (FINISH_PRODUCT_PRIME_MT),
  *                  both against the one plan (a Prime + SL plan);
- *   availability = ACTUAL_RUNNING_HRS ÷ (ACTUAL_RUNNING_HRS + breakdown + CCM breakdown) × 100 — running hours already
- *                  exclude the stops, so they are added back below the line (the user, 26 Nov 2026); breakdown = the
- *                  Breakdown card's seven items, CCM breakdown = TOTAL_CCM_BD_IN_HRS (Online only);
- *                  an Offline entry's stops never count (the user, 26 Nov 2026): Offline availability is 100 %, so
- *                  Offline efficiency = performance — what was made against the plan;
+ *   availability = ACTUAL_RUNNING_HRS ÷ AVAILABLE_HOURS × 100 — the ERP's actual and available hours, the same rule on
+ *                  Online, Offline and Both (the user, 27 Nov 2026; was running ÷ (running + breakdown + CCM breakdown),
+ *                  with Offline fixed at 100). Over the entries that have both hours;
  *   efficiency   = performance × availability ÷ 100.
  * Over several dates the MT and hours are summed first, then the formula is applied once. Null without a plan.
  */
 export function plantEfficiency(rows: RmdLogRow[], plan: PlanByDate | undefined) {
-  const none = { planMt: null, effDays: 0, effBreakdownHrs: null, ccmBreakdownHrs: null, performancePct: null, primePerformancePct: null, availabilityPct: null, plantEfficiencyPct: null, primeEfficiencyPct: null };
+  const none = { planMt: null, effDays: 0, effRunningHrs: null, availableHrs: null, performancePct: null, primePerformancePct: null, availabilityPct: null, plantEfficiencyPct: null, primeEfficiencyPct: null };
   if (!plan) return none;
   const dates = [...new Set(rows.map((r) => r.date))].filter((d) => (plan.get(d) ?? 0) > 0);
   if (!dates.length) return none;
@@ -93,17 +91,20 @@ export function plantEfficiency(rows: RmdLogRow[], plan: PlanByDate | undefined)
   const planMt = round2(dates.reduce((a, d) => a + plan.get(d)!, 0));
   const sl = sumOf(mine, 'PRODUCT_PRIME_SLENGTH_MT');
   const prime = sumOf(mine, 'FINISH_PRODUCT_PRIME_MT');
-  const runH = sumOf(mine, 'ACTUAL_RUNNING_HRS');
-  const stops = mine.filter((r) => r.mode !== 'offline');
-  const bdH = stops.length ? breakdownOf(stops).breakdownHrs ?? 0 : 0;
-  const ccmH = round2(stops.reduce((a, r) => a + Math.max(0, r.v.TOTAL_CCM_BD_IN_HRS ?? 0), 0));
+  // Hours added first, then divided once — over the entries that have both.
+  const hrs = mine.filter((r) => typeof r.v.ACTUAL_RUNNING_HRS === 'number' && (r.v.AVAILABLE_HOURS ?? 0) > 0);
+  const runRaw = hrs.reduce((a, r) => a + r.v.ACTUAL_RUNNING_HRS!, 0);
+  const availRaw = hrs.reduce((a, r) => a + r.v.AVAILABLE_HOURS!, 0);
+  const runH = hrs.length ? round2(runRaw) : null;
+  const availH = hrs.length ? round2(availRaw) : null;
   const pct = (a: number | null, b: number) => (a === null ? null : round2((a / b) * 100));
-  const availabilityPct = runH ? round2((runH / (runH + bdH + ccmH)) * 100) : null;
+  // The exact hours divided; only the result rounded.
+  const availabilityPct = hrs.length && availRaw > 0 ? round2((runRaw / availRaw) * 100) : null;
   const performancePct = pct(sl, planMt);
   const primePerformancePct = pct(prime, planMt);
   const eff = (p: number | null) => (p === null || availabilityPct === null ? null : round2((p * availabilityPct) / 100));
   return {
-    planMt, effDays: dates.length, effBreakdownHrs: round2(bdH), ccmBreakdownHrs: ccmH, performancePct, primePerformancePct, availabilityPct,
+    planMt, effDays: dates.length, effRunningHrs: runH, availableHrs: availH, performancePct, primePerformancePct, availabilityPct,
     plantEfficiencyPct: eff(performancePct), primeEfficiencyPct: eff(primePerformancePct),
   };
 }

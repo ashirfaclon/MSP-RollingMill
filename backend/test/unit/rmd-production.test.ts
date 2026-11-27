@@ -9,7 +9,7 @@ const entry = (date: string, vrno: string, input: number, prod: number, prime: n
   v: { INPUT_MT: input, ACTUAL_RUNNING_HRS: 5, PRODUCT_PRIME_SLENGTH_MT: prod, FINISH_PRODUCT_PRIME_MT: prime, BLOSS_MT: bloss, ENDCUT_MT: endcut, MISROLL_MT: misroll, CHIP_OFF_MT: chip, TOTAL_POWER_CONSUMPTION: null, MILL_SINGLE_STAND: null,
     ROLLING_IN_TOTAL_PERCENTAGE: null, ROLLING_IN_DELIVERY_PRCNT: null, PLANT_EFFICIENCY: null, PRODUCTION_TARGET: null,
     COAL_CONSUMPTION_KGMT: null, TOTAL_COAL_CONSUMPTION: null,
-    TOTAL_CCM_BD_IN_HRS: null, MILL_BKDN_IN_MIN_MECHANICAL: null, MILL_BKDN_IN_MIN_ELECTRICAL: null, MILL_BKDN_IN_MIN_PROCESS: null, MILL_BKDN_IN_MIN_RM: null, MILL_BKDN_IN_MIN_POWEROTHERS: null, MILL_1_12__STAND: null,
+    TOTAL_CCM_BD_IN_HRS: null, AVAILABLE_HOURS: null, MILL_BKDN_IN_MIN_MECHANICAL: null, MILL_BKDN_IN_MIN_ELECTRICAL: null, MILL_BKDN_IN_MIN_PROCESS: null, MILL_BKDN_IN_MIN_RM: null, MILL_BKDN_IN_MIN_POWEROTHERS: null, MILL_1_12__STAND: null,
     CCM_BYPASS_MT: null, MILL_BYPASS_MT: null, FINISH_PRODUCT_SLENGTH_MT: null, DELIVERY_RATE_MTHRS: null },
 });
 // 7 Oct 2026 as the ERP holds it: two entries.
@@ -125,49 +125,47 @@ test('TPH is the ERP\'s delivery rate; several entries weighted by their hours, 
   expect(deliveryRate([])).toBeNull();
 });
 
-describe('plant efficiency, the plant\'s formula (the user, 26 Nov 2026)', () => {
-  // 19 Nov 2026 Online as the ERP holds it: Prime + SL 244.81, 9.583 h running, 85 min process breakdown; a 250 MT plan.
-  const day = (date: string, sl: number, prime: number, runH: number, processMin: number, ccmH = 0): RmdLogRow => {
-    const e = entry(date, `L4P-${date}`, 260, sl, prime, 0, 0, 0, 0);
-    return { ...e, v: { ...e.v, ACTUAL_RUNNING_HRS: runH, MILL_BKDN_IN_MIN_PROCESS: processMin, TOTAL_CCM_BD_IN_HRS: ccmH } };
+describe('plant efficiency, the plant\'s formula (the user, 26 Nov 2026; availability 27 Nov 2026)', () => {
+  // 19 Nov 2026 Online as the ERP holds it: Prime + SL 244.81, 9.583 h actual of 11 h available; a 250 MT plan.
+  const day = (date: string, sl: number, prime: number, runH: number, availH: number | null, mode: 'online' | 'offline' = 'online'): RmdLogRow => {
+    const e = entry(date, `L4P-${date}-${mode === 'online' ? '0001' : '0002'}`, 260, sl, prime, 0, 0, 0, 0);
+    return { ...e, mode, v: { ...e.v, ACTUAL_RUNNING_HRS: runH, AVAILABLE_HOURS: availH, MILL_BKDN_IN_MIN_PROCESS: 85, TOTAL_CCM_BD_IN_HRS: 3 } };
   };
-  const n19 = day('2026-11-19', 244.81, 240, 9.583, 85);
-  const n20 = day('2026-11-20', 120, 118, 8.17, 0);
+  const n19 = day('2026-11-19', 244.81, 240, 9.583, 11);
+  const n20 = day('2026-11-20', 120, 118, 8.17, 8.17);
 
-  test('performance = actual ÷ plan; availability = running ÷ (running + breakdown + CCM breakdown); efficiency = their product ÷ 100', () => {
-    // 9.58 ÷ (9.58 + 1.42) — running hours already exclude the breakdown, so it is added back below the line.
+  test('availability = ACTUAL_RUNNING_HRS ÷ AVAILABLE_HOURS × 100; breakdown and CCM hours no longer enter it', () => {
     expect(plantEfficiency([n19], new Map([['2026-11-19', 250]]))).toEqual({
-      planMt: 250, effDays: 1, effBreakdownHrs: 1.42, ccmBreakdownHrs: 0,
-      performancePct: 97.92, primePerformancePct: 96, availabilityPct: 87.09,
-      plantEfficiencyPct: 85.28, primeEfficiencyPct: 83.61,
+      planMt: 250, effDays: 1, effRunningHrs: 9.58, availableHrs: 11,
+      performancePct: 97.92, primePerformancePct: 96, availabilityPct: 87.12,
+      plantEfficiencyPct: 85.31, primeEfficiencyPct: 83.64,
     });
   });
 
-  test('CCM breakdown counts (the user, 26 Nov 2026): 23 Nov Online — 7.75 h running, no mill breakdown, 3.17 h CCM', () => {
-    const n23 = day('2026-11-23', 197.08, 195.2, 7.75, 0, 3.1666666666666665);
-    expect(plantEfficiency([n23], new Map([['2026-11-23', 200]]))).toMatchObject({ ccmBreakdownHrs: 3.17, availabilityPct: 70.97 });
+  test('the same rule on Offline (no fixed 100 any more) and on Both', () => {
+    const off = day('2026-11-19', 244.81, 240, 9.583, 11, 'offline');
+    expect(plantEfficiency([off], new Map([['2026-11-19', 250]]))).toMatchObject({ availabilityPct: 87.12, plantEfficiencyPct: 85.31 });
+    // Both on one day: the two entries' hours added — (9.583 + 8.17) ÷ (11 + 8.17).
+    const off19 = { ...n20, date: '2026-11-19', vrno: 'L4P-2026-11-19-0002', mode: 'offline' as const };
+    expect(plantEfficiency([n19, off19], new Map([['2026-11-19', 400]]))).toMatchObject({ effRunningHrs: 17.75, availableHrs: 19.17, availabilityPct: 92.61 });
   });
 
   test('several days: MT and hours summed first, then the formula once', () => {
     const r = plantEfficiency([n19, n20], new Map([['2026-11-19', 250], ['2026-11-20', 120]]));
-    expect(r).toMatchObject({ planMt: 370, effDays: 2, performancePct: 98.6, availabilityPct: 92.59, plantEfficiencyPct: 91.29 });
+    expect(r).toMatchObject({ planMt: 370, effDays: 2, performancePct: 98.6, availabilityPct: 92.61, plantEfficiencyPct: 91.31 });
   });
 
-  test('Offline: breakdown hours never count (the user, 26 Nov 2026) — availability 100 %, efficiency = performance', () => {
-    const off: RmdLogRow = { ...n19, vrno: 'L4P-2026-11-19-0002', mode: 'offline' };
-    expect(plantEfficiency([off], new Map([['2026-11-19', 250]]))).toMatchObject({
-      effBreakdownHrs: 0, ccmBreakdownHrs: 0, availabilityPct: 100, performancePct: 97.92, plantEfficiencyPct: 97.92, primeEfficiencyPct: 96,
-    });
-    // Both: the Online entry's stops count, the Offline one's don't.
-    const on20: RmdLogRow = { ...n20, v: { ...n20.v, MILL_BKDN_IN_MIN_PROCESS: 60 } };
-    const off20: RmdLogRow = { ...off, date: '2026-11-20' };
-    expect(plantEfficiency([on20, off20], new Map([['2026-11-20', 400]]))).toMatchObject({ effBreakdownHrs: 1 });
+  test('an entry without available hours is left out of availability; none at all → no efficiency', () => {
+    expect(plantEfficiency([n19, { ...n20, v: { ...n20.v, AVAILABLE_HOURS: null } }], new Map([['2026-11-19', 250], ['2026-11-20', 120]])))
+      .toMatchObject({ effRunningHrs: 9.58, availableHrs: 11, availabilityPct: 87.12 });
+    expect(plantEfficiency([{ ...n19, v: { ...n19.v, AVAILABLE_HOURS: null } }], new Map([['2026-11-19', 250]])))
+      .toMatchObject({ availabilityPct: null, plantEfficiencyPct: null, performancePct: 97.92 });
   });
 
   test('only the days with both a plan and an ERP entry; no plan, no efficiency', () => {
-    expect(plantEfficiency([n19, n20], new Map([['2026-11-19', 250]]))).toMatchObject({ effDays: 1, plantEfficiencyPct: 85.28 });
+    expect(plantEfficiency([n19, n20], new Map([['2026-11-19', 250]]))).toMatchObject({ effDays: 1, plantEfficiencyPct: 85.31 });
     expect(plantEfficiency([n19], new Map())).toMatchObject({ effDays: 0, plantEfficiencyPct: null, primeEfficiencyPct: null });
     expect(plantEfficiency([n19], undefined).plantEfficiencyPct).toBeNull();
-    expect(summarise('d', '19 Nov', ['2026-11-19'], [n19], new Map([['2026-11-19', 250]]))).toMatchObject({ plantEfficiencyPct: 85.28, primeEfficiencyPct: 83.61 });
+    expect(summarise('d', '19 Nov', ['2026-11-19'], [n19], new Map([['2026-11-19', 250]]))).toMatchObject({ plantEfficiencyPct: 85.31, primeEfficiencyPct: 83.64 });
   });
 });

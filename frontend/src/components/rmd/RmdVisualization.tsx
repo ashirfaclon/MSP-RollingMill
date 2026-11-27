@@ -35,11 +35,13 @@ import '@/components/visualization/visualization.css';
 import './rmd.css';
 
 export default function RmdVisualization() {
+  const rolling = useGlobalSel().rmdMode;
   return (
     <div className="rm-viz">
       <RmdKpiStrip />
       <div className="rm-row">
-        <RmdShiftProduction rate={<RunningRateFoot />} />
+        {/* TPH · delivery rate: Online and Offline only, not under Both (the user, 27 Nov 2026). */}
+        <RmdShiftProduction rate={rolling === 'all' ? null : <RunningRateFoot />} />
         <RmdStockBySize />
       </div>
       <div className="rm-row rm-row--full">

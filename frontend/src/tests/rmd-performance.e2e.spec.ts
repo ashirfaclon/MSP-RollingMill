@@ -25,6 +25,18 @@ test.skip(!live, 'needs backend/.env (ERP cache)');
 test('RMD: rolling in casting, rolling in delivery and plant efficiency, per rolling, with their days', async ({ page }) => {
   await page.goto('/rmd/visualization');
   const strip = page.getByRole('region', { name: 'Headline KPIs' });
+  // Both (the default): no rolling in casting / delivery (the user, 27 Nov 2026) — ten cards, two rows of five.
+  await expect(strip.locator('.rm-card-value', { hasText: 'Loading' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(strip.getByRole('button', { name: /^Rolling in (casting|delivery)/ })).toHaveCount(0);
+  await expect(strip.locator('.rm-card')).toHaveCount(10);
+  const bothTops = await strip.locator('.rm-card').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top / 10)));
+  expect(new Set(bothTops).size).toBe(2);
+  expect(bothTops.filter((t) => t === bothTops[0]).length).toBe(5);
+  await strip.screenshot({ path: `${SHOTS}/rmd-both-cards.png` });
+  const both = await strip.getByRole('button', { name: /^Plant efficiency/ }).innerText();
+  const rolling = page.getByRole('button', { name: /^Rolling:/ });
+  await rolling.click();
+  await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Online' }).click();
   const cards = ['Rolling in casting', 'Rolling in delivery', 'Plant efficiency'];
   for (const c of cards) {
     await expect(strip.getByRole('button', { name: new RegExp(`^${c}`) })).not.toContainText('Loading', { timeout: 60_000 });
@@ -32,11 +44,9 @@ test('RMD: rolling in casting, rolling in delivery and plant efficiency, per rol
   }
   await page.screenshot({ path: `${SHOTS}/rmd-performance-cards.png` });
 
+  await expect(strip.locator('.rm-card')).toHaveCount(12);
   // Online and Offline: each its own figures.
-  const both = await strip.getByRole('button', { name: /^Plant efficiency/ }).innerText();
-  // The Rolling dropdown (was tabs, 21 Nov 2026).
-  const rolling = page.getByRole('button', { name: /^Rolling:/ });
-  await expect(rolling).toHaveAccessibleName('Rolling: Both');
+  await expect(rolling).toHaveAccessibleName('Rolling: Online');
   await rolling.click();
   await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Offline' }).click();
   await expect(rolling).toHaveAccessibleName('Rolling: Offline');
@@ -52,7 +62,7 @@ test('RMD: rolling in casting, rolling in delivery and plant efficiency, per rol
   expect(rows).toBe(2);
   await strip.screenshot({ path: `${SHOTS}/rmd-offline-cards.png` });
   await rolling.click();
-  await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Both' }).click();
+  await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Online' }).click();
 
   await strip.getByRole('button', { name: /^Rolling in casting/ }).click();
   const drill = page.getByRole('dialog', { name: /Rolling in casting and delivery/ });
@@ -62,25 +72,44 @@ test('RMD: rolling in casting, rolling in delivery and plant efficiency, per rol
   await drill.screenshot({ path: `${SHOTS}/rmd-performance-drill.png` });
 });
 
-test('RMD plant efficiency: performance against the dashboard plan × availability, Prime + SL and Prime (the user, 26 Nov 2026)', async ({ page }) => {
+test('RMD plant efficiency: availability = actual hours ÷ available hours, the same on Online, Offline and Both (the user, 27 Nov 2026)', async ({ page }) => {
+  test.setTimeout(240_000);
+  const period = async (from: string, to: string) => {
+    await page.getByRole('button', { name: /Duration/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Select period' });
+    await dialog.getByLabel('Start Date').fill(from);
+    await dialog.getByLabel('End Date').fill(to);
+    await dialog.getByRole('button', { name: 'Apply' }).click();
+  };
+  const num = (v: number | null) => (v === null ? 'NA' : String(v));
   await page.goto('/rmd/visualization');
-  await page.getByRole('button', { name: /Duration/ }).click();
-  const dialog = page.getByRole('dialog', { name: 'Select period' });
-  await dialog.getByLabel('Start Date').fill('2026-11-19');
-  await dialog.getByLabel('End Date').fill('2026-11-19');
-  await dialog.getByRole('button', { name: 'Apply' }).click();
-  await page.getByRole('button', { name: /^Rolling:/ }).click();
-  await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Online' }).click();
-  // 19 Nov Online: performance 101.69 % (Prime + SL ÷ the 240.74 MT plan) × availability 87.09 % (9.58 ÷ (9.58 + 1.42 + 0 CCM))
-  // = 88.56 %; Prime 87.71 %.
   const card = page.getByRole('region', { name: 'Headline KPIs' }).getByRole('button', { name: /^Plant efficiency/ });
-  await expect(card.locator('.rm-card-pair')).toHaveText(/Prime \+ SL\s*88\.56\s*Prime\s*87\.71/, { timeout: 60_000 });
-  await card.click();
-  const d = page.getByRole('dialog', { name: /Plant efficiency/ });
-  await expect(d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot')).toContainText('88.56');
-  await expect(d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot')).toContainText('87.09');
-  await page.waitForTimeout(1200);
-  await d.screenshot({ path: `${SHOTS}/rmd-efficiency-drill.png` });
+  for (const [from, to] of [['2026-11-25', '2026-11-25'], ['2026-11-01', '2026-11-26']]) {
+    await period(from, to);
+    for (const [rolling, mode] of [['Online', 'online'], ['Offline', 'offline'], ['Both', 'all']] as const) {
+      const api = await (await page.request.get(`http://localhost:8521/api/rmd/production?from=${from}&to=${to}&grain=day&mode=${mode}`)).json();
+      const t = api.totals as { plantEfficiencyPct: number | null; primeEfficiencyPct: number | null; availabilityPct: number | null; effRunningHrs: number | null; availableHrs: number | null };
+      if (t.effRunningHrs !== null && t.availableHrs) {
+        expect(t.availabilityPct, `${rolling} ${from}`).toBeCloseTo((t.effRunningHrs / t.availableHrs) * 100, 0);
+      }
+      await page.getByRole('button', { name: /^Rolling:/ }).click();
+      await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: rolling }).click();
+      await expect(card.locator('.rm-card-pair')).toHaveText(new RegExp(`Prime \\+ SL\\s*${num(t.plantEfficiencyPct).replace('.', '\\.')}\\s*Prime\\s*${num(t.primeEfficiencyPct).replace('.', '\\.')}`), { timeout: 60_000 });
+      await card.click();
+      const d = page.getByRole('dialog', { name: /Plant efficiency/ });
+      const table = d.getByRole('table', { name: 'Plant efficiency by period' });
+      await expect(table.locator('thead')).toContainText('Actual hours (h)');
+      await expect(table.locator('thead')).toContainText('Available hours (h)');
+      await expect(table.locator('thead')).not.toContainText('Breakdown');
+      await expect(table.locator('tfoot')).toContainText(num(t.availabilityPct));
+      await expect(d.getByRole('region', { name: 'Formula' })).toContainText('Availability = Actual hours ÷ Available hours × 100');
+      await expect(d.getByRole('region', { name: 'Data source' })).toContainText('AVAILABLE_HOURS');
+      await expect(d.getByRole('region', { name: 'Data source' })).not.toContainText('MILL_BKDN');
+      await page.waitForTimeout(600);
+      await d.screenshot({ path: `${SHOTS}/rmd-efficiency-${mode}-${from === to ? 'day' : 'month'}.png` });
+      await d.getByRole('button', { name: 'Close' }).click();
+    }
+  }
 });
 
 test('RMD Breakdown: the sheet\'s seven items added, hours; opens each on its own like Finished stock (the user, 25 Nov 2026)', async ({ page }) => {
@@ -98,7 +127,8 @@ test('RMD Breakdown: the sheet\'s seven items added, hours; opens each on its ow
     await page.setViewportSize({ width: w, height: 1000 });
     const rows = new Set(await strip.locator('.rm-card').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top / 10)))).size;
     expect(rows, `${w}: two rows`).toBe(2);
-    await expect(strip.locator('.rm-card')).toHaveCount(12);
+    // Both: ten cards, two rows of five — no rolling % under Both (the user, 27 Nov 2026).
+    await expect(strip.locator('.rm-card')).toHaveCount(10);
   }
   await card.click();
   const d = page.getByRole('dialog', { name: 'Breakdown' });
@@ -190,6 +220,15 @@ test('RMD TPH is the ERP\'s delivery rate, exactly as filed — Visualization an
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect(await foot.evaluate((e) => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
   }
+  // Both: no TPH (the user, 27 Nov 2026) — the plan panel keeps three equal figures, no empty fourth.
+  await page.getByRole('button', { name: /^Rolling:/ }).click();
+  await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Both' }).click();
+  await expect(foot).toHaveCount(0, { timeout: 30_000 });
+  const stats = page.locator('.rm-pvp-stats').first();
+  await expect(stats.locator('> *')).toHaveCount(3);
+  const widths = await stats.locator('> *').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
+  expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(3);
+  await online();
   await page.goto('/rmd/condition-analytics');
   await expect(page.getByRole('button', { name: /^Actual rate/ }).locator('.rm-card-value')).toHaveText(/^12\.85/, { timeout: 60_000 });
   expect(errors).toEqual([]);
@@ -216,69 +255,4 @@ test('RMD Billets in says it is from Influx (the plant counters), not the ERP �
   await expect(src).not.toContainText('ERP');
   if (down) await expect(d.getByRole('status').filter({ hasText: 'not answering' })).toContainText('ERP figures are not affected');
   await d.screenshot({ path: `${SHOTS}/rmd-billets-drill.png` });
-});
-
-test('RMD Offline plant efficiency: breakdown hours never count, so it is what was made against the plan (the user, 26 Nov 2026)', async ({ page }) => {
-  for (const w of [1366, 1920]) {
-    await page.setViewportSize({ width: w, height: 1000 });
-    await page.goto('/rmd/visualization');
-    await page.getByRole('button', { name: /Duration/ }).click();
-    const dialog = page.getByRole('dialog', { name: 'Select period' });
-    await dialog.getByLabel('Start Date').fill('2026-11-23');
-    await dialog.getByLabel('End Date').fill('2026-11-26');
-    await dialog.getByRole('button', { name: 'Apply' }).click();
-    await page.getByRole('button', { name: /^Rolling:/ }).click();
-    await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: 'Offline' }).click();
-    // 23–25 Nov Offline (26 Nov not filed yet): Prime + SL 461.2, Prime 450.81 MT against 3 × 178.32 = 534.96 MT of plan;
-    // no stops counted, availability 100 % → 86.21 % and 84.27 %.
-    const card = page.getByRole('region', { name: 'Headline KPIs' }).getByRole('button', { name: /^Plant efficiency/ });
-    await expect(card.locator('.rm-card-pair')).toHaveText(/Prime \+ SL\s*86\.21\s*Prime\s*84\.27/, { timeout: 60_000 });
-    expect(await card.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), `${w}: no overflow`).toBe(true);
-    await card.click();
-    const d = page.getByRole('dialog', { name: /Plant efficiency/ });
-    const foot = d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot td');
-    // Offline: Plan, Prime + SL, Prime, Performance, Availability, Efficiency ×2 — no running / breakdown hours (27 Nov 2026).
-    await expect(foot).toHaveText(['Total', '534.96', '461.2', '450.81', '86.21', '100', '86.21', '84.27']);
-    await page.waitForTimeout(1200);
-    await d.screenshot({ path: `${SHOTS}/rmd-efficiency-offline-${w}.png` });
-  }
-});
-
-test('RMD plant efficiency drill-down: the formula box states each rolling\'s availability rule (the user, 27 Nov 2026)', async ({ page }) => {
-  await page.goto('/rmd/visualization');
-  await page.getByRole('button', { name: /Duration/ }).click();
-  const dialog = page.getByRole('dialog', { name: 'Select period' });
-  await dialog.getByLabel('Start Date').fill('2026-11-25');
-  await dialog.getByLabel('End Date').fill('2026-11-25');
-  await dialog.getByRole('button', { name: 'Apply' }).click();
-  const card = page.getByRole('region', { name: 'Headline KPIs' }).getByRole('button', { name: /^Plant efficiency/ });
-  // 25 Nov: Online 79.15 / 78.40; Offline 109.20 / 106.75 (no stops counted); Both 92.78 / 91.33.
-  const cases: [string, RegExp, RegExp, string | null][] = [
-    ['Online', /Prime \+ SL\s*79\.15\s*Prime\s*78\.4/, /Availability = Running hours ÷ \(Running hours \+ Breakdown hours \+ CCM breakdown hours\) × 100/, null],
-    ['Offline', /Prime \+ SL\s*109\.2\s*Prime\s*106\.75/, /Availability = 100 \(breakdown hours are not counted for Offline\)/, 'Running hours ÷'],
-    ['Both', /Prime \+ SL\s*92\.78\s*Prime\s*91\.33/, /Breakdown and CCM breakdown hours: Online entries only/, null],
-  ];
-  for (const [rolling, value, formula, absent] of cases) {
-    await page.getByRole('button', { name: /^Rolling:/ }).click();
-    await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: rolling }).click();
-    await expect(card.locator('.rm-card-pair')).toHaveText(value, { timeout: 60_000 });
-    await card.click();
-    const d = page.getByRole('dialog', { name: /Plant efficiency/ });
-    const box = d.getByRole('region', { name: 'Formula' });
-    await expect(box).toContainText(formula);
-    if (absent) await expect(box).not.toContainText(absent);
-    // Offline: no breakdown columns or fields — only what its figure is made of.
-    const head = d.getByRole('table', { name: 'Plant efficiency by period' }).locator('thead');
-    const src = d.getByRole('region', { name: 'Data source' });
-    if (rolling === 'Offline') {
-      await expect(head).not.toContainText('Breakdown');
-      await expect(src).not.toContainText('MILL_BKDN');
-    } else {
-      await expect(head).toContainText('CCM breakdown (h)');
-      await expect(src).toContainText('TOTAL_CCM_BD_IN_HRS');
-    }
-    await page.waitForTimeout(800);
-    await d.screenshot({ path: `${SHOTS}/rmd-efficiency-formula-${rolling.toLowerCase()}.png` });
-    await d.getByRole('button', { name: 'Close' }).click();
-  }
 });

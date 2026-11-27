@@ -60,6 +60,8 @@
    production, prime, yield, rolling in casting / delivery, plant efficiency — then power, energy, the two
    mill speeds, chemistry and Finished stock at the right end (the user, 31 Oct 2026). */
 .rm-strip.rmd-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+/* Both (no rolling %, the user, 27 Nov 2026): ten cards, two rows of five. */
+.rm-strip.rmd-strip.rmd-strip--ten { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 /* Narrow cards: a card's date on its own line under the label. */
 .rmd-strip .rm-card-term { display: block; margin-top: 2px; }
 .rmd-strip .rm-card-term::before { content: none; }
