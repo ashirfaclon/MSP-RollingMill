@@ -7,7 +7,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { SessionResponse, SsoExchangeResponse } from '../../contracts';
 import type { ServerConfig } from '../../config/server';
-import { exchangeSsoToken } from '../../integrations/logbook/client';
+import { describeUser, exchangeSsoToken } from '../../integrations/logbook/client';
 import { HttpError } from '../../shared/http-error';
 import { MSG } from '../../shared/messages';
 
@@ -36,6 +36,12 @@ export async function authRoutes(app: FastifyInstance, opts: { config: ServerCon
     const sessionToken = app.jwt.sign({ sub: userId, org: organisation });
     const { exp } = app.jwt.decode<{ exp: number }>(sessionToken)!;
     req.log.info({ userId, organisation }, 'signed in from IOsense');
+    // Who this is in IOsense — role / main account — written to the log, to build per-mill access on
+    // (the user, 27 Nov 2026). Does not hold up the sign-in; the person's session is not kept.
+    if (r.userBearer) {
+      const log = req.log;
+      void describeUser(r.userBearer).then((d) => log.info({ userId, organisation, ...d }, 'IOsense role at sign-in'));
+    }
     return { sessionToken, expiresAt: new Date(exp * 1000).toISOString(), user: { userId, organisation } };
   });
 

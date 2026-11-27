@@ -182,9 +182,11 @@ describe('sign-in with the IOsense SSO token', () => {
   beforeAll(async () => {
     const used = new Set<string>();
     iosense = createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      // After a sign-in the app asks who the person is (my-permissions / fetchRole, 27 Nov 2026) — not an exchange.
+      if (!(req.url ?? '').startsWith('/api/retrieve-sso-token/')) { res.end(JSON.stringify({ success: true, data: { isSubUser: true, roleID: 'r-1' } })); return; }
       const token = decodeURIComponent((req.url ?? '').split('/').pop() ?? '');
       calls.push(token);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
       const ok = (token === 'GOOD' || token === 'OTHER-ORG') && !used.has(token);
       used.add(token);
       res.end(JSON.stringify(ok

@@ -3,14 +3,19 @@
  * from the pellet client (handover §5).
  *
  * Auth: a one-time SSO token arrives on the app URL (?token=); the browser posts it to
- * /api/auth/sso, which exchanges it here (signing the user in to the app) and keeps the
- * resulting Bearer JWT IN PROCESS MEMORY only — never sent to the browser, never written
- * to disk. A PAT in .env.local may seed a session
- * (a PAT does not expire; an SSO session dies with the process). With no valid session
- * every logbook-derived value stays NA. No substitution, ever.
+ * /api/auth/sso, which exchanges it here (signing the user in to the app). The server reads data
+ * with ONE session: the access token from the environment (IOSENSE_BEARER / IOSENSE_PAT) when set —
+ * a person signing in never replaces it (the user, 27 Nov 2026: a sub-user with fewer IOsense
+ * permissions would otherwise turn logbook figures off for everyone until the next sign-in). Only
+ * with no token in the environment does the signed-in person's session become the data session.
+ * The person's own IOsense session is used just to ask who they are (role) and is never kept.
+ * Nothing is sent to the browser or written to disk. With no valid session every logbook-derived
+ * value stays NA. No substitution, ever.
  *
  * IOsense functionIDs used (tracked in iosense.md):
  *   validateSSOToken    GET  /api/retrieve-sso-token/{token}
+ *   my-permissions      GET  /api/account/my-permissions                 — the person's IOsense role (sub-users)
+ *   fetchRole           PUT  /api/account/subuser/fetchRole/{page}/{size} — the account's roles (main account)
  *   findUserDevices     PUT  /api/account/devices/1/1          — session probe only
  *   insightResult fetch PUT  /api/account/bruce/insightResult/fetch/paginated/{id}
  *
@@ -77,6 +82,8 @@ export interface SsoExchange {
   message: string;
   /** Who IOsense signed in — present when ok. */
   user?: { userId: string; organisation: string };
+  /** The person's own IOsense session — for asking who they are (describeUser), never kept. */
+  userBearer?: string;
   /** true when IOsense answered and refused the token (vs. could not be reached). */
   rejected?: boolean;
 }
@@ -92,15 +99,55 @@ export async function exchangeSsoToken(ssoToken: string, env = loadEnv()): Promi
     });
     const body = (await res.json()) as { success?: boolean; token?: string; userId?: string; organisation?: string };
     if (!body.success || !body.token) return { ok: false, rejected: true, message: MSG.LOGBOOK_SESSION_EXPIRED };
-    // Already prefixed "Bearer " — store and send as-is.
-    bearer = body.token.startsWith('Bearer ') ? body.token : `Bearer ${body.token}`;
-    droppedReason = null;
-    // A new session invalidates everything fetched under the old one.
-    cache.length = 0;
-    forms.clear();
-    return { ok: true, message: MSG.LOGBOOK_UP, user: { userId: String(body.userId ?? ''), organisation: String(body.organisation ?? '') } };
+    // Already prefixed "Bearer " — send as-is.
+    const userBearer = body.token.startsWith('Bearer ') ? body.token : `Bearer ${body.token}`;
+    if (env.iosenseBearer) {
+      // Data stays on the environment's token; a refusal that dropped it is taken back now.
+      if (bearer === null) { bearer = undefined; droppedReason = null; }
+    } else {
+      bearer = userBearer;
+      droppedReason = null;
+      // A new session invalidates everything fetched under the old one.
+      cache.length = 0;
+      forms.clear();
+    }
+    return { ok: true, message: MSG.LOGBOOK_UP, userBearer, user: { userId: String(body.userId ?? ''), organisation: String(body.organisation ?? '') } };
   } catch {
     return { ok: false, message: MSG.LOGBOOK_UNREACHABLE };
+  }
+}
+
+/** What IOsense says about a signed-in person: sub-user or main account, their role, and (main account) the roles defined. */
+export interface UserDescription {
+  isSubUser: boolean | null;
+  roleId: string | null;
+  /** Main account only: every role of the account — id, name and how many sub-users are in it. */
+  roles?: { id: string; name: string; members: number }[];
+  error?: string;
+}
+
+/**
+ * Ask IOsense who a signed-in person is, with their own session (functionIDs my-permissions, fetchRole).
+ * my-permissions answers isSubUser and, for a sub-user, the roleID; for the main account the roles are listed
+ * instead so a roleID can be matched to its name. Best effort: a failure is described, never thrown.
+ */
+export async function describeUser(userBearer: string, env = loadEnv()): Promise<UserDescription> {
+  try {
+    const res = await fetch(`${env.iosenseBase}/api/account/my-permissions`, { headers: headers(env, userBearer), signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const body = (await res.json().catch(() => ({}))) as { success?: boolean; data?: { isSubUser?: boolean; roleID?: string } };
+    const isSubUser = typeof body.data?.isSubUser === 'boolean' ? body.data.isSubUser : null;
+    const out: UserDescription = { isSubUser, roleId: body.data?.roleID ? String(body.data.roleID) : null };
+    if (!body.success) out.error = `my-permissions HTTP ${res.status}`;
+    if (isSubUser === false) {
+      const r = await fetch(`${env.iosenseBase}/api/account/subuser/fetchRole/1/100`, {
+        method: 'PUT', headers: headers(env, userBearer), body: JSON.stringify({ search: {} }), signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      const j = (await r.json().catch(() => ({}))) as { data?: { data?: { _id?: string; roleName?: string; subUsers?: unknown[] }[] } };
+      out.roles = (j.data?.data ?? []).map((x) => ({ id: String(x._id ?? ''), name: String(x.roleName ?? ''), members: Array.isArray(x.subUsers) ? x.subUsers.length : 0 }));
+    }
+    return out;
+  } catch (e) {
+    return { isSubUser: null, roleId: null, error: (e as Error).message };
   }
 }
 

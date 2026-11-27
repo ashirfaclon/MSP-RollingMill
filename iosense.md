@@ -75,3 +75,5 @@ body: { insightID, pagination: { page, count: 500 },
 | Resource | ID | Notes |
 |---|---|---|
 | MSP logbook insight | `INS_353018753af1` | HSM forms found: quality-report-hsm/hsm-online-profile-check-inspection-report, electrical-hsm/electrical-delays, ccm/hsm. `ccm/entry-os` (Entry OS) exists but its 3 entries in 60 days are all for mill RMS — not usable for HSM billet length |
+| 2026-11-27 | auth | `my-permissions` | Signed-in sub-user's role | GET `/api/account/my-permissions` with the person's session (logged at sign-in) |
+| 2026-11-27 | auth | `fetchRole` | Main account's roles (name, members) | PUT `/api/account/subuser/fetchRole/1/100`, body `{search:{}}` |
