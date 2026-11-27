@@ -21,15 +21,15 @@ export const LOG_METRICS: Record<LogMetric, {
   name: string; unit: string; field: string; token: string;
   /** The figure it is read against, beside it in the table. */
   against: { key: Num; name: string; unit: string; field: string };
-  /** Also shown as a % of `against` (the user, 27 Nov 2026: HSM Defective % beside the MT). */
-  pct?: boolean;
+  /** Its % as the ERP files it (the user, 27 Nov 2026): the period's field and the ERP's attribute. */
+  pct?: { key: 'rollingDefectPct' | 'ccmBypassPct' | 'hsmBypassPct'; field: string };
 }> = {
-  rollingDefectMt: { name: 'Defective', unit: 'MT', field: 'ROLLING_DEFECT_MT', token: '--risk', pct: true,
+  rollingDefectMt: { name: 'Defective', unit: 'MT', field: 'ROLLING_DEFECT_MT', token: '--risk', pct: { key: 'rollingDefectPct', field: 'ROLLING_DEFECT_PERCENTAGE' },
     against: { key: 'productionMt', name: 'Production', unit: 'MT', field: 'PRODUCTION_MT' } },
-  ccmBypassMt: { name: 'CCM bypass', unit: 'MT', field: 'CCM_BY_PASSMT', token: '--s-alt',
-    against: { key: 'inputMt', name: 'Billet input', unit: 'MT', field: 'INPUT_MT' } },
-  hsmBypassMt: { name: 'HSM bypass', unit: 'MT', field: 'HSM_BYPASS_MT', token: '--violet',
-    against: { key: 'inputMt', name: 'Billet input', unit: 'MT', field: 'INPUT_MT' } },
+  ccmBypassMt: { name: 'CCM bypass', unit: 'MT', field: 'CCM_BY_PASSMT', token: '--s-alt', pct: { key: 'ccmBypassPct', field: 'CCM_BYPASS_PERCENTAGE' },
+    against: { key: 'castMt', name: 'Total cast', unit: 'MT', field: 'TOTAL_CAST_QTY' } },
+  hsmBypassMt: { name: 'HSM bypass', unit: 'MT', field: 'HSM_BYPASS_MT', token: '--violet', pct: { key: 'hsmBypassPct', field: 'HSM_BYPASS_PERCENTAGE' },
+    against: { key: 'castMt', name: 'Total cast', unit: 'MT', field: 'TOTAL_CAST_QTY' } },
   breakdownHrs: { name: 'Breakdown', unit: 'h', field: 'DELAY_HRS', token: '--risk',
     against: { key: 'productionMt', name: 'Production', unit: 'MT', field: 'PRODUCTION_MT' } },
 };
@@ -37,13 +37,12 @@ export const LOG_METRICS: Record<LogMetric, {
 const f = (v: number | null | undefined) => (v === null || v === undefined ? '—' : fmtNum(v, 2));
 
 /**
- * A metric as a % of the figure it is read against — Σ metric ÷ Σ against × 100 over the period, the tonnes added first
- * (as the ERP's ROLLING_DEFECT_PERCENTAGE per entry: ROLLING_DEFECT_MT ÷ PRODUCTION_MT). Null without both.
+ * A metric's % as the ERP files it — ROLLING_DEFECT_PERCENTAGE, CCM_BYPASS_PERCENTAGE, HSM_BYPASS_PERCENTAGE — not
+ * worked out here (the user, 27 Nov 2026). Over several entries the backend weights each by what it is a % of.
  */
 export function shareOf(x: LogPeriod, metric: LogMetric): number | null {
-  const v = x[metric] as number | null;
-  const of = x[LOG_METRICS[metric].against.key] as number | null;
-  return v === null || v === undefined || !of ? null : (v / of) * 100;
+  const p = LOG_METRICS[metric].pct;
+  return p ? x[p.key] ?? null : null;
 }
 
 export default function LogMetricDrawer({ metric, onClose }: { metric: LogMetric | null; onClose: () => void }) {
@@ -92,11 +91,14 @@ function Content({ data, metric }: { data: LogSheetReport; metric: LogMetric }) 
           ['Table', 'ATTR_TRAN_DATA_HEAD ⋈ ATTR_TRAN_DATA_BODY'],
           ['Filter', "ENTITY 'MP' · DIV 'S1' · TNATURE 'PRLOG' · SERIES 'L6P'"],
           ['Rolling', 'TRAN_COLUMN_NAME1: ST001 = Online, ST002 = Offline'],
-          ['Field', `ATTR_CODE = '${m.field}', '${m.against.field}' (value in ATTR_VALUE)`],
+          ['Field', `ATTR_CODE = '${m.field}', ${m.pct ? `'${m.pct.field}', ` : ''}'${m.against.field}' (value in ATTR_VALUE)`],
         ] }]}
         formula={[
           `${m.name} = Σ ${m.field} of the chosen rolling's entries (Both adds Online and Offline)`,
-          ...(m.pct ? [`${m.name} % = Σ ${m.field} ÷ Σ ${m.against.field} × 100`] : []),
+          ...(m.pct ? [
+            `${m.name} % = the ERP's ${m.pct.field} of each entry, as filed`,
+            `Several entries: each % weighted by ${m.against.field}`,
+          ] : []),
         ]}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}

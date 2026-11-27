@@ -25,6 +25,16 @@ export interface LogPeriod {
   /** CCM_BY_PASSMT, HSM_BYPASS_MT — billets cast and not rolled in the HSM (Online entries only, so far). */
   ccmBypassMt: number | null;
   hsmBypassMt: number | null;
+  /** TOTAL_CAST_QTY — what the ERP's CCM_BYPASS_PERCENTAGE / HSM_BYPASS_PERCENTAGE divide by (the user, 27 Nov 2026). */
+  castMt: number | null;
+  /**
+   * The ERP's own % (the user, 27 Nov 2026 — "from the ERP, not calculated"): ROLLING_DEFECT_PERCENTAGE,
+   * CCM_BYPASS_PERCENTAGE, HSM_BYPASS_PERCENTAGE of the entry, as filed. Over several entries — a week, or Online and
+   * Offline together — each entry's % weighted by what it is a % of (PRODUCTION_MT; TOTAL_CAST_QTY). Null with none.
+   */
+  rollingDefectPct: number | null;
+  ccmBypassPct: number | null;
+  hsmBypassPct: number | null;
   /** DELAY_HRS — breakdown hours, as LSM's (performance.xlsx, the user, 25 Nov 2026). */
   breakdownHrs: number | null;
   /** input − production. */

@@ -143,7 +143,7 @@ export default function MaterialBalance() {
         { key: 'out', label: 'Coils out', value: has ? t!.productionPcs : null, unit: 'pcs', whole: true, loading, onOpen: () => setOpen(true), title: 'Material balance per day' },
         ...OPS.filter((k) => mode !== 'offline' || k === 'rollingDefectMt').map((k) => ({
           key: k, label: LOG_METRICS[k].name, value: has ? (t![k] as number | null) : null, unit: LOG_METRICS[k].unit, loading,
-          // Defective with its % of production beside it (the user, 27 Nov 2026).
+          // Each with its % beside it (the user, 27 Nov 2026): defective of production, the bypasses of the total cast.
           pct: has && LOG_METRICS[k].pct ? shareOf(t!, k) : null,
           onOpen: () => setMetric(k), title: `${LOG_METRICS[k].name} per day`,
         })),

@@ -91,3 +91,29 @@ describe('stock', () => {
     expect(financialYear('2026-04-01')).toEqual({ label: '26-27', start: '2026-04-01' });
   });
 });
+
+describe('HSM defective / bypass %: the ERP\'s own figures (the user, 27 Nov 2026)', () => {
+  // 26 Oct 2026 as the ERP holds it: Online and Offline entries of the same day.
+  const on = { date: '2026-10-26', vrno: 'L6P26O26-0001', mt: 148.49, mode: 'online' as const, v: {
+    PRODUCTION_MT: 148.49, TOTAL_CAST_QTY: 159.79, ROLLING_DEFECT_MT: 12.31, CCM_BY_PASSMT: 0.81, HSM_BYPASS_MT: 4.79,
+    ROLLING_DEFECT_PERCENTAGE: 8.29, CCM_BYPASS_PERCENTAGE: 0.505, HSM_BYPASS_PERCENTAGE: 3 } } as ErpProductionRow;
+  const off = { date: '2026-10-26', vrno: 'L6P26O26-0002', mt: 6.15, mode: 'offline' as const, v: {
+    PRODUCTION_MT: 6.15, TOTAL_CAST_QTY: 6.39, ROLLING_DEFECT_PERCENTAGE: 0, CCM_BYPASS_PERCENTAGE: 0, HSM_BYPASS_PERCENTAGE: 0 } } as ErpProductionRow;
+  const pct = (rows: ErpProductionRow[]) => {
+    const p = summariseLog('d', '26 Oct', buildLogDays(['2026-10-26'], rows, new Map()));
+    return { rollingDefectPct: p.rollingDefectPct, ccmBypassPct: p.ccmBypassPct, hsmBypassPct: p.hsmBypassPct };
+  };
+
+  test('one entry: exactly the ERP\'s %, as filed', () => {
+    expect(pct([on])).toEqual({ rollingDefectPct: 8.29, ccmBypassPct: 0.51, hsmBypassPct: 3 });
+  });
+  test('several entries: each % weighted by what it is a % of — production; total cast', () => {
+    // (8.29 × 148.49 + 0 × 6.15) ÷ 154.64; (0.505 × 159.79 + 0) ÷ 166.18; (3 × 159.79 + 0) ÷ 166.18.
+    expect(pct([on, off])).toEqual({ rollingDefectPct: 7.96, ccmBypassPct: 0.49, hsmBypassPct: 2.88 });
+  });
+  test('a typing slip shows as filed; no % filed is null, not 0', () => {
+    expect(pct([{ ...on, v: { ...on.v, HSM_BYPASS_PERCENTAGE: 92.929 } }]).hsmBypassPct).toBe(92.93);
+    const { ROLLING_DEFECT_PERCENTAGE: _d, CCM_BYPASS_PERCENTAGE: _c, HSM_BYPASS_PERCENTAGE: _h, ...bare } = on.v!;
+    expect(pct([{ ...on, v: bare }])).toEqual({ rollingDefectPct: null, ccmBypassPct: null, hsmBypassPct: null });
+  });
+});

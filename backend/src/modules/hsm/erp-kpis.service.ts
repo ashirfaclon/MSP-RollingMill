@@ -38,12 +38,36 @@ const sum = (xs: number[]) => round2(xs.reduce((a, b) => a + b, 0));
 
 /* ------------------------------- log sheet ------------------------------- */
 
-type DayFields = Omit<LogPeriod, 'key' | 'label' | 'fromDate' | 'toDate' | 'days' | 'balanceOkDays' | 'qualityOkDays' | 'storesOkDays'>;
-interface LogDay extends DayFields { date: string }
+type DayFields = Omit<LogPeriod, 'key' | 'label' | 'fromDate' | 'toDate' | 'days' | 'balanceOkDays' | 'qualityOkDays' | 'storesOkDays' | PctKey>;
+type PctKey = 'rollingDefectPct' | 'ccmBypassPct' | 'hsmBypassPct';
+/** Σ (% × weight) and Σ weight of the entries that have the ERP's % — so a day or a period is their weighted mean. */
+type PctParts = Record<PctKey, { pw: number; w: number }>;
+interface LogDay extends DayFields { date: string; pct: PctParts }
+
+/** The ERP's % per entry, and what each is a % of (its weight over several entries). */
+const PCT_OF: Record<PctKey, { pct: LogField; of: (r: ErpProductionRow) => number | null }> = {
+  rollingDefectPct: { pct: 'ROLLING_DEFECT_PERCENTAGE', of: (r) => r.mt ?? r.v?.PRODUCTION_MT ?? null },
+  ccmBypassPct: { pct: 'CCM_BYPASS_PERCENTAGE', of: (r) => r.v?.TOTAL_CAST_QTY ?? null },
+  hsmBypassPct: { pct: 'HSM_BYPASS_PERCENTAGE', of: (r) => r.v?.TOTAL_CAST_QTY ?? null },
+};
+const PCT_KEYS = Object.keys(PCT_OF) as PctKey[];
+
+function pctParts(vs: ErpProductionRow[]): PctParts {
+  return Object.fromEntries(PCT_KEYS.map((k) => {
+    let pw = 0, w = 0;
+    for (const r of vs) {
+      const p = r.v?.[PCT_OF[k].pct];
+      const of = PCT_OF[k].of(r);
+      if (typeof p !== 'number' || of === null || !(of > 0)) continue;
+      pw += p * of; w += of;
+    }
+    return [k, { pw, w }];
+  })) as PctParts;
+}
 
 const SUMMED = [
   'inputMt', 'inputPcs', 'productionMt', 'productionPcs', 'primeMt', 'defectiveMt', 'rollingDefectMt',
-  'burningLossMt', 'endCutMt', 'missRollMt', 'rejectMt', 'ccmBypassMt', 'hsmBypassMt', 'breakdownHrs', 'massDiffMt', 'storesMt',
+  'burningLossMt', 'endCutMt', 'missRollMt', 'rejectMt', 'ccmBypassMt', 'hsmBypassMt', 'castMt', 'breakdownHrs', 'massDiffMt', 'storesMt',
   'balanceGapMt', 'qualityGapMt', 'storesGapMt',
 ] as const satisfies readonly (keyof DayFields)[];
 
@@ -51,7 +75,7 @@ const FIELD_OF: Record<Exclude<(typeof SUMMED)[number], 'massDiffMt' | 'storesMt
   inputMt: 'INPUT_MT', inputPcs: 'INPUT_PCS', productionMt: 'PRODUCTION_MT', productionPcs: 'PRODUCTION_PCS',
   primeMt: 'PRIME_MT', defectiveMt: 'DEFECTIVE_MT', rollingDefectMt: 'ROLLING_DEFECT_MT',
   burningLossMt: 'BLOSS_MT', endCutMt: 'ENDCUT_MT', missRollMt: 'MISSROLL_MT', rejectMt: 'REJECT_MT',
-  ccmBypassMt: 'CCM_BY_PASSMT', hsmBypassMt: 'HSM_BYPASS_MT', breakdownHrs: 'DELAY_HRS',
+  ccmBypassMt: 'CCM_BY_PASSMT', hsmBypassMt: 'HSM_BYPASS_MT', castMt: 'TOTAL_CAST_QTY', breakdownHrs: 'DELAY_HRS',
 };
 
 /**
@@ -68,7 +92,7 @@ export function buildLogDays(
   return dates.map((date) => {
     const vs = byDate.get(date) ?? [];
     const stores = storesByDate.has(date) ? round2(storesByDate.get(date)!) : null;
-    const base = { date, entryDays: vs.length ? 1 : 0, entries: vs.length, storesMt: stores };
+    const base = { date, entryDays: vs.length ? 1 : 0, entries: vs.length, storesMt: stores, pct: pctParts(vs) };
     if (!vs.length) {
       const nulls = Object.fromEntries(SUMMED.map((k) => [k, null])) as Record<(typeof SUMMED)[number], null>;
       return { ...nulls, ...base, yieldPct: null };
@@ -83,7 +107,7 @@ export function buildLogDays(
       ...base,
       inputMt: input, inputPcs: f('inputPcs'), productionMt: prod, productionPcs: f('productionPcs'),
       ...quality, ...losses,
-      ccmBypassMt: f('ccmBypassMt'), hsmBypassMt: f('hsmBypassMt'), breakdownHrs: f('breakdownHrs'),
+      ccmBypassMt: f('ccmBypassMt'), hsmBypassMt: f('hsmBypassMt'), castMt: f('castMt'), breakdownHrs: f('breakdownHrs'),
       massDiffMt: round2(input - prod),
       yieldPct: input > 0 ? round2((prod / input) * 100) : null,
       storesMt: stores ?? 0,
@@ -102,6 +126,11 @@ export function summariseLog(key: string, label: string, days: LogDay[]): LogPer
     entries: days.reduce((a, d) => a + d.entries, 0),
   } as LogPeriod;
   for (const k of SUMMED) out[k] = entered.length ? sum(entered.map((d) => d[k] ?? 0)) : null;
+  for (const k of PCT_KEYS) {
+    const pw = entered.reduce((a, d) => a + d.pct[k].pw, 0);
+    const w = entered.reduce((a, d) => a + d.pct[k].w, 0);
+    out[k] = w > 0 ? round2(pw / w) : null;
+  }
   // Stores receipts can exist on a day the log sheet has not reached; they are still receipts.
   const stored = days.filter((d) => d.storesMt !== null);
   out.storesMt = stored.length ? sum(stored.map((d) => d.storesMt!)) : null;

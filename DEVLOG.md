@@ -700,3 +700,27 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   year 292.52 MT · 0.75 %; one row at 1366 / 1920, no spill. `BalanceStats` gains `pct`. Influx was jammed again
   (CPP-MSP-Dashboard ~3,000 connections to 10.135.20.130), so HSM Influx-backed calls time out locally — not from this
   change. e2e hsm-defective-pct passes. Not committed.
+- **27 Nov 2026** — **HSM CCM bypass and HSM bypass show their % too** (the user), beside the MT like Defective:
+  "1,932.66 MT · 4.23 %". % = Σ bypass ÷ Σ TOTAL_CAST_QTY × 100 — the ERP's own CCM_BYPASS_PERCENTAGE (312 / 323
+  entries) and HSM_BYPASS_PERCENTAGE (218 / 224) rule; ÷ delivery only 124 / 323. `castMt` (TOTAL_CAST_QTY, already
+  synced) added to the HSM log-sheet periods; the bypass drill-downs now read against Total cast (was billet input),
+  with the % stat, column and formula. Checks: 26 Oct Online 0.51 / 3 = the ERP's stored 0.505 / 3; Both 0.49 / 2.88;
+  year 4.23 / 6.89. The user asked whether the ERP has separate % entries: yes — ROLLING_DEFECT_PERCENTAGE,
+  DEFECTIVE_C_PERCENTAGE (for DEFECTIVE_MT, not the tile's field), CCM_BYPASS_PERCENTAGE, HSM_BYPASS_PERCENTAGE. Not
+  used directly: a % can't be added up over days, and some stored values are typing slips (May 2026: CCM 37.06 / 51.32
+  / 100 for 5.30 / 3.77 / 4.23; HSM 62.94 / 92.93 / 100 for 9.00 / 13.25 / 6.27). Unit 320 / 320; e2e
+  hsm-defective-pct passes. Not committed.
+- **27 Nov 2026** — **HSM Defective / CCM bypass / HSM bypass %: now the ERP's own figures** (the user: "show from ERP
+  instead of self calculating"). Synced ROLLING_DEFECT_PERCENTAGE, CCM_BYPASS_PERCENTAGE, HSM_BYPASS_PERCENTAGE; one entry
+  shows its % as filed; several entries (a week, or Online + Offline on a day) — each % weighted by what it is a % of
+  (PRODUCTION_MT; TOTAL_CAST_QTY), since the ERP has no combined figure. `rollingDefectPct` / `ccmBypassPct` /
+  `hsmBypassPct` on the HSM log-sheet periods; drill-down formula "… = the ERP's <FIELD> of each entry, as filed;
+  several entries: weighted by …", Data source lists the % field. Same as the tonnes figure on normal days (26 Oct Online
+  8.29 / 0.51 / 3; Both 7.96 / 0.49 / 2.88; Oct 0.64 → 0.65). Typing slips now show: May 2026 Online CCM bypass 15.17 %,
+  HSM bypass 26.96 % (entries filed as 37 / 51 / 100 % and 63 / 93 / 100 %) — for the plant to correct. Unit 323 / 323
+  (erp-kpis +3); e2e hsm-defective-pct passes. Not committed.
+- **27 Nov 2026** — HSM % follow-up: the user kept the ERP's % weighted by tonnes for several days (option 1, not tonnes
+  first — typing slips like May 2026 show in totals, for the plant to correct). The RMS casting sheet confirms the plant
+  totals a bypass % as Σ bypass ÷ Σ cast (O34 / S34 = 2.73 / 4.20 %) = daily % weighted by cast; a plain average gives
+  2.67 / 4.22. Rolling split checked on all three tabs (Feb 2026): Online defective 1.04 %, CCM 7.28 %, HSM 10.03 %;
+  Offline defective 23.97 % (bypasses not shown — Online figures); Both 1.64 / 7.11 / 9.8. e2e covers Offline too.

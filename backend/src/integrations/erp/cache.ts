@@ -308,6 +308,9 @@ export const LOG_FIELDS = [
   // Billets cast but not rolled here (performance.xlsx, the user, 25 Nov 2026): TOTAL_CAST_QTY = INPUT_MT +
   // CCM_BY_PASSMT + HSM_BYPASS_MT + END_CRACK_BY_PASS_CCMMT on all 275 entries checked (Jun–Nov 2026).
   'CCM_BY_PASSMT', 'HSM_BYPASS_MT',
+  // The ERP's own percentages, shown as filed (the user, 27 Nov 2026): ROLLING_DEFECT_MT ÷ PRODUCTION_MT, and each
+  // bypass ÷ TOTAL_CAST_QTY, × 100, per entry.
+  'ROLLING_DEFECT_PERCENTAGE', 'CCM_BYPASS_PERCENTAGE', 'HSM_BYPASS_PERCENTAGE',
 ] as const;
 export type LogField = (typeof LOG_FIELDS)[number];
 /** Online / Offline: the log sheet head's TRAN_COLUMN_NAME1, ST001 = Online, ST002 = Offline (cold rolling) — HSM.xlsx, 23 Nov 2026. */
