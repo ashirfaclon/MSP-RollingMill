@@ -237,9 +237,48 @@ test('RMD Offline plant efficiency: breakdown hours never count, so it is what w
     await card.click();
     const d = page.getByRole('dialog', { name: /Plant efficiency/ });
     const foot = d.getByRole('table', { name: 'Plant efficiency by period' }).locator('tfoot td');
-    // Plan, Prime + SL, Prime, Running, Breakdown, CCM breakdown, Performance, Availability, Efficiency ×2.
-    await expect(foot).toHaveText(['Total', '534.96', '461.2', '450.81', '31.84', '0', '0', '86.21', '100', '86.21', '84.27']);
+    // Offline: Plan, Prime + SL, Prime, Performance, Availability, Efficiency ×2 — no running / breakdown hours (27 Nov 2026).
+    await expect(foot).toHaveText(['Total', '534.96', '461.2', '450.81', '86.21', '100', '86.21', '84.27']);
     await page.waitForTimeout(1200);
     await d.screenshot({ path: `${SHOTS}/rmd-efficiency-offline-${w}.png` });
+  }
+});
+
+test('RMD plant efficiency drill-down: the formula box states each rolling\'s availability rule (the user, 27 Nov 2026)', async ({ page }) => {
+  await page.goto('/rmd/visualization');
+  await page.getByRole('button', { name: /Duration/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Select period' });
+  await dialog.getByLabel('Start Date').fill('2026-11-25');
+  await dialog.getByLabel('End Date').fill('2026-11-25');
+  await dialog.getByRole('button', { name: 'Apply' }).click();
+  const card = page.getByRole('region', { name: 'Headline KPIs' }).getByRole('button', { name: /^Plant efficiency/ });
+  // 25 Nov: Online 79.15 / 78.40; Offline 109.20 / 106.75 (no stops counted); Both 92.78 / 91.33.
+  const cases: [string, RegExp, RegExp, string | null][] = [
+    ['Online', /Prime \+ SL\s*79\.15\s*Prime\s*78\.4/, /Availability = Running hours ÷ \(Running hours \+ Breakdown hours \+ CCM breakdown hours\) × 100/, null],
+    ['Offline', /Prime \+ SL\s*109\.2\s*Prime\s*106\.75/, /Availability = 100 \(breakdown hours are not counted for Offline\)/, 'Running hours ÷'],
+    ['Both', /Prime \+ SL\s*92\.78\s*Prime\s*91\.33/, /Breakdown and CCM breakdown hours: Online entries only/, null],
+  ];
+  for (const [rolling, value, formula, absent] of cases) {
+    await page.getByRole('button', { name: /^Rolling:/ }).click();
+    await page.getByRole('listbox', { name: 'Rolling' }).getByRole('option', { name: rolling }).click();
+    await expect(card.locator('.rm-card-pair')).toHaveText(value, { timeout: 60_000 });
+    await card.click();
+    const d = page.getByRole('dialog', { name: /Plant efficiency/ });
+    const box = d.getByRole('region', { name: 'Formula' });
+    await expect(box).toContainText(formula);
+    if (absent) await expect(box).not.toContainText(absent);
+    // Offline: no breakdown columns or fields — only what its figure is made of.
+    const head = d.getByRole('table', { name: 'Plant efficiency by period' }).locator('thead');
+    const src = d.getByRole('region', { name: 'Data source' });
+    if (rolling === 'Offline') {
+      await expect(head).not.toContainText('Breakdown');
+      await expect(src).not.toContainText('MILL_BKDN');
+    } else {
+      await expect(head).toContainText('CCM breakdown (h)');
+      await expect(src).toContainText('TOTAL_CCM_BD_IN_HRS');
+    }
+    await page.waitForTimeout(800);
+    await d.screenshot({ path: `${SHOTS}/rmd-efficiency-formula-${rolling.toLowerCase()}.png` });
+    await d.getByRole('button', { name: 'Close' }).click();
   }
 });

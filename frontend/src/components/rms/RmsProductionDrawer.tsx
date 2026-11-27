@@ -51,7 +51,7 @@ const label = (x: RmsProductionPeriod) => (
   <td><b>{x.label}</b>{x.days > 1 && x.key !== 'total' && <span className="pd-dim"> · {dm(x.fromDate)}–{dm(x.toDate)}</span>}</td>
 );
 
-/** Each period's on-line rolling %, the ERP's, with the billet input they are weighted by. */
+/** Each period's on-line rolling %: Σ billet input ÷ Σ cast / Σ delivery, with the tonnes behind them. */
 function RollingContent({ data }: { data: RmsProductionReport }) {
   const rows = data.rows;
   const t = data.totals;

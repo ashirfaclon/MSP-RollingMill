@@ -318,12 +318,15 @@ function PerformanceRow({ x }: { x: RmdProductionPeriod }) {
 function EfficiencyContent({ data }: { data: RmdProductionReport }) {
   const rows = data.rows;
   const t = data.totals;
+  // Offline counts no breakdown hours (the user, 26 Nov 2026): availability is always 100, so its line, the hours behind
+  // it and their ERP fields are not shown there — the view explains only what that rolling's figure is made of.
+  const off = data.mode === 'offline';
   const categories = useMemo(() => rows.map((x) => x.label), [rows]);
   const series = useMemo<DrillSeries[]>(() => [
     { id: 'sl', name: 'Efficiency · Prime + SL', token: '--s-prod', type: 'column', data: rows.map((x) => x.plantEfficiencyPct), dp: 2 },
     { id: 'prime', name: 'Efficiency · Prime', token: '--s-order', type: 'column', data: rows.map((x) => x.primeEfficiencyPct), dp: 2 },
-    { id: 'avail', name: 'Availability', token: '--s-pred', type: 'line', data: rows.map((x) => x.availabilityPct), dp: 2 },
-  ], [rows]);
+    ...(off ? [] : [{ id: 'avail', name: 'Availability', token: '--s-pred', type: 'line' as const, data: rows.map((x) => x.availabilityPct), dp: 2 }]),
+  ], [rows, off]);
   const axes = useMemo(() => [{ title: '%', unit: '%', min: 0 }], []);
   return (
     <>
@@ -340,22 +343,27 @@ function EfficiencyContent({ data }: { data: RmdProductionReport }) {
         <table className="grid pd-table" aria-label="Plant efficiency by period">
           <thead><tr>
             <th>Period</th><th className="r">Plan (MT)</th><th className="r">Prime + SL (MT)</th><th className="r">Prime (MT)</th>
-            <th className="r">Running (h)</th><th className="r">Breakdown (h)</th><th className="r">CCM breakdown (h)</th>
+            {!off && <><th className="r">Running (h)</th><th className="r">Breakdown (h)</th><th className="r">CCM breakdown (h)</th></>}
             <th className="r">Performance (%)</th><th className="r">Availability (%)</th><th className="r">Efficiency · Prime + SL (%)</th><th className="r">Efficiency · Prime (%)</th>
           </tr></thead>
-          <tbody>{rows.map((x) => <EfficiencyRow key={x.key} x={x} />)}</tbody>
-          <tfoot><EfficiencyRow x={t} /></tfoot>
+          <tbody>{rows.map((x) => <EfficiencyRow key={x.key} x={x} off={off} />)}</tbody>
+          <tfoot><EfficiencyRow x={t} off={off} /></tfoot>
         </table>
       </div>
       <SourceBox
         sources={[
-          ...sources(['PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'ACTUAL_RUNNING_HRS', 'MILL_BKDN_IN_MIN_MECHANICAL / _ELECTRICAL / _PROCESS / _RM / _POWEROTHERS', 'MILL_SINGLE_STAND', 'MILL_1_12__STAND', 'TOTAL_CCM_BD_IN_HRS']),
+          ...sources(off ? ['PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT']
+            : ['PRODUCT_PRIME_SLENGTH_MT', 'FINISH_PRODUCT_PRIME_MT', 'ACTUAL_RUNNING_HRS', 'MILL_BKDN_IN_MIN_MECHANICAL / _ELECTRICAL / _PROCESS / _RM / _POWEROTHERS', 'MILL_SINGLE_STAND', 'MILL_1_12__STAND', 'TOTAL_CCM_BD_IN_HRS']),
           { name: 'Logbook', rows: [['Form', 'Production Plan (RMD ROLLING PLAN), saved on the dashboard'], ['Field', 'Day + Night plan, MT (Prime + SL)']] },
         ]}
+        // Offline never counts breakdown hours (the user, 26 Nov 2026); the box says so for the rolling chosen.
         formula={[
           'Plant efficiency = Performance × Availability ÷ 100',
           'Performance = Actual production ÷ Plan × 100',
-          'Availability = Running hours ÷ (Running hours + Breakdown hours + CCM breakdown hours) × 100',
+          data.mode === 'offline'
+            ? 'Availability = 100 (breakdown hours are not counted for Offline)'
+            : 'Availability = Running hours ÷ (Running hours + Breakdown hours + CCM breakdown hours) × 100',
+          ...(data.mode === 'all' ? ['Breakdown and CCM breakdown hours: Online entries only'] : []),
         ]}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
@@ -363,16 +371,18 @@ function EfficiencyContent({ data }: { data: RmdProductionReport }) {
   );
 }
 
-function EfficiencyRow({ x }: { x: RmdProductionPeriod }) {
+function EfficiencyRow({ x, off }: { x: RmdProductionPeriod; off: boolean }) {
   return (
     <tr>
       {label(x)}
       <td className="num r">{f(x.planMt)}</td>
       <td className="num r">{f(x.productionMt)}</td>
       <td className="num r">{f(x.primeMt)}</td>
-      <td className="num r">{f(x.runningHrs)}</td>
-      <td className="num r">{f(x.effBreakdownHrs)}</td>
-      <td className="num r">{f(x.ccmBreakdownHrs)}</td>
+      {!off && <>
+        <td className="num r">{f(x.runningHrs)}</td>
+        <td className="num r">{f(x.effBreakdownHrs)}</td>
+        <td className="num r">{f(x.ccmBreakdownHrs)}</td>
+      </>}
       <td className="num r">{f(x.performancePct)}</td>
       <td className="num r">{f(x.availabilityPct)}</td>
       <td className="num r v-val"><b>{f(x.plantEfficiencyPct)}</b></td>
