@@ -14,9 +14,9 @@ test('an RMD user: lands on RMD, only RMD in the menu, another mill\'s link goes
     access: { mills: ['rmd'], email: 'manager_qc_rm_tmt@msprgh.mspsteel.com' } });
   await page.goto('/');
   await expect(page).toHaveURL(/\/rmd\/visualization/, { timeout: 60_000 });
-  await page.getByRole('button', { name: /^Rolling mill:/ }).click();
-  await expect(page.getByRole('listbox', { name: 'Rolling mill' }).getByRole('option')).toHaveText(['RMD']);
-  await page.keyboard.press('Escape');
+  // One mill: a plain label, no dropdown (the user, 27 Nov 2026).
+  await expect(page.getByLabel('Rolling mill: RMD')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Rolling mill:/ })).toHaveCount(0);
   await page.goto('/hsm/asset-health');
   await expect(page).toHaveURL(/\/rmd\/asset-health/, { timeout: 30_000 });
   await page.locator('.topbar').screenshot({ path: `${SHOTS}/access-rmd-topbar.png` });

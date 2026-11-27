@@ -12,6 +12,9 @@
 }
 .mp-trigger:hover, .mp-trigger.on { border-color: var(--border-hi); }
 .mp-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* One mill only: the same chip, not a button — no hover, no pointer, no caret. */
+.mp-trigger.mp-trigger--fixed { cursor: default; }
+.mp-trigger.mp-trigger--fixed:hover { border-color: var(--border); }
 .mp-k { color: var(--muted-2); font-weight: 700; letter-spacing: 0.3px; }
 .mp-v { font-weight: 800; letter-spacing: 0.5px; }
 .mp-caret { color: var(--muted-2); transition: transform 130ms ease; }

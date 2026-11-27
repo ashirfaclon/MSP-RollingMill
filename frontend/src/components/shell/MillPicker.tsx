@@ -9,9 +9,22 @@ import { DEFAULT_SCREEN, MILLS, hasScreen, pathFor, type MillId, type ScreenId }
 import { canSee } from '@/auth/session';
 import Picker from './Picker';
 
+const title = 'Rolling mill';
+
 export default function MillPicker({ mill, screen }: { mill: MillId; screen: ScreenId }) {
   const router = useRouter();
   const options = MILLS.filter((m) => canSee(m.id)).map((m) => ({ id: m.id, text: m.code }));
+  // One mill: a plain label, not a dropdown with one choice (the user, 27 Nov 2026).
+  if (options.length === 1) {
+    return (
+      <div className="mp">
+        <span className="mp-trigger mp-trigger--fixed" title={title} aria-label={`${title}: ${options[0].text}`}>
+          <span className="mp-k">Mill</span>
+          <span className="mp-v">{options[0].text}</span>
+        </span>
+      </div>
+    );
+  }
   return (
     <Picker label="Mill" title="Rolling mill" options={options} value={mill}
       // Keeps the screen when the other mill has it, else Visualization.

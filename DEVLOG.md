@@ -761,3 +761,4 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   list and keep every mill until they end (≤ 12 h). Tests: route tests (HSM user refused RMD data/settings/alerts/forms,
   All Access / main / master login, other-org main and Forms role refused, IOsense down, role moved on refresh) — unit
   325 / 325; e2e mill-access (RMD user lands on RMD, menu shows only RMD, HSM link → RMD; no-mill screen) passes. Committed.
+- **27 Nov 2026** — Mill menu: a person with one mill sees a plain "Mill RMD" label, no dropdown (the user: "why give a dropdown if they can't see someone else's?"); All Access / main / master keep the dropdown of four. e2e mill-access updated, passes. Committed.
