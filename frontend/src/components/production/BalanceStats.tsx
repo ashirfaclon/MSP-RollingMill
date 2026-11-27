@@ -21,6 +21,8 @@ export interface BalanceStat {
   title?: string;
   /** A short warning under the figure, e.g. why it is NA. */
   note?: string;
+  /** A % beside the figure, same size (the user, 27 Nov 2026: HSM Defective "12.31 MT · 7.96 %"). */
+  pct?: number | null;
 }
 
 export default function BalanceStats({ items }: { items: BalanceStat[] }) {
@@ -36,6 +38,9 @@ export default function BalanceStats({ items }: { items: BalanceStat[] }) {
                 ? <span className="skel skel--num" role="status" aria-label="Loading" />
                 : <span className={`rm-mb-stat-v num ${na ? 'v-na' : ''}`}>
                     {na ? 'NA' : <>{s.whole ? Math.round(s.value!).toLocaleString('en-IN') : fixed(s.value)}<span className="rm-card-unit">{s.unit}</span></>}
+                    {!na && s.pct !== null && s.pct !== undefined && (
+                      <span className="rm-mb-stat-pct"><span className="rm-mb-stat-sep" aria-hidden>·</span>{fixed(s.pct, 2)}<span className="rm-card-unit">%</span></span>
+                    )}
                   </span>}
               {s.note && !s.loading && <span className="rm-mb-stat-note v-warn">{s.note}</span>}
             </>

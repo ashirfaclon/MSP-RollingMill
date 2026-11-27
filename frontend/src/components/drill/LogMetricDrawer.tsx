@@ -21,8 +21,10 @@ export const LOG_METRICS: Record<LogMetric, {
   name: string; unit: string; field: string; token: string;
   /** The figure it is read against, beside it in the table. */
   against: { key: Num; name: string; unit: string; field: string };
+  /** Also shown as a % of `against` (the user, 27 Nov 2026: HSM Defective % beside the MT). */
+  pct?: boolean;
 }> = {
-  rollingDefectMt: { name: 'Defective', unit: 'MT', field: 'ROLLING_DEFECT_MT', token: '--risk',
+  rollingDefectMt: { name: 'Defective', unit: 'MT', field: 'ROLLING_DEFECT_MT', token: '--risk', pct: true,
     against: { key: 'productionMt', name: 'Production', unit: 'MT', field: 'PRODUCTION_MT' } },
   ccmBypassMt: { name: 'CCM bypass', unit: 'MT', field: 'CCM_BY_PASSMT', token: '--s-alt',
     against: { key: 'inputMt', name: 'Billet input', unit: 'MT', field: 'INPUT_MT' } },
@@ -33,6 +35,16 @@ export const LOG_METRICS: Record<LogMetric, {
 };
 
 const f = (v: number | null | undefined) => (v === null || v === undefined ? '—' : fmtNum(v, 2));
+
+/**
+ * A metric as a % of the figure it is read against — Σ metric ÷ Σ against × 100 over the period, the tonnes added first
+ * (as the ERP's ROLLING_DEFECT_PERCENTAGE per entry: ROLLING_DEFECT_MT ÷ PRODUCTION_MT). Null without both.
+ */
+export function shareOf(x: LogPeriod, metric: LogMetric): number | null {
+  const v = x[metric] as number | null;
+  const of = x[LOG_METRICS[metric].against.key] as number | null;
+  return v === null || v === undefined || !of ? null : (v / of) * 100;
+}
 
 export default function LogMetricDrawer({ metric, onClose }: { metric: LogMetric | null; onClose: () => void }) {
   const mode = useGlobalSel().rmdMode;
@@ -62,6 +74,7 @@ function Content({ data, metric }: { data: LogSheetReport; metric: LogMetric }) 
     <>
       <Stats items={[
         { label: m.name, value: f(t[metric]), unit: m.unit },
+        ...(m.pct ? [{ label: `${m.name} %`, value: f(shareOf(t, metric)), unit: '%' }] : []),
         { label: m.against.name, value: f(t[m.against.key]), unit: m.against.unit },
         { label: 'Days entered', value: String(t.entryDays), unit: `of ${t.days}` },
       ]} />
@@ -69,7 +82,7 @@ function Content({ data, metric }: { data: LogSheetReport; metric: LogMetric }) 
         ariaLabel={`${m.name} by period: ${rows.map((x) => `${x.label} ${f(x[metric])} ${m.unit}`).join('; ')}`} />
       <div className="pd-table-wrap">
         <table className="grid pd-table" aria-label={`${m.name} by period`}>
-          <thead><tr><th>Period</th><th className="r">{m.name} ({m.unit})</th><th className="r">{m.against.name} ({m.against.unit})</th></tr></thead>
+          <thead><tr><th>Period</th><th className="r">{m.name} ({m.unit})</th>{m.pct && <th className="r">{m.name} (%)</th>}<th className="r">{m.against.name} ({m.against.unit})</th></tr></thead>
           <tbody>{rows.map((x) => <Row key={x.key} x={x} metric={metric} />)}</tbody>
           <tfoot><Row x={t} metric={metric} /></tfoot>
         </table>
@@ -81,7 +94,10 @@ function Content({ data, metric }: { data: LogSheetReport; metric: LogMetric }) 
           ['Rolling', 'TRAN_COLUMN_NAME1: ST001 = Online, ST002 = Offline'],
           ['Field', `ATTR_CODE = '${m.field}', '${m.against.field}' (value in ATTR_VALUE)`],
         ] }]}
-        formula={[`${m.name} = Σ ${m.field} of the chosen rolling's entries (Both adds Online and Offline)`]}
+        formula={[
+          `${m.name} = Σ ${m.field} of the chosen rolling's entries (Both adds Online and Offline)`,
+          ...(m.pct ? [`${m.name} % = Σ ${m.field} ÷ Σ ${m.against.field} × 100`] : []),
+        ]}
       />
       {data.erp.connection === 'down' && <p className="v-warn">{data.erp.message}</p>}
     </>
@@ -94,6 +110,7 @@ function Row({ x, metric }: { x: LogPeriod; metric: LogMetric }) {
     <tr>
       <td><b>{x.label}</b>{x.days > 1 && x.key !== 'total' && <span className="pd-dim"> · {dm(x.fromDate)}–{dm(x.toDate)}</span>}</td>
       <td className="num r v-val"><b>{f(x[metric])}</b></td>
+      {m.pct && <td className="num r">{f(shareOf(x, metric))}</td>}
       <td className="num r">{f(x[m.against.key])}</td>
     </tr>
   );

@@ -24,7 +24,7 @@ import Panel from '@/components/Panel';
 import { fixed } from '@/lib/num';
 import BalanceDrawer from '@/components/drill/BalanceDrawer';
 import BalanceStats from '@/components/production/BalanceStats';
-import LogMetricDrawer, { LOG_METRICS, type LogMetric } from '@/components/drill/LogMetricDrawer';
+import LogMetricDrawer, { LOG_METRICS, shareOf, type LogMetric } from '@/components/drill/LogMetricDrawer';
 import { RMD_MODE_LABELS, useGlobalSel } from '@/state/globalSel';
 import { useErpPeriod } from '@/components/production/useErpPeriod';
 import type { LogPeriod } from '@/services/hsmApi';
@@ -143,6 +143,8 @@ export default function MaterialBalance() {
         { key: 'out', label: 'Coils out', value: has ? t!.productionPcs : null, unit: 'pcs', whole: true, loading, onOpen: () => setOpen(true), title: 'Material balance per day' },
         ...OPS.filter((k) => mode !== 'offline' || k === 'rollingDefectMt').map((k) => ({
           key: k, label: LOG_METRICS[k].name, value: has ? (t![k] as number | null) : null, unit: LOG_METRICS[k].unit, loading,
+          // Defective with its % of production beside it (the user, 27 Nov 2026).
+          pct: has && LOG_METRICS[k].pct ? shareOf(t!, k) : null,
           onOpen: () => setMetric(k), title: `${LOG_METRICS[k].name} per day`,
         })),
       ]} />
