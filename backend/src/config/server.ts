@@ -40,6 +40,15 @@ const schema = z.object({
   SESSION_TTL_HOURS: z.coerce.number().positive().max(168).default(12),
   /** IOsense organisation ids allowed in, comma-separated. Empty = any organisation IOsense signs in. */
   AUTH_ALLOWED_ORGANISATIONS: list,
+  /**
+   * Organisations whose MAIN account sees every mill (the user, 27 Nov 2026) — MSP's. Sub-users get their mill from
+   * their IOsense role (modules/auth/access.ts); another organisation's main account gets none.
+   */
+  FULL_ACCESS_ORGANISATIONS: z.string().default('5b0d386f82d7525268dfbe06')
+    .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean)),
+  /** Logins that see every mill whatever IOsense says of their role — MSP's master account (the user, 27 Nov 2026). */
+  FULL_ACCESS_EMAILS: z.string().default('mspsteel@ycp.com')
+    .transform((s) => s.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean)),
 });
 
 export type ServerConfig = z.infer<typeof schema>;

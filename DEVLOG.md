@@ -743,3 +743,21 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   since 26 Nov (Online 240.72 → 166.66, Offline 178.32 → 113.32 MT), so performance now reads ~148 % — someone re-saved
   the November plan. Unit 323 / 323; e2e (rmd-performance: Both cards, efficiency on all three tabs against the API,
   TPH under Both) pass 6 / 6 (dev servers run briefly, then off again); rolling-mill RMS card list updated to its 10 cards. Committed.
+- **27 Nov 2026** — **Per-mill access by IOsense role — built** (the user: roles assigned in IOsense; A–D and edge cases
+  agreed). `backend/src/modules/auth/access.ts`: role ID → mills — HSM 6b0948ae…, RMD 6b094dc9…, LSM 6b094b69…, RMS
+  6b0950e7… (one mill), All Access 6ae08f11… (every mill); matched by ID (renames are fine; a re-created role needs its new
+  ID). MSP's main account (organisation in FULL_ACCESS_ORGANISATIONS, default 5b0d386f…) and FULL_ACCESS_EMAILS (default
+  mspsteel@ycp.com, the master login — every mill even if IOsense gives it no role) see every mill; another organisation's
+  main account or any other role → refused "No mill is assigned to your IOsense role — contact your admin". Outsiders are
+  not blocked from opening (user: "let it be"). IOsense not answering at sign-in → refused "Could not check your access".
+  Sign-in: my-permissions + getUserDetails with the person's own session; the session carries sid, email, mills; the
+  person's IOsense session kept in memory per sid so GET /api/auth/session re-reads the role on every open / refresh —
+  a changed role re-issues the session (same end time), no mill left → 403 no_mill_access, IOsense down on refresh → keep.
+  Server enforcement (plugins/auth): `millOfPath` — /api/<mill>/…, /api/{mid,pm,ca,settings,alerts}/<mill>,
+  /api/forms/{plan,ca}/<mill>, /api/forms/hsm/…, equipment hsm-/rmd- — another mill's request → 403 mill_forbidden; ERP
+  sync / sources / health shared. "Changed by" on plans, settings, contacts, checklists = the person's email (sub-users
+  share the main account's user ID). Screens: mill menu lists only their mills; `/` lands on their first mill; another
+  mill's link goes to their own (AppShell); "No access" screen for no-mill. Sessions from before this deploy carry no mill
+  list and keep every mill until they end (≤ 12 h). Tests: route tests (HSM user refused RMD data/settings/alerts/forms,
+  All Access / main / master login, other-org main and Forms role refused, IOsense down, role moved on refresh) — unit
+  325 / 325; e2e mill-access (RMD user lands on RMD, menu shows only RMD, HSM link → RMD; no-mill screen) passes. Committed.

@@ -16,6 +16,7 @@
  *   validateSSOToken    GET  /api/retrieve-sso-token/{token}
  *   my-permissions      GET  /api/account/my-permissions                 — the person's IOsense role (sub-users)
  *   fetchRole           PUT  /api/account/subuser/fetchRole/{page}/{size} — the account's roles (main account)
+ *   getUserDetails      GET  /api/account/getUserDetails                 — the person's own email (who changed what)
  *   findUserDevices     PUT  /api/account/devices/1/1          — session probe only
  *   insightResult fetch PUT  /api/account/bruce/insightResult/fetch/paginated/{id}
  *
@@ -148,6 +149,18 @@ export async function describeUser(userBearer: string, env = loadEnv()): Promise
     return out;
   } catch (e) {
     return { isSubUser: null, roleId: null, error: (e as Error).message };
+  }
+}
+
+/** The signed-in person's own email (getUserDetails, their session) — null when IOsense does not give one. */
+export async function userEmail(userBearer: string, env = loadEnv()): Promise<string | null> {
+  try {
+    const res = await fetch(`${env.iosenseBase}/api/account/getUserDetails`, { headers: headers(env, userBearer), signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const b = (await res.json().catch(() => ({}))) as { email?: unknown; userID?: { email?: unknown } };
+    const e = typeof b.email === 'string' ? b.email : typeof b.userID?.email === 'string' ? b.userID.email : null;
+    return e && /^\S+@\S+$/.test(e) ? e.trim().toLowerCase() : null;
+  } catch {
+    return null;
   }
 }
 

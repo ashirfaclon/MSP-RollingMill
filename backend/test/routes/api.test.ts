@@ -175,22 +175,51 @@ describe('access: only through an IOsense session', () => {
 });
 
 describe('sign-in with the IOsense SSO token', () => {
-  /** A stand-in for IOsense's validateSSOToken: GOOD is accepted once, anything else refused. */
+  /**
+   * A stand-in for IOsense: validateSSOToken (GOOD is accepted once; the people below any number of times), and — with
+   * the person's own session, "Bearer iosense-<token>" — my-permissions and getUserDetails (27 Nov 2026).
+   */
   let iosense: Server;
   let calls: string[] = [];
   const saved = process.env.IOSENSE_BASE;
+  const MSP_ORG = '5b0d386f82d7525268dfbe06';
+  const HSM_ROLE = '6b0948ae0e5ad8305db1948f';
+  const RMD_ROLE = '6b094dc90e5ad8305db1c54d';
+  const ALL_ROLE = '6ae08f11c853b299a010112c';
+  /** token → organisation and what my-permissions answers (null: IOsense fails). */
+  const people: Record<string, { org: string; perm: { isSubUser: boolean; roleID?: string } | null }> = {
+    GOOD: { org: 'org-msp', perm: { isSubUser: true, roleID: HSM_ROLE } },
+    HSM: { org: MSP_ORG, perm: { isSubUser: true, roleID: HSM_ROLE } },
+    ALL: { org: MSP_ORG, perm: { isSubUser: true, roleID: ALL_ROLE } },
+    MAIN: { org: MSP_ORG, perm: { isSubUser: false } },
+    'MAIN-X': { org: 'org-x', perm: { isSubUser: false } },
+    FORMS: { org: MSP_ORG, perm: { isSubUser: true, roleID: 'role-forms' } },
+    DOWN: { org: MSP_ORG, perm: null },
+    MSPSTEEL: { org: MSP_ORG, perm: null },
+    MOVED: { org: MSP_ORG, perm: { isSubUser: true, roleID: HSM_ROLE } },
+    'OTHER-ORG': { org: 'org-x', perm: { isSubUser: true, roleID: HSM_ROLE } },
+  };
   beforeAll(async () => {
     const used = new Set<string>();
     iosense = createServer((req, res) => {
+      const url = req.url ?? '';
+      const who = String(req.headers.authorization ?? '').replace(/^Bearer iosense-/, '');
+      if (url === '/api/account/my-permissions') {
+        const p = people[who]?.perm;
+        if (!p) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end('{}'); return; }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, data: { ...p, permissions: {} } }));
+        return;
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      // After a sign-in the app asks who the person is (my-permissions / fetchRole, 27 Nov 2026) — not an exchange.
-      if (!(req.url ?? '').startsWith('/api/retrieve-sso-token/')) { res.end(JSON.stringify({ success: true, data: { isSubUser: true, roleID: 'r-1' } })); return; }
-      const token = decodeURIComponent((req.url ?? '').split('/').pop() ?? '');
+      if (url === '/api/account/getUserDetails') { res.end(JSON.stringify({ email: who === 'MSPSTEEL' ? 'MSPSteel@ycp.com' : `${who.toLowerCase()}@msp.test` })); return; }
+      if (url.startsWith('/api/account/subuser/fetchRole/')) { res.end(JSON.stringify({ success: true, data: { data: [] } })); return; }
+      const token = decodeURIComponent(url.split('/').pop() ?? '');
       calls.push(token);
-      const ok = (token === 'GOOD' || token === 'OTHER-ORG') && !used.has(token);
+      const ok = token in people && !(token === 'GOOD' && used.has(token));
       used.add(token);
       res.end(JSON.stringify(ok
-        ? { success: true, token: 'Bearer iosense-jwt', userId: 'u-42', organisation: token === 'GOOD' ? 'org-msp' : 'org-x' }
+        ? { success: true, token: `Bearer iosense-${token}`, userId: 'u-42', organisation: people[token].org }
         : { success: false, errors: ['Invalid token'] }));
     });
     await new Promise<void>((r) => iosense.listen(0, '127.0.0.1', r));
@@ -205,9 +234,52 @@ describe('sign-in with the IOsense SSO token', () => {
     const body = res.json();
     expect(body).toMatchObject({ user: { userId: 'u-42', organisation: 'org-msp' }, expiresAt: expect.any(String) });
     expect(Date.parse(body.expiresAt) - Date.now()).toBeGreaterThan(11.9 * 3_600_000);   // 12 h by default
-    expect(JSON.stringify(body)).not.toContain('iosense-jwt');                             // IOsense's JWT never reaches the browser
+    expect(JSON.stringify(body)).not.toContain('iosense-GOOD');                            // IOsense's JWT never reaches the browser
+    expect(body.access).toEqual({ mills: ['hsm'], email: 'good@msp.test' });
     const r = await get('/api/hsm/stock?to=x', { authorization: `Bearer ${body.sessionToken}` });
     expect(r.status).toBe(400);                                                            // past the gate, into the route
+  });
+
+  test('per-mill access (the user, 27 Nov 2026): the IOsense role decides which mills; the server refuses the rest', async () => {
+    const as = async (who: string) => (await sso({ token: who })).json();
+    // HSM role: HSM's routes open; RMD's refused — data, settings, alerts, forms alike; what every mill shares stays open.
+    const hsm = await as('HSM');
+    expect(hsm.access).toEqual({ mills: ['hsm'], email: 'hsm@msp.test' });
+    const h = { authorization: `Bearer ${hsm.sessionToken}` };
+    expect((await get('/api/hsm/stock?to=x', h)).status).toBe(400);
+    for (const url of ['/api/rmd/stock?to=x', '/api/settings/rmd', '/api/alerts/lsm', '/api/forms/plan/rms', '/api/forms/equipment/rmd-tanks', '/api/mid/rmd']) {
+      expect(await get(url, h), url).toMatchObject({ status: 403, body: { error: 'mill_forbidden' } });
+    }
+    expect((await get('/api/erp', h)).status).not.toBe(403);
+    // All Access and MSP's main account: every mill. Another organisation's main account, or a role with no mill: refused.
+    expect((await as('ALL')).access.mills).toEqual(['hsm', 'rmd', 'lsm', 'rms']);
+    expect((await as('MAIN')).access.mills).toEqual(['hsm', 'rmd', 'lsm', 'rms']);
+    expect(await as('MAIN-X')).toMatchObject({ error: 'no_mill_access' });
+    expect(await as('FORMS')).toMatchObject({ error: 'no_mill_access' });
+    // IOsense does not say who it is: no unchecked way in.
+    expect(await as('DOWN')).toMatchObject({ error: 'access_unavailable' });
+    // The master login, mspsteel@ycp.com: every mill even when IOsense gives it no role at all (the user, 27 Nov 2026).
+    expect((await as('MSPSTEEL')).access).toEqual({ mills: ['hsm', 'rmd', 'lsm', 'rms'], email: 'mspsteel@ycp.com' });
+  });
+
+  test('the role is asked again when the dashboard is opened or refreshed: a move takes effect then', async () => {
+    const first = (await sso({ token: 'MOVED' })).json();
+    const h = { authorization: `Bearer ${first.sessionToken}` };
+    expect((await get('/api/auth/session', h)).body.access.mills).toEqual(['hsm']);
+    people.MOVED.perm = { isSubUser: true, roleID: RMD_ROLE };
+    const s = await get('/api/auth/session', h);
+    expect(s.body.access.mills).toEqual(['rmd']);
+    expect(s.body.sessionToken).toEqual(expect.any(String));
+    expect(Date.parse(s.body.expiresAt)).toBe(Date.parse(first.expiresAt));             // a refresh never lengthens it
+    expect((await get('/api/rmd/stock?to=x', { authorization: `Bearer ${s.body.sessionToken}` })).status).toBe(400);
+    expect((await get('/api/hsm/stock?to=x', { authorization: `Bearer ${s.body.sessionToken}` })).status).toBe(403);
+    // Taken out of every mill role: the next refresh ends the session.
+    people.MOVED.perm = { isSubUser: true, roleID: 'role-forms' };
+    expect(await get('/api/auth/session', { authorization: `Bearer ${s.body.sessionToken}` })).toMatchObject({ status: 403, body: { error: 'no_mill_access' } });
+    // IOsense not answering on a refresh: the session keeps what it has.
+    people.MOVED.perm = null;
+    const kept = await get('/api/auth/session', h);
+    expect(kept).toMatchObject({ status: 200, body: { access: { mills: ['hsm'] } } });
   });
 
   test('the token works once only — a reused link is refused, not retried', async () => {

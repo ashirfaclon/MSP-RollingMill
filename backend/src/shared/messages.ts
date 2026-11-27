@@ -19,6 +19,9 @@ export const MSG = {
   HISTORIAN_UP: 'Plant historian connected',
   HISTORIAN_NOT_CONFIGURED: 'Plant historian connection not yet configured',
   HISTORIAN_UNREACHABLE: 'Plant historian unreachable',
+  AUTH_NO_MILL: 'No mill is assigned to your IOsense role — contact your admin.',
+  AUTH_MILL_DENIED: 'This mill is not assigned to your IOsense role.',
+  AUTH_ACCESS_UNAVAILABLE: 'Could not check your access with IOsense — please try again in a moment.',
   HISTORIAN_NO_TAGS: 'No historian tag is mapped for this mill yet',
   HISTORIAN_STALE: 'Plant historian connected — no recent readings for this mill',
 

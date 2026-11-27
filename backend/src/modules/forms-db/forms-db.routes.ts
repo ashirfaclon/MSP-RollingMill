@@ -24,7 +24,7 @@ const millOf = (m: string): ConfigMill => {
   return m as ConfigMill;
 };
 /** Who saved it: the signed-in IOsense user, else (sign-in off, e.g. local) the dashboard. */
-const filledByOf = (req: FastifyRequest) => (req.user as { sub?: string } | undefined)?.sub || 'rolling-mill-dashboard';
+const filledByOf = (req: FastifyRequest) => (req.user as { sub?: string; email?: string | null } | undefined)?.email || (req.user as { sub?: string } | undefined)?.sub || 'rolling-mill-dashboard';
 const done = (form: string, w: FormWrite): FormSaveResult => {
   if (!w.ok) throw new HttpError(502, 'logbook_write_failed', `${w.message}${w.saved ? ` (${w.saved} saved before it stopped)` : ''}`);
   return { ok: true, form, entries: w.saved };

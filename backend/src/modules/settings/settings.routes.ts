@@ -18,7 +18,7 @@ export const millOf = (m: string): LimitMill => {
   return m as LimitMill;
 };
 /** Who saved it: the signed-in IOsense user, else (sign-in off, e.g. local) the dashboard. */
-export const filledByOf = (req: FastifyRequest) => (req.user as { sub?: string } | undefined)?.sub || 'rolling-mill-dashboard';
+export const filledByOf = (req: FastifyRequest) => (req.user as { sub?: string; email?: string | null } | undefined)?.email || (req.user as { sub?: string } | undefined)?.sub || 'rolling-mill-dashboard';
 
 export async function settingsRoutes(app: FastifyInstance) {
   app.get<{ Params: { mill: string } }>('/:mill', { config: { errorCode: 'settings_read_failed' } }, async (req) =>

@@ -35,7 +35,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     <main className="auth-screen">
       <div className="auth-card" role="alert">
         <Icon id="shield-alert" size={34} color="#f5b54a" />
-        <h1 className="auth-title">{state.reason === 'denied' ? 'No access' : 'Open from IOsense'}</h1>
+        <h1 className="auth-title">{state.reason === 'denied' || state.reason === 'no-mill' ? 'No access' : 'Open from IOsense'}</h1>
         <p className="auth-text">{state.message}</p>
         {retry
           ? <button type="button" className="auth-btn" onClick={() => window.location.reload()}>Try again</button>
