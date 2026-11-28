@@ -1,6 +1,6 @@
 /**
  * The limits every screen judges a reading by, and alerts will raise on — the shipped DEFAULTS
- * (the user, 19 Nov 2026; SETTINGS_AND_ALERTS_REPLICATION.md §3). Each says where its figure came
+ * (the user, 19 Nov 2026; docs/SETTINGS_AND_ALERTS_REPLICATION.md §3). Each says where its figure came
  * from: the plant's own (`plant`), or a standard placeholder the plant replaces from the Settings
  * screen once live (`placeholder`, the user: "a reference until they fill their own"). A limit the
  * plant must give and no standard covers ships empty (`none`): no limit, no colour, no alert.
@@ -135,7 +135,7 @@ const TEMP: readonly [number, number] = [5, 150];
 /**
  * What a filed reading can really be: outside this it is a typing slip (the logbook has oil at 2 °C, a
  * bearing at 4 °C, an RMS oil pressure of 35.2), shown as a data check and not judged against its limit
- * (SETTINGS_AND_ALERTS_REPLICATION.md §5: a broken input raises a data row, never a process alarm).
+ * (docs/SETTINGS_AND_ALERTS_REPLICATION.md §5: a broken input raises a data row, never a process alarm).
  * Worked-out daily figures have none.
  */
 const PLAUSIBLE: Record<string, readonly [number, number]> = {

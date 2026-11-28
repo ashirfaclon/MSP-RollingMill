@@ -1,4 +1,4 @@
-/** Alerts: the one checker, the alert settings' layers and checks, and the live list (SETTINGS_AND_ALERTS_REPLICATION.md §4–§7). */
+/** Alerts: the one checker, the alert settings' layers and checks, and the live list (docs/SETTINGS_AND_ALERTS_REPLICATION.md §4–§7). */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Env } from '../../src/config/env';
 import { LIMIT_MILLS } from '../../src/config/limits';

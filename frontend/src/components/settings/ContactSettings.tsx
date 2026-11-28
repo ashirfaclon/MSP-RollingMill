@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The Settings screen's "Escalation matrix" tab (named so by the user, 21 Nov 2026; was "Who is told") (the user, 21 Nov 2026; SMS-ALERTS.md §5.5): the mill's
+ * The Settings screen's "Escalation matrix" tab (named so by the user, 21 Nov 2026; was "Who is told") (the user, 21 Nov 2026; docs/SMS-ALERTS.md §5.5): the mill's
  * contact list — one per mill. Up to 10 levels, each with how often it is told and three channels
  * (SMS, WhatsApp, email), each switchable, each a comma-separated list. Plus the one switch:
  * one message per crossing (level 1 only), or every level on its own interval.

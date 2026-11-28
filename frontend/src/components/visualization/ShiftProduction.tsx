@@ -12,7 +12,7 @@ import PlanConfig from '@/components/plan/PlanConfig';
 
 /**
  * HSM · Production vs plan, all from /api/hsm/plan — whole day only (the user, 24 Nov 2026; the
- * per-shift view is kept in archive/shift-breakdown/):
+ * per-shift view is kept in git: commit f1222fd, archive/shift-breakdown/):
  *   – output: the Production card's figure for the plant day (08:00 → 08:00 IST);
  *   – target: the logbook Production Plan form (HSM ROLLING PLAN, saved with Edit plan), the day's
  *     Day + Night as written there; NA where the period has no plan;

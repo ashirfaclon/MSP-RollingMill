@@ -1,4 +1,4 @@
-/** Plant settings: defaults, edits over them, and the shared store (SETTINGS_AND_ALERTS_REPLICATION.md §3). */
+/** Plant settings: defaults, edits over them, and the shared store (docs/SETTINGS_AND_ALERTS_REPLICATION.md §3). */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Env } from '../../src/config/env';
 import { LIMIT_DEFAULTS, LIMIT_MILLS } from '../../src/config/limits';

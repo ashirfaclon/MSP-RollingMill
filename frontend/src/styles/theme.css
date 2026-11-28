@@ -1,6 +1,6 @@
 /* ============================================================================
    MSP control-room design system — ported from pellet-frontend (see
-   DESIGN_HANDOVER.md). Tokens and primitives shared by every rolling-mill
+   docs/DESIGN_HANDOVER.md). Tokens and primitives shared by every rolling-mill
    screen; the look (deep navy field, luminous panels, status-coloured accents)
    lives here so the screens themselves stay layout-only.
    ========================================================================== */

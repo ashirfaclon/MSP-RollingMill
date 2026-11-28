@@ -3,7 +3,7 @@
 /**
  * Production vs plan drill-down (RMD, LSM, RMS) — ERP production against the day's plan, per day /
  * week / month over the dashboard's period, with compliance and plan gap. Whole day only, no shift
- * breakdown (the user, 24 Nov 2026; the shift views are kept in archive/shift-breakdown/).
+ * breakdown (the user, 24 Nov 2026; the shift views are kept in git: commit f1222fd, archive/shift-breakdown/).
  * Gap and compliance compare only the days that have both plan and ERP production. RMD measures
  * Prime + SL (PRODUCT_PRIME_SLENGTH_MT), LSM PRODUTION_MT, RMS PRODUCTION_MT.
  */

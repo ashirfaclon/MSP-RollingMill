@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Alerts (the user, 19 Nov 2026; SETTINGS_AND_ALERTS_REPLICATION.md §10.3): what is past its limit on
+ * Alerts (the user, 19 Nov 2026; docs/SETTINGS_AND_ALERTS_REPLICATION.md §10.3): what is past its limit on
  * the mill now, and the data checks that failed — from the backend's one checker, which reads the same
  * forms and limits Asset Health colours by, so the two never disagree.
  *

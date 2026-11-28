@@ -1,5 +1,5 @@
 /**
- * The alert sender (the user, 19 and 21 Nov 2026; SMS-ALERTS.md §6–§8): its own deployment, apart
+ * The alert sender (the user, 19 and 21 Nov 2026; docs/SMS-ALERTS.md §6–§8): its own deployment, apart
  * from the API, so restarting the dashboard never stops alerting and a stuck receiver never takes the
  * dashboard down.
  *
@@ -12,7 +12,7 @@
  * which do the SMS / WhatsApp / email sending. Ticks never overlap.
  *
  * It reads the logbook with the account's access token (IOSENSE_BEARER / IOSENSE_PAT) and nobody ever
- * logs in to it, so a dashboard user's expired login can't silence it (SMS-ALERTS.md §9.1).
+ * logs in to it, so a dashboard user's expired login can't silence it (docs/SMS-ALERTS.md §9.1).
  *
  * Health: GET / on ALERT_PORT — 503 when no check has finished in three intervals.
  */

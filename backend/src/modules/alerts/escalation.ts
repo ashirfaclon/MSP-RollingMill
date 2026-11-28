@@ -1,6 +1,6 @@
 /**
  * Who is told, and how often — each mill's escalation matrix (the user, 21 Nov 2026: one contact list
- * per mill, as SMS-ALERTS.md §5.5 has it for the Melt Shop). Stored in the settings document beside the
+ * per mill, as docs/SMS-ALERTS.md §5.5 has it for the Melt Shop). Stored in the settings document beside the
  * mill's alert controls (alerts → mill → escalation) and saved whole: the screen sends the list as it
  * stands, never a patch.
  *

@@ -1,5 +1,5 @@
 /**
- * POST one message to one receiver (SMS-ALERTS.md §7.1): JSON, X-Alert-Token when a secret is set,
+ * POST one message to one receiver (docs/SMS-ALERTS.md §7.1): JSON, X-Alert-Token when a secret is set,
  * 10 s timeout, any non-2xx a failure (retried by the outbox).
  *
  * The rehearsal copy: for an n8n URL with /webhook/ in it, the same body also goes to its /webhook-test/

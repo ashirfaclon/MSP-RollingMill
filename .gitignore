@@ -101,3 +101,5 @@
     # Temporary folders
     tmp/
     temp/
+# Plant data kept local only (not for git)
+docs/plant-sheets/Casting Sheet November 26.xls

@@ -1,6 +1,6 @@
 /**
  * The Alerts page and the Settings screen's Alerts tab (the user, 19 Nov 2026;
- * SETTINGS_AND_ALERTS_REPLICATION.md §4–§7, §9):
+ * docs/SETTINGS_AND_ALERTS_REPLICATION.md §4–§7, §9):
  *
  *   rules     every alert a mill can have — one per limit (Settings → Limits), one "not filled" check
  *             per form, one typing-slip check — with its controls resolved and whether it can fire

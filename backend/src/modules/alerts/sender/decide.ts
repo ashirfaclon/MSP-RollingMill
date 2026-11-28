@@ -1,5 +1,5 @@
 /**
- * What is news (SMS-ALERTS.md §6.1, SETTINGS_AND_ALERTS_REPLICATION.md §8.2). Pure: the alarms of
+ * What is news (docs/SMS-ALERTS.md §6.1, docs/SETTINGS_AND_ALERTS_REPLICATION.md §8.2). Pure: the alarms of
  * every mill as the checker lists them now, and what the sender remembers, in; the messages to send
  * and what to remember, out.
  *

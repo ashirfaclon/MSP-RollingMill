@@ -1,6 +1,6 @@
 /**
  * Process historian reads. Ported from the pellet/CPP client (see
- * BACKEND_CONNECTIVITY_HANDOVER.md §3).
+ * docs/BACKEND_CONNECTIVITY_HANDOVER.md §3).
  *
  * Honesty rule: when the historian is not configured or unreachable, every requested tag
  * comes back as an EMPTY series with `connection: 'down'` and a stated reason. Nothing is

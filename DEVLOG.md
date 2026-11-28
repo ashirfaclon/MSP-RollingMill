@@ -762,3 +762,26 @@ default. Code: `backend/src/config/limits.ts`, `backend/src/modules/settings`, `
   All Access / main / master login, other-org main and Forms role refused, IOsense down, role moved on refresh) — unit
   325 / 325; e2e mill-access (RMD user lands on RMD, menu shows only RMD, HSM link → RMD; no-mill screen) passes. Committed.
 - **27 Nov 2026** — Mill menu: a person with one mill sees a plain "Mill RMD" label, no dropdown (the user: "why give a dropdown if they can't see someone else's?"); All Access / main / master keep the dropdown of four. e2e mill-access updated, passes. Committed.
+- **28 Nov 2026** — "Sign-in service could not be reached" for every user (tmtqclab@msp.com reported): our deployed backend (…-894fcffa) and alert sender (…-212bd7a9) were **undeployed in AI Studio Manager on 27 Nov at 13:00 UTC (18:30 IST)** ("Node.js service undeployed successfully" in its deployment logs); only the frontend stayed deployed, so every sign-in failed to reach the backend. Port 9020 now belongs to "MSP Steel – SID – Prod" (aad7940e). Per-mill access itself worked before that: the live log shows HSM, RMD, LSM, RMS users and mspsteel@ycp.com signed in with the right mills (17:46–18:12 IST). Fix: redeploy both in AI Studio Manager (it gives the backend a free port). No alert messages are sent while the alert sender is undeployed.
+- **28 Nov 2026** — Redeployed by the user from the existing entries: backend …-894fcffa now on PORT 9022 (pm2 175), alert sender …-212bd7a9 on 9026 (pm2 176), both 25eefd1; public health 200, /api/auth/sso answers (a dummy token is refused as "link used"), alert sender ticking with 1 receiver, no error.
+- **28 Nov 2026** — **Repo clean-up** (the user: "too much mess", "clean up files not needed", "don't break anything").
+  Root now: README, CLAUDE, DEVLOG, iosense.md, backend/, frontend/, docs/. Moved (git mv, history kept): the six
+  handover / spec notes, the TMT Online/Offline PDF and the HSM shift-timing sample page → `docs/`; the plant's
+  spreadsheets (Management Dash ×3, HSM, performance, bearing log, plan / checklist form specs, and the untracked Casting
+  Sheet November 26) → `docs/plant-sheets/`. Code comments and iosense.md now point at docs/…. `archive/shift-breakdown/`
+  (the old per-shift production view) removed from the tree — in git at commit f1222fd, comments say so. Removed as
+  unused (nothing imports them): SourceTable, FreeStockCard, ProductionWithoutOrderCard, StockSplitLegend, FlowArrow,
+  StackBar, useHsmMimic, lib/time, and the Next.js starter icons (file / globe / next / vercel / window.svg). Kept: the
+  twin sprites (built by name in twinArt.tsx) and tools/mimic-render (draws them). Out of the repo folder, not deleted:
+  the two sheets holding the shared password (Untitled spreadsheet (1).xlsx, Rolling Mill Users - Roles.xlsx) and the
+  stale backend/.env.deploy (old Influx address) → ~/msp-private/ (owner-only); old test screenshots and design-tool
+  scratch → scratchpad backup/repo-cleanup-28nov. Checked: frontend + backend type-check, `next build` (static export)
+  succeeds, backend build, unit 325 / 325.
+- **28 Nov 2026** — Influx (10.135.20.130) jammed again ~30 min after the user redeployed: 844 connections from a
+  developer copy of the CPP dashboard (`workspace/bda1f68a-…-demopowerplant/backend`, tsx, started 05:35 UTC); ours 6 + 6.
+  Reported, not touched (hands off other apps).
+- **28 Nov 2026** — "Sign-in service could not be reached" screen (user screenshot). Cause: Ubuntu automatic updates
+  (unattended-upgrades, 06:47 UTC) restarted the server's whole pm2 service → all 66 apps restarted, ours included
+  (backend rebuilds on start, back ~06:47:41). One sign-in at 06:47:41 hit the gap and got 502; every other sign-in
+  today answered 200. Not a code bug. Possible fix offered (not built): dashboard retries sign-in for ~20 s on 502/503/504
+  or no answer before showing the message. Server update settings are IT's (not touched).

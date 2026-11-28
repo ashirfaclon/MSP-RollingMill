@@ -1,5 +1,5 @@
 /**
- * The alert sender's settings, from its environment (SMS-ALERTS.md §8.2). Read on every call, like
+ * The alert sender's settings, from its environment (docs/SMS-ALERTS.md §8.2). Read on every call, like
  * config/env.ts, so tests can set and clear them per case.
  *
  *   ALERT_WEBHOOK_URL       receivers: a list (commas, spaces or newlines). Empty: alerts are tracked, nobody told

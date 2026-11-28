@@ -1,4 +1,4 @@
-/** The alert sender: what is news, the message, delivery and its memory (SMS-ALERTS.md §6–§7). */
+/** The alert sender: what is news, the message, delivery and its memory (docs/SMS-ALERTS.md §6–§7). */
 import { createServer, type IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';

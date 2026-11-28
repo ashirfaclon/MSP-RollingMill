@@ -7,9 +7,12 @@ the ERP and the IOsense logbook.
 
 ```
 MSP-RollingMill/
-├── frontend/     Next.js dashboard — UI only, no plant credentials (see frontend/README.md)
-├── backend/      Fastify API — reads Influx / ERP / logbook, computes every KPI (see backend/README.md)
-└── iosense.md    API and data-source tracking
+├── frontend/            Next.js dashboard — UI only, no plant credentials (see frontend/README.md)
+├── backend/             Fastify API — reads Influx / ERP / logbook, computes every KPI (see backend/README.md)
+├── docs/                handover and design notes, the alert specs, the mimic guide
+│   └── plant-sheets/    the plant's spreadsheets the KPIs are checked against (Management Dash, HSM, performance …)
+├── DEVLOG.md            what was built and decided, by date
+└── iosense.md           API and data-source tracking
 ```
 
 The two are **deployed separately**:

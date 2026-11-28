@@ -2,7 +2,7 @@
 
 /**
  * Production vs plan (RMD, LSM, RMS), from /api/{mill}/plan — whole day only (the user, 24 Nov 2026;
- * the per-shift view is kept in archive/shift-breakdown/):
+ * the per-shift view is kept in git: commit f1222fd, archive/shift-breakdown/):
  *   – target: the plan saved with Edit plan, the day's Day + Night (RMD Prime + SL, LSM PRODUTION_MT,
  *     RMS PRODUCTION_MT);
  *   – output: the ERP's production for the plant day, with compliance and plan gap over the days

@@ -4,7 +4,7 @@
  *
  * The tick and meter carry the SERIES colour (production / against order / free), which
  * is a category, not a verdict. None of these figures has an approved target on this
- * screen, so the card edge stays neutral — see DESIGN_HANDOVER.md §5, `metricTone()`.
+ * screen, so the card edge stays neutral — see docs/DESIGN_HANDOVER.md §5, `metricTone()`.
  *
  * With `onOpen` the card is a button that opens its drill-down. `loading` shows a
  * skeleton in place of the value — only for the first load, never as "NA".

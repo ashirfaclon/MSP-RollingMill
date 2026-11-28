@@ -1,6 +1,6 @@
 /**
  * The sender's memory, kept in IOsense rather than on the server's disk (the user, 19 Nov 2026: a
- * redeploy wipes the server — SMS-ALERTS.md §9.2 is that gap in the Melt Shop's build):
+ * redeploy wipes the server — docs/SMS-ALERTS.md §9.2 is that gap in the Melt Shop's build):
  *
  *   state    one row of the logbook insight (ALERT_STATE_FORM), updated in place: when it first looked
  *            (primedAt), the crossings it remembers and what it told, and the messages not yet delivered

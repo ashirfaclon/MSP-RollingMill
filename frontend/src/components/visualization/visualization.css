@@ -197,7 +197,7 @@
 
 /* ---------------------------- Production vs plan ---------------------------- */
 /* Whole day only since 24 Nov 2026. The flip card (.rm-flip*) below is the By shift view's, kept so the
-   backup in archive/shift-breakdown/ can be restored as it is. */
+   backup (git: commit f1222fd, archive/shift-breakdown/) can be restored as it is. */
 
 /* The compliance panel (the user, 24 Nov 2026): the headline figure beside one thick bar, the daily strip
    taking the spare height, and the four figures in one row at the foot. */

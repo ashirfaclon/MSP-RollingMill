@@ -1,6 +1,6 @@
 /**
  * When each alert notifies — the Settings screen's Alerts tab (the user, 19 Nov 2026;
- * SETTINGS_AND_ALERTS_REPLICATION.md §6). Three layers, each field resolved separately:
+ * docs/SETTINGS_AND_ALERTS_REPLICATION.md §6). Three layers, each field resolved separately:
  *
  *   SHIPPED  →  the mill's defaults  →  the rule's own setting
  *

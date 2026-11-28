@@ -566,7 +566,7 @@ export async function saveFormEntries(
 
 /**
  * Add one entry to a form and keep every earlier one (addInsightResult): for a store whose history
- * is its audit trail — the settings document, the newest row wins (SETTINGS_AND_ALERTS_REPLICATION.md §3.4).
+ * is its audit trail — the settings document, the newest row wins (docs/SETTINGS_AND_ALERTS_REPLICATION.md §3.4).
  * `success` in the body decides, not the HTTP status. The form's read cache is cleared after.
  */
 export async function appendFormEntry(

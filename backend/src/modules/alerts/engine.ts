@@ -1,5 +1,5 @@
 /**
- * The one checker (SETTINGS_AND_ALERTS_REPLICATION.md §4): walks one point's readings, oldest first,
+ * The one checker (docs/SETTINGS_AND_ALERTS_REPLICATION.md §4): walks one point's readings, oldest first,
  * against its limit and returns every crossing — one continuous stretch past the limit.
  *
  *   No limit           nothing (the app never invents one, §5)

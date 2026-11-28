@@ -3,7 +3,7 @@
 /**
  * HSM production vs plan drill-down — the whole day's output against the day's plan, per day / week /
  * month over the dashboard's period, with compliance and the plan gap: which days missed. Whole day
- * only, no shift breakdown (the user, 24 Nov 2026; the shift view is kept in archive/shift-breakdown/).
+ * only, no shift breakdown (the user, 24 Nov 2026; the shift view is kept in git: commit f1222fd, archive/shift-breakdown/).
  * Everything comes from /api/hsm/plan; the grouping is done here.
  */
 import { useMemo } from 'react';

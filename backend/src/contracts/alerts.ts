@@ -123,7 +123,7 @@ export interface AlertsReport {
   sender: { running: boolean; message: string; lastCheckAt: string | null };
 }
 
-/* ------------------------------ who is told (SMS-ALERTS.md §5.5) ------------------------------ */
+/* ------------------------------ who is told (docs/SMS-ALERTS.md §5.5) ------------------------------ */
 
 /** One way of telling a level: on / off and who. Off keeps its contacts, so switching it back on needs no retyping. */
 export interface AlertChannel { enabled: boolean; contacts: string[] }

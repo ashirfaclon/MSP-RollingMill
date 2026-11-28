@@ -1,5 +1,5 @@
 /**
- * What the webhook receives — one message per event, in the Melt Shop's shape (SMS-ALERTS.md §7.2)
+ * What the webhook receives — one message per event, in the Melt Shop's shape (docs/SMS-ALERTS.md §7.2)
  * so the same kind of n8n workflow sends it, plus the department (the user, 21 Nov 2026: one webhook
  * for every mill, each message names its department).
  *

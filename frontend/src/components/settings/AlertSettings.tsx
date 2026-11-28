@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The Settings screen's Alerts tab (the user, 19 Nov 2026; SETTINGS_AND_ALERTS_REPLICATION.md §6, §10.2):
+ * The Settings screen's Alerts tab (the user, 19 Nov 2026; docs/SETTINGS_AND_ALERTS_REPLICATION.md §6, §10.2):
  * when each of the mill's alerts sends a message. The limits themselves are on the Limits tab — one
  * limit sheet, not two.
  *

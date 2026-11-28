@@ -1,5 +1,5 @@
 /**
- * Delivering the outbox (SETTINGS_AND_ALERTS_REPLICATION.md §8.5):
+ * Delivering the outbox (docs/SETTINGS_AND_ALERTS_REPLICATION.md §8.5):
  *
  *   - Each message is owed to every receiver, tracked by URL; one receiver down retries only that one.
  *   - Retries back off 0, 1, 2, 4 … minutes, capped at 30, from the last try.

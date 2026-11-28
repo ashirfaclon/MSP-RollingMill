@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The Settings screen (the user, 19 Nov 2026; SETTINGS_AND_ALERTS_REPLICATION.md §10), three tabs:
+ * The Settings screen (the user, 19 Nov 2026; docs/SETTINGS_AND_ALERTS_REPLICATION.md §10), three tabs:
  *   Limits        every limit of the mill a reading is judged by — and alerts raise on — and, for one changed
  *                 here, who changed it and when, with Reset
  *   Alerts        when each alert sends a message (AlertSettings.tsx)

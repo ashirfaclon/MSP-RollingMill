@@ -1,6 +1,6 @@
 /**
  * Plant settings: the limits every screen judges a reading by and alerts will raise on
- * (the user, 19 Nov 2026), built as SETTINGS_AND_ALERTS_REPLICATION.md §3 describes:
+ * (the user, 19 Nov 2026), built as docs/SETTINGS_AND_ALERTS_REPLICATION.md §3 describes:
  *
  *   - Two layers. The defaults ship in config/limits.ts; the overrides are ONE document holding only
  *     what a person changed, so an untouched limit keeps tracking its default.

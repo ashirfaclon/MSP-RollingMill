@@ -28,7 +28,7 @@ const dayLabel = (d: string) => `${Number(d.slice(8, 10))} ${MONTHS[Number(d.sli
 
 /**
  * "Production vs plan", every mill — a compliance KPI for the whole plant day, no shift breakdown
- * (the user, 24 Nov 2026; the By shift view is kept in archive/shift-breakdown/). Built around the one
+ * (the user, 24 Nov 2026; the By shift view is kept in git: commit f1222fd, archive/shift-breakdown/). Built around the one
  * thing it says (the user, 24 Nov 2026):
  *   – compliance, the headline figure, beside one thick bar of output against the target;
  *   – compliance over time as a strip under it — by day, week or month by the period's length, never more
